@@ -22,11 +22,11 @@ services:
     container_name: enterprise_access.app
     volumes:
       - .:/edx/app/enterprise_access/
-    command: bash -c 'while true; do python /edx/app/enterprise_access/manage.py runserver 0.0.0.0:8000; sleep 2; done'
+    command: bash -c 'while true; do python /edx/app/enterprise_access/manage.py runserver 0.0.0.0:18270; sleep 2; done'
     environment:
       DJANGO_SETTINGS_MODULE: enterprise_access.settings.devstack
     ports:
-      - "8000:8000" # TODO: change this to your port
+      - "18270:18270" # TODO: change this to your port
     networks:
       - devstack_default
     stdin_open: true

@@ -1,5 +1,5 @@
 name="enterprise_access"
-port="8000"
+port="18270"
 
 docker-compose up -d --build
 
