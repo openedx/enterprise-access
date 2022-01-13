@@ -1,0 +1,30 @@
+name: Django CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8"]
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+        architecture: x64
+    - name: Install requirements
+      run: make requirements
+    - name: Upgrade packages
+      run: pip install -U pip wheel codecov
+    - name: Validate translations
+      run: make validate_translations
+    - name: Run tests and style checks
+      run: make validate
+    - name: Codecov
+      run: codecov

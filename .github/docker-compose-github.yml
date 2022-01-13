@@ -1,0 +1,36 @@
+version: "2.1"
+services:
+  mysql:
+    image: mysql:5.7
+    container_name: enterprise_access.mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ""
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: "enterprise_access"
+    volumes:
+      - enterprise_access_mysql:/var/lib/mysql
+
+  app:
+    image: openedx/enterprise-access
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: enterprise_access.app
+    volumes:
+      - ..:/edx/app/enterprise-access/enterprise_access
+    # Use the Django devserver, so that we can hot-reload code changes
+    command: bash -c 'while true; do python /edx/app/enterprise-access/manage.py runserver 0.0.0.0:18270; sleep 2; done'
+    ports:
+      - "18270:18270"
+    depends_on:
+      - mysql
+    # Allows attachment to this container using 'docker attach <containerID>'.
+    stdin_open: true
+    tty: true
+    environment:
+      CELERY_ALWAYS_EAGER: 'true'
+      DJANGO_SETTINGS_MODULE: enterprise_access.settings.test
+
+volumes:
+  enterprise_catalog_mysql:
+    driver: local
