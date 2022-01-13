@@ -34,32 +34,32 @@ One Time Setup
   git clone git@github.com:edx/enterprise-access.git
   cd enterprise-access
 
-  # Set up a virtualenv using virtualenvwrapper with the same name as the repo and activate it
-  mkvirtualenv -p python3.8 enterprise-access
 
-
-Every time you develop something in this repo
+Developing in this repo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. code-block::
 
-  # Activate the virtualenv
-  workon enterprise-access
+  # Spin up the docker container
+  make dev.up
 
-  # Grab the latest code
-  git checkout main
-  git pull
+  # Shell into the docker container
+  make app-shell
 
-  # Install/update the dev requirements
+  # Install any requirements
   make requirements
 
-  # Run the tests and quality checks (to verify the status before you make any changes)
+  # Run test suite
   make validate
+
+  # If everything passes, your local app is set up and ready to go!
+
+
+Every time you want to contribute something in this repo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. code-block::
 
   # Make a new branch for your changes
   git checkout -b <your_github_username>/<short_description>
-
-  # Using your favorite editor, edit the code to make your change.
-  vim …
 
   # Run your new tests
   pytest ./path/to/new/tests
@@ -72,6 +72,8 @@ Every time you develop something in this repo
   git push
 
   # Open a PR and ask for review.
+
+
 
 License
 -------
