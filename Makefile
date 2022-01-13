@@ -190,21 +190,21 @@ db-shell: # Run the app shell as root, enter the app's database
 	docker attach enterprise_access.$*
 
 github_docker_build:
-	docker build . -f Dockerfile --target app -t openedx/repo_name
-	docker build . -f Dockerfile --target newrelic -t openedx/repo_name:latest-newrelic
+	docker build . -f Dockerfile --target app -t openedx/enterprise-access
+	docker build . -f Dockerfile --target newrelic -t openedx/enterprise-access:latest-newrelic
 
 github_docker_tag: github_docker_build
-	docker tag openedx/repo_name openedx/repo_name:${GITHUB_SHA}
-	docker tag openedx/repo_name:latest-newrelic openedx/repo_name:${GITHUB_SHA}-newrelic
+	docker tag openedx/enterprise-access openedx/enterprise-access:${GITHUB_SHA}
+	docker tag openedx/enterprise-access:latest-newrelic openedx/enterprise-access:${GITHUB_SHA}-newrelic
 
 github_docker_auth:
 	echo "$$DOCKERHUB_PASSWORD" | docker login -u "$$DOCKERHUB_USERNAME" --password-stdin
 
 github_docker_push: github_docker_tag github_docker_auth ## push to docker hub
-	docker push 'openedx/repo_name:latest'
-	docker push "openedx/repo_name:${GITHUB_SHA}"
-	docker push 'openedx/repo_name:latest-newrelic'
-	docker push "openedx/repo_name:${GITHUB_SHA}-newrelic"
+	docker push 'openedx/enterprise-access:latest'
+	docker push "openedx/enterprise-access:${GITHUB_SHA}"
+	docker push 'openedx/enterprise-access:latest-newrelic'
+	docker push "openedx/enterprise-access:${GITHUB_SHA}-newrelic"
 
 selfcheck: ## check that the Makefile is well-formed
 	@echo "The Makefile is well-formed."
