@@ -22,7 +22,7 @@ services:
     container_name: enterprise_access.app
     volumes:
       - .:/edx/app/enterprise-access/
-    command: bash -c 'while true; do python /edx/app/enterprise-access/enterprise_access/manage.py runserver 0.0.0.0:18270; sleep 2; done'
+    command: bash -c 'while true; do python /edx/app/enterprise-access/manage.py runserver 0.0.0.0:18270; sleep 2; done'
     environment:
       DJANGO_SETTINGS_MODULE: enterprise_access.settings.devstack
     ports:

@@ -1,67 +1,46 @@
-enterprise_access
-=============================
+Service to manage access to content for enterprise users.
 
-|pypi-badge| |ci-badge| |codecov-badge| |doc-badge| |pyversions-badge|
-|license-badge|
+Setting up enterprise-access
+--------------------------
 
-The ``README.rst`` file should start with a brief description of the repository,
-which sets it in the context of other repositories under the ``edx``
-organization. It should make clear where this fits in to the overall edX
-codebase.
+Prerequisites
+^^^^^^^^^^^^^
+- Set the ``DEVSTACK_WORKSPACE`` env variable (either locally or in your shell config file: ``.bash_rc``, ``.zshrc``, or equivalent) to the folder which contains this repo and the `devstack` repo.
+  e.g ``export DEVSTACK_WORKSPACE=/home/<your_user>/edx``
+- Set up `devstack <https://github.com/edx/devstack>`_
 
-Service to manage access to content for enterprise users
+Quick Setup
+^^^^^^^^^^^
 
-Overview (please modify)
-------------------------
+::
 
-The ``README.rst`` file should then provide an overview of the code in this
-repository, including the main components and useful entry points for starting
-to understand the code in more detail.
+  $ make docker_build
+  $ make dev.provision
+  $ make dev.up
+  $ make app-shell
+  # make requirements
+  # make validate  # to run full test suite
 
-Documentation
--------------
+The server will run on ``localhost:18270``
 
-(TODO: `Set up documentation <https://openedx.atlassian.net/wiki/spaces/DOC/pages/21627535/Publish+Documentation+on+Read+the+Docs>`_)
+Running migrations
+^^^^^^^^^^^^^^^^^^
 
-Development Workflow
---------------------
+::
 
-One Time Setup
-~~~~~~~~~~~~~~
-.. code-block::
-
-  # Clone the repository
-  git clone git@github.com:edx/enterprise-access.git
-  cd enterprise-access
-
-
-Developing in this repo
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-.. code-block::
-
-  # Spin up the docker container
-  make dev.up
-
-  # Shell into the docker container
-  make app-shell
-
-  # Install any requirements
-  make requirements
-
-  # Run test suite
-  make validate
-
-  # If everything passes, your local app is set up and ready to go!
+  $ make app-shell
+  # python ./manage.py migrate
 
 
 Every time you want to contribute something in this repo
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. code-block::
 
   # Make a new branch for your changes
   git checkout -b <your_github_username>/<short_description>
 
   # Run your new tests
+  make app-shell
   pytest ./path/to/new/tests
 
   # Run all the tests and quality checks
@@ -73,6 +52,11 @@ Every time you want to contribute something in this repo
 
   # Open a PR and ask for review.
 
+
+Documentation
+-------------
+
+(TODO: `Set up documentation <https://openedx.atlassian.net/wiki/spaces/DOC/pages/21627535/Publish+Documentation+on+Read+the+Docs>`_)
 
 
 License

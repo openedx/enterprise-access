@@ -161,6 +161,9 @@ travis_docker_push: travis_docker_tag travis_docker_auth ## push to docker hub
 	docker push 'openedx/enterprise-access:latest-newrelic'
 	docker push "openedx/enterprise-access:$$TRAVIS_COMMIT-newrelic"
 
+dev.provision:
+	bash ./provision-enterprise-access.sh
+
 # devstack-themed shortcuts
 dev.up: # Starts all containers
 	docker-compose up -d

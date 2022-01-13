@@ -20,11 +20,11 @@ docker exec -i enterprise_access.db mysql -u root -se "CREATE DATABASE enterpris
 
 # Run migrations
 echo -e "${GREEN}Running migrations for ${name}...${NC}"
-docker exec -t enterprise_access.app bash -c "cd /edx/app/${name}/ && make migrate"
+docker exec -t enterprise_access.app bash -c "cd /edx/app/enterprise-access/ && make migrate"
 
 # Create superuser
 echo -e "${GREEN}Creating super-user for ${name}...${NC}"
-docker exec -t enterprise_access.app bash -c "echo 'from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.create_superuser(\"edx\", \"edx@example.com\", \"edx\") if not User.objects.filter(username=\"edx\").exists() else None' | python /edx/app/${name}/manage.py shell"
+docker exec -t enterprise_access.app bash -c "echo 'from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.create_superuser(\"edx\", \"edx@example.com\", \"edx\") if not User.objects.filter(username=\"edx\").exists() else None' | python /edx/app/enterprise-access/manage.py shell"
 
 # Provision IDA User in LMS
 echo -e "${GREEN}Provisioning ${name}_worker in LMS...${NC}"
