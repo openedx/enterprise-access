@@ -3,6 +3,10 @@ MAINTAINER sre@edx.org
 
 
 # Packages installed:
+# git; Used to pull in particular requirements from github rather than pypi,
+# and to check the sha of the code checkout.
+
+# build-essentials; so we can use make with the docker container
 
 # language-pack-en locales; ubuntu locale support so that system utilities have a consistent
 # language and time zone.
@@ -30,7 +34,8 @@ RUN apt-get update && apt-get -qy install --no-install-recommends \
  libssl-dev \
  python3-dev \
  gcc \
- build-essential
+ build-essential \
+ git
 
 
 RUN pip install --upgrade pip setuptools
