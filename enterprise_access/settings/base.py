@@ -43,6 +43,7 @@ THIRD_PARTY_APPS = (
 )
 
 PROJECT_APPS = (
+    'enterprise_access.apps.track',
     'enterprise_access.apps.core',
     'enterprise_access.apps.api',
 )
@@ -230,3 +231,6 @@ PLATFORM_NAME = 'Your Platform Name Here'
 
 # Set up logging for development use (logging to stdout)
 LOGGING = get_logger_config(debug=DEBUG)
+
+# SEGMENT CONFIGURATION
+SEGMENT_KEY = 'replace-me'

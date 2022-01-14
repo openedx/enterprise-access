@@ -6,6 +6,8 @@
 #
 alabaster==0.7.12
     # via sphinx
+analytics-python==1.4.0
+    # via -r requirements/test.txt
 asgiref==3.4.1
     # via
     #   -r requirements/test.txt
@@ -21,6 +23,10 @@ attrs==21.4.0
     #   pytest
 babel==2.9.1
     # via sphinx
+backoff==1.10.0
+    # via
+    #   -r requirements/test.txt
+    #   analytics-python
 bleach==4.1.0
     # via readme-renderer
 certifi==2021.10.8
@@ -101,7 +107,7 @@ django-extensions==3.1.5
     # via -r requirements/test.txt
 django-rest-swagger==2.2.0
     # via -r requirements/test.txt
-django-waffle==2.2.1
+django-waffle==2.3.0
     # via
     #   -r requirements/test.txt
     #   edx-django-utils
@@ -126,7 +132,7 @@ drf-jwt==1.19.2
     #   edx-drf-extensions
 edx-auth-backends==4.0.1
     # via -r requirements/test.txt
-edx-django-release-util==1.1.0
+edx-django-release-util==1.1.1
     # via -r requirements/test.txt
 edx-django-utils==4.4.1
     # via
@@ -192,6 +198,10 @@ mccabe==0.6.1
     #   pylint
 mock==4.0.3
     # via -r requirements/test.txt
+monotonic==1.6
+    # via
+    #   -r requirements/test.txt
+    #   analytics-python
 mysqlclient==2.1.0
     # via -r requirements/test.txt
 newrelic==7.2.4.171
@@ -302,6 +312,7 @@ pytest-django==4.5.2
 python-dateutil==2.8.2
     # via
     #   -r requirements/test.txt
+    #   analytics-python
     #   edx-drf-extensions
 python-slugify==5.0.2
     # via
@@ -327,6 +338,7 @@ readme-renderer==32.0
 requests==2.27.1
     # via
     #   -r requirements/test.txt
+    #   analytics-python
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
@@ -352,6 +364,7 @@ simplejson==3.17.6
 six==1.16.0
     # via
     #   -r requirements/test.txt
+    #   analytics-python
     #   bleach
     #   django-dynamic-fixture
     #   edx-auth-backends
