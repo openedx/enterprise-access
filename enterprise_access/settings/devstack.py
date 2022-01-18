@@ -47,3 +47,7 @@ JWT_AUTH.update({
         'SECRET_KEY': 'lms-secret',
     }],
 })
+
+# Install django-extensions for improved dev experiences
+# https://github.com/django-extensions/django-extensions#using-it
+INSTALLED_APPS += ('django_extensions',)

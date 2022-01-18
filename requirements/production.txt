@@ -4,10 +4,16 @@
 #
 #    make upgrade
 #
+analytics-python==1.4.0
+    # via -r requirements/base.txt
 asgiref==3.4.1
     # via
     #   -r requirements/base.txt
     #   django
+backoff==1.10.0
+    # via
+    #   -r requirements/base.txt
+    #   analytics-python
 certifi==2021.10.8
     # via
     #   -r requirements/base.txt
@@ -61,7 +67,7 @@ django-extensions==3.1.5
     # via -r requirements/base.txt
 django-rest-swagger==2.2.0
     # via -r requirements/base.txt
-django-waffle==2.2.1
+django-waffle==2.3.0
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -78,7 +84,7 @@ drf-jwt==1.19.2
     #   edx-drf-extensions
 edx-auth-backends==4.0.1
     # via -r requirements/base.txt
-edx-django-release-util==1.1.0
+edx-django-release-util==1.1.1
     # via -r requirements/base.txt
 edx-django-utils==4.4.1
     # via
@@ -119,6 +125,10 @@ markupsafe==2.0.1
     # via
     #   -r requirements/base.txt
     #   jinja2
+monotonic==1.6
+    # via
+    #   -r requirements/base.txt
+    #   analytics-python
 mysqlclient==2.1.0
     # via
     #   -r requirements/base.txt
@@ -171,6 +181,7 @@ pymongo==4.0.1
 python-dateutil==2.8.2
     # via
     #   -r requirements/base.txt
+    #   analytics-python
     #   edx-drf-extensions
 python-memcached==1.59
     # via -r requirements/production.in
@@ -191,6 +202,7 @@ pyyaml==6.0
 requests==2.27.1
     # via
     #   -r requirements/base.txt
+    #   analytics-python
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
@@ -213,6 +225,7 @@ simplejson==3.17.6
 six==1.16.0
     # via
     #   -r requirements/base.txt
+    #   analytics-python
     #   edx-auth-backends
     #   edx-django-release-util
     #   edx-drf-extensions
