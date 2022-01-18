@@ -51,6 +51,7 @@ ENV LC_ALL en_US.UTF-8
 ENV DJANGO_SETTINGS_MODULE enterprise_access.settings.production
 
 EXPOSE 18270
+EXPOSE 18271
 RUN useradd -m --shell /bin/false app
 
 WORKDIR /edx/app/enterprise-access

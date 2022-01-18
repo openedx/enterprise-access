@@ -234,3 +234,60 @@ LOGGING = get_logger_config(debug=DEBUG)
 
 # SEGMENT CONFIGURATION
 SEGMENT_KEY = 'replace-me'
+
+"""############################# BEGIN CELERY CONFIG ##################################"""
+
+# Message configuration
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_COMPRESSION = 'gzip'
+CELERY_RESULT_COMPRESSION = 'gzip'
+
+# Results configuration
+CELERY_TASK_IGNORE_RESULT = False
+CELERY_TASK_STORE_ERRORS_EVEN_IF_IGNORED = True
+
+# Events configuration
+CELERY_TASK_TRACK_STARTED = True
+CELERY_WORKER_SEND_TASK_EVENTS = True
+CELERY_TASK_SEND_SENT_EVENT = True
+
+# Celery task routing configuration.
+# Only the enterprise_access worker should receive enterprise_access tasks.
+# Explicitly define these to avoid name collisions with other services
+# using the same broker and the standard default queue name of "celery".
+CELERY_TASK_DEFAULT_EXCHANGE = os.environ.get('CELERY_DEFAULT_EXCHANGE', 'enterprise_access')
+CELERY_TASK_DEFAULT_ROUTING_KEY = os.environ.get('CELERY_DEFAULT_ROUTING_KEY', 'enterprise_access')
+CELERY_TASK_DEFAULT_QUEUE = os.environ.get('CELERY_DEFAULT_QUEUE', 'enterprise_access.default')
+
+# Celery Broker
+# These settings need not be set if CELERY_TASK_ALWAYS_EAGER == True, like in Standalone.
+# Devstack overrides these in its docker-compose.yml.
+# Production environments can override these to be whatever they want.
+CELERY_BROKER_TRANSPORT = os.environ.get('CELERY_BROKER_TRANSPORT', '')
+CELERY_BROKER_HOSTNAME = os.environ.get('CELERY_BROKER_HOSTNAME', '')
+CELERY_BROKER_VHOST = os.environ.get('CELERY_BROKER_VHOST', '')
+CELERY_BROKER_USER = os.environ.get('CELERY_BROKER_USER', '')
+CELERY_BROKER_PASSWORD = os.environ.get('CELERY_BROKER_PASSWORD', '')
+CELERY_BROKER_URL = '{}://{}:{}@{}/{}'.format(
+    CELERY_BROKER_TRANSPORT,
+    CELERY_BROKER_USER,
+    CELERY_BROKER_PASSWORD,
+    CELERY_BROKER_HOSTNAME,
+    CELERY_BROKER_VHOST
+)
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+
+# Celery task time limits.
+# Tasks will be asked to quit after four minutes, and un-gracefully killed
+# after five.
+CELERY_TASK_SOFT_TIME_LIMIT = 240
+CELERY_TASK_TIME_LIMIT = 300
+
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'fanout_patterns': True,
+    'fanout_prefix': True,
+}
+"""############################# END CELERY CONFIG ##################################"""
+

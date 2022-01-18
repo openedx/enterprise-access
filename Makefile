@@ -194,6 +194,9 @@ db-shell: # Run the app shell as root, enter the app's database
 %-attach:
 	docker attach enterprise_access.$*
 
+%-shell: # Run a shell, as root, on the specified service container
+	docker exec -u 0 -it enterprise_access.$* bash
+
 github_docker_build:
 	docker build . -f Dockerfile --target app -t openedx/enterprise-access
 	docker build . -f Dockerfile --target newrelic -t openedx/enterprise-access:latest-newrelic

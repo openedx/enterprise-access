@@ -53,3 +53,14 @@ DB_OVERRIDES = dict(
 
 for override, value in DB_OVERRIDES.items():
     DATABASES['default'][override] = value
+
+# BEGIN CELERY
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+CELERY_BROKER_URL = "{}://{}:{}@{}/{}".format(
+    CELERY_BROKER_TRANSPORT,
+    CELERY_BROKER_USER,
+    CELERY_BROKER_PASSWORD,
+    CELERY_BROKER_HOSTNAME,
+    CELERY_BROKER_VHOST
+)
+# END CELERY

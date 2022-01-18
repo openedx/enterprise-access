@@ -51,3 +51,11 @@ JWT_AUTH.update({
 # Install django-extensions for improved dev experiences
 # https://github.com/django-extensions/django-extensions#using-it
 INSTALLED_APPS += ('django_extensions',)
+
+# BEGIN CELERY
+CELERY_WORKER_HIJACK_ROOT_LOGGER = True
+CELERY_TASK_ALWAYS_EAGER = (
+    os.environ.get("CELERY_ALWAYS_EAGER", "false").lower() == "true"
+)
+# END CELERY
+

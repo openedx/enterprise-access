@@ -27,10 +27,50 @@ services:
       DJANGO_SETTINGS_MODULE: enterprise_access.settings.devstack
     ports:
       - "18270:18270" # TODO: change this to your port
+    depends_on:
+      - db
+      - worker
     networks:
       - devstack_default
     stdin_open: true
     tty: true
+    environment:
+      CELERY_ALWAYS_EAGER: 'false'
+      CELERY_BROKER_TRANSPORT: redis
+      CELERY_BROKER_HOSTNAME: edx.devstack.redis:6379
+      CELERY_BROKER_VHOST: 0
+      CELERY_BROKER_PASSWORD: password
+      DJANGO_SETTINGS_MODULE: enterprise_access.settings.devstack
+      DJANGO_WATCHMAN_TIMEOUT: 30
+      ENABLE_DJANGO_TOOLBAR: 1
+
+  worker:
+    image: openedx/enterprise-access.worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: bash -c 'cd /edx/app/enterprise-access/ && celery -A enterprise_access worker -l DEBUG'
+    container_name: enterprise_access.worker
+    depends_on:
+      - db
+    environment:
+      CELERY_ALWAYS_EAGER: 'false'
+      CELERY_BROKER_TRANSPORT: redis
+      CELERY_BROKER_HOSTNAME: edx.devstack.redis:6379
+      CELERY_BROKER_VHOST: 0
+      CELERY_BROKER_PASSWORD: password
+      DJANGO_SETTINGS_MODULE: enterprise_access.settings.devstack
+      COLUMNS: 80
+    hostname: worker.enterprise_access
+    networks:
+      - devstack_default
+    ports:
+      - "18271:18271"
+    restart: always
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/edx/app/enterprise-access/
 
 networks:
   devstack_default:
