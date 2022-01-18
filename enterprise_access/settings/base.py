@@ -3,6 +3,13 @@ from os.path import abspath, dirname, join
 
 from corsheaders.defaults import default_headers as corsheaders_default_headers
 
+from enterprise_access.apps.core.constants import (
+    REQUESTS_ADMIN_ROLE,
+    REQUESTS_LEARNER_ROLE,
+    SYSTEM_ENTERPRISE_ADMIN_ROLE,
+    SYSTEM_ENTERPRISE_LEARNER_ROLE,
+    SYSTEM_ENTERPRISE_OPERATOR_ROLE
+)
 from enterprise_access.settings.utils import get_logger_config
 
 # PATH vars
@@ -31,6 +38,7 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'release_util',
+    'rules.apps.AutodiscoverRulesConfig'
 )
 
 THIRD_PARTY_APPS = (
@@ -188,6 +196,8 @@ AUTH_USER_MODEL = 'core.User'
 AUTHENTICATION_BACKENDS = (
     'auth_backends.backends.EdXOAuth2',
     'django.contrib.auth.backends.ModelBackend',
+    'rules.permissions.ObjectPermissionBackend',
+    'django.contrib.auth.backends.ModelBackend',
 )
 
 ENABLE_AUTO_AUTH = False
@@ -204,7 +214,8 @@ BACKEND_SERVICE_EDX_OAUTH2_KEY = 'replace-me'
 BACKEND_SERVICE_EDX_OAUTH2_SECRET = 'replace-me'
 
 JWT_AUTH = {
-    'JWT_ISSUER': 'http://127.0.0.1:8000/oauth2',
+    'JWT_AUTH_HEADER_PREFIX': 'JWT',
+    'JWT_ISSUER': 'http://127.0.0.1:18000/oauth2',
     'JWT_ALGORITHM': 'HS256',
     'JWT_VERIFY_EXPIRATION': True,
     'JWT_PAYLOAD_GET_USERNAME_HANDLER': lambda d: d.get('preferred_username'),
@@ -215,6 +226,24 @@ JWT_AUTH = {
     'JWT_AUTH_COOKIE_HEADER_PAYLOAD': 'edx-jwt-cookie-header-payload',
     'JWT_AUTH_COOKIE_SIGNATURE': 'edx-jwt-cookie-signature',
     'JWT_AUTH_REFRESH_COOKIE': 'edx-jwt-refresh-cookie',
+    'JWT_SECRET_KEY': 'SET-ME-PLEASE',
+    # JWT_ISSUERS enables token decoding for multiple issuers (Note: This is not a native DRF-JWT field)
+    # We use it to allow different values for the 'ISSUER' field, but keep the same SECRET_KEY and
+    # AUDIENCE values across all issuers.
+    'JWT_ISSUERS': [
+        {
+            'AUDIENCE': 'SET-ME-PLEASE',
+            'ISSUER': 'http://localhost:18000/oauth2',
+            'SECRET_KEY': 'SET-ME-PLEASE'
+        },
+    ],
+}
+
+# Set up system-to-feature roles mapping for edx-rbac
+SYSTEM_TO_FEATURE_ROLE_MAPPING = {
+    SYSTEM_ENTERPRISE_OPERATOR_ROLE: [REQUESTS_ADMIN_ROLE],
+    SYSTEM_ENTERPRISE_ADMIN_ROLE: [REQUESTS_ADMIN_ROLE],
+    SYSTEM_ENTERPRISE_LEARNER_ROLE: [REQUESTS_LEARNER_ROLE],
 }
 
 # Request the user's permissions in the ID token
