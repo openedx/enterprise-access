@@ -14,7 +14,9 @@ edx-celeryutils
 edx-django-utils
 edx-django-release-util
 edx-drf-extensions
+edx-rbac
 edx-rest-api-client
 mysqlclient
 pytz
 redis
+rules

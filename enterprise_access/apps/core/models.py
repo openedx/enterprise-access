@@ -3,6 +3,8 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
+from edx_rbac.models import UserRole, UserRoleAssignment
+from edx_rbac.utils import ALL_ACCESS_CONTEXT
 
 
 class User(AbstractUser):
@@ -35,3 +37,62 @@ class User(AbstractUser):
 
     def __str__(self):
         return str(self.get_full_name())
+
+
+class EnterpriseAccessFeatureRole(UserRole):
+    """
+    User role definitions specific to Enterprise Access.
+     .. no_pii:
+    """
+
+    def __str__(self):
+        """
+        Return human-readable string representation.
+        """
+        return f"EnterpriseAccessFeatureRole(name={self.name})"
+
+    def __repr__(self):
+        """
+        Return uniquely identifying string representation.
+        """
+        return self.__str__()
+
+
+class EnterpriseAccessRoleAssignment(UserRoleAssignment):
+    """
+    Model to map users to a EnterpriseAccessFeatureRole.
+     .. no_pii:
+    """
+
+    role_class = EnterpriseAccessFeatureRole
+    enterprise_customer_uuid = models.UUIDField(blank=True, null=True, verbose_name='Enterprise Customer UUID')
+
+    def get_context(self):
+        """
+        Return the enterprise customer id or `*` if the user has access to all resources.
+        """
+        if self.enterprise_customer_uuid:
+            return str(self.enterprise_customer_uuid)
+        return ALL_ACCESS_CONTEXT
+
+    @classmethod
+    def user_assignments_for_role_name(cls, user, role_name):
+        """
+        Returns assignments for a given user and role name.
+        """
+        return cls.objects.filter(user__id=user.id, role__name=role_name)
+
+    def __str__(self):
+        """
+        Return human-readable string representation.
+        """
+        return "EnterpriseAccessRoleAssignment(name={name}, user={user})".format(
+            name=self.role.name,  # pylint: disable=no-member
+            user=self.user.id,
+        )
+
+    def __repr__(self):
+        """
+        Return uniquely identifying string representation.
+        """
+        return self.__str__()
