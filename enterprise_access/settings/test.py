@@ -1,4 +1,5 @@
 import os
+import tempfile
 
 from enterprise_access.settings.base import *
 
@@ -14,3 +15,9 @@ DATABASES = {
     },
 }
 # END IN-MEMORY TEST DATABASE
+
+# BEGIN CELERY
+CELERY_TASK_ALWAYS_EAGER = True
+results_dir = tempfile.TemporaryDirectory()
+CELERY_RESULT_BACKEND = f'file://{results_dir.name}'
+# END CELERY

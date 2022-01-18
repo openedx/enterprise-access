@@ -2,6 +2,7 @@
 -c constraints.txt
 
 analytics-python
+celery
 Django>=2.2          # Web application framework
 django-cors-headers
 django-extensions
@@ -9,9 +10,11 @@ django-rest-swagger
 django-waffle
 djangorestframework
 edx-auth-backends
+edx-celeryutils
 edx-django-utils
 edx-django-release-util
 edx-drf-extensions
 edx-rest-api-client
 mysqlclient
 pytz
+redis
