@@ -50,7 +50,7 @@ Every time you want to contribute something in this repo
   git commit …
   git push
 
-  # Open a PR and ask for review.
+  # Open a PR and ask for review!
 
 
 Documentation
