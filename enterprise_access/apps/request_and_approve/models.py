@@ -1,4 +1,4 @@
-""" request_and_access models. """
+""" request_and_approve models. """
 
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
@@ -7,7 +7,7 @@ from model_utils.models import TimeStampedModel
 
 from simple_history.models import HistoricalRecords
 
-from enterprise_access.apps.request_and_access.constants import (
+from enterprise_access.apps.request_and_approve.constants import (
     PendingRequestReminderFrequency,
     SubsidyTypeChoices,
 )
@@ -15,7 +15,7 @@ from enterprise_access.apps.request_and_access.constants import (
 
 class SubsidyRequestCustomerConfiguration(TimeStampedModel):
     """
-    Stores request_and_access configuration for a customers
+    Stores request_and_approve configuration for a customers
 
     .. no_pii: This model has no PII
     """

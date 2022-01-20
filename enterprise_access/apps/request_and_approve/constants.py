@@ -1,4 +1,4 @@
-""" Constants for the request_and_access app. """
+""" Constants for the request_and_approve app. """
 
 class SubsidyTypeChoices:
     LICENSE = 'License'
