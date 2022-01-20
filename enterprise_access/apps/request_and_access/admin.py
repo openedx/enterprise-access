@@ -1,4 +1,4 @@
-""" Admin configuration for core models. """
+""" Admin configuration for request_and_access models. """
 
 from django.contrib import admin
 from django.utils.translation import ugettext_lazy as _
@@ -8,7 +8,7 @@ from enterprise_access.apps.request_and_access.models import (
 )
 
 class SubsidyRequestCustomerConfigurationAdmin(admin.ModelAdmin):
-    """ Admin configuration for the custom User model. """
+    """ Admin configuration for the SubsidyRequestCustomerConfiguration model. """
     list_display = ()
     fieldsets = ()
 
