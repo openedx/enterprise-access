@@ -1,9 +1,9 @@
-""" Admin configuration for request_and_approve models. """
+""" Admin configuration for subsidy_requests models. """
 
 from django.contrib import admin
 from django.utils.translation import ugettext_lazy as _
 
-from enterprise_access.apps.request_and_approve.models import (
+from enterprise_access.apps.subsidy_requests.models import (
 	SubsidyRequestCustomerConfiguration,
 )
 
