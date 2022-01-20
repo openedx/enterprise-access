@@ -3,7 +3,7 @@
 from django.contrib import admin
 from django.utils.translation import ugettext_lazy as _
 
-from enterprise_access.apps.access_and_request.models import (
+from enterprise_access.apps.request_and_access.models import (
 	SubsidyRequestCustomerConfiguration,
 )
 

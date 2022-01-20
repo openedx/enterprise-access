@@ -7,7 +7,7 @@ from model_utils.models import TimeStampedModel
 
 from simple_history.models import HistoricalRecords
 
-from enterprise_access.apps.access_and_request.constants import (
+from enterprise_access.apps.request_and_access.constants import (
     PendingRequestReminderFrequency,
     SubsidyTypeChoices,
 )
