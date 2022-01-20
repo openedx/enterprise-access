@@ -100,6 +100,7 @@ cryptography==36.0.1
     # via
     #   -r requirements/test.txt
     #   pyjwt
+    #   secretstorage
     #   social-auth-core
 ddt==1.4.4
     # via -r requirements/test.txt
@@ -230,6 +231,10 @@ itypes==1.2.0
     # via
     #   -r requirements/test.txt
     #   coreapi
+jeepney==0.7.1
+    # via
+    #   keyring
+    #   secretstorage
 jinja2==3.0.3
     # via
     #   -r requirements/test.txt
@@ -430,6 +435,8 @@ rfc3986==2.0.0
     # via twine
 rules==3.1
     # via -r requirements/test.txt
+secretstorage==3.3.1
+    # via keyring
 semantic-version==2.8.5
     # via
     #   -r requirements/test.txt
