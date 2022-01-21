@@ -39,3 +39,7 @@ waffle.Sample:
   ".. no_pii:": "This model has no PII"
 waffle.Switch:
   ".. no_pii:": "This model has no PII"
+subsidy_request.HistoricalLicenseRequest:
+  ".. no_pii:": "This model has no PII"
+subsidy_request.HistoricalCouponCodeRequest:
+  ".. no_pii:": "This model has no PII"

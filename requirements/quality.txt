@@ -10,7 +10,7 @@ amqp==5.0.9
     #   kombu
 analytics-python==1.4.0
     # via -r requirements/test.txt
-asgiref==3.4.1
+asgiref==3.5.0
     # via
     #   -r requirements/test.txt
     #   django
@@ -33,8 +33,9 @@ billiard==3.6.4.0
     #   celery
 bleach==4.1.0
     # via readme-renderer
-celery==5.2.3
+celery==5.0.4
     # via
+    #   -c requirements/constraints.txt
     #   -r requirements/test.txt
     #   edx-celeryutils
 certifi==2021.10.8
@@ -49,8 +50,9 @@ charset-normalizer==2.0.10
     # via
     #   -r requirements/test.txt
     #   requests
-click==8.0.3
+click==7.1.2
     # via
+    #   -c requirements/constraints.txt
     #   -r requirements/test.txt
     #   celery
     #   click-didyoumean
@@ -90,7 +92,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/test.txt
     #   coreapi
-coverage[toml]==6.2
+coverage[toml]==6.3
     # via
     #   -r requirements/test.txt
     #   pytest-cov
@@ -99,6 +101,8 @@ cryptography==36.0.1
     #   -r requirements/test.txt
     #   pyjwt
     #   social-auth-core
+ddt==1.4.4
+    # via -r requirements/test.txt
 defusedxml==0.7.1
     # via
     #   -r requirements/test.txt
@@ -143,6 +147,8 @@ django-model-utils==4.2.0
     #   edx-rbac
 django-rest-swagger==2.2.0
     # via -r requirements/test.txt
+django-simple-history==3.0.0
+    # via -r requirements/test.txt
 django-waffle==2.3.0
     # via
     #   -r requirements/test.txt
@@ -162,11 +168,11 @@ drf-jwt==1.19.2
     #   edx-drf-extensions
 edx-auth-backends==4.0.1
     # via -r requirements/test.txt
-edx-celeryutils==1.1.1
+edx-celeryutils==1.2.1
     # via -r requirements/test.txt
 edx-django-release-util==1.1.1
     # via -r requirements/test.txt
-edx-django-utils==4.4.1
+edx-django-utils==4.4.2
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
@@ -183,10 +189,16 @@ edx-opaque-keys==2.2.2
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
-edx-rbac==1.5.1
+edx-rbac==1.6.0
     # via -r requirements/test.txt
-edx-rest-api-client==5.4.1
+edx-rest-api-client==5.5.0
     # via -r requirements/test.txt
+factory-boy==3.2.1
+    # via -r requirements/test.txt
+faker==11.3.0
+    # via
+    #   -r requirements/test.txt
+    #   factory-boy
 filelock==3.4.2
     # via
     #   -r requirements/test.txt
@@ -253,7 +265,7 @@ monotonic==1.6
     #   analytics-python
 mysqlclient==2.1.0
     # via -r requirements/test.txt
-newrelic==7.2.4.171
+newrelic==7.4.0.172
     # via
     #   -r requirements/test.txt
     #   edx-django-utils
@@ -307,7 +319,7 @@ pycparser==2.21
     # via
     #   -r requirements/test.txt
     #   cffi
-pycryptodomex==3.12.0
+pycryptodomex==3.13.0
     # via
     #   -r requirements/test.txt
     #   pyjwkest
@@ -351,7 +363,7 @@ pymongo==4.0.1
     # via
     #   -r requirements/test.txt
     #   edx-opaque-keys
-pyparsing==3.0.6
+pyparsing==3.0.7
     # via
     #   -r requirements/test.txt
     #   packaging
@@ -369,6 +381,7 @@ python-dateutil==2.8.2
     #   -r requirements/test.txt
     #   analytics-python
     #   edx-drf-extensions
+    #   faker
 python-slugify==5.0.2
     # via
     #   -r requirements/test.txt
@@ -469,6 +482,7 @@ stevedore==3.5.0
 text-unidecode==1.3
     # via
     #   -r requirements/test.txt
+    #   faker
     #   python-slugify
 toml==0.10.2
     # via
