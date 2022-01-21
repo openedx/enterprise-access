@@ -8,14 +8,15 @@ amqp==5.0.9
     # via kombu
 analytics-python==1.4.0
     # via -r requirements/base.in
-asgiref==3.4.1
+asgiref==3.5.0
     # via django
 backoff==1.10.0
     # via analytics-python
 billiard==3.6.4.0
     # via celery
-celery==5.2.3
+celery==5.0.4
     # via
+    #   -c requirements/constraints.txt
     #   -r requirements/base.in
     #   edx-celeryutils
 certifi==2021.10.8
@@ -24,8 +25,9 @@ cffi==1.15.0
     # via cryptography
 charset-normalizer==2.0.10
     # via requests
-click==8.0.3
+click==7.1.2
     # via
+    #   -c requirements/constraints.txt
     #   celery
     #   click-didyoumean
     #   click-plugins
@@ -81,6 +83,8 @@ django-model-utils==4.2.0
     #   edx-rbac
 django-rest-swagger==2.2.0
     # via -r requirements/base.in
+django-simple-history==3.0.0
+    # via -r requirements/base.in
 django-waffle==2.3.0
     # via
     #   -r requirements/base.in
@@ -96,11 +100,11 @@ drf-jwt==1.19.2
     # via edx-drf-extensions
 edx-auth-backends==4.0.1
     # via -r requirements/base.in
-edx-celeryutils==1.1.1
+edx-celeryutils==1.2.1
     # via -r requirements/base.in
 edx-django-release-util==1.1.1
     # via -r requirements/base.in
-edx-django-utils==4.4.1
+edx-django-utils==4.4.2
     # via
     #   -r requirements/base.in
     #   edx-drf-extensions
@@ -111,9 +115,9 @@ edx-drf-extensions==8.0.1
     #   edx-rbac
 edx-opaque-keys==2.2.2
     # via edx-drf-extensions
-edx-rbac==1.5.1
+edx-rbac==1.6.0
     # via -r requirements/base.in
-edx-rest-api-client==5.4.1
+edx-rest-api-client==5.5.0
     # via -r requirements/base.in
 future==0.18.2
     # via
@@ -135,7 +139,7 @@ monotonic==1.6
     # via analytics-python
 mysqlclient==2.1.0
     # via -r requirements/base.in
-newrelic==7.2.4.171
+newrelic==7.4.0.172
     # via edx-django-utils
 oauthlib==3.1.1
     # via
@@ -151,7 +155,7 @@ psutil==5.9.0
     # via edx-django-utils
 pycparser==2.21
     # via cffi
-pycryptodomex==3.12.0
+pycryptodomex==3.13.0
     # via pyjwkest
 pyjwkest==1.4.2
     # via edx-drf-extensions
@@ -235,6 +239,3 @@ vine==5.0.0
     #   kombu
 wcwidth==0.2.5
     # via prompt-toolkit
-
-# The following packages are considered to be unsafe in a requirements file:
-# setuptools

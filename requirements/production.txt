@@ -10,7 +10,7 @@ amqp==5.0.9
     #   kombu
 analytics-python==1.4.0
     # via -r requirements/base.txt
-asgiref==3.4.1
+asgiref==3.5.0
     # via
     #   -r requirements/base.txt
     #   django
@@ -22,7 +22,7 @@ billiard==3.6.4.0
     # via
     #   -r requirements/base.txt
     #   celery
-celery==5.2.3
+celery==5.0.4
     # via
     #   -r requirements/base.txt
     #   edx-celeryutils
@@ -38,7 +38,7 @@ charset-normalizer==2.0.10
     # via
     #   -r requirements/base.txt
     #   requests
-click==8.0.3
+click==7.1.2
     # via
     #   -r requirements/base.txt
     #   celery
@@ -108,6 +108,8 @@ django-model-utils==4.2.0
     #   edx-rbac
 django-rest-swagger==2.2.0
     # via -r requirements/base.txt
+django-simple-history==3.0.0
+    # via -r requirements/base.txt
 django-waffle==2.3.0
     # via
     #   -r requirements/base.txt
@@ -125,11 +127,11 @@ drf-jwt==1.19.2
     #   edx-drf-extensions
 edx-auth-backends==4.0.1
     # via -r requirements/base.txt
-edx-celeryutils==1.1.1
+edx-celeryutils==1.2.1
     # via -r requirements/base.txt
 edx-django-release-util==1.1.1
     # via -r requirements/base.txt
-edx-django-utils==4.4.1
+edx-django-utils==4.4.2
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
@@ -142,9 +144,9 @@ edx-opaque-keys==2.2.2
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
-edx-rbac==1.5.1
+edx-rbac==1.6.0
     # via -r requirements/base.txt
-edx-rest-api-client==5.4.1
+edx-rest-api-client==5.5.0
     # via -r requirements/base.txt
 future==0.18.2
     # via
@@ -189,7 +191,7 @@ mysqlclient==2.1.0
     # via
     #   -r requirements/base.txt
     #   -r requirements/production.in
-newrelic==7.2.4.171
+newrelic==7.4.0.172
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -218,7 +220,7 @@ pycparser==2.21
     # via
     #   -r requirements/base.txt
     #   cffi
-pycryptodomex==3.12.0
+pycryptodomex==3.13.0
     # via
     #   -r requirements/base.txt
     #   pyjwkest

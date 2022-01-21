@@ -53,6 +53,7 @@ THIRD_PARTY_APPS = (
 PROJECT_APPS = (
     'enterprise_access.apps.track',
     'enterprise_access.apps.core',
+    'enterprise_access.apps.subsidy_request',
     'enterprise_access.apps.api',
 )
 
