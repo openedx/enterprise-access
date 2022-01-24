@@ -25,9 +25,6 @@ class SubsidyRequestCustomerConfiguration(TimeStampedModel):
 
     enterprise_customer_uuid = models.UUIDField(
         primary_key=True,
-        default=uuid4,
-        editable=False,
-        unique=True,
     )
 
     subsidy_requests_enabled = models.BooleanField(

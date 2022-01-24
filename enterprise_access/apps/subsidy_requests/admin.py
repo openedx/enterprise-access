@@ -29,10 +29,19 @@ class SubsidyRequestCustomerConfigurationAdmin(admin.ModelAdmin):
         
     ]
     exclude = ['changed_by']
-    readonly_fields = [
-        'enterprise_customer_uuid',
-        'last_changed_by',
-    ]
+
+    def get_readonly_fields(self, request, obj=None):
+        """
+        Override to only display some fields on creation of object in admin, as well
+        as limit what is editable after creation.
+        """
+        if obj:
+            return [
+            'enterprise_customer_uuid',
+            'last_changed_by',
+        ]
+        else:
+            return []
 
     def last_changed_by(self, obj):
         return 'LMS User: {} ({})'.format(
