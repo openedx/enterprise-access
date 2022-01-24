@@ -37,9 +37,9 @@ class SubsidyRequestCustomerConfigurationAdmin(admin.ModelAdmin):
         """
         if obj:
             return [
-            'enterprise_customer_uuid',
-            'last_changed_by',
-        ]
+                'enterprise_customer_uuid',
+                'last_changed_by',
+            ]
         else:
             return []
 
