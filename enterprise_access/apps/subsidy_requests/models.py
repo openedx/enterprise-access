@@ -1,5 +1,8 @@
 """ subsidy_requests models. """
 
+from uuid import uuid4
+
+from django.conf import settings
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
@@ -53,17 +56,14 @@ class SubsidyRequestCustomerConfiguration(TimeStampedModel):
         ),
     )
 
-    changed_by = models.TextField(
-        blank=False,
-        null=False,
-        help_text=(
-            "Name of (admin) user who makes a change to this config object."
-        ),
-    )
+    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING)
 
     history = HistoricalRecords()
 
+    @property
+    def _history_user(self):
+        return self.changed_by
 
-    def save(self, *args, **kwargs):
-        # Do something here to determine which user is saving the record
-        super().save(*args, **kwargs)
+    @_history_user.setter
+    def _history_user(self, value):
+        self.changed_by = value

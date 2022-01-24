@@ -124,6 +124,7 @@ cryptography==36.0.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pyjwt
+    #   secretstorage
     #   social-auth-core
 ddt==1.4.4
     # via
@@ -215,7 +216,11 @@ edx-auth-backends==4.0.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
+<<<<<<< HEAD
 edx-celeryutils==1.2.1
+=======
+edx-celeryutils==1.2.0
+>>>>>>> iterating...
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -244,6 +249,7 @@ edx-opaque-keys==2.2.2
     #   -r requirements/test.txt
     #   edx-drf-extensions
 edx-rbac==1.6.0
+<<<<<<< HEAD
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -256,6 +262,12 @@ factory-boy==3.2.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
 faker==11.3.0
+=======
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+edx-rest-api-client==5.5.0
+>>>>>>> iterating...
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -297,6 +309,11 @@ itypes==1.2.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   coreapi
+jeepney==0.7.1
+    # via
+    #   -r requirements/quality.txt
+    #   keyring
+    #   secretstorage
 jinja2==3.0.3
     # via
     #   -r requirements/quality.txt
@@ -554,6 +571,10 @@ rules==3.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
+secretstorage==3.3.1
+    # via
+    #   -r requirements/quality.txt
+    #   keyring
 semantic-version==2.8.5
     # via
     #   -r requirements/quality.txt
