@@ -36,8 +36,8 @@ class SubsidyRequestCustomerConfiguration(TimeStampedModel):
 
     subsidy_type = models.CharField(
         max_length=32,
-        blank=False,
-        null=False,
+        blank=True,
+        null=True,
         choices=SubsidyTypeChoices.CHOICES,
         help_text=("Which type of subsidy is used to grant access."),
     )
@@ -53,7 +53,12 @@ class SubsidyRequestCustomerConfiguration(TimeStampedModel):
         ),
     )
 
-    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.DO_NOTHING,
+        blank=True,
+        null=True,
+    )
 
     history = HistoricalRecords()
 
