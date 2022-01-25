@@ -57,7 +57,7 @@ class CouponCodeRequestFactory(SubsidyRequestFactory):
     Test factory for the `CouponCodeRequest` model.
     """
 
-    coupon_id = factory.LazyFunction(uuid4)
+    coupon_id = factory.LazyAttribute(lambda x: FAKER.pyint())
     coupon_code = factory.LazyFunction(uuid4)
 
     class Meta:

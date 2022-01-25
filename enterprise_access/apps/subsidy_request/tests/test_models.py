@@ -11,7 +11,7 @@ from enterprise_access.apps.subsidy_request.constants import SubsidyRequestState
 from enterprise_access.apps.subsidy_request.tests.factories import CouponCodeRequestFactory, LicenseRequestFactory
 
 now = datetime.utcnow()
-mock_lms_user_id = uuid4()
+mock_lms_user_id = 1
 
 @ddt.ddt
 class LicenseRequestTests(TestCase):
@@ -60,7 +60,7 @@ class LicenseRequestTests(TestCase):
 class CouponCodeRequestTests(TestCase):
     """ CouponCodeRequest model tests. """
 
-    mock_coupon_id = uuid4()
+    mock_coupon_id = 123456
     mock_coupon_code = uuid4()
 
     @ddt.data(
@@ -68,14 +68,14 @@ class CouponCodeRequestTests(TestCase):
         (None, mock_coupon_code),
     )
     @ddt.unpack
-    def test_missing_license_info(self, coupon_id, coupon_code):
+    def test_missing_coupon_info(self, coupon_id, coupon_code):
         with self.assertRaises(ValidationError) as error:
-            license_request = CouponCodeRequestFactory(
+            coupon_code_request = CouponCodeRequestFactory(
                 state=SubsidyRequestStates.APPROVED_FULFILLED,
                 coupon_id=coupon_id,
                 coupon_code=coupon_code,
             )
-            license_request.save()
+            coupon_code_request.save()
 
         expected_error = 'Both coupon_id and coupon_code are required for a fulfilled coupon request.'
         assert error.exception.messages[0] == expected_error
