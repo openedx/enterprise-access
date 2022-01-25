@@ -6,21 +6,21 @@ from django.contrib.admin.sites import AdminSite
 from django.http import HttpRequest
 from django.test import TestCase
 
-from enterprise_access.apps.subsidy_requests.admin import (
+from enterprise_access.apps.subsidy_request.admin import (
     SubsidyRequestCustomerConfigurationAdmin,
 )
-from enterprise_access.apps.subsidy_requests.models import (
+from enterprise_access.apps.subsidy_request.models import (
     SubsidyRequestCustomerConfiguration,
 )
-from enterprise_access.apps.subsidy_requests.tests.factories import (
+from enterprise_access.apps.subsidy_request.tests.factories import (
     SubsidyRequestCustomerConfigurationFactory,
     UserFactory,
 )
 
 class AdminTests(TestCase):
 
-    @mock.patch('enterprise_access.apps.subsidy_requests.admin.get_data_from_jwt_payload')
-    @mock.patch('enterprise_access.apps.subsidy_requests.admin.get_user_from_request_session')
+    @mock.patch('enterprise_access.apps.subsidy_request.admin.get_data_from_jwt_payload')
+    @mock.patch('enterprise_access.apps.subsidy_request.admin.get_user_from_request_session')
     def test_subsidy_request_config_admin(self, mock_get_user, mock_get_jwt_data):
         """
         Verify that creating a config object in admin sets changed_by

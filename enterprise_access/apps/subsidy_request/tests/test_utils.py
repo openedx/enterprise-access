@@ -7,7 +7,7 @@ from django.contrib.sessions.middleware import SessionMiddleware
 from django.http import HttpRequest
 from django.test import TestCase
 
-from enterprise_access.apps.subsidy_requests.utils import (
+from enterprise_access.apps.subsidy_request.utils import (
     get_user_from_request_session,
     get_data_from_jwt_payload,
 )
@@ -34,7 +34,7 @@ class UtilsTests(TestCase):
 
         assert get_user_from_request_session(request) == test_user
 
-    @mock.patch('enterprise_access.apps.subsidy_requests.utils.configured_jwt_decode_handler')
+    @mock.patch('enterprise_access.apps.subsidy_request.utils.configured_jwt_decode_handler')
     def test_get_data_from_jwt_payload(self, mock_jwt_decoder):
         """
         Test get_data_from_jwt_payload

@@ -55,7 +55,6 @@ PROJECT_APPS = (
     'enterprise_access.apps.core',
     'enterprise_access.apps.subsidy_request',
     'enterprise_access.apps.api',
-    'enterprise_access.apps.subsidy_requests',
 )
 
 INSTALLED_APPS += THIRD_PARTY_APPS
