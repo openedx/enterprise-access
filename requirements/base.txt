@@ -100,15 +100,7 @@ drf-jwt==1.19.2
     # via edx-drf-extensions
 edx-auth-backends==4.0.1
     # via -r requirements/base.in
-<<<<<<< HEAD
-<<<<<<< HEAD
 edx-celeryutils==1.2.1
-=======
-edx-celeryutils==1.2.0
->>>>>>> iterating...
-=======
-edx-celeryutils==1.2.1
->>>>>>> iterating...
     # via -r requirements/base.in
 edx-django-release-util==1.1.1
     # via -r requirements/base.in

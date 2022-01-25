@@ -169,15 +169,7 @@ drf-jwt==1.19.2
     #   edx-drf-extensions
 edx-auth-backends==4.0.1
     # via -r requirements/test.txt
-<<<<<<< HEAD
-<<<<<<< HEAD
 edx-celeryutils==1.2.1
-=======
-edx-celeryutils==1.2.0
->>>>>>> iterating...
-=======
-edx-celeryutils==1.2.1
->>>>>>> iterating...
     # via -r requirements/test.txt
 edx-django-release-util==1.1.1
     # via -r requirements/test.txt
@@ -199,21 +191,11 @@ edx-opaque-keys==2.2.2
     #   -r requirements/test.txt
     #   edx-drf-extensions
 edx-rbac==1.6.0
-<<<<<<< HEAD
     # via -r requirements/test.txt
 edx-rest-api-client==5.5.0
     # via -r requirements/test.txt
 factory-boy==3.2.1
-=======
     # via -r requirements/test.txt
-edx-rest-api-client==5.5.0
->>>>>>> iterating...
-    # via -r requirements/test.txt
-<<<<<<< HEAD
-=======
-factory-boy==3.2.1
-    # via -r requirements/test.txt
->>>>>>> iterating...
 faker==11.3.0
     # via
     #   -r requirements/test.txt
