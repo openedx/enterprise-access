@@ -11,6 +11,7 @@ from enterprise_access.apps.subsidy_request.constants import SubsidyRequestState
 from enterprise_access.apps.subsidy_request.tests.factories import CouponCodeRequestFactory, LicenseRequestFactory
 
 now = datetime.utcnow()
+mock_lms_user_id = uuid4()
 
 @ddt.ddt
 class LicenseRequestTests(TestCase):
@@ -20,14 +21,15 @@ class LicenseRequestTests(TestCase):
     mock_license_uuid = uuid4()
 
     @ddt.data(
-        (now,),
-        (None,)
+        (None, now),
+        (mock_lms_user_id, None)
     )
     @ddt.unpack
-    def test_missing_review_info(self, reviewed_at):
+    def test_missing_review_info(self, reviewer_lms_user_id, reviewed_at):
         with self.assertRaises(ValidationError) as error:
             license_request = LicenseRequestFactory(
                 state=SubsidyRequestStates.APPROVED_PENDING,
+                reviewer_lms_user_id=reviewer_lms_user_id,
                 reviewed_at=reviewed_at,
             )
             license_request.save()
