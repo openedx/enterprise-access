@@ -1,4 +1,3 @@
-
 """ Constants for the subsidy_request app. """
 
 class SubsidyRequestStates:
@@ -14,4 +13,15 @@ class SubsidyRequestStates:
         (APPROVED_PENDING, "Approved - Pending"),
         (APPROVED_FULFILLED, "Approved - Fulfilled"),
         (DENIED, "Denied"),
+    )
+
+
+class SubsidyTypeChoices:
+    """ Type of subsidies. """
+    LICENSE = 'License'
+    COUPON = 'Coupon'  # aka A la cart
+
+    CHOICES = (
+        (LICENSE, 'License Subsidy'),
+        (COUPON, 'Coupon Subsidy'),
     )
