@@ -151,6 +151,8 @@ drf-jwt==1.19.2
     #   edx-drf-extensions
 edx-auth-backends==4.0.1
     # via -r requirements/base.txt
+edx-braze-client==0.1.0
+    # via -r requirements/base.txt
 edx-celeryutils==1.2.1
     # via -r requirements/base.txt
 edx-django-release-util==1.1.1
