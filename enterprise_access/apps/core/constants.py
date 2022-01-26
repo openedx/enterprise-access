@@ -11,6 +11,8 @@ SYSTEM_ENTERPRISE_OPERATOR_ROLE = 'enterprise_openedx_operator'
 REQUESTS_ADMIN_ACCESS_PERMISSION = 'requests.has_admin_access'
 REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION = 'requests.has_learner_or_admin_access'
 
+ALL_ACCESS_CONTEXT = '*'
+
 class Status:
     """Health statuses."""
     OK = "OK"

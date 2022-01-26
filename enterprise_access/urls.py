@@ -21,14 +21,16 @@ from auth_backends.urls import oauth2_urlpatterns
 from django.conf import settings
 from django.conf.urls import include, url
 from django.contrib import admin
+from edx_api_doc_tools import make_api_info, make_docs_urls
 from rest_framework_swagger.views import get_swagger_view
 
 from enterprise_access.apps.api import urls as api_urls
 from enterprise_access.apps.core import views as core_views
 
+api_info = make_api_info(title="Enterprise Access API", version="v1")
 admin.autodiscover()
 
-urlpatterns = oauth2_urlpatterns + [
+urlpatterns = oauth2_urlpatterns + make_docs_urls(api_info) + [
     url(r'^admin/', admin.site.urls),
     url(r'^api/', include(api_urls)),
     url(r'^api-docs/', get_swagger_view(title='enterprise-access API')),

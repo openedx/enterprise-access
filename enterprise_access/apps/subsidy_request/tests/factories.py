@@ -8,7 +8,6 @@ from uuid import uuid4
 import factory
 from faker import Faker
 
-from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
@@ -16,10 +15,7 @@ from enterprise_access.apps.subsidy_request.models import (
     SubsidyRequestCustomerConfiguration
 )
 
-USER_PASSWORD = 'password'
-
 FAKER = Faker()
-
 
 class SubsidyRequestFactory(factory.django.DjangoModelFactory):
     """
@@ -59,23 +55,6 @@ class CouponCodeRequestFactory(SubsidyRequestFactory):
     class Meta:
         model = CouponCodeRequest
 
-class UserFactory(factory.django.DjangoModelFactory):
-    """
-    Test factory for the `User` model.
-    """
-    id = factory.Sequence(lambda n: n + 1)
-    username = factory.Faker('user_name')
-    password = factory.PostGenerationMethodCall('set_password', USER_PASSWORD)
-    email = factory.Faker('email')
-    first_name = factory.Faker('first_name')
-    last_name = factory.Faker('last_name')
-    is_active = True
-    is_staff = False
-    is_superuser = False
-    lms_user_id = None
-
-    class Meta:
-        model = User
 
 
 class SubsidyRequestCustomerConfigurationFactory(factory.django.DjangoModelFactory):

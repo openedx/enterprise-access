@@ -93,11 +93,13 @@ coreapi==2.3.3
     # via
     #   -r requirements/validation.txt
     #   django-rest-swagger
+    #   drf-yasg
     #   openapi-codec
 coreschema==0.0.4
     # via
     #   -r requirements/validation.txt
     #   coreapi
+    #   drf-yasg
 coverage[toml]==6.3
     # via
     #   -r requirements/validation.txt
@@ -106,7 +108,6 @@ cryptography==36.0.1
     # via
     #   -r requirements/validation.txt
     #   pyjwt
-    #   secretstorage
     #   social-auth-core
 ddt==1.4.4
     # via -r requirements/validation.txt
@@ -128,9 +129,12 @@ django==3.2.11
     #   django-crum
     #   django-debug-toolbar
     #   django-extensions
+    #   django-filter
     #   django-model-utils
     #   djangorestframework
     #   drf-jwt
+    #   drf-yasg
+    #   edx-api-doc-tools
     #   edx-auth-backends
     #   edx-celeryutils
     #   edx-django-release-util
@@ -152,6 +156,8 @@ django-dynamic-fixture==3.1.2
     # via -r requirements/validation.txt
 django-extensions==3.1.5
     # via -r requirements/validation.txt
+django-filter==21.1
+    # via -r requirements/validation.txt
 django-model-utils==4.2.0
     # via
     #   -r requirements/validation.txt
@@ -171,6 +177,8 @@ djangorestframework==3.13.1
     #   -r requirements/validation.txt
     #   django-rest-swagger
     #   drf-jwt
+    #   drf-yasg
+    #   edx-api-doc-tools
     #   edx-drf-extensions
 docutils==0.18.1
     # via
@@ -180,6 +188,12 @@ drf-jwt==1.19.2
     # via
     #   -r requirements/validation.txt
     #   edx-drf-extensions
+drf-yasg==1.20.0
+    # via
+    #   -r requirements/validation.txt
+    #   edx-api-doc-tools
+edx-api-doc-tools==1.5.0
+    # via -r requirements/validation.txt
 edx-auth-backends==4.0.1
     # via -r requirements/validation.txt
 edx-braze-client==0.1.0
@@ -234,6 +248,10 @@ importlib-metadata==4.10.1
     #   -r requirements/validation.txt
     #   keyring
     #   twine
+inflection==0.5.1
+    # via
+    #   -r requirements/validation.txt
+    #   drf-yasg
 iniconfig==1.1.1
     # via
     #   -r requirements/validation.txt
@@ -246,11 +264,6 @@ itypes==1.2.0
     # via
     #   -r requirements/validation.txt
     #   coreapi
-jeepney==0.7.1
-    # via
-    #   -r requirements/validation.txt
-    #   keyring
-    #   secretstorage
 jinja2==3.0.3
     # via
     #   -r requirements/validation.txt
@@ -306,6 +319,7 @@ packaging==21.3
     # via
     #   -r requirements/validation.txt
     #   bleach
+    #   drf-yasg
     #   pytest
     #   tox
 path==16.3.0
@@ -473,12 +487,16 @@ rfc3986==2.0.0
     # via
     #   -r requirements/validation.txt
     #   twine
-rules==3.1
-    # via -r requirements/validation.txt
-secretstorage==3.3.1
+ruamel.yaml==0.17.20
     # via
     #   -r requirements/validation.txt
-    #   keyring
+    #   drf-yasg
+ruamel.yaml.clib==0.2.6
+    # via
+    #   -r requirements/validation.txt
+    #   ruamel.yaml
+rules==3.1
+    # via -r requirements/validation.txt
 semantic-version==2.8.5
     # via
     #   -r requirements/validation.txt
@@ -565,6 +583,7 @@ uritemplate==4.1.1
     # via
     #   -r requirements/validation.txt
     #   coreapi
+    #   drf-yasg
 urllib3==1.26.8
     # via
     #   -r requirements/validation.txt
