@@ -11,6 +11,7 @@ django-simple-history
 django-waffle
 djangorestframework
 edx-auth-backends
+edx-braze-client
 edx-celeryutils
 edx-django-utils
 edx-django-release-util
