@@ -5,12 +5,10 @@ from django.contrib.admin.sites import AdminSite
 from django.http import HttpRequest
 from django.test import TestCase
 
+from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_request.admin import SubsidyRequestCustomerConfigurationAdmin
 from enterprise_access.apps.subsidy_request.models import SubsidyRequestCustomerConfiguration
-from enterprise_access.apps.subsidy_request.tests.factories import (
-    SubsidyRequestCustomerConfigurationFactory,
-    UserFactory
-)
+from enterprise_access.apps.subsidy_request.tests.factories import SubsidyRequestCustomerConfigurationFactory
 
 
 class AdminTests(TestCase):

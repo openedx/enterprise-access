@@ -108,12 +108,14 @@ coreapi==2.3.3
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django-rest-swagger
+    #   drf-yasg
     #   openapi-codec
 coreschema==0.0.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   coreapi
+    #   drf-yasg
 coverage[toml]==6.3
     # via
     #   -r requirements/quality.txt
@@ -124,7 +126,6 @@ cryptography==36.0.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pyjwt
-    #   secretstorage
     #   social-auth-core
 ddt==1.4.4
     # via
@@ -148,9 +149,12 @@ django==3.2.11
     #   django-cors-headers
     #   django-crum
     #   django-extensions
+    #   django-filter
     #   django-model-utils
     #   djangorestframework
     #   drf-jwt
+    #   drf-yasg
+    #   edx-api-doc-tools
     #   edx-auth-backends
     #   edx-celeryutils
     #   edx-django-release-util
@@ -173,6 +177,10 @@ django-dynamic-fixture==3.1.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
 django-extensions==3.1.5
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+django-filter==21.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -202,6 +210,8 @@ djangorestframework==3.13.1
     #   -r requirements/test.txt
     #   django-rest-swagger
     #   drf-jwt
+    #   drf-yasg
+    #   edx-api-doc-tools
     #   edx-drf-extensions
 docutils==0.18.1
     # via
@@ -212,6 +222,15 @@ drf-jwt==1.19.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-drf-extensions
+drf-yasg==1.20.0
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   edx-api-doc-tools
+edx-api-doc-tools==1.5.0
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
 edx-auth-backends==4.0.1
     # via
     #   -r requirements/quality.txt
@@ -287,6 +306,11 @@ importlib-metadata==4.10.1
     #   -r requirements/quality.txt
     #   keyring
     #   twine
+inflection==0.5.1
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   drf-yasg
 iniconfig==1.1.1
     # via
     #   -r requirements/quality.txt
@@ -302,11 +326,6 @@ itypes==1.2.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   coreapi
-jeepney==0.7.1
-    # via
-    #   -r requirements/quality.txt
-    #   keyring
-    #   secretstorage
 jinja2==3.0.3
     # via
     #   -r requirements/quality.txt
@@ -376,6 +395,7 @@ packaging==21.3
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   bleach
+    #   drf-yasg
     #   pytest
     #   tox
 pbr==5.8.0
@@ -560,14 +580,20 @@ rfc3986==2.0.0
     # via
     #   -r requirements/quality.txt
     #   twine
+ruamel.yaml==0.17.20
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   drf-yasg
+ruamel.yaml.clib==0.2.6
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   ruamel.yaml
 rules==3.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-secretstorage==3.3.1
-    # via
-    #   -r requirements/quality.txt
-    #   keyring
 semantic-version==2.8.5
     # via
     #   -r requirements/quality.txt
@@ -666,6 +692,7 @@ uritemplate==4.1.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   coreapi
+    #   drf-yasg
 urllib3==1.26.8
     # via
     #   -r requirements/quality.txt

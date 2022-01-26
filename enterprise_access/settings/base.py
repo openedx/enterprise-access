@@ -37,15 +37,18 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'drf_yasg',
+    'edx_api_doc_tools',
     'release_util',
-    'rules.apps.AutodiscoverRulesConfig'
 )
 
 THIRD_PARTY_APPS = (
     'corsheaders',
     'csrf.apps.CsrfAppConfig',  # Enables frontend apps to retrieve CSRF tokens
+    'django_filters',
     'rest_framework',
     'rest_framework_swagger',
+    'rules.apps.AutodiscoverRulesConfig',
     'social_django',
     'waffle',
 )
