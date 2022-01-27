@@ -31,6 +31,23 @@ Running migrations
   $ make app-shell
   # python ./manage.py migrate
 
+A note on creating SubsidyRequestCustomerConfiguration Objects locally
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*Important note*
+
+In a devstack enviroment, login to the LMS and navigate to any
+MFE before creating SubsidyRequestCustomerConfiguration objects in the
+enterprise-access Django admin
+
+*Why*
+
+If you create a SubsidyRequestCustomerConfiguration in the Django
+admin, because we keep track of who changed the field, we need to grab the
+"who" from somewhere. In our case, we use the jwt payload header combined
+with the signature, which will be populated in your cookies when you go to an
+MFE while logged in. We can't use the edx-jwt-cookie outright because it
+won't be set by default when navigating to the django admin.
 
 Every time you want to contribute something in this repo
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
