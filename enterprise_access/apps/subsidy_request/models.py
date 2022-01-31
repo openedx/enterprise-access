@@ -6,13 +6,13 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
-from model_utils.models import TimeStampedModel
+from model_utils.models import SoftDeletableModel, TimeStampedModel
 from simple_history.models import HistoricalRecords
 
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
 
 
-class SubsidyRequest(TimeStampedModel):
+class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
     """
     Stores information related to a request for a subsidy (license or coupon).
 

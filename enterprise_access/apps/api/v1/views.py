@@ -16,7 +16,11 @@ from rest_framework.response import Response
 
 from enterprise_access.apps.api import serializers
 from enterprise_access.apps.api.exceptions import SubsidyRequestCreationError
-from enterprise_access.apps.api.filters import SubsidyRequestFilterBackend
+from enterprise_access.apps.api.filters import (
+    SubsidyRequestCustomerConfigurationFilterBackend,
+    SubsidyRequestFilterBackend
+)
+from enterprise_access.apps.api.tasks import delete_enterprise_subsidy_requests_task
 from enterprise_access.apps.api.utils import get_enterprise_uuid_from_request_data
 from enterprise_access.apps.core import constants
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
@@ -160,3 +164,43 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
                 f'under enterprise: {enterprise_customer_uuid}.'
             logger.exception(error_msg)
             raise SubsidyRequestCreationError(error_msg, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+
+class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
+    """ Viewset for customer configurations."""
+
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = serializers.SubsidyRequestCustomerConfigurationSerializer
+
+    authentication_classes = (JwtAuthentication,)
+
+    filter_backends = (filters.OrderingFilter, DjangoFilterBackend, SubsidyRequestCustomerConfigurationFilterBackend)
+    filterset_fields = ('enterprise_customer_uuid', 'subsidy_requests_enabled', 'subsidy_type',)
+    pagination_class = PaginationWithPageCount
+
+    queryset = SubsidyRequestCustomerConfiguration.objects.order_by('-created')
+
+    http_method_names = ['get', 'post', 'patch']
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=lambda request, pk: pk
+    )
+    def partial_update(self, request, *args, **kwargs):
+        pk = kwargs['pk']
+        current_config = SubsidyRequestCustomerConfiguration.objects.get(pk=pk)
+
+        if 'subsidy_type' in request.data:
+            subsidy_type = request.data['subsidy_type']
+            if current_config.subsidy_type and subsidy_type != current_config.subsidy_type:
+                # Remove all subsidy requests of the previous type
+                delete_enterprise_subsidy_requests_task.delay(pk, current_config.subsidy_type)
+
+        return super().partial_update(request, *args, **kwargs)

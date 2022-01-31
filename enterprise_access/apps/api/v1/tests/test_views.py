@@ -3,6 +3,7 @@ Tests for Enterprise Access API v1 views.
 """
 
 
+from unittest import mock
 from uuid import uuid4
 
 import ddt
@@ -17,7 +18,7 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
-from enterprise_access.apps.subsidy_request.models import LicenseRequest
+from enterprise_access.apps.subsidy_request.models import LicenseRequest, SubsidyRequestCustomerConfiguration
 from enterprise_access.apps.subsidy_request.tests.factories import (
     CouponCodeRequestFactory,
     LicenseRequestFactory,
@@ -27,6 +28,7 @@ from test_utils import APITest
 
 LICENSE_REQUESTS_LIST_ENDPOINT = reverse('api:v1:license-requests-list')
 COUPON_CODE_REQUESTS_LIST_ENDPOINT = reverse('api:v1:coupon-code-requests-list')
+CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT = reverse('api:v1:customer-configurations-list')
 
 @ddt.ddt
 @mark.django_db
@@ -338,14 +340,10 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         """
         Test that a staff/superuser should see all requests.
         """
+        self.user.is_staff = is_staff
+        self.user.is_superuser = is_superuser
 
-        if is_staff:
-            self.user.is_staff = True
-            self.user.save()
-
-        if is_superuser:
-            self.user.is_superuser = True
-            self.user.save()
+        self.user.save()
 
         response = self.client.get(COUPON_CODE_REQUESTS_LIST_ENDPOINT)
         response_json = self.load_json(response.content)
@@ -421,3 +419,231 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         }
         response = self.client.post(COUPON_CODE_REQUESTS_LIST_ENDPOINT, payload)
         assert response.status_code == status.HTTP_201_CREATED
+
+@ddt.ddt
+class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
+    """
+    Tests for SubsidyRequestCustomerConfigurationViewSet.
+    """
+
+    enterprise_customer_uuid_1 = uuid4()
+    enterprise_customer_uuid_2 = uuid4()
+
+    def setUp(self):
+        super().setUp()
+        self.set_jwt_cookie([
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+                'context': ALL_ACCESS_CONTEXT
+            }
+        ])
+        self.customer_configuration_1 = SubsidyRequestCustomerConfigurationFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+        self.customer_configuration_2 = SubsidyRequestCustomerConfigurationFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_2
+        )
+
+    @ddt.data(
+        [{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': enterprise_customer_uuid_2
+        }],
+        [{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': enterprise_customer_uuid_1
+        }]
+    )
+    def test_create_403(self, roles_and_contexts):
+        """
+        Test that a 403 response is returned if the user is not an admin of the enterprise.
+        """
+        self.set_jwt_cookie(roles_and_contexts)
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+        }
+        response = self.client.post(CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_create_happy_path(self):
+        """
+        Test that a customer configuration can be created.
+        """
+        SubsidyRequestCustomerConfiguration.objects.all().delete()
+
+        self.set_jwt_cookie(roles_and_contexts=[
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+                'context': self.enterprise_customer_uuid_1
+            },
+        ])
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_requests_enabled': True,
+            'subsidy_type': SubsidyTypeChoices.COUPON
+        }
+        response = self.client.post(CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_201_CREATED
+
+        customer_configuration = SubsidyRequestCustomerConfiguration.objects.get(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+        assert customer_configuration.subsidy_requests_enabled
+        assert customer_configuration.subsidy_type == SubsidyTypeChoices.COUPON
+
+    @ddt.data(
+        (True, False),
+        (False, True),
+        (True, True)
+    )
+    @ddt.unpack
+    def test_list_as_staff_or_superuser(self, is_staff, is_superuser):
+        self.user.is_staff = is_staff
+        self.user.is_superuser = is_superuser
+
+        self.user.save()
+
+        response = self.client.get(CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT)
+        response_json = self.load_json(response.content)
+
+        configuration_enterprise_customer_uuids = sorted(
+            [lr['enterprise_customer_uuid'] for lr in response_json['results']]
+        )
+        expected_configuration_enterprise_customer_uuids = sorted([
+            str(self.customer_configuration_1.enterprise_customer_uuid),
+            str(self.customer_configuration_2.enterprise_customer_uuid),
+        ])
+
+        assert configuration_enterprise_customer_uuids == expected_configuration_enterprise_customer_uuids
+
+
+    @ddt.data(
+        [{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': enterprise_customer_uuid_1
+        }],
+        [{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': enterprise_customer_uuid_1
+        }]
+    )
+    def test_list_as_admin_or_learner(self, roles_and_contexts):
+        self.set_jwt_cookie(roles_and_contexts)
+
+        response = self.client.get(CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT)
+        response_json = self.load_json(response.content)
+
+        configuration_enterprise_customer_uuids = [lr['enterprise_customer_uuid'] for lr in response_json['results']]
+        expected_configuration_enterprise_customer_uuids = [str(self.customer_configuration_1.enterprise_customer_uuid)]
+
+        assert configuration_enterprise_customer_uuids == expected_configuration_enterprise_customer_uuids
+
+    @ddt.data(
+        [{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': enterprise_customer_uuid_2
+        }],
+        [{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': enterprise_customer_uuid_1
+        }]
+    )
+    def test_partial_update_403(self, roles_and_contexts):
+        """
+        Test that a 403 response is returned if the user is not an admin of the enterprise.
+        """
+
+        self.set_jwt_cookie(roles_and_contexts)
+
+        response = self.client.patch(f'{CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT}{self.enterprise_customer_uuid_1}/', {})
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+    def test_partial_update_happy_path(self):
+        """
+        Test that a customer configuration can be patched.
+        """
+
+        self.set_jwt_cookie(roles_and_contexts=[
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+                'context': self.enterprise_customer_uuid_1
+            },
+        ])
+
+        customer_config = SubsidyRequestCustomerConfiguration.objects.get(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+
+        customer_config.subsidy_requests_enabled = False
+        customer_config.subsidy_type = None
+        customer_config.save()
+
+        payload = {
+            'subsidy_requests_enabled': True,
+            'subsidy_type': SubsidyTypeChoices.COUPON
+        }
+        response = self.client.patch(
+            f'{CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT}{self.enterprise_customer_uuid_1}/',
+            payload
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        customer_config = SubsidyRequestCustomerConfiguration.objects.get(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+
+        assert customer_config.subsidy_requests_enabled
+        assert customer_config.subsidy_type == SubsidyTypeChoices.COUPON
+
+
+    @mock.patch('enterprise_access.apps.api.tasks.delete_enterprise_subsidy_requests_task.delay')
+    @ddt.data(
+        (SubsidyTypeChoices.LICENSE, SubsidyTypeChoices.COUPON, SubsidyTypeChoices.LICENSE),
+        (SubsidyTypeChoices.COUPON, SubsidyTypeChoices.LICENSE, SubsidyTypeChoices.COUPON),
+        (SubsidyTypeChoices.LICENSE, None, SubsidyTypeChoices.LICENSE),
+        (SubsidyTypeChoices.COUPON, None, SubsidyTypeChoices.COUPON),
+        (None, SubsidyTypeChoices.LICENSE, None),
+    )
+    @ddt.unpack
+    def test_partial_update_deletes_old_requests(
+        self,
+        previous_subsidy_type,
+        new_subsidy_type,
+        expected_deleted_subsidy_type,
+        mock_delete_enterprise_subsidy_requests_task
+    ):
+        """
+        Test that old requests are deleted if the subsidy type changes.
+        """
+
+        self.set_jwt_cookie(roles_and_contexts=[
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+                'context': self.enterprise_customer_uuid_1
+            },
+        ])
+
+        customer_config = SubsidyRequestCustomerConfiguration.objects.get(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+
+        customer_config.subsidy_requests_enabled = False
+        customer_config.subsidy_type = previous_subsidy_type
+        customer_config.save()
+
+        payload = {
+            'subsidy_requests_enabled': True,
+            'subsidy_type': new_subsidy_type
+        }
+        response = self.client.patch(
+            f'{CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT}{self.enterprise_customer_uuid_1}/',
+            payload
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        if expected_deleted_subsidy_type:
+            mock_delete_enterprise_subsidy_requests_task.assert_called_with(
+                str(self.enterprise_customer_uuid_1),
+                expected_deleted_subsidy_type
+            )
