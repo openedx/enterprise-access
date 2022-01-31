@@ -60,7 +60,7 @@ shell: ## run Django shell
 	python manage.py shell
 
 test: clean ## run tests and generate coverage report
-	pytest
+	pytest --ds=enterprise_access.settings.test
 
 # To be run from CI context
 coverage: clean

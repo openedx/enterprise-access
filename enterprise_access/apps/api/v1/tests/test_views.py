@@ -2,11 +2,10 @@
 Tests for Enterprise Access API v1 views.
 """
 
-
-from unittest import mock
 from uuid import uuid4
 
 import ddt
+import mock
 from pytest import mark
 from rest_framework import status
 from rest_framework.reverse import reverse
@@ -18,7 +17,11 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
-from enterprise_access.apps.subsidy_request.models import LicenseRequest, SubsidyRequestCustomerConfiguration
+from enterprise_access.apps.subsidy_request.models import (
+    CouponCodeRequest,
+    LicenseRequest,
+    SubsidyRequestCustomerConfiguration
+)
 from enterprise_access.apps.subsidy_request.tests.factories import (
     CouponCodeRequestFactory,
     LicenseRequestFactory,
@@ -27,8 +30,13 @@ from enterprise_access.apps.subsidy_request.tests.factories import (
 from test_utils import APITest
 
 LICENSE_REQUESTS_LIST_ENDPOINT = reverse('api:v1:license-requests-list')
+LICENSE_REQUESTS_APPROVE_ENDPOINT = reverse('api:v1:license-requests-approve')
+LICENSE_REQUESTS_DECLINE_ENDPOINT = reverse('api:v1:license-requests-decline')
 COUPON_CODE_REQUESTS_LIST_ENDPOINT = reverse('api:v1:coupon-code-requests-list')
+COUPON_CODE_REQUESTS_APPROVE_ENDPOINT = reverse('api:v1:coupon-code-requests-approve')
+COUPON_CODE_REQUESTS_DECLINE_ENDPOINT = reverse('api:v1:coupon-code-requests-decline')
 CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT = reverse('api:v1:customer-configurations-list')
+
 
 @ddt.ddt
 @mark.django_db
@@ -60,7 +68,7 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
 
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
-            'context': str(self.enterprise_customer_uuid_1)
+            'context': str(self.enterprise_customer_uuid_1),
         }])
 
         # license requests for the user
@@ -257,6 +265,290 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         response = self.client.post(LICENSE_REQUESTS_LIST_ENDPOINT, payload)
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_approve_no_subsidy_request_uuids(self):
+        """ 400 thrown if no subsidy requests provided """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [],
+            'subscription_plan_uuid': self.user_license_request_1.subscription_plan_uuid,
+        }
+        response = self.client.post(LICENSE_REQUESTS_APPROVE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+    def test_approve_invalid_subsidy_request_uuid(self):
+        """ 400 thrown if any subsidy request uuids invalid """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.user_license_request_1.uuid, 'hehe-im-not-a-uuid'],
+            'subscription_plan_uuid': self.user_license_request_1.subscription_plan_uuid,
+        }
+        response = self.client.post(LICENSE_REQUESTS_APPROVE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+    def test_approve_no_subscription_plan_uuid(self):
+        """ 400 thrown if no subscription plan uuid provided """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.user_license_request_1.uuid],
+            'subscription_plan_uuid': '',
+        }
+        response = self.client.post(LICENSE_REQUESTS_APPROVE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+    def test_approve_invalid_subscription_plan_uuid(self):
+        """ 400 thrown if subscription plan uuid invalid """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.user_license_request_1.uuid],
+            'subscription_plan_uuid': 'hehe-im-just-a-reggo-string',
+        }
+        response = self.client.post(LICENSE_REQUESTS_APPROVE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+    @mock.patch('enterprise_access.apps.api.v1.views.LicenseManagerApiClient.get_subscription_overview')
+    def test_approve_not_enough_subs_remaining_in_lm(self, mock_get_sub):
+        """ 422 thrown if not enough subs remaining in license """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        mock_get_sub.return_value = {
+            'results': [
+                {
+                    'status': 'assigned',
+                    'count': 13,
+                },
+                {
+                    'status': 'unassigned',
+                    'count': 0,
+                }
+            ]
+        }
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.user_license_request_1.uuid],
+            'subscription_plan_uuid': self.user_license_request_1.subscription_plan_uuid,
+        }
+        response = self.client.post(LICENSE_REQUESTS_APPROVE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+    @mock.patch('enterprise_access.apps.api.v1.views.LicenseManagerApiClient.get_subscription_overview')
+    def test_approve_subsidy_request_already_declined(self, mock_get_sub):
+        """ 422 thrown if any subsidy request in payload already declined """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        mock_get_sub.return_value = {
+            'results': [
+                {
+                    'status': 'assigned',
+                    'count': 13,
+                },
+                {
+                    'status': 'unassigned',
+                    'count': 100000000,
+                }
+            ]
+        }
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+        self.user_license_request_1.state = SubsidyRequestStates.DECLINED
+        self.user_license_request_1.save()
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.user_license_request_1.uuid],
+            'subscription_plan_uuid': self.user_license_request_1.subscription_plan_uuid,
+        }
+        response = self.client.post(LICENSE_REQUESTS_APPROVE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+    @mock.patch('enterprise_access.apps.api.v1.views.LicenseManagerApiClient.get_subscription_overview')
+    def test_approve_subsidy_request_success(self, mock_get_sub):
+        """ Test subsidy approval takes place when proper info provided"""
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        mock_get_sub.return_value = {
+            'results': [
+                {
+                    'status': 'assigned',
+                    'count': 13,
+                },
+                {
+                    'status': 'unassigned',
+                    'count': 100000000,
+                }
+            ]
+        }
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.user_license_request_1.uuid],
+            'subscription_plan_uuid': self.user_license_request_1.subscription_plan_uuid,
+        }
+        response = self.client.post(LICENSE_REQUESTS_APPROVE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_200_OK
+        self.user_license_request_1.refresh_from_db()
+        assert self.user_license_request_1.state == SubsidyRequestStates.PENDING
+
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 1
+
+    def test_decline_no_subsidy_request_uuids(self):
+        """ 400 thrown if no subsidy requests provided """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [],
+        }
+        response = self.client.post(LICENSE_REQUESTS_DECLINE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+    def test_decline_invalid_subsidy_request_uuid(self):
+        """ 400 thrown if any subsidy request uuids invalid """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.user_license_request_1.uuid, 'hehe-im-not-a-uuid'],
+        }
+        response = self.client.post(LICENSE_REQUESTS_DECLINE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+    def test_decline_subsidy_request_already_approved(self):
+        """ 422 thrown if any subsidy request in payload already declined """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+        self.user_license_request_1.state = SubsidyRequestStates.PENDING
+        self.user_license_request_1.save()
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.user_license_request_1.uuid],
+            'subscription_plan_uuid': self.user_license_request_1.subscription_plan_uuid,
+        }
+        response = self.client.post(LICENSE_REQUESTS_DECLINE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+    def test_decline_request_success(self):
+        """ Test 200 returned if successful """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.user_license_request_1.uuid],
+        }
+        response = self.client.post(LICENSE_REQUESTS_DECLINE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_200_OK
+        self.user_license_request_1.refresh_from_db()
+        assert self.user_license_request_1.state == SubsidyRequestStates.DECLINED
+
+        assert LicenseRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 1
+
+
 @ddt.ddt
 class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
     """
@@ -420,6 +712,227 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         response = self.client.post(COUPON_CODE_REQUESTS_LIST_ENDPOINT, payload)
         assert response.status_code == status.HTTP_201_CREATED
 
+    def test_approve_no_subsidy_request_uuids(self):
+        """ 400 thrown if no subsidy requests provided """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [],
+            'coupon_id': self.coupon_code_request_1.coupon_id,
+        }
+        response = self.client.post(COUPON_CODE_REQUESTS_APPROVE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+    def test_approve_invalid_subsidy_request_uuid(self):
+        """ 400 thrown if any subsidy request uuids invalid """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.coupon_code_request_1.uuid, 'lol-not-a-uuid'],
+            'coupon_id': self.coupon_code_request_1.coupon_id,
+        }
+        response = self.client.post(COUPON_CODE_REQUESTS_APPROVE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+    @mock.patch('enterprise_access.apps.api.v1.views.EcommerceApiClient.get_coupon_overview')
+    def test_approve_not_enough_codes_left_in_coupon(self, mock_get_coupon):
+        """ 422 thrown if not enough codes remaining in coupon """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        mock_get_coupon.return_value = {
+            "id": 123,
+            "title": "Test coupon",
+            "start_date": "2022-01-06T00:00:00Z",
+            "end_date": "2023-05-31T00:00:00Z",
+            "num_uses": 0,
+            "usage_limitation": "Multi-use",
+            "num_codes": 100,
+            "max_uses": 200,
+            "num_unassigned": 0,
+            "errors": [],
+            "available": True
+        }
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.coupon_code_request_1.uuid],
+            'coupon_id': self.coupon_code_request_1.coupon_id,
+        }
+        response = self.client.post(COUPON_CODE_REQUESTS_APPROVE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+
+    @mock.patch('enterprise_access.apps.api.v1.views.EcommerceApiClient.get_coupon_overview')
+    def test_approve_subsidy_request_already_declined(self, mock_get_coupon):
+        """ 422 thrown if any subsidy request in payload already declined """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        mock_get_coupon.return_value = {"num_unassigned": 1000000000}
+        self.coupon_code_request_1.state = SubsidyRequestStates.DECLINED
+        self.coupon_code_request_1.save()
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.coupon_code_request_1.uuid],
+            'coupon_id': self.coupon_code_request_1.coupon_id,
+        }
+        response = self.client.post(COUPON_CODE_REQUESTS_APPROVE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+    @mock.patch('enterprise_access.apps.api.v1.views.EcommerceApiClient.get_coupon_overview')
+    def test_approve_subsidy_request_success(self, mock_get_coupon):
+        """ Test subsidy approval takes place when proper info provided"""
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        mock_get_coupon.return_value = {'num_unassigned': 1000000000}
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.coupon_code_request_1.uuid],
+            'coupon_id': self.coupon_code_request_1.coupon_id,
+        }
+        response = self.client.post(COUPON_CODE_REQUESTS_APPROVE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_200_OK
+
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.PENDING
+        ).count() == 1
+
+    def test_decline_no_subsidy_request_uuids(self):
+        """ 400 thrown if no subsidy requests provided """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [],
+        }
+        response = self.client.post(COUPON_CODE_REQUESTS_DECLINE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+    def test_decline_invalid_subsidy_request_uuid(self):
+        """ 400 thrown if any subsidy request uuids invalid """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.coupon_code_request_1.uuid, 'hehe-im-not-a-uuid'],
+        }
+        response = self.client.post(COUPON_CODE_REQUESTS_DECLINE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+    def test_decline_subsidy_request_already_approved(self):
+        """ 422 thrown if any subsidy request in payload already approved """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        self.coupon_code_request_1.state = SubsidyRequestStates.PENDING
+        self.coupon_code_request_1.save()
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.coupon_code_request_1.uuid],
+            'coupon_id': self.coupon_code_request_1.coupon_id,
+        }
+        response = self.client.post(COUPON_CODE_REQUESTS_DECLINE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+    def test_decline_request_success(self):
+        """ Test 200 returned if successful """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 0
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.coupon_code_request_1.uuid],
+        }
+        response = self.client.post(COUPON_CODE_REQUESTS_DECLINE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_200_OK
+        self.coupon_code_request_1.refresh_from_db()
+        assert self.coupon_code_request_1.state == SubsidyRequestStates.DECLINED
+
+        assert CouponCodeRequest.objects.filter(
+            state=SubsidyRequestStates.DECLINED
+        ).count() == 1
+
+
 @ddt.ddt
 class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
     """
@@ -557,7 +1070,6 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
 
         response = self.client.patch(f'{CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT}{self.enterprise_customer_uuid_1}/', {})
         assert response.status_code == status.HTTP_403_FORBIDDEN
-
 
     def test_partial_update_happy_path(self):
         """

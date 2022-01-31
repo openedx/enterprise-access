@@ -13,7 +13,7 @@ Learners who can browse the Enterprise Learner Portal without a subsidy should b
 request a subsidy (either a license or coupon code) from their enterprise administrator.
 In the Enterprise Admin Portal, an enterprise admin should be able to see which learners
 have requested a license or coupon code, and then either assign those learners a license,
-or deny the request.
+or decline the request.
 
 Note that the source of truth about subsidy state is stored in other services - license-manager
 is the source of truth for licenses, and ecommerce is the source of truth about coupon codes.
@@ -83,7 +83,7 @@ It should store at least the following:
 Subsidy Request admin experience
 --------------------------------
 There will be a new user interface in the admin portal displaying a data table of subsidy requests.
-From this data table, an admin is able to either approve (assign subsidies) requests, or deny them.
+From this data table, an admin is able to either approve (assign subsidies) requests, or decline them.
 Either action may be made in bulk.
 
 Subsidy approval flow and data
@@ -119,8 +119,8 @@ We will only allow licenses from a single plan to be assigned to a set of select
 an admin may not assign licenses from multiple plans amongst multiple requesting learners
 in a single bulk action request.
 
-Denying a subsidy request
-^^^^^^^^^^^^^^^^^^^^^^^^^
+Declining a subsidy request
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 In this case, no license or code will be assigned to the requesting learner.
 The Request record should be updated to reflect the denial; the suggested data modeling above
 would have us create a discrete ``Denial`` record.

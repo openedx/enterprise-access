@@ -10,6 +10,7 @@ from model_utils.models import SoftDeletableModel, TimeStampedModel
 from simple_history.models import HistoricalRecords
 
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
+from enterprise_access.apps.subsidy_request.utils import localized_utcnow
 
 
 class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
@@ -63,7 +64,7 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
     def approve(self, reviewer_lms_user_id):
         raise NotImplementedError
 
-    def deny(self, reviewer_lms_user_id, reason):
+    def decline(self, reviewer_lms_user_id, reason):
         raise NotImplementedError
 
     def clean(self):
@@ -116,10 +117,17 @@ class LicenseRequest(SubsidyRequest):
         return f'<LicenseRequest for {self.course_id}>'
 
     def approve(self, reviewer_lms_user_id):
-        raise NotImplementedError
+        self.reviewer_lms_user_id = reviewer_lms_user_id
+        self.state = SubsidyRequestStates.PENDING
+        self.reviewed_at = localized_utcnow()
+        self.save()
 
-    def deny(self, reviewer_lms_user_id, reason):
-        raise NotImplementedError
+    def decline(self, reviewer_lms_user_id, reason=None):
+        self.reviewer_lms_user_id = reviewer_lms_user_id
+        self.state = SubsidyRequestStates.DECLINED
+        self.denial_reason = reason
+        self.reviewed_at = localized_utcnow()
+        self.save()
 
 
 class CouponCodeRequest(SubsidyRequest):
@@ -158,10 +166,17 @@ class CouponCodeRequest(SubsidyRequest):
         return f'<CouponCodeRequest for {self.course_id}>'
 
     def approve(self, reviewer_lms_user_id):
-        raise NotImplementedError
+        self.reviewer_lms_user_id = reviewer_lms_user_id
+        self.state = SubsidyRequestStates.PENDING
+        self.reviewed_at = localized_utcnow()
+        self.save()
 
-    def deny(self, reviewer_lms_user_id, reason):
-        raise NotImplementedError
+    def decline(self, reviewer_lms_user_id, reason=None):
+        self.reviewer_lms_user_id = reviewer_lms_user_id
+        self.state = SubsidyRequestStates.DECLINED
+        self.denial_reason = reason
+        self.reviewed_at = localized_utcnow()
+        self.save()
 
 
 class SubsidyRequestCustomerConfiguration(TimeStampedModel):
