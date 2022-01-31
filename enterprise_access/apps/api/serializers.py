@@ -4,7 +4,12 @@ Serializers for Enterprise Access API v1.
 
 from rest_framework import serializers
 
-from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest, SubsidyRequest
+from enterprise_access.apps.subsidy_request.models import (
+    CouponCodeRequest,
+    LicenseRequest,
+    SubsidyRequest,
+    SubsidyRequestCustomerConfiguration
+)
 
 
 class SubsidyRequestSerializer(serializers.ModelSerializer):
@@ -75,3 +80,22 @@ class CouponCodeRequestSerializer(SubsidyRequestSerializer):
             'coupon_id',
             'coupon_code'
         ]
+
+
+class SubsidyRequestCustomerConfigurationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the `SubsidyRequestCustomerConfiguration` model.
+    """
+
+    class Meta:
+        model = SubsidyRequestCustomerConfiguration
+        fields = [
+            'enterprise_customer_uuid',
+            'subsidy_requests_enabled',
+            'subsidy_type'
+        ]
+
+    def update(self, instance, validated_data):
+        # Pop enterprise_customer_uuid so that it's read-only for updates.
+        validated_data.pop('enterprise_customer_uuid', None)
+        return super().update(instance, validated_data)

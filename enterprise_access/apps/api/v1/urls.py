@@ -11,5 +11,6 @@ router = DefaultRouter()
 
 router.register("license-requests", views.LicenseRequestViewSet, 'license-requests')
 router.register("coupon-code-requests", views.CouponCodeRequestViewSet, 'coupon-code-requests')
+router.register("customer-configurations", views.SubsidyRequestCustomerConfigurationViewSet, 'customer-configurations')
 
 urlpatterns += router.urls
