@@ -198,7 +198,7 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         assert response.data == f'Subsidy request type must be {SubsidyTypeChoices.COUPON}'
 
-    @ddt.data(SubsidyRequestStates.PENDING_REVIEW, SubsidyRequestStates.APPROVED_PENDING)
+    @ddt.data(SubsidyRequestStates.REQUESTED, SubsidyRequestStates.PENDING)
     def test_create_pending_license_request_exists(self, current_request_state):
         """
         Test that a 422 response is returned when creating a request if the user
