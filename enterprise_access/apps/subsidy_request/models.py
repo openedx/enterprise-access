@@ -41,7 +41,7 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
         blank=False,
         null=False,
         choices=SubsidyRequestStates.CHOICES,
-        default=SubsidyRequestStates.PENDING_REVIEW
+        default=SubsidyRequestStates.REQUESTED
     )
 
     reviewed_at = models.DateTimeField(
@@ -67,7 +67,7 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
         raise NotImplementedError
 
     def clean(self):
-        if self.state != SubsidyRequestStates.PENDING_REVIEW:
+        if self.state != SubsidyRequestStates.REQUESTED:
             if not (self.reviewed_at and self.reviewer_lms_user_id):
                 raise ValidationError('Both reviewer_lms_user_id and reviewed_at are required for a review.')
 
@@ -101,7 +101,7 @@ class LicenseRequest(SubsidyRequest):
     history = HistoricalRecords()
 
     def clean(self):
-        if self.state == SubsidyRequestStates.APPROVED_FULFILLED:
+        if self.state == SubsidyRequestStates.APPROVED:
             if not (self.subscription_plan_uuid and self.license_uuid):
                 raise ValidationError(
                     'Both subscription_plan_uuid and license_uuid are required for a fulfilled license request.'
@@ -143,7 +143,7 @@ class CouponCodeRequest(SubsidyRequest):
     history = HistoricalRecords()
 
     def clean(self):
-        if self.state == SubsidyRequestStates.APPROVED_FULFILLED:
+        if self.state == SubsidyRequestStates.APPROVED:
             if not (self.coupon_id and self.coupon_code):
                 raise ValidationError(
                     'Both coupon_id and coupon_code are required for a fulfilled coupon request.'

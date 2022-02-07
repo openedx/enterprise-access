@@ -130,7 +130,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         has_pending_request = LicenseRequest.objects.filter(
             lms_user_id=self.lms_user_id,
             enterprise_customer_uuid=enterprise_customer_uuid,
-            state__in=[SubsidyRequestStates.PENDING_REVIEW, SubsidyRequestStates.APPROVED_PENDING]
+            state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.PENDING]
         ).first()
 
         if has_pending_request:
@@ -155,7 +155,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         has_pending_request = CouponCodeRequest.objects.filter(
             lms_user_id=self.lms_user_id,
             enterprise_customer_uuid=enterprise_customer_uuid,
-            state__in=[SubsidyRequestStates.PENDING_REVIEW, SubsidyRequestStates.APPROVED_PENDING],
+            state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.PENDING],
             course_id=course_id
         ).exists()
 

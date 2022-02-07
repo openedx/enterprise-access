@@ -26,7 +26,7 @@ class SubsidyRequestFactory(factory.django.DjangoModelFactory):
     lms_user_id = factory.LazyAttribute(lambda x: FAKER.pyint())
     course_id = factory.LazyFunction(uuid4)
     enterprise_customer_uuid = factory.LazyFunction(uuid4)
-    state = SubsidyRequestStates.PENDING_REVIEW
+    state = SubsidyRequestStates.REQUESTED
     reviewed_at = datetime.utcnow()
     reviewer_lms_user_id = factory.LazyAttribute(lambda x: FAKER.pyint())
     denial_reason = None

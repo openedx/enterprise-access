@@ -28,7 +28,7 @@ class LicenseRequestTests(TestCase):
     def test_missing_review_info(self, reviewer_lms_user_id, reviewed_at):
         with self.assertRaises(ValidationError) as error:
             license_request = LicenseRequestFactory(
-                state=SubsidyRequestStates.APPROVED_PENDING,
+                state=SubsidyRequestStates.PENDING,
                 reviewer_lms_user_id=reviewer_lms_user_id,
                 reviewed_at=reviewed_at,
             )
@@ -47,7 +47,7 @@ class LicenseRequestTests(TestCase):
     def test_missing_license_info(self, subscription_plan_uuid, license_uuid):
         with self.assertRaises(ValidationError) as error:
             license_request = LicenseRequestFactory(
-                state=SubsidyRequestStates.APPROVED_FULFILLED,
+                state=SubsidyRequestStates.APPROVED,
                 subscription_plan_uuid=subscription_plan_uuid,
                 license_uuid=license_uuid,
             )
@@ -71,7 +71,7 @@ class CouponCodeRequestTests(TestCase):
     def test_missing_coupon_info(self, coupon_id, coupon_code):
         with self.assertRaises(ValidationError) as error:
             coupon_code_request = CouponCodeRequestFactory(
-                state=SubsidyRequestStates.APPROVED_FULFILLED,
+                state=SubsidyRequestStates.APPROVED,
                 coupon_id=coupon_id,
                 coupon_code=coupon_code,
             )
