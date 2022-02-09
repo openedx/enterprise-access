@@ -21,6 +21,7 @@ Contents:
    changelog
    decisions
    features
+   request_and_approve
 
 
 Indices and tables
