@@ -21,3 +21,6 @@ CELERY_TASK_ALWAYS_EAGER = True
 results_dir = tempfile.TemporaryDirectory()
 CELERY_RESULT_BACKEND = f'file://{results_dir.name}'
 # END CELERY
+
+ECOMMERCE_URL = 'http://ecommerce.example.com'
+LICENSE_MANAGER_URL = 'http://license-manager.example.com'

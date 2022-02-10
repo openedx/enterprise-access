@@ -36,3 +36,12 @@ def get_enterprise_uuid_from_request_data(request):
         return UUID(enterprise_customer_uuid)
     except ValueError as ex:
         raise ParseError('{} is not a valid uuid.'.format(enterprise_customer_uuid)) from ex
+
+# Can use this to replace above logic in other utils functions,
+# but not yet to avoid merge conflicts
+def validate_uuid(uuid):
+    """ Check if UUID is valid. If not, raise an error. """
+    try:
+        return UUID(uuid)
+    except ValueError as ex:
+        raise ParseError('{} is not a valid uuid.'.format(uuid)) from ex
