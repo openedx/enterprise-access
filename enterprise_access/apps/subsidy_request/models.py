@@ -17,7 +17,7 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
     """
     Stores information related to a request for a subsidy (license or coupon).
 
-    .. pii_types: id,email_address
+    .. no_pii: This model has no PII
     """
 
     uuid = models.UUIDField(
@@ -28,11 +28,6 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
     )
 
     lms_user_id = models.IntegerField()
-
-    user_email = models.EmailField(
-        blank=True,
-        null=True,
-    )
 
     course_id = models.CharField(
         null=True,
