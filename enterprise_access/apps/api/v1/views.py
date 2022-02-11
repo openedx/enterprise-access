@@ -1,7 +1,7 @@
 """
 Views for Enterprise Access API v1.
 """
-
+from celery import chain
 import logging
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -26,7 +26,10 @@ from enterprise_access.apps.api.filters import (
     SubsidyRequestCustomerConfigurationFilterBackend,
     SubsidyRequestFilterBackend
 )
-from enterprise_access.apps.api.tasks import delete_enterprise_subsidy_requests_task
+from enterprise_access.apps.api.tasks import (
+    decline_enterprise_subsidy_requests_task,
+    send_decline_notifications_task,
+)
 from enterprise_access.apps.api.utils import get_enterprise_uuid_from_request_data, validate_uuid
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
@@ -542,7 +545,16 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
         if 'subsidy_type' in request.data:
             subsidy_type = request.data['subsidy_type']
             if current_config.subsidy_type and subsidy_type != current_config.subsidy_type:
-                # Remove all subsidy requests of the previous type
-                delete_enterprise_subsidy_requests_task.delay(pk, current_config.subsidy_type)
+
+                send_notification = request.data['send_notification']
+                if send_notification is True:
+                    tasks = chain(
+                        decline_enterprise_subsidy_requests_task(pk, current_config.subsidy_type),
+                        send_decline_notifications_task()
+                        )
+                else:
+                    tasks = decline_enterprise_subsidy_requests_task(pk, current_config.subsidy_type)
+
+                tasks.apply_async()
 
         return super().partial_update(request, *args, **kwargs)

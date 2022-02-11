@@ -27,3 +27,8 @@ class SubsidyTypeChoices:
         (LICENSE, 'License Subsidy'),
         (COUPON, 'Coupon Subsidy'),
     )
+
+SUBSIDY_TYPE_CHANGE_DECLINATION = (
+    'Declined because subsidy type on SubsidyRequestCustomerConfiguration '
+    'has changed.'
+)
