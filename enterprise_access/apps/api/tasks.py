@@ -52,7 +52,7 @@ def decline_enterprise_subsidy_requests_task(enterprise_customer_uuid, subsidy_t
                 SubsidyRequestStates.ERROR
             ],
         )
-    elif subsidy_type == SubsidyTypeChoices.LICENSE:
+    if subsidy_type == SubsidyTypeChoices.LICENSE:
         subsidy_requests = LicenseRequest.objects.filter(
             enterprise_customer_uuid=enterprise_customer_uuid,
             state__in=[
