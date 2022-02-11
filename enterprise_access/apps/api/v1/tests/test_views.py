@@ -1093,7 +1093,8 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
 
         payload = {
             'subsidy_requests_enabled': True,
-            'subsidy_type': SubsidyTypeChoices.COUPON
+            'subsidy_type': SubsidyTypeChoices.COUPON,
+            'send_notification': False,
         }
         response = self.client.patch(
             f'{CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT}{self.enterprise_customer_uuid_1}/',
@@ -1109,7 +1110,7 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
         assert customer_config.subsidy_type == SubsidyTypeChoices.COUPON
 
 
-    @mock.patch('enterprise_access.apps.api.tasks.delete_enterprise_subsidy_requests_task.delay')
+    @mock.patch('enterprise_access.apps.api.tasks.decline_enterprise_subsidy_requests_task.delay')
     @ddt.data(
         (SubsidyTypeChoices.LICENSE, SubsidyTypeChoices.COUPON, SubsidyTypeChoices.LICENSE),
         (SubsidyTypeChoices.COUPON, SubsidyTypeChoices.LICENSE, SubsidyTypeChoices.COUPON),
@@ -1118,15 +1119,15 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
         (None, SubsidyTypeChoices.LICENSE, None),
     )
     @ddt.unpack
-    def test_partial_update_deletes_old_requests(
+    def test_partial_update_declines_old_requests(
         self,
         previous_subsidy_type,
         new_subsidy_type,
         expected_deleted_subsidy_type,
-        mock_delete_enterprise_subsidy_requests_task
+        mock_decline_enterprise_subsidy_requests_task
     ):
         """
-        Test that old requests are deleted if the subsidy type changes.
+        Test that old requests are declined if the subsidy type changes.
         """
 
         self.set_jwt_cookie(roles_and_contexts=[
@@ -1146,7 +1147,8 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
 
         payload = {
             'subsidy_requests_enabled': True,
-            'subsidy_type': new_subsidy_type
+            'subsidy_type': new_subsidy_type,
+            'send_notification': False,
         }
         response = self.client.patch(
             f'{CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT}{self.enterprise_customer_uuid_1}/',
@@ -1155,7 +1157,8 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
         assert response.status_code == status.HTTP_200_OK
 
         if expected_deleted_subsidy_type:
-            mock_delete_enterprise_subsidy_requests_task.assert_called_with(
+            mock_decline_enterprise_subsidy_requests_task.assert_called_with(
                 str(self.enterprise_customer_uuid_1),
-                expected_deleted_subsidy_type
+                expected_deleted_subsidy_type,
+                False,
             )

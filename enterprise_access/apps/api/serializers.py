@@ -27,7 +27,7 @@ class SubsidyRequestSerializer(serializers.ModelSerializer):
             'state',
             'reviewed_at',
             'reviewer_lms_user_id',
-            'denial_reason',
+            'decline_reason',
             'created',
             'modified',
 
@@ -37,7 +37,7 @@ class SubsidyRequestSerializer(serializers.ModelSerializer):
             'state',
             'reviewed_at',
             'reviewer_lms_user_id',
-            'denial_reason',
+            'decline_reason',
             'created',
             'modified',
         ]

@@ -29,7 +29,7 @@ class SubsidyRequestFactory(factory.django.DjangoModelFactory):
     state = SubsidyRequestStates.REQUESTED
     reviewed_at = datetime.utcnow()
     reviewer_lms_user_id = factory.LazyAttribute(lambda x: FAKER.pyint())
-    denial_reason = None
+    decline_reason = None
 
 
 class LicenseRequestFactory(SubsidyRequestFactory):

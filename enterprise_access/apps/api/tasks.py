@@ -32,7 +32,7 @@ def _aliased_recipient_object_from_email(user_email):
 
 
 @shared_task(base=LoggedTask)
-def decline_enterprise_subsidy_requests_task(enterprise_customer_uuid, subsidy_type):
+def decline_enterprise_subsidy_requests_task(enterprise_customer_uuid, subsidy_type, send_notification):
     """
     Decline all subsidy requests of the given type for the enterprise customer.
     """
@@ -40,30 +40,26 @@ def decline_enterprise_subsidy_requests_task(enterprise_customer_uuid, subsidy_t
     if subsidy_type == SubsidyTypeChoices.COUPON:
         subsidy_requests = CouponCodeRequest.objects.filter(
             enterprise_customer_uuid=enterprise_customer_uuid,
-            status__in=[
+            state__in=[
                 SubsidyRequestStates.REQUESTED,
                 SubsidyRequestStates.PENDING,
                 SubsidyRequestStates.ERROR
             ],
         )
-        subsidy_requests.state = SubsidyRequestStates.DECLINED
-        subsidy_requests.decline_reason = SUBSIDY_TYPE_CHANGE_DECLINATION
-        subsidy_requests.save()
-
     elif subsidy_type == SubsidyTypeChoices.LICENSE:
         subsidy_requests = LicenseRequest.objects.filter(
             enterprise_customer_uuid=enterprise_customer_uuid,
-            status__in=[
+            state__in=[
                 SubsidyRequestStates.REQUESTED,
                 SubsidyRequestStates.PENDING,
                 SubsidyRequestStates.ERROR
             ],
         )
-        subsidy_requests.state = SubsidyRequestStates.DECLINED
-        subsidy_requests.decline_reason = SUBSIDY_TYPE_CHANGE_DECLINATION
-        subsidy_requests.save()
 
-    return subsidy_requests
+    subsidy_requests.update(
+        state=SubsidyRequestStates.DECLINED,
+        decline_reason=SUBSIDY_TYPE_CHANGE_DECLINATION,
+    )
 
 
 @shared_task(base=LoggedTask)
@@ -80,8 +76,8 @@ def send_decline_notifications_task(subsidy_requests):
         # Todo: add things to this dictionary once the campaign template exists
         braze_trigger_properties = {}
 
-        braze_client_instance.send_campaign_message(
-            braze_campaign_id,
-            recipients=[recipient],
-            trigger_properties=braze_trigger_properties,
-        )
+        # braze_client_instance.send_campaign_message(
+        #     braze_campaign_id,
+        #     recipients=[recipient],
+        #     trigger_properties=braze_trigger_properties,
+        # )

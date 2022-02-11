@@ -27,7 +27,7 @@ class BaseSubsidyRequestAdmin:
 
     read_only_fields = (
         'uuid',
-        'denial_reason',
+        'decline_reason',
         'state',
         'reviewer_lms_user_id',
         'reviewed_at',
@@ -37,7 +37,7 @@ class BaseSubsidyRequestAdmin:
         'lms_user_id',
         'course_id',
         'enterprise_customer_uuid',
-        'denial_reason',
+        'decline_reason',
         'reviewer_lms_user_id',
         'reviewed_at',
         'state',
