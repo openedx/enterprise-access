@@ -32,3 +32,5 @@ SUBSIDY_TYPE_CHANGE_DECLINATION = (
     'Declined because subsidy type on SubsidyRequestCustomerConfiguration '
     'has changed.'
 )
+
+ENTERPRISE_BRAZE_ALIAS_LABEL = 'Enterprise'  # Do Not change this, this is consistent with other uses across edX repos.
