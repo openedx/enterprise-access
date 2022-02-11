@@ -26,10 +26,7 @@ from enterprise_access.apps.api.filters import (
     SubsidyRequestCustomerConfigurationFilterBackend,
     SubsidyRequestFilterBackend
 )
-from enterprise_access.apps.api.tasks import (
-    decline_enterprise_subsidy_requests_task,
-    send_decline_notifications_task,
-)
+from enterprise_access.apps.api.tasks import decline_enterprise_subsidy_requests_task
 from enterprise_access.apps.api.utils import get_enterprise_uuid_from_request_data, validate_uuid
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
@@ -543,10 +540,11 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
         current_config = SubsidyRequestCustomerConfiguration.objects.get(pk=pk)
 
         if 'subsidy_type' in request.data:
+
             subsidy_type = request.data['subsidy_type']
             send_notification = request.data['send_notification']
-            if current_config.subsidy_type and subsidy_type != current_config.subsidy_type:
 
+            if current_config.subsidy_type and subsidy_type != current_config.subsidy_type:
                 decline_enterprise_subsidy_requests_task.delay(pk, current_config.subsidy_type, send_notification)
 
         return super().partial_update(request, *args, **kwargs)
