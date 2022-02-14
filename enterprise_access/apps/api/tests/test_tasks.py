@@ -56,7 +56,7 @@ class TestTasks(APITest):
             state=SubsidyRequestStates.DECLINED,
         ).exists()
 
-        decline_enterprise_subsidy_requests_task.delay(
+        decline_enterprise_subsidy_requests_task(
             self.enterprise_customer_uuid_1,
             SubsidyTypeChoices.COUPON,
             False
@@ -78,7 +78,7 @@ class TestTasks(APITest):
             state=SubsidyRequestStates.DECLINED,
         ).exists()
 
-        decline_enterprise_subsidy_requests_task.delay(
+        decline_enterprise_subsidy_requests_task(
             self.enterprise_customer_uuid_1,
             SubsidyTypeChoices.LICENSE,
             False
@@ -108,7 +108,7 @@ class TestTasks(APITest):
         mock_lms_client.get_enterprise_learner_data = mock_get_learner_data
 
         # Run the task
-        decline_enterprise_subsidy_requests_task.delay(
+        decline_enterprise_subsidy_requests_task(
             self.enterprise_customer_uuid_1,
             SubsidyTypeChoices.LICENSE,
             True
