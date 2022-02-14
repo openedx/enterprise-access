@@ -1,6 +1,8 @@
+"""
+API client for calls to the LMS.
+"""
 import logging
 
-import requests
 from django.conf import settings
 
 from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient

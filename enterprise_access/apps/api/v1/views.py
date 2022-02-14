@@ -1,7 +1,7 @@
 """
 Views for Enterprise Access API v1.
 """
-from celery import chain
+
 import logging
 
 from django.core.exceptions import ObjectDoesNotExist

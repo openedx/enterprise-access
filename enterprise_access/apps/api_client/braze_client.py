@@ -1,3 +1,6 @@
+"""
+API client for calls to Braze.
+"""
 import logging
 
 from braze.client import BrazeClient
@@ -8,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 
 class BrazeApiClient(BrazeClient):
+    """
+    API client for calls to Braze.
+    """
     def __init__(self):
 
         required_settings = ['BRAZE_API_KEY', 'BRAZE_API_URL', 'BRAZE_APP_ID']

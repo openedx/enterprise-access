@@ -3,7 +3,6 @@ Celery tasks for Enterprise Access API.
 """
 import logging
 
-from braze.exceptions import BrazeClientError
 from celery import shared_task
 from celery_utils.logged_task import LoggedTask
 
@@ -83,7 +82,7 @@ def decline_enterprise_subsidy_requests_task(enterprise_customer_uuid, subsidy_t
 
         for subsidy_request in subsidy_requests:
             logger.info(f'Looking up user email in the LMS to send notifcation for subsidy request {subsidy_request}')
-            enterprise_customer_user_data = LmsApiClient.get_enterprise_learner_data(subsidy_request.lms_user_id)
+            enterprise_customer_user_data = lms_client.get_enterprise_learner_data(subsidy_request.lms_user_id)
             user_email = enterprise_customer_user_data['user']['email']
             recipient = _aliased_recipient_object_from_email(user_email)
             # Todo: add things to this dictionary once the campaign template exists

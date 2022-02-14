@@ -5,10 +5,13 @@ Tests for Enterprise Access API tasks.
 from uuid import uuid4
 
 import mock
-from django.conf import settings
 
 from enterprise_access.apps.api.tasks import decline_enterprise_subsidy_requests_task
-from enterprise_access.apps.subsidy_request.constants import ENTERPRISE_BRAZE_ALIAS_LABEL, SubsidyRequestStates, SubsidyTypeChoices
+from enterprise_access.apps.subsidy_request.constants import (
+    ENTERPRISE_BRAZE_ALIAS_LABEL,
+    SubsidyRequestStates,
+    SubsidyTypeChoices,
+)
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LicenseRequest,
@@ -90,7 +93,7 @@ class TestTasks(APITest):
             state=SubsidyRequestStates.DECLINED,
         ).count() == 3
 
-    @mock.patch('enterprise_access.apps.api.tasks.LmsApiClient')
+    @mock.patch('enterprise_access.apps.api.tasks.LmsApiClient', return_value=mock.MagicMock())
     @mock.patch('enterprise_access.apps.api.tasks.BrazeApiClient', return_value=mock.MagicMock())
     def test_decline_requests_task_notification_sent_to_user(self, mock_braze_client, mock_lms_client):
         """
@@ -98,14 +101,11 @@ class TestTasks(APITest):
         """
         user_email = 'example@example.com'
 
-        # Make a fake lms client
-        mock_get_learner_data = mock.Mock()
-        mock_get_learner_data.return_value = {
+        mock_lms_client().get_enterprise_learner_data.return_value = {
             'user': {
                 'email': user_email,
             }
         }
-        mock_lms_client.get_enterprise_learner_data = mock_get_learner_data
 
         # Run the task
         decline_enterprise_subsidy_requests_task(
@@ -116,7 +116,7 @@ class TestTasks(APITest):
 
         # Make sure our LMS client got called correct times and with what we expected
         mock_lms_client().get_enterprise_learner_data.called_with(self.user.lms_user_id)
-        assert mock_get_learner_data.call_count == 3
+        assert mock_lms_client().get_enterprise_learner_data.call_count == 3
 
         # And also the same for the Braze Client
         expected_recipient = {
