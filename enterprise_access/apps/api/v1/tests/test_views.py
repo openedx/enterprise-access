@@ -1109,7 +1109,6 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
         assert customer_config.subsidy_requests_enabled
         assert customer_config.subsidy_type == SubsidyTypeChoices.COUPON
 
-
     @mock.patch('enterprise_access.apps.api.tasks.decline_enterprise_subsidy_requests_task.delay')
     @ddt.data(
         (SubsidyTypeChoices.LICENSE, SubsidyTypeChoices.COUPON, SubsidyTypeChoices.LICENSE),
