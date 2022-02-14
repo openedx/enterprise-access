@@ -6,7 +6,6 @@ import logging
 from braze.client import BrazeClient
 from django.conf import settings
 
-
 logger = logging.getLogger(__name__)
 
 

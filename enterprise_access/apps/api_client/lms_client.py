@@ -7,7 +7,6 @@ from django.conf import settings
 
 from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
 
-
 logger = logging.getLogger(__name__)
 
 

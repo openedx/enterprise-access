@@ -5,19 +5,17 @@ import logging
 
 from celery import shared_task
 from celery_utils.logged_task import LoggedTask
-
 from django.conf import settings
 
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.subsidy_request.constants import (
     ENTERPRISE_BRAZE_ALIAS_LABEL,
-    SubsidyRequestStates,
     SUBSIDY_TYPE_CHANGE_DECLINATION,
-    SubsidyTypeChoices,
+    SubsidyRequestStates,
+    SubsidyTypeChoices
 )
 from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
-
 
 logger = logging.getLogger(__name__)
 

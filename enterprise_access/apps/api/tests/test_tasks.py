@@ -10,16 +10,10 @@ from enterprise_access.apps.api.tasks import decline_enterprise_subsidy_requests
 from enterprise_access.apps.subsidy_request.constants import (
     ENTERPRISE_BRAZE_ALIAS_LABEL,
     SubsidyRequestStates,
-    SubsidyTypeChoices,
+    SubsidyTypeChoices
 )
-from enterprise_access.apps.subsidy_request.models import (
-    CouponCodeRequest,
-    LicenseRequest,
-)
-from enterprise_access.apps.subsidy_request.tests.factories import (
-    CouponCodeRequestFactory,
-    LicenseRequestFactory,
-)
+from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
+from enterprise_access.apps.subsidy_request.tests.factories import CouponCodeRequestFactory, LicenseRequestFactory
 from test_utils import APITest
 
 
