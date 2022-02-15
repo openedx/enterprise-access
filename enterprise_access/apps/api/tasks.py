@@ -24,6 +24,12 @@ def _aliased_recipient_object_from_email(user_email):
     """
     Returns a dictionary with a braze recipient object, including
     a braze alias object.
+
+    Args:
+        user_email (string): email of user
+
+    Returns:
+        a dictionary with a braze recipient object, including a braze alias object.
     """
     return {
         'attributes': {'email': user_email},

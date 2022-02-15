@@ -2,6 +2,7 @@
 Views for Enterprise Access API v1.
 """
 
+from celery import chain
 import logging
 
 from django.core.exceptions import ObjectDoesNotExist
@@ -536,8 +537,8 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
         fn=lambda request, pk: pk
     )
     def partial_update(self, request, *args, **kwargs):
-        pk = kwargs['pk']
-        current_config = SubsidyRequestCustomerConfiguration.objects.get(pk=pk)
+        enterprise_customer_uuid = kwargs['pk']
+        current_config = SubsidyRequestCustomerConfiguration.objects.get(pk=enterprise_customer_uuid)
 
         if 'subsidy_type' in request.data:
 
@@ -545,6 +546,27 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
             send_notification = request.data['send_notification']
 
             if current_config.subsidy_type and subsidy_type != current_config.subsidy_type:
-                decline_enterprise_subsidy_requests_task.delay(pk, current_config.subsidy_type, send_notification)
+
+                subsidy_model = None
+                if current_config.subsidy_type == SubsidyTypeChoices.COUPON:
+                    subsidy_model = CouponCodeRequest
+                if current_config.subsidy_type == SubsidyTypeChoices.LICENSE:
+                    subsidy_model = LicenseRequest
+
+                if subsidy_model is None:
+                    message = f'Cannot process partial update. Subsidy type provided ({subsidy_type}) is incorrect.'
+                    return Response(message, status.HTTP_400_BAD_REQUEST)
+
+                # Get objects to decline and optionally send notifcations for
+                subsidy_requests = subsidy_model.objects.filter(
+                    enterprise_customer_uuid=enterprise_customer_uuid,
+                    state__in=[
+                        SubsidyRequestStates.REQUESTED,
+                        SubsidyRequestStates.PENDING,
+                        SubsidyRequestStates.ERROR
+                    ],
+                )
+
+                decline_enterprise_subsidy_requests_task.delay(enterprise_customer_uuid, subsidy_requests, send_notification)
 
         return super().partial_update(request, *args, **kwargs)
