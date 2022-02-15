@@ -1109,13 +1109,12 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
         assert customer_config.subsidy_requests_enabled
         assert customer_config.subsidy_type == SubsidyTypeChoices.COUPON
 
-    @mock.patch('enterprise_access.apps.api.tasks.decline_enterprise_subsidy_requests_task.delay')
+    @mock.patch('enterprise_access.apps.api.tasks.decline_enterprise_subsidy_requests_task.si')
     @ddt.data(
         (SubsidyTypeChoices.LICENSE, LicenseRequest, SubsidyTypeChoices.COUPON, SubsidyTypeChoices.LICENSE),
         (SubsidyTypeChoices.COUPON, CouponCodeRequest, SubsidyTypeChoices.LICENSE, SubsidyTypeChoices.COUPON),
         (SubsidyTypeChoices.LICENSE, LicenseRequest, None, SubsidyTypeChoices.LICENSE),
         (SubsidyTypeChoices.COUPON, CouponCodeRequest, None, SubsidyTypeChoices.COUPON),
-        (None, None, SubsidyTypeChoices.LICENSE, None),
     )
     @ddt.unpack
     def test_partial_update_declines_old_requests(
@@ -1123,7 +1122,7 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
         previous_subsidy_type,
         previous_subsidy_object_type,
         new_subsidy_type,
-        expected_deleted_subsidy_type,
+        expected_declined_subsidy_type,
         mock_decline_enterprise_subsidy_requests_task
     ):
         """
@@ -1145,6 +1144,12 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
         customer_config.subsidy_type = previous_subsidy_type
         customer_config.save()
 
+        expected_declined_subsidy = previous_subsidy_object_type.objects.create(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            state=SubsidyRequestStates.REQUESTED,
+            lms_user_id=self.user.lms_user_id,
+        )
+
         payload = {
             'subsidy_requests_enabled': True,
             'subsidy_type': new_subsidy_type,
@@ -1156,26 +1161,20 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
         )
         assert response.status_code == status.HTTP_200_OK
 
-        if expected_deleted_subsidy_type:
-            expected_queryset = previous_subsidy_object_type.objects.filter(
-                enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-                state__in=[
-                    SubsidyRequestStates.REQUESTED,
-                    SubsidyRequestStates.PENDING,
-                    SubsidyRequestStates.ERROR
-                ],
-            )
+        expected_queryset = previous_subsidy_object_type.objects.filter(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            state__in=[
+                SubsidyRequestStates.REQUESTED,
+                SubsidyRequestStates.PENDING,
+                SubsidyRequestStates.ERROR
+            ],
+        )
 
-            # Assert things about how mock_decline_enterprise_subsidy_requests_task is called
+        mock_decline_enterprise_subsidy_requests_task.assert_called_with(
+            str(self.enterprise_customer_uuid_1),
+            [str(expected_declined_subsidy.uuid)],
+            previous_subsidy_type,
+        )
 
-            # Spent time troubleshooting AssertionError: <SoftDeletableQuerySet []> != <SoftDeletableQuerySet []>
-            # when using assert_called_with on the task, but still unclear why this is happening.
-            # I'd rather move on and just make more specific assertions to confirm the expected
-            # is happening, hence the reference to call_args here
-            mock_decline_enterprise_subsidy_requests_task.assert_called_once()
-            actual_uuid = mock_decline_enterprise_subsidy_requests_task.call_args[0][0]
-            actual_qs = mock_decline_enterprise_subsidy_requests_task.call_args[0][1]
-            actual_notify_bool = mock_decline_enterprise_subsidy_requests_task.call_args[0][2]
-            assert actual_uuid == str(self.enterprise_customer_uuid_1)
-            assert str(actual_qs.query) == str(expected_queryset.query)
-            assert actual_notify_bool is False
+
+# make separate test for (None, None, SubsidyTypeChoices.LICENSE, None), case 

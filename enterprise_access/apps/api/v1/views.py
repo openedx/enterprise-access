@@ -28,7 +28,7 @@ from enterprise_access.apps.api.filters import (
     SubsidyRequestFilterBackend
 )
 from enterprise_access.apps.api.tasks import decline_enterprise_subsidy_requests_task
-from enterprise_access.apps.api.utils import get_enterprise_uuid_from_request_data, validate_uuid
+from enterprise_access.apps.api.utils import get_enterprise_uuid_from_request_data, get_subsidy_model, validate_uuid
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
@@ -544,29 +544,40 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
 
             subsidy_type = request.data['subsidy_type']
             send_notification = request.data['send_notification']
+            current_subsidy_type = current_config.subsidy_type
 
             if current_config.subsidy_type and subsidy_type != current_config.subsidy_type:
 
-                subsidy_model = None
-                if current_config.subsidy_type == SubsidyTypeChoices.COUPON:
-                    subsidy_model = CouponCodeRequest
-                if current_config.subsidy_type == SubsidyTypeChoices.LICENSE:
-                    subsidy_model = LicenseRequest
-
-                if subsidy_model is None:
-                    message = f'Cannot process partial update. Subsidy type provided ({subsidy_type}) is incorrect.'
-                    return Response(message, status.HTTP_400_BAD_REQUEST)
-
-                # Get objects to decline and optionally send notifcations for
-                subsidy_requests = subsidy_model.objects.filter(
+                current_subsidy_model = get_subsidy_model(current_config.subsidy_type)
+                # Get identifiers of requests to decline and optionally send notifcations for
+                subsidy_request_uuids = list(current_subsidy_model.objects.filter(
                     enterprise_customer_uuid=enterprise_customer_uuid,
                     state__in=[
                         SubsidyRequestStates.REQUESTED,
                         SubsidyRequestStates.PENDING,
                         SubsidyRequestStates.ERROR
                     ],
+                ).values_list('uuid', flat=True))
+                subsidy_request_uuids = [str(uuid) for uuid in subsidy_request_uuids]
+
+                tasks = chain(
+                    decline_enterprise_subsidy_requests_task.si(
+                        enterprise_customer_uuid,
+                        subsidy_request_uuids,
+                        current_subsidy_type,
+                    ),
                 )
 
-                decline_enterprise_subsidy_requests_task.delay(enterprise_customer_uuid, subsidy_requests, send_notification)
+                if send_notification:
+                    tasks.link(
+                        send_notification_emails_for_requests.si(
+                            enterprise_customer_uuid,
+                            subsidy_request_uuids,
+                            settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
+                            current_subsidy_type,
+                        )
+                    )
+
+                tasks.delay()
 
         return super().partial_update(request, *args, **kwargs)
