@@ -19,11 +19,11 @@ OAUTH2_PROVIDER_URL = 'http://edx.devstack.lms:18000/oauth2'
 # OAuth2 variables specific to social-auth/SSO login use case.
 SOCIAL_AUTH_EDX_OAUTH2_KEY = os.environ.get('SOCIAL_AUTH_EDX_OAUTH2_KEY', 'enterprise_access-sso-key')
 SOCIAL_AUTH_EDX_OAUTH2_SECRET = os.environ.get('SOCIAL_AUTH_EDX_OAUTH2_SECRET', 'enterprise_access-sso-secret')
-SOCIAL_AUTH_EDX_OAUTH2_ISSUER = os.environ.get('SOCIAL_AUTH_EDX_OAUTH2_ISSUER', 'http://localhost:18000')
+SOCIAL_AUTH_EDX_OAUTH2_ISSUER = os.environ.get('SOCIAL_AUTH_EDX_OAUTH2_ISSUER', 'http://edx.devstack.lms:18000')
 SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT = os.environ.get('SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT', 'http://edx.devstack.lms:18000')
-SOCIAL_AUTH_EDX_OAUTH2_LOGOUT_URL = os.environ.get('SOCIAL_AUTH_EDX_OAUTH2_LOGOUT_URL', 'http://localhost:18000/logout')
+SOCIAL_AUTH_EDX_OAUTH2_LOGOUT_URL = os.environ.get('SOCIAL_AUTH_EDX_OAUTH2_LOGOUT_URL', 'http://edx.devstack.lms:18000/logout')
 SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT = os.environ.get(
-    'SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT', 'http://localhost:18000',
+    'SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT', 'http://edx.devstack.lms:18000',
 )
 
 # OAuth2 variables specific to backend service API calls.
@@ -32,7 +32,7 @@ BACKEND_SERVICE_EDX_OAUTH2_SECRET = os.environ.get('BACKEND_SERVICE_EDX_OAUTH2_S
 
 JWT_AUTH.update({
     'JWT_SECRET_KEY': 'lms-secret',
-    'JWT_ISSUER': 'http://localhost:18000/oauth2',
+    'JWT_ISSUER': 'http://edx.devstack.lms:18000/oauth2',
     'JWT_AUDIENCE': None,
     'JWT_VERIFY_AUDIENCE': False,
     'JWT_PUBLIC_SIGNING_JWK_SET': (
@@ -43,7 +43,7 @@ JWT_AUTH.update({
     ),
     'JWT_ISSUERS': [{
         'AUDIENCE': 'lms-key',
-        'ISSUER': 'http://localhost:18000/oauth2',
+        'ISSUER': 'http://edx.devstack.lms:18000/oauth2',
         'SECRET_KEY': 'lms-secret',
     }],
 })
@@ -69,4 +69,4 @@ CORS_ORIGIN_WHITELIST = [
 
 ECOMMERCE_URL = 'http://localhost:18130'
 LICENSE_MANAGER_URL = 'http://localhost:18170'
-LMS_URL = 'http://localhost:18000'
+LMS_URL = 'http://edx.devstack.lms:18000'
