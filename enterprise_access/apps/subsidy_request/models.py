@@ -55,7 +55,7 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
         blank=True
     )
 
-    denial_reason = models.CharField(
+    decline_reason = models.CharField(
         max_length=255,
         blank=True,
         null=True,
@@ -125,7 +125,7 @@ class LicenseRequest(SubsidyRequest):
     def decline(self, reviewer_lms_user_id, reason=None):
         self.reviewer_lms_user_id = reviewer_lms_user_id
         self.state = SubsidyRequestStates.DECLINED
-        self.denial_reason = reason
+        self.decline_reason = reason
         self.reviewed_at = localized_utcnow()
         self.save()
 
@@ -174,7 +174,7 @@ class CouponCodeRequest(SubsidyRequest):
     def decline(self, reviewer_lms_user_id, reason=None):
         self.reviewer_lms_user_id = reviewer_lms_user_id
         self.state = SubsidyRequestStates.DECLINED
-        self.denial_reason = reason
+        self.decline_reason = reason
         self.reviewed_at = localized_utcnow()
         self.save()
 

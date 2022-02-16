@@ -4,6 +4,8 @@ Views for Enterprise Access API v1.
 
 import logging
 
+from celery import chain
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.utils.functional import cached_property
@@ -26,8 +28,11 @@ from enterprise_access.apps.api.filters import (
     SubsidyRequestCustomerConfigurationFilterBackend,
     SubsidyRequestFilterBackend
 )
-from enterprise_access.apps.api.tasks import delete_enterprise_subsidy_requests_task
-from enterprise_access.apps.api.utils import get_enterprise_uuid_from_request_data, validate_uuid
+from enterprise_access.apps.api.tasks import (
+    decline_enterprise_subsidy_requests_task,
+    send_notification_emails_for_requests
+)
+from enterprise_access.apps.api.utils import get_enterprise_uuid_from_request_data, get_subsidy_model, validate_uuid
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
@@ -536,13 +541,49 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
         fn=lambda request, pk: pk
     )
     def partial_update(self, request, *args, **kwargs):
-        pk = kwargs['pk']
-        current_config = SubsidyRequestCustomerConfiguration.objects.get(pk=pk)
+        enterprise_customer_uuid = kwargs['pk']
+        current_config = SubsidyRequestCustomerConfiguration.objects.get(pk=enterprise_customer_uuid)
 
         if 'subsidy_type' in request.data:
+
             subsidy_type = request.data['subsidy_type']
-            if current_config.subsidy_type and subsidy_type != current_config.subsidy_type:
-                # Remove all subsidy requests of the previous type
-                delete_enterprise_subsidy_requests_task.delay(pk, current_config.subsidy_type)
+            send_notification = request.data['send_notification']
+            current_subsidy_type = current_config.subsidy_type
+
+            if current_subsidy_type and subsidy_type != current_subsidy_type:
+
+                current_subsidy_model = get_subsidy_model(current_subsidy_type)
+                # Don't flush anything if current subsidy model not set yet
+                if current_subsidy_model is None:
+                    return super().partial_update(request, *args, **kwargs)
+
+                # Get identifiers of requests to decline and optionally send notifcations for
+                subsidy_request_uuids = list(current_subsidy_model.objects.filter(
+                    enterprise_customer_uuid=enterprise_customer_uuid,
+                    state__in=[
+                        SubsidyRequestStates.REQUESTED,
+                        SubsidyRequestStates.PENDING,
+                        SubsidyRequestStates.ERROR
+                    ],
+                ).values_list('uuid', flat=True))
+                subsidy_request_uuids = [str(uuid) for uuid in subsidy_request_uuids]
+
+                tasks = chain(
+                    decline_enterprise_subsidy_requests_task.si(
+                        subsidy_request_uuids,
+                        current_subsidy_type,
+                    ),
+                )
+
+                if send_notification:
+                    tasks.link(
+                        send_notification_emails_for_requests.si(
+                            subsidy_request_uuids,
+                            settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
+                            current_subsidy_type,
+                        )
+                    )
+
+                tasks.delay()
 
         return super().partial_update(request, *args, **kwargs)

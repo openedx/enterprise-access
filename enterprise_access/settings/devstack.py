@@ -69,3 +69,4 @@ CORS_ORIGIN_WHITELIST = [
 
 ECOMMERCE_URL = 'http://localhost:18130'
 LICENSE_MANAGER_URL = 'http://localhost:18170'
+LMS_URL = 'http://localhost:18000'

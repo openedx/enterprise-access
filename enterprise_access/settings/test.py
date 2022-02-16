@@ -24,3 +24,6 @@ CELERY_RESULT_BACKEND = f'file://{results_dir.name}'
 
 ECOMMERCE_URL = 'http://ecommerce.example.com'
 LICENSE_MANAGER_URL = 'http://license-manager.example.com'
+LMS_URL = 'http://edx-platform.example.com'
+
+BRAZE_DECLINE_NOTIFICATION_CAMPAIGN = 'test-campaign-id'
