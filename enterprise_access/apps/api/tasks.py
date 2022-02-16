@@ -5,7 +5,6 @@ import logging
 
 from celery import shared_task
 from celery_utils.logged_task import LoggedTask
-from django.conf import settings
 
 from enterprise_access.apps.api.utils import get_subsidy_model
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
@@ -13,10 +12,8 @@ from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.subsidy_request.constants import (
     ENTERPRISE_BRAZE_ALIAS_LABEL,
     SUBSIDY_TYPE_CHANGE_DECLINATION,
-    SubsidyRequestStates,
-    SubsidyTypeChoices
+    SubsidyRequestStates
 )
-from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +38,8 @@ def _aliased_recipient_object_from_email(user_email):
     }
 
 
-
-
 @shared_task(base=LoggedTask)
-def decline_enterprise_subsidy_requests_task(enterprise_customer_uuid, subsidy_request_uuids, subsidy_type):
+def decline_enterprise_subsidy_requests_task(subsidy_request_uuids, subsidy_type):
     """
     Decline all subsidy requests of the given type for the enterprise customer.
     """
@@ -67,7 +62,6 @@ def decline_enterprise_subsidy_requests_task(enterprise_customer_uuid, subsidy_r
 
 @shared_task(base=LoggedTask)
 def send_notification_emails_for_requests(
-        enterprise_customer_uuid,
         subsidy_request_uuids,
         braze_campaign_id,
         subsidy_type,

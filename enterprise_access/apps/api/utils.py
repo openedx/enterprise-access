@@ -9,6 +9,7 @@ from rest_framework.exceptions import ParseError
 from enterprise_access.apps.subsidy_request.constants import SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
 
+
 def get_enterprise_uuid_from_query_params(request):
     """
     Extracts enterprise_customer_uuid from query params.

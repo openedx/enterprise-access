@@ -6,7 +6,10 @@ from uuid import uuid4
 
 import mock
 
-from enterprise_access.apps.api.tasks import decline_enterprise_subsidy_requests_task
+from enterprise_access.apps.api.tasks import (
+    decline_enterprise_subsidy_requests_task,
+    send_notification_emails_for_requests
+)
 from enterprise_access.apps.subsidy_request.constants import (
     ENTERPRISE_BRAZE_ALIAS_LABEL,
     SubsidyRequestStates,
@@ -30,17 +33,19 @@ class TestTasks(APITest):
             SubsidyRequestStates.PENDING,
             SubsidyRequestStates.ERROR,
         ]
+        self.license_requests = []
+        self.coupon_code_requests = []
         for state in self.subsidy_states_to_decline:
-            LicenseRequestFactory(
+            self.license_requests.append(LicenseRequestFactory(
                 enterprise_customer_uuid=self.enterprise_customer_uuid_1,
                 lms_user_id=self.user.lms_user_id,
                 state=state
-            )
-            CouponCodeRequestFactory(
+            ))
+            self.coupon_code_requests.append(CouponCodeRequestFactory(
                 enterprise_customer_uuid=self.enterprise_customer_uuid_1,
                 lms_user_id=self.user.lms_user_id,
                 state=state
-            )
+            ))
 
 
     def test_decline_requests_task_coupons(self):
@@ -53,10 +58,10 @@ class TestTasks(APITest):
             state=SubsidyRequestStates.DECLINED,
         ).exists()
 
+        subsidy_request_uuids = [str(request.uuid) for request in self.coupon_code_requests]
         decline_enterprise_subsidy_requests_task(
-            self.enterprise_customer_uuid_1,
+            subsidy_request_uuids,
             SubsidyTypeChoices.COUPON,
-            False
         )
 
         assert CouponCodeRequest.objects.filter(
@@ -75,10 +80,10 @@ class TestTasks(APITest):
             state=SubsidyRequestStates.DECLINED,
         ).exists()
 
+        subsidy_request_uuids = [str(request.uuid) for request in self.license_requests]
         decline_enterprise_subsidy_requests_task(
-            self.enterprise_customer_uuid_1,
+            subsidy_request_uuids,
             SubsidyTypeChoices.LICENSE,
-            False
         )
 
         assert LicenseRequest.objects.filter(
@@ -89,9 +94,9 @@ class TestTasks(APITest):
 
     @mock.patch('enterprise_access.apps.api.tasks.LmsApiClient', return_value=mock.MagicMock())
     @mock.patch('enterprise_access.apps.api.tasks.BrazeApiClient', return_value=mock.MagicMock())
-    def test_decline_requests_task_notification_sent_to_user(self, mock_braze_client, mock_lms_client):
+    def test_send_notification_emails_for_requests(self, mock_braze_client, mock_lms_client):
         """
-        Verify when send_notification is true that we hit braze client with expected args
+        Verify send_notification_emails_for_requests hits braze client with expected args
         """
         user_email = 'example@example.com'
 
@@ -102,10 +107,11 @@ class TestTasks(APITest):
         }
 
         # Run the task
-        decline_enterprise_subsidy_requests_task(
-            self.enterprise_customer_uuid_1,
+        subsidy_request_uuids = [str(request.uuid) for request in self.license_requests]
+        send_notification_emails_for_requests(
+            subsidy_request_uuids,
+            'test-campaign-id',
             SubsidyTypeChoices.LICENSE,
-            True
         )
 
         # Make sure our LMS client got called correct times and with what we expected

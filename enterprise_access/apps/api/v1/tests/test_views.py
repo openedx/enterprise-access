@@ -1111,10 +1111,10 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
 
     @mock.patch('enterprise_access.apps.api.tasks.decline_enterprise_subsidy_requests_task.si')
     @ddt.data(
-        (SubsidyTypeChoices.LICENSE, LicenseRequest, SubsidyTypeChoices.COUPON, SubsidyTypeChoices.LICENSE),
-        (SubsidyTypeChoices.COUPON, CouponCodeRequest, SubsidyTypeChoices.LICENSE, SubsidyTypeChoices.COUPON),
-        (SubsidyTypeChoices.LICENSE, LicenseRequest, None, SubsidyTypeChoices.LICENSE),
-        (SubsidyTypeChoices.COUPON, CouponCodeRequest, None, SubsidyTypeChoices.COUPON),
+        (SubsidyTypeChoices.LICENSE, LicenseRequest, SubsidyTypeChoices.COUPON),
+        (SubsidyTypeChoices.COUPON, CouponCodeRequest, SubsidyTypeChoices.LICENSE),
+        (SubsidyTypeChoices.LICENSE, LicenseRequest, None),
+        (SubsidyTypeChoices.COUPON, CouponCodeRequest, None),
     )
     @ddt.unpack
     def test_partial_update_declines_old_requests(
@@ -1122,7 +1122,6 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
         previous_subsidy_type,
         previous_subsidy_object_type,
         new_subsidy_type,
-        expected_declined_subsidy_type,
         mock_decline_enterprise_subsidy_requests_task
     ):
         """
@@ -1161,20 +1160,110 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
         )
         assert response.status_code == status.HTTP_200_OK
 
-        expected_queryset = previous_subsidy_object_type.objects.filter(
-            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-            state__in=[
-                SubsidyRequestStates.REQUESTED,
-                SubsidyRequestStates.PENDING,
-                SubsidyRequestStates.ERROR
-            ],
-        )
-
         mock_decline_enterprise_subsidy_requests_task.assert_called_with(
-            str(self.enterprise_customer_uuid_1),
             [str(expected_declined_subsidy.uuid)],
             previous_subsidy_type,
         )
 
+    @mock.patch('enterprise_access.apps.api.tasks.send_notification_emails_for_requests.si')
+    @mock.patch('enterprise_access.apps.api.tasks.decline_enterprise_subsidy_requests_task.si')
+    @ddt.data(
+        (SubsidyTypeChoices.LICENSE, LicenseRequest, SubsidyTypeChoices.COUPON),
+    )
+    @ddt.unpack
+    def test_partial_update_send_notification(
+        self,
+        previous_subsidy_type,
+        previous_subsidy_object_type,
+        new_subsidy_type,
+        mock_decline_enterprise_subsidy_requests_task,
+        mock_send_notification_emails_for_requests,
+    ):
+        """
+        Test that partial_updates runs send_notification task with correct args
+        """
 
-# make separate test for (None, None, SubsidyTypeChoices.LICENSE, None), case 
+        self.set_jwt_cookie(roles_and_contexts=[
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+                'context': self.enterprise_customer_uuid_1
+            },
+        ])
+
+        customer_config = SubsidyRequestCustomerConfiguration.objects.get(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+
+        customer_config.subsidy_requests_enabled = False
+        customer_config.subsidy_type = previous_subsidy_type
+        customer_config.save()
+
+        expected_declined_subsidy = previous_subsidy_object_type.objects.create(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            state=SubsidyRequestStates.REQUESTED,
+            lms_user_id=self.user.lms_user_id,
+        )
+
+        payload = {
+            'subsidy_requests_enabled': True,
+            'subsidy_type': new_subsidy_type,
+            'send_notification': True,
+        }
+        response = self.client.patch(
+            f'{CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT}{self.enterprise_customer_uuid_1}/',
+            payload
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        mock_decline_enterprise_subsidy_requests_task.assert_called_once()
+        mock_send_notification_emails_for_requests.assert_called_with(
+            [str(expected_declined_subsidy.uuid)],
+            'test-campaign-id',
+            previous_subsidy_type,
+        )
+
+    @mock.patch('enterprise_access.apps.api.tasks.send_notification_emails_for_requests.si')
+    @mock.patch('enterprise_access.apps.api.tasks.decline_enterprise_subsidy_requests_task.si')
+    @ddt.data(
+        (None, SubsidyTypeChoices.LICENSE),
+    )
+    @ddt.unpack
+    def test_partial_update_no_tasks(
+        self,
+        previous_subsidy_type,
+        new_subsidy_type,
+        mock_decline_enterprise_subsidy_requests_task,
+        mock_send_notification_emails_for_requests,
+    ):
+        """
+        Test that partial_updates runs no tasks if subsidy_type hasn't been set yet.
+        """
+
+        self.set_jwt_cookie(roles_and_contexts=[
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+                'context': self.enterprise_customer_uuid_1
+            },
+        ])
+
+        customer_config = SubsidyRequestCustomerConfiguration.objects.get(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+
+        customer_config.subsidy_requests_enabled = False
+        customer_config.subsidy_type = previous_subsidy_type
+        customer_config.save()
+
+        payload = {
+            'subsidy_requests_enabled': True,
+            'subsidy_type': new_subsidy_type,
+            'send_notification': True,
+        }
+        response = self.client.patch(
+            f'{CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT}{self.enterprise_customer_uuid_1}/',
+            payload
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        mock_decline_enterprise_subsidy_requests_task.assert_not_called()
+        mock_send_notification_emails_for_requests.assert_not_called()

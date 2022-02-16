@@ -2,9 +2,10 @@
 Views for Enterprise Access API v1.
 """
 
-from celery import chain
 import logging
 
+from celery import chain
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.utils.functional import cached_property
@@ -27,7 +28,10 @@ from enterprise_access.apps.api.filters import (
     SubsidyRequestCustomerConfigurationFilterBackend,
     SubsidyRequestFilterBackend
 )
-from enterprise_access.apps.api.tasks import decline_enterprise_subsidy_requests_task
+from enterprise_access.apps.api.tasks import (
+    decline_enterprise_subsidy_requests_task,
+    send_notification_emails_for_requests
+)
 from enterprise_access.apps.api.utils import get_enterprise_uuid_from_request_data, get_subsidy_model, validate_uuid
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
@@ -546,9 +550,13 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
             send_notification = request.data['send_notification']
             current_subsidy_type = current_config.subsidy_type
 
-            if current_config.subsidy_type and subsidy_type != current_config.subsidy_type:
+            if current_subsidy_type and subsidy_type != current_subsidy_type:
 
-                current_subsidy_model = get_subsidy_model(current_config.subsidy_type)
+                current_subsidy_model = get_subsidy_model(current_subsidy_type)
+                # Don't flush anything if current subsidy model not set yet
+                if current_subsidy_model is None:
+                    return super().partial_update(request, *args, **kwargs)
+
                 # Get identifiers of requests to decline and optionally send notifcations for
                 subsidy_request_uuids = list(current_subsidy_model.objects.filter(
                     enterprise_customer_uuid=enterprise_customer_uuid,
@@ -562,7 +570,6 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
 
                 tasks = chain(
                     decline_enterprise_subsidy_requests_task.si(
-                        enterprise_customer_uuid,
                         subsidy_request_uuids,
                         current_subsidy_type,
                     ),
@@ -571,7 +578,6 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
                 if send_notification:
                     tasks.link(
                         send_notification_emails_for_requests.si(
-                            enterprise_customer_uuid,
                             subsidy_request_uuids,
                             settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
                             current_subsidy_type,
