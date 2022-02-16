@@ -29,8 +29,12 @@ from enterprise_access.apps.api.filters import (
     SubsidyRequestFilterBackend
 )
 from enterprise_access.apps.api.tasks import (
+    assign_coupon_codes_task,
+    assign_licenses_task,
     decline_enterprise_subsidy_requests_task,
-    send_notification_emails_for_requests
+    send_notification_emails_for_requests,
+    update_coupon_code_requests_after_assignments_task,
+    update_license_requests_after_assignments_task
 )
 from enterprise_access.apps.api.utils import get_enterprise_uuid_from_request_data, get_subsidy_model, validate_uuid
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
@@ -59,6 +63,7 @@ class PaginationWithPageCount(PageNumberPagination):
         response = super().get_paginated_response(data)
         response.data['num_pages'] = self.page.paginator.num_pages
         return response
+
 
 class SubsidyRequestViewSet(viewsets.ModelViewSet):
     """
@@ -264,26 +269,26 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         """
 
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
-        subsidy_request_uuids = self.request.data.get('subsidy_request_uuids')
+        license_request_uuids = self.request.data.get('subsidy_request_uuids')
         subscription_plan_uuid = self.request.data.get('subscription_plan_uuid')
         reviewer_lms_user_id = self.lms_user_id
 
         try:
-            self._validate_subsidy_request_uuids(subsidy_request_uuids)
+            self._validate_subsidy_request_uuids(license_request_uuids)
             self._validate_subscription_plan_uuid(subscription_plan_uuid)
-            self._verify_subsidies_remaining(subscription_plan_uuid, subsidy_request_uuids)
+            self._verify_subsidies_remaining(subscription_plan_uuid, license_request_uuids)
         except SubsidyRequestError as exc:
             logger.exception(exc)
             return Response(exc.message, exc.http_status_code)
 
-        subsidy_requests = LicenseRequest.objects.filter(
-            uuid__in=subsidy_request_uuids,
+        license_requests = LicenseRequest.objects.filter(
+            uuid__in=license_request_uuids,
             enterprise_customer_uuid=enterprise_customer_uuid,
         )
 
         try:
             self._raise_error_if_any_requests_match_incorrect_states(
-                subsidy_requests,
+                license_requests,
                 incorrect_states=[SubsidyRequestStates.DECLINED],
                 current_action=SubsidyRequestStates.APPROVED
             )
@@ -291,18 +296,23 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
             logger.exception(exc)
             return Response(exc.message, exc.http_status_code)
 
-        subsidies_to_approve = subsidy_requests.filter(
+        license_requests_to_approve = license_requests.filter(
             state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.ERROR]
         )
         with transaction.atomic():
-            for subsidy_request in subsidies_to_approve:
-                subsidy_request.approve(reviewer_lms_user_id)
+            for request in license_requests_to_approve:
+                request.approve(reviewer_lms_user_id)
 
-        # All requests successfully approved, you may now spin off tasks
-        # my_celery_task(subsidies_to_approve)
-        print('SPIN OFF CELERY TASK TO DO THE ASSIGNMENT')
+        license_assignment_tasks = chain(
+            assign_licenses_task.s(
+                [license_request.uuid for license_request in license_requests_to_approve],
+                subscription_plan_uuid
+            ), update_license_requests_after_assignments_task.s()
+        )
 
-        serialized_subsidy_requests = serializers.LicenseRequestSerializer(subsidies_to_approve, many=True)
+        license_assignment_tasks.apply_async()
+
+        serialized_subsidy_requests = serializers.LicenseRequestSerializer(license_requests_to_approve, many=True)
 
         return Response(
             serialized_subsidy_requests.data,
@@ -423,25 +433,25 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         """
 
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
-        subsidy_request_uuids = self.request.data.get('subsidy_request_uuids')
+        coupon_code_request_uuids = self.request.data.get('subsidy_request_uuids')
         coupon_id = self.request.data.get('coupon_id')
         reviewer_lms_user_id = self.lms_user_id
 
         try:
-            self._validate_subsidy_request_uuids(subsidy_request_uuids)
-            self._validate_redemptions_remaining(enterprise_customer_uuid, coupon_id, subsidy_request_uuids)
+            self._validate_subsidy_request_uuids(coupon_code_request_uuids)
+            self._validate_redemptions_remaining(enterprise_customer_uuid, coupon_id, coupon_code_request_uuids)
         except SubsidyRequestError as exc:
             logger.exception(exc)
             return Response(exc.message, exc.http_status_code)
 
-        subsidy_requests = CouponCodeRequest.objects.filter(
-            uuid__in=subsidy_request_uuids,
+        coupon_code_requests = CouponCodeRequest.objects.filter(
+            uuid__in=coupon_code_request_uuids,
             enterprise_customer_uuid=enterprise_customer_uuid,
         )
 
         try:
             self._raise_error_if_any_requests_match_incorrect_states(
-                subsidy_requests,
+                coupon_code_requests,
                 incorrect_states=[SubsidyRequestStates.DECLINED],
                 current_action=SubsidyRequestStates.APPROVED
             )
@@ -449,21 +459,30 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             logger.exception(exc)
             return Response(exc.message, exc.http_status_code)
 
-        subsidies_to_approve = subsidy_requests.filter(
+        coupon_code_requests_to_approve = coupon_code_requests.filter(
             state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.ERROR]
         )
         with transaction.atomic():
-            for subsidy_request in subsidies_to_approve:
-                subsidy_request.approve(reviewer_lms_user_id)
+            for coupon_code_request in coupon_code_requests_to_approve:
+                coupon_code_request.approve(reviewer_lms_user_id)
 
-        # All requests successfully approved, you may now spin off tasks
-        # my_celery_task(subsidies_to_approve)
-        print('SPIN OFF CELERY TASK TO DO THE ASSIGNMENT')
 
-        serialized_subsidy_requests = serializers.CouponCodeRequestSerializer(subsidies_to_approve, many=True)
+        coupon_code_assignment_tasks = chain(
+            assign_coupon_codes_task.s(
+                [coupon_code_request.uuid for coupon_code_request in  coupon_code_requests_to_approve],
+                coupon_id
+            ), update_coupon_code_requests_after_assignments_task.s()
+        )
+
+        coupon_code_assignment_tasks.apply_async()
+
+        serialized_coupon_code_request = serializers.CouponCodeRequestSerializer(
+            coupon_code_requests_to_approve,
+            many=True
+        )
 
         return Response(
-            serialized_subsidy_requests.data,
+            serialized_coupon_code_request.data,
             status=status.HTTP_200_OK,
         )
 

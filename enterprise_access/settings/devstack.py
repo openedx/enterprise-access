@@ -67,6 +67,6 @@ CORS_ORIGIN_WHITELIST = [
 ]
 # END CORS
 
-ECOMMERCE_URL = 'http://localhost:18130'
-LICENSE_MANAGER_URL = 'http://localhost:18170'
+ECOMMERCE_URL = 'http://edx.devstack.ecommerce:18130'
+LICENSE_MANAGER_URL = 'http://license-manager.app:18170'
 LMS_URL = 'http://edx.devstack.lms:18000'

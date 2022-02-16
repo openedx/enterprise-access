@@ -15,3 +15,8 @@ class SubsidyRequestCreationError(SubsidyRequestError):
     """
     An exception indicating that a subsidy request cannot be created.
     """
+
+class MissingEnterpriseLearnerDataError(Exception):
+    """
+    An exception indicating that required enterprise learner data is missing.
+    """

@@ -8,8 +8,13 @@ from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from model_utils.models import SoftDeletableModel, TimeStampedModel
 from simple_history.models import HistoricalRecords
+from simple_history.utils import bulk_update_with_history
 
-from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
+from enterprise_access.apps.subsidy_request.constants import (
+    SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
+    SubsidyRequestStates,
+    SubsidyTypeChoices
+)
 from enterprise_access.apps.subsidy_request.utils import localized_utcnow
 
 
@@ -77,6 +82,18 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
+
+    @classmethod
+    def bulk_update(cls, subsidy_requests, field_names, batch_size=SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE):
+        """
+        django-simple-history functions by saving history using a post_save signal every time that
+        an object with history is saved. However, for certain bulk operations, such as bulk_create, bulk_update,
+        and queryset updates, signals are not sent, and the history is not saved automatically.
+        However, django-simple-history provides utility functions to work around this.
+
+        https://django-simple-history.readthedocs.io/en/2.12.0/common_issues.html#bulk-creating-and-queryset-updating
+        """
+        bulk_update_with_history(subsidy_requests, cls, field_names, batch_size=batch_size)
 
     class Meta:
         abstract = True
