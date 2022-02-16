@@ -1,10 +1,14 @@
 """
 API client for calls to the ecommerce service.
 """
+import logging
+
+import requests
 from django.conf import settings
 
 from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
 
+logger = logging.getLogger(__name__)
 
 class EcommerceApiClient(BaseOAuthClient):
     """
@@ -41,7 +45,34 @@ class EcommerceApiClient(BaseOAuthClient):
           "available":true
         }
         """
-        query_params = {'coupon_id': coupon_id}
-        endpoint = self.enterprise_coupons_endpoint + str(enterprise_uuid) + '/overview/'
-        response = self.client.get(endpoint, params=query_params, timeout=settings.ECOMMERCE_CLIENT_TIMEOUT)
-        return response.json()
+        try:
+            query_params = {'coupon_id': coupon_id}
+            endpoint = self.enterprise_coupons_endpoint + str(enterprise_uuid) + '/overview/'
+            response = self.client.get(endpoint, params=query_params, timeout=settings.ECOMMERCE_CLIENT_TIMEOUT)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(exc)
+            raise
+
+    def assign_coupon_codes(self, user_emails, coupon_id):
+        """
+        Given a list of emails, assign each email a coupon code under the given coupon.
+
+        Arguments:
+            user_emails (list of str): Emails to assign coupon codes to
+        """
+
+        try:
+            endpoint = f'{self.enterprise_coupons_endpoint}{coupon_id}/assign/'
+            payload = {
+                'users': [{ 'email': email } for email in user_emails],
+                # Skip code assignment email since we have a request approved email
+                'notify_learners': False
+            }
+            response = self.client.post(endpoint, json=payload)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(exc)
+            raise

@@ -34,7 +34,7 @@ cffi==1.15.0
     # via
     #   -r requirements/base.txt
     #   cryptography
-charset-normalizer==2.0.10
+charset-normalizer==2.0.12
     # via
     #   -r requirements/base.txt
     #   requests
@@ -78,7 +78,11 @@ defusedxml==0.7.1
     #   -r requirements/base.txt
     #   python3-openid
     #   social-auth-core
-django==3.2.11
+deprecated==1.2.13
+    # via
+    #   -r requirements/base.txt
+    #   redis
+django==3.2.12
     # via
     #   -r requirements/base.txt
     #   django-cors-headers
@@ -138,17 +142,17 @@ drf-yasg==1.20.0
     # via
     #   -r requirements/base.txt
     #   edx-api-doc-tools
-edx-api-doc-tools==1.5.0
+edx-api-doc-tools==1.6.0
     # via -r requirements/base.txt
-edx-auth-backends==4.0.1
+edx-auth-backends==4.1.0
     # via -r requirements/base.txt
-edx-braze-client==0.1.0
+edx-braze-client==0.1.2
     # via -r requirements/base.txt
 edx-celeryutils==1.2.1
     # via -r requirements/base.txt
 edx-django-release-util==1.1.1
     # via -r requirements/base.txt
-edx-django-utils==4.4.2
+edx-django-utils==4.5.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
@@ -157,7 +161,7 @@ edx-drf-extensions==8.0.1
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-opaque-keys==2.2.2
+edx-opaque-keys==2.3.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
@@ -216,7 +220,7 @@ newrelic==7.4.0.172
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
-oauthlib==3.1.1
+oauthlib==3.2.0
     # via
     #   -r requirements/base.txt
     #   requests-oauthlib
@@ -229,11 +233,12 @@ packaging==21.3
     # via
     #   -r requirements/base.txt
     #   drf-yasg
-pbr==5.8.0
+    #   redis
+pbr==5.8.1
     # via
     #   -r requirements/base.txt
     #   stevedore
-prompt-toolkit==3.0.24
+prompt-toolkit==3.0.28
     # via
     #   -r requirements/base.txt
     #   click-repl
@@ -245,7 +250,7 @@ pycparser==2.21
     # via
     #   -r requirements/base.txt
     #   cffi
-pycryptodomex==3.13.0
+pycryptodomex==3.14.1
     # via
     #   -r requirements/base.txt
     #   pyjwkest
@@ -261,7 +266,7 @@ pyjwt[crypto]==2.3.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pymongo==4.0.1
+pymongo==3.12.3
     # via
     #   -r requirements/base.txt
     #   edx-opaque-keys
@@ -291,7 +296,7 @@ pyyaml==6.0
     #   -r requirements/base.txt
     #   -r requirements/production.in
     #   edx-django-release-util
-redis==3.5.3
+redis==4.1.4
     # via -r requirements/base.txt
 requests==2.27.1
     # via
@@ -304,11 +309,11 @@ requests==2.27.1
     #   requests-oauthlib
     #   slumber
     #   social-auth-core
-requests-oauthlib==1.3.0
+requests-oauthlib==1.3.1
     # via
     #   -r requirements/base.txt
     #   social-auth-core
-ruamel.yaml==0.17.20
+ruamel.yaml==0.17.21
     # via
     #   -r requirements/base.txt
     #   drf-yasg
@@ -318,7 +323,7 @@ ruamel.yaml.clib==0.2.6
     #   ruamel.yaml
 rules==3.1
     # via -r requirements/base.txt
-semantic-version==2.8.5
+semantic-version==2.9.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
@@ -379,6 +384,10 @@ wcwidth==0.2.5
     # via
     #   -r requirements/base.txt
     #   prompt-toolkit
+wrapt==1.13.3
+    # via
+    #   -r requirements/base.txt
+    #   deprecated
 zope.event==4.5.0
     # via gevent
 zope.interface==5.4.0

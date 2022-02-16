@@ -25,13 +25,13 @@ class TestLmsApiClient(TestCase):
         mock_oauth_client.get = mock_get
 
         client = LmsApiClient()
-        client.get_enterprise_learner_data(123)
+        client.get_enterprise_learner_data([1,2,3])
 
         expected_url = (
             'http://edx-platform.example.com/'
             'enterprise/api/v1/'
             'enterprise-learner/'
-            '123'
+            '?user_ids=1,2,3'
         )
         mock_oauth_client.return_value.get.assert_called_with(
             expected_url,

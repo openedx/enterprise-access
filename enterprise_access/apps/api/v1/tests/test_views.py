@@ -421,8 +421,9 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             state=SubsidyRequestStates.PENDING
         ).count() == 0
 
+    @mock.patch('enterprise_access.apps.api.v1.views.assign_licenses_task')
     @mock.patch('enterprise_access.apps.api.v1.views.LicenseManagerApiClient.get_subscription_overview')
-    def test_approve_subsidy_request_success(self, mock_get_sub):
+    def test_approve_subsidy_request_success(self, mock_get_sub, _):
         """ Test subsidy approval takes place when proper info provided"""
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -819,8 +820,9 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
             state=SubsidyRequestStates.PENDING
         ).count() == 0
 
+    @mock.patch('enterprise_access.apps.api.v1.views.assign_coupon_codes_task')
     @mock.patch('enterprise_access.apps.api.v1.views.EcommerceApiClient.get_coupon_overview')
-    def test_approve_subsidy_request_success(self, mock_get_coupon):
+    def test_approve_subsidy_request_success(self, mock_get_coupon, _):
         """ Test subsidy approval takes place when proper info provided"""
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
