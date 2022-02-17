@@ -92,7 +92,7 @@ def _get_enterprise_learner_data(lms_user_ids):
 
     return learner_data
 
-@shared_task(base=LoggedTask)
+@shared_task(base=LoggedTaskWithRetry)
 def decline_enterprise_subsidy_requests_task(subsidy_request_uuids, subsidy_type):
     """
     Decline all subsidy requests of the given type for the enterprise customer.
@@ -113,7 +113,8 @@ def decline_enterprise_subsidy_requests_task(subsidy_request_uuids, subsidy_type
         subsidy_request.decline_reason = SUBSIDY_TYPE_CHANGE_DECLINATION
         subsidy_request.save()
 
-@shared_task(base=LoggedTask)
+
+@shared_task(base=LoggedTaskWithRetry)
 def send_notification_emails_for_requests(
         subsidy_request_uuids,
         braze_campaign_id,
