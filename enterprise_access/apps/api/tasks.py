@@ -119,9 +119,19 @@ def send_notification_emails_for_requests(
         subsidy_request_uuids,
         braze_campaign_id,
         subsidy_type,
+        braze_trigger_properties,
     ):
     """
-    Send emails via braze for each subsidy_request.
+    Send emails via braze for each subsidy_request
+
+    Args:
+        subsidy_request_uuids: list strings containing subsidy request uuid identifiers
+        braze_campaign_id: string representation of braze campaign uuid
+        subsidy_type: string representing the type of subsidy (e.g. 'Coupon')
+        braze_trigger_properties: dictionary where keys are names of properties that
+            match variable names in a braze template, and values are the strings
+            you wish to appear in the braze email template where the key (name)
+            is found.
     """
 
     braze_client_instance = BrazeApiClient()
@@ -136,8 +146,6 @@ def send_notification_emails_for_requests(
     for subsidy_request in subsidy_requests:
         user_email = enterprise_learner_data[subsidy_request.lms_user_id]['user']['email']
         recipient = _get_aliased_recipient_object_from_email(user_email)
-        # Todo: add things to this dictionary once the campaign template exists
-        braze_trigger_properties = {}
 
         logger.info(f'Sending braze campaign message for subsidy request {subsidy_request}')
         braze_client_instance.send_campaign_message(

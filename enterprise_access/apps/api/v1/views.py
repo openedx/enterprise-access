@@ -600,6 +600,7 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
                             subsidy_request_uuids,
                             settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
                             current_subsidy_type,
+                            {},
                         )
                     )
 

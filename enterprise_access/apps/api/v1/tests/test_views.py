@@ -1222,6 +1222,7 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
             [str(expected_declined_subsidy.uuid)],
             'test-campaign-id',
             previous_subsidy_type,
+            {},
         )
 
     @mock.patch('enterprise_access.apps.api.tasks.send_notification_emails_for_requests.si')

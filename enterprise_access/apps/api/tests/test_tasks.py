@@ -116,6 +116,7 @@ class TestTasks(APITest):
             subsidy_request_uuids,
             'test-campaign-id',
             SubsidyTypeChoices.LICENSE,
+            {},
         )
 
         # Make sure our LMS client got called correct times and with what we expected
