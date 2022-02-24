@@ -32,7 +32,7 @@ BACKEND_SERVICE_EDX_OAUTH2_SECRET = os.environ.get('BACKEND_SERVICE_EDX_OAUTH2_S
 
 JWT_AUTH.update({
     'JWT_SECRET_KEY': 'lms-secret',
-    'JWT_ISSUER': 'http://edx.devstack.lms:18000/oauth2',
+    'JWT_ISSUER': 'http://localhost:18000/oauth2',
     'JWT_AUDIENCE': None,
     'JWT_VERIFY_AUDIENCE': False,
     'JWT_PUBLIC_SIGNING_JWK_SET': (
@@ -43,7 +43,7 @@ JWT_AUTH.update({
     ),
     'JWT_ISSUERS': [{
         'AUDIENCE': 'lms-key',
-        'ISSUER': 'http://edx.devstack.lms:18000/oauth2',
+        'ISSUER': 'http://localhost:18000/oauth2',
         'SECRET_KEY': 'lms-secret',
     }],
 })
