@@ -109,6 +109,7 @@ class TestTasks(APITest):
                 'email': user_email,
                 'enterprise_customer': {
                     'contact_email': 'example2@example.com',
+                    'slug': 'test-org-for-learning'
                 }
             }
         }
@@ -133,10 +134,16 @@ class TestTasks(APITest):
                 'alias_name': user_email,
             },
         }
+        expected_course_about_page_url = (
+            'http://enterprise-learner-portal.example.com/test-org-for-learning/course/' +
+            self.license_requests[-1].course_id  # mocked call has args from last time it was called
+        )
         mock_braze_client().send_campaign_message.assert_called_with(
             'test-campaign-id',
             recipients=[expected_recipient],
-            trigger_properties={'contact_email': 'example2@example.com'},
+            trigger_properties={
+                'contact_email': 'example2@example.com',
+                'course_about_page_url': expected_course_about_page_url},
             )
         assert mock_braze_client().send_campaign_message.call_count == 3
 

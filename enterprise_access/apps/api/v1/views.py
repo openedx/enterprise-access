@@ -271,6 +271,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
         license_request_uuids = self.request.data.get('subsidy_request_uuids')
         subscription_plan_uuid = self.request.data.get('subscription_plan_uuid')
+        send_notification = self.request.data.get('send_notification')
         reviewer_lms_user_id = self.lms_user_id
 
         try:
@@ -310,6 +311,16 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
             ), update_license_requests_after_assignments_task.s()
         )
 
+        if send_notification:
+            license_assignment_tasks.link(
+                send_notification_emails_for_requests.si(
+                    subsidy_request_uuids,
+                    settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
+                    current_subsidy_type,
+                    {},
+                )
+            )
+
         license_assignment_tasks.apply_async()
 
         serialized_subsidy_requests = serializers.LicenseRequestSerializer(license_requests_to_approve, many=True)
@@ -331,6 +342,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
 
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
         subsidy_request_uuids = self.request.data.get('subsidy_request_uuids')
+        send_notification = self.request.data.get('send_notification')
         reviewer_lms_user_id = self.lms_user_id
 
         try:
@@ -435,6 +447,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
         coupon_code_request_uuids = self.request.data.get('subsidy_request_uuids')
         coupon_id = self.request.data.get('coupon_id')
+        send_notification = self.request.data.get('send_notification')
         reviewer_lms_user_id = self.lms_user_id
 
         try:
@@ -474,6 +487,8 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             ), update_coupon_code_requests_after_assignments_task.s()
         )
 
+        if coupon_code_assignment_tasks
+
         coupon_code_assignment_tasks.apply_async()
 
         serialized_coupon_code_request = serializers.CouponCodeRequestSerializer(
@@ -494,6 +509,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
 
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
         subsidy_request_uuids = self.request.data.get('subsidy_request_uuids')
+        send_notification = self.request.data.get('send_notification')
         reviewer_lms_user_id = self.lms_user_id
 
         try:

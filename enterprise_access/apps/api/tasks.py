@@ -6,6 +6,7 @@ import logging
 from braze.exceptions import BrazeClientError
 from celery import shared_task
 from celery_utils.logged_task import LoggedTask
+from django.conf import settings
 from django.db import OperationalError
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError
@@ -149,10 +150,20 @@ def send_notification_emails_for_requests(
 
         # Use the contact_email of the enterprise customer user's
         # enterprise customer object in the LMS (which we have from the API)
+        # Note this means that if you hand the task contact_email explicitly,
+        # this will overwrite it. I didn't want to overengineer something like
+        # setting a flag that detects whether or not the task got called with
+        # a particular var set, but we can do that in the future if need be
         contact_email = enterprise_learner_data[subsidy_request.lms_user_id]['enterprise_customer']['contact_email']
-        if ('contact_email' not in braze_trigger_properties or
-                braze_trigger_properties['contact_email'] != contact_email):
-            braze_trigger_properties['contact_email'] = contact_email
+        braze_trigger_properties['contact_email'] = contact_email
+
+        enterprise_slug = enterprise_learner_data[subsidy_request.lms_user_id]['enterprise_customer']['slug']
+        course_about_page_url = '{}/{}/course/{}'.format(
+            settings.ENTERPRISE_LEARNER_PORTAL_URL,
+            enterprise_slug,
+            subsidy_request.course_id
+        )
+        braze_trigger_properties['course_about_page_url'] = course_about_page_url
 
         logger.info(f'Sending braze campaign message for subsidy request {subsidy_request}')
         braze_client_instance.send_campaign_message(
