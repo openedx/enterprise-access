@@ -144,8 +144,15 @@ def send_notification_emails_for_requests(
     )
 
     for subsidy_request in subsidy_requests:
-        user_email = enterprise_learner_data[subsidy_request.lms_user_id]['user']['email']
+        user_email = enterprise_learner_data[subsidy_request.lms_user_id]['email']
         recipient = _get_aliased_recipient_object_from_email(user_email)
+
+        # Use the contact_email of the enterprise customer user's
+        # enterprise customer object in the LMS (which we have from the API)
+        contact_email = enterprise_learner_data[subsidy_request.lms_user_id]['enterprise_customer']['contact_email']
+        if ('contact_email' not in braze_trigger_properties or
+                braze_trigger_properties['contact_email'] != contact_email):
+            braze_trigger_properties['contact_email'] = contact_email
 
         logger.info(f'Sending braze campaign message for subsidy request {subsidy_request}')
         braze_client_instance.send_campaign_message(

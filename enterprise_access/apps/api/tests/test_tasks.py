@@ -105,9 +105,12 @@ class TestTasks(APITest):
         user_email = 'example@example.com'
 
         mock_lms_client().get_enterprise_learner_data.return_value = {
-            self.user.lms_user_id:  {'user': {
+            self.user.lms_user_id: {
                 'email': user_email,
-            }}
+                'enterprise_customer': {
+                    'contact_email': 'example2@example.com',
+                }
+            }
         }
 
         # Run the task
@@ -133,7 +136,7 @@ class TestTasks(APITest):
         mock_braze_client().send_campaign_message.assert_called_with(
             'test-campaign-id',
             recipients=[expected_recipient],
-            trigger_properties={}
+            trigger_properties={'contact_email': 'example2@example.com'},
             )
         assert mock_braze_client().send_campaign_message.call_count == 3
 
