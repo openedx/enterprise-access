@@ -148,12 +148,6 @@ def send_notification_emails_for_requests(
         user_email = enterprise_learner_data[subsidy_request.lms_user_id]['email']
         recipient = _get_aliased_recipient_object_from_email(user_email)
 
-        # Use the contact_email of the enterprise customer user's
-        # enterprise customer object in the LMS (which we have from the API)
-        # Note this means that if you hand the task contact_email explicitly,
-        # this will overwrite it. I didn't want to overengineer something like
-        # setting a flag that detects whether or not the task got called with
-        # a particular var set, but we can do that in the future if need be
         contact_email = enterprise_learner_data[subsidy_request.lms_user_id]['enterprise_customer']['contact_email']
         braze_trigger_properties['contact_email'] = contact_email
 

@@ -27,4 +27,4 @@ LICENSE_MANAGER_URL = 'http://license-manager.example.com'
 LMS_URL = 'http://edx-platform.example.com'
 ENTERPRISE_LEARNER_PORTAL_URL = 'http://enterprise-learner-portal.example.com'
 
-BRAZE_DECLINE_NOTIFICATION_CAMPAIGN = 'test-campaign-id'
+BRAZE_AUTO_DECLINE_NOTIFICATION_CAMPAIGN = 'test-campaign-id'

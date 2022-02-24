@@ -315,7 +315,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
             license_assignment_tasks.link(
                 send_notification_emails_for_requests.si(
                     subsidy_request_uuids,
-                    settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
+                    settings.BRAZE_AUTO_DECLINE_NOTIFICATION_CAMPAIGN,
                     current_subsidy_type,
                     {},
                 )
@@ -614,7 +614,7 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
                     tasks.link(
                         send_notification_emails_for_requests.si(
                             subsidy_request_uuids,
-                            settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
+                            settings.BRAZE_AUTO_DECLINE_NOTIFICATION_CAMPAIGN,
                             current_subsidy_type,
                             {},
                         )
