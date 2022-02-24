@@ -304,19 +304,21 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
             for request in license_requests_to_approve:
                 request.approve(reviewer_lms_user_id)
 
+        subsidy_request_uuids = [license_request.uuid for license_request in license_requests_to_approve]
         license_assignment_tasks = chain(
             assign_licenses_task.s(
-                [license_request.uuid for license_request in license_requests_to_approve],
+                subsidy_request_uuids,
                 subscription_plan_uuid
-            ), update_license_requests_after_assignments_task.s()
+            ),
+            update_license_requests_after_assignments_task.s()
         )
 
         if send_notification:
             license_assignment_tasks.link(
                 send_notification_emails_for_requests.si(
                     subsidy_request_uuids,
-                    settings.BRAZE_AUTO_DECLINE_NOTIFICATION_CAMPAIGN,
-                    current_subsidy_type,
+                    settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
+                    LicenseRequest,
                     {},
                 )
             )
@@ -372,6 +374,15 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         with transaction.atomic():
             for subsidy_request in subsidies_to_decline:
                 subsidy_request.decline(reviewer_lms_user_id)
+
+        subsidy_request_uuids = [subsidy_request.uuid for subsidy_requests in subsidies_to_decline]
+        if send_notification:
+            send_notification_emails_for_requests.apply_async(
+                subsidy_request_uuids,
+                settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
+                LicenseRequest,
+                {}
+            )
 
         serialized_subsidy_requests = serializers.LicenseRequestSerializer(subsidies_to_decline, many=True)
 
@@ -479,15 +490,24 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             for coupon_code_request in coupon_code_requests_to_approve:
                 coupon_code_request.approve(reviewer_lms_user_id)
 
-
+        subsidy_request_uuids = [coupon_code_request.uuid for coupon_code_request in  coupon_code_requests_to_approve]
         coupon_code_assignment_tasks = chain(
             assign_coupon_codes_task.s(
-                [coupon_code_request.uuid for coupon_code_request in  coupon_code_requests_to_approve],
+                subsidy_request_uuids,
                 coupon_id
-            ), update_coupon_code_requests_after_assignments_task.s()
+            ),
+            update_coupon_code_requests_after_assignments_task.s()
         )
 
-        if coupon_code_assignment_tasks
+        if send_notification:
+            coupon_code_assignment_tasks.link(
+                send_notification_emails_for_requests.si(
+                    subsidy_request_uuids,
+                    settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
+                    CouponCodeRequest,
+                    {},
+                )
+            )
 
         coupon_code_assignment_tasks.apply_async()
 
@@ -539,6 +559,15 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         with transaction.atomic():
             for subsidy_request in subsidies_to_decline:
                 subsidy_request.decline(reviewer_lms_user_id)
+
+        subsidy_request_uuids = [subsidy_request.uuid for subsidy_requests in subsidies_to_decline]
+        if send_notification:
+            send_notification_emails_for_requests.apply_async(
+                subsidy_request_uuids,
+                settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
+                CouponCodeRequest,
+                {}
+            )
 
         serialized_subsidy_requests = serializers.CouponCodeRequestSerializer(subsidies_to_decline, many=True)
 
