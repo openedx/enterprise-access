@@ -375,7 +375,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
             for subsidy_request in subsidies_to_decline:
                 subsidy_request.decline(reviewer_lms_user_id)
 
-        subsidy_request_uuids = [subsidy_request.uuid for subsidy_requests in subsidies_to_decline]
+        subsidy_request_uuids = [subsidy_request.uuid for subsidy_request in subsidies_to_decline]
         if send_notification:
             send_notification_emails_for_requests.apply_async(
                 subsidy_request_uuids,
@@ -560,7 +560,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             for subsidy_request in subsidies_to_decline:
                 subsidy_request.decline(reviewer_lms_user_id)
 
-        subsidy_request_uuids = [subsidy_request.uuid for subsidy_requests in subsidies_to_decline]
+        subsidy_request_uuids = [subsidy_request.uuid for subsidy_request in subsidies_to_decline]
         if send_notification:
             send_notification_emails_for_requests.apply_async(
                 subsidy_request_uuids,

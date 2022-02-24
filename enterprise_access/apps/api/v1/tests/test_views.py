@@ -4,9 +4,9 @@ Tests for Enterprise Access API v1 views.
 
 from uuid import uuid4
 
-from django.conf import settings
 import ddt
 import mock
+from django.conf import settings
 from pytest import mark
 from rest_framework import status
 from rest_framework.reverse import reverse
