@@ -352,9 +352,9 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 """############################# END CELERY CONFIG ##################################"""
 
 # Default URLS for external services
-LICENSE_MANAGER_URL = os.environ.get('LICENSE_MANAGER_URL', '')
-LMS_URL = os.environ.get('LMS_URL', '')
-ECOMMERCE_URL = os.environ.get('ECOMMERCE_URL', '')
+LICENSE_MANAGER_URL = ''
+LMS_URL = ''
+ECOMMERCE_URL = ''
 ENTERPRISE_LEARNER_PORTAL_URL = ''
 
 LICENSE_MANAGER_CLIENT_TIMEOUT = os.environ.get('LICENSE_MANAGER_CLIENT_TIMEOUT', 45)
