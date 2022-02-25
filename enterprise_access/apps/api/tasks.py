@@ -120,7 +120,7 @@ def send_notification_emails_for_requests(
         subsidy_request_uuids,
         braze_campaign_id,
         subsidy_type,
-        braze_trigger_properties,
+        braze_trigger_properties=None,
     ):
     """
     Send emails via braze for each subsidy_request
@@ -134,6 +134,8 @@ def send_notification_emails_for_requests(
             you wish to appear in the braze email template where the key (name)
             is found.
     """
+    if braze_trigger_properties is None:
+        braze_trigger_properties = {}
 
     braze_client_instance = BrazeApiClient()
 

@@ -466,7 +466,6 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             [self.user_license_request_1.uuid],
             settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
             LicenseRequest,
-            {},
         )
 
     def test_decline_no_subsidy_request_uuids(self):
@@ -560,7 +559,7 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         ).count() == 1
 
     @mock.patch('enterprise_access.apps.api.v1.views.send_notification_emails_for_requests.apply_async')
-    def test_decline_send_notifcation(self, mock_notify):
+    def test_decline_send_notification(self, mock_notify):
         """ Test braze task called if send_notification is True """
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -577,7 +576,6 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             [self.user_license_request_1.uuid],
             settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
             LicenseRequest,
-            {}
         )
 
 
@@ -882,7 +880,6 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
             [self.coupon_code_request_1.uuid],
             settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
             CouponCodeRequest,
-            {},
         )
 
     def test_decline_no_subsidy_request_uuids(self):
@@ -975,7 +972,7 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         ).count() == 1
 
     @mock.patch('enterprise_access.apps.api.v1.views.send_notification_emails_for_requests.apply_async')
-    def test_decline_send_notifcation(self, mock_notify):
+    def test_decline_send_notification(self, mock_notify):
         """ Test braze task called if send_notification is True """
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -992,7 +989,6 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
             [self.coupon_code_request_1.uuid],
             settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
             CouponCodeRequest,
-            {}
         )
 
 @ddt.ddt
@@ -1282,7 +1278,6 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
             [str(expected_declined_subsidy.uuid)],
             'test-campaign-id',
             previous_subsidy_type,
-            {},
         )
 
     @mock.patch('enterprise_access.apps.api.tasks.send_notification_emails_for_requests.si')

@@ -120,7 +120,6 @@ class TestTasks(APITest):
             subsidy_request_uuids,
             'test-campaign-id',
             SubsidyTypeChoices.LICENSE,
-            {},
         )
 
         # Make sure our LMS client got called correct times and with what we expected
@@ -135,7 +134,7 @@ class TestTasks(APITest):
             },
         }
         expected_course_about_page_url = (
-            'http://enterprise-learner-portal.example.com/test-org-for-learning/course/' +
+            f'http://enterprise-learner-portal.example.com/test-org-for-learning/course/' +
             self.license_requests[0].course_id
         )
         mock_braze_client().send_campaign_message.assert_any_call(
