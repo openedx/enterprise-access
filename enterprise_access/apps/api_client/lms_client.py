@@ -33,9 +33,10 @@ class LmsApiClient(BaseOAuthClient):
             endpoint = f'{self.enterprise_learner_endpoint}?user_ids={user_ids}'
             response = self.client.get(endpoint, timeout=settings.LMS_CLIENT_TIMEOUT)
             results = response.json()['results']
-            learner_data = {
-                result['user']['id']: result['user'] for result in results
-            }
+            learner_data = {}
+            for result in results:
+                learner_data[result['user']['id']] = result['user']
+                learner_data[result['user']['id']]['enterprise_customer'] = result['enterprise_customer']
             return learner_data
         except requests.exceptions.HTTPError as exc:
             logger.exception(exc)

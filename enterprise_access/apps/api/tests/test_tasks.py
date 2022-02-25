@@ -105,13 +105,17 @@ class TestTasks(APITest):
         user_email = 'example@example.com'
 
         mock_lms_client().get_enterprise_learner_data.return_value = {
-            self.user.lms_user_id:  {'user': {
+            self.user.lms_user_id: {
                 'email': user_email,
-            }}
+                'enterprise_customer': {
+                    'contact_email': 'example2@example.com',
+                    'slug': 'test-org-for-learning'
+                }
+            }
         }
 
         # Run the task
-        subsidy_request_uuids = [str(request.uuid) for request in self.license_requests]
+        subsidy_request_uuids = [self.license_requests[0].uuid]  # Just use 1 to prevent flakiness
         send_notification_emails_for_requests(
             subsidy_request_uuids,
             'test-campaign-id',
@@ -129,12 +133,19 @@ class TestTasks(APITest):
                 'alias_name': user_email,
             },
         }
-        mock_braze_client().send_campaign_message.assert_called_with(
+        expected_course_about_page_url = (
+            'http://enterprise-learner-portal.example.com/test-org-for-learning/course/' +
+            self.license_requests[0].course_id
+        )
+        mock_braze_client().send_campaign_message.assert_any_call(
             'test-campaign-id',
             recipients=[expected_recipient],
-            trigger_properties={}
+            trigger_properties={
+                'contact_email': 'example2@example.com',
+                'course_about_page_url': expected_course_about_page_url},
             )
-        assert mock_braze_client().send_campaign_message.call_count == 3
+        assert mock_braze_client().send_campaign_message.call_count == 1
+
 
 class TestLicenseAssignmentTasks(APITest):
     """

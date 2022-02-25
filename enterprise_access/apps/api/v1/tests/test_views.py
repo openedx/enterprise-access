@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import ddt
 import mock
+from django.conf import settings
 from pytest import mark
 from rest_framework import status
 from rest_framework.reverse import reverse
@@ -421,9 +422,10 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             state=SubsidyRequestStates.PENDING
         ).count() == 0
 
+    @mock.patch('enterprise_access.apps.api.v1.views.send_notification_emails_for_requests.si')
     @mock.patch('enterprise_access.apps.api.v1.views.assign_licenses_task')
     @mock.patch('enterprise_access.apps.api.v1.views.LicenseManagerApiClient.get_subscription_overview')
-    def test_approve_subsidy_request_success(self, mock_get_sub, _):
+    def test_approve_subsidy_request_success(self, mock_get_sub, _, mock_notify):
         """ Test subsidy approval takes place when proper info provided"""
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -449,6 +451,7 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
             'subsidy_request_uuids': [self.user_license_request_1.uuid],
             'subscription_plan_uuid': self.user_license_request_1.subscription_plan_uuid,
+            'send_notification': True,
         }
         response = self.client.post(LICENSE_REQUESTS_APPROVE_ENDPOINT, payload)
         assert response.status_code == status.HTTP_200_OK
@@ -458,6 +461,12 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         assert LicenseRequest.objects.filter(
             state=SubsidyRequestStates.PENDING
         ).count() == 1
+
+        mock_notify.assert_called_with(
+            [self.user_license_request_1.uuid],
+            settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
+            LicenseRequest,
+        )
 
     def test_decline_no_subsidy_request_uuids(self):
         """ 400 thrown if no subsidy requests provided """
@@ -548,6 +557,26 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         assert LicenseRequest.objects.filter(
             state=SubsidyRequestStates.DECLINED
         ).count() == 1
+
+    @mock.patch('enterprise_access.apps.api.v1.views.send_notification_emails_for_requests.apply_async')
+    def test_decline_send_notification(self, mock_notify):
+        """ Test braze task called if send_notification is True """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.user_license_request_1.uuid],
+            'send_notification': True,
+        }
+        response = self.client.post(LICENSE_REQUESTS_DECLINE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_200_OK
+        mock_notify.assert_called_with(
+            [self.user_license_request_1.uuid],
+            settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
+            LicenseRequest,
+        )
 
 
 @ddt.ddt
@@ -820,9 +849,10 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
             state=SubsidyRequestStates.PENDING
         ).count() == 0
 
+    @mock.patch('enterprise_access.apps.api.v1.views.send_notification_emails_for_requests.si')
     @mock.patch('enterprise_access.apps.api.v1.views.assign_coupon_codes_task')
     @mock.patch('enterprise_access.apps.api.v1.views.EcommerceApiClient.get_coupon_overview')
-    def test_approve_subsidy_request_success(self, mock_get_coupon, _):
+    def test_approve_subsidy_request_success(self, mock_get_coupon, _, mock_notify):
         """ Test subsidy approval takes place when proper info provided"""
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -837,6 +867,7 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
             'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
             'subsidy_request_uuids': [self.coupon_code_request_1.uuid],
             'coupon_id': self.coupon_code_request_1.coupon_id,
+            'send_notification': True,
         }
         response = self.client.post(COUPON_CODE_REQUESTS_APPROVE_ENDPOINT, payload)
         assert response.status_code == status.HTTP_200_OK
@@ -844,6 +875,12 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         assert CouponCodeRequest.objects.filter(
             state=SubsidyRequestStates.PENDING
         ).count() == 1
+
+        mock_notify.assert_called_with(
+            [self.coupon_code_request_1.uuid],
+            settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
+            CouponCodeRequest,
+        )
 
     def test_decline_no_subsidy_request_uuids(self):
         """ 400 thrown if no subsidy requests provided """
@@ -934,6 +971,25 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
             state=SubsidyRequestStates.DECLINED
         ).count() == 1
 
+    @mock.patch('enterprise_access.apps.api.v1.views.send_notification_emails_for_requests.apply_async')
+    def test_decline_send_notification(self, mock_notify):
+        """ Test braze task called if send_notification is True """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.coupon_code_request_1.uuid],
+            'send_notification': True,
+        }
+        response = self.client.post(COUPON_CODE_REQUESTS_DECLINE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_200_OK
+        mock_notify.assert_called_with(
+            [self.coupon_code_request_1.uuid],
+            settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
+            CouponCodeRequest,
+        )
 
 @ddt.ddt
 class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
