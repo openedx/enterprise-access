@@ -134,7 +134,7 @@ class TestTasks(APITest):
             },
         }
         expected_course_about_page_url = (
-            f'http://enterprise-learner-portal.example.com/test-org-for-learning/course/' +
+            'http://enterprise-learner-portal.example.com/test-org-for-learning/course/' +
             self.license_requests[0].course_id
         )
         mock_braze_client().send_campaign_message.assert_any_call(

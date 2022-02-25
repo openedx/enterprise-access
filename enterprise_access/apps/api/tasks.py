@@ -126,7 +126,7 @@ def send_notification_emails_for_requests(
     Send emails via braze for each subsidy_request
 
     Args:
-        subsidy_request_uuids: list strings containing subsidy request uuid identifiers
+        subsidy_request_uuids: list of strings containing subsidy request uuid identifiers
         braze_campaign_id: string representation of braze campaign uuid
         subsidy_type: string representing the type of subsidy (e.g. 'Coupon')
         braze_trigger_properties: dictionary where keys are names of properties that
