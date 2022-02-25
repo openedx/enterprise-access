@@ -469,39 +469,6 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             {},
         )
 
-    @mock.patch('enterprise_access.apps.api.v1.views.assign_licenses_task')
-    @mock.patch('enterprise_access.apps.api.v1.views.LicenseManagerApiClient.get_subscription_overview')
-    def test_approve_send_notification(self, mock_get_sub, _):
-        """ Test subsidy approval sends notification """
-        self.set_jwt_cookie([{
-            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
-            'context': str(self.enterprise_customer_uuid_1)
-        }])
-        mock_get_sub.return_value = {
-            'results': [
-                {
-                    'status': 'assigned',
-                    'count': 13,
-                },
-                {
-                    'status': 'unassigned',
-                    'count': 100000000,
-                }
-            ]
-        }
-
-        payload = {
-            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
-            'subsidy_request_uuids': [self.user_license_request_1.uuid],
-            'subscription_plan_uuid': self.user_license_request_1.subscription_plan_uuid,
-            'send_notification': True,
-        }
-        response = self.client.post(LICENSE_REQUESTS_APPROVE_ENDPOINT, payload)
-        assert response.status_code == status.HTTP_200_OK
-
-
-
-
     def test_decline_no_subsidy_request_uuids(self):
         """ 400 thrown if no subsidy requests provided """
         self.set_jwt_cookie([{
