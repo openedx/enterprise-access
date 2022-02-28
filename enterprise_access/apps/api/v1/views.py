@@ -8,6 +8,7 @@ from celery import chain
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.http import QueryDict
 from django.utils.functional import cached_property
 from django_filters.rest_framework import DjangoFilterBackend
 from edx_rbac import utils
@@ -168,7 +169,9 @@ class SubsidyRequestViewSet(viewsets.ModelViewSet):
             return Response(exc.message, exc.http_status_code)
 
         # Set the lms user id for the request
+        request.data._mutable = True
         request.data['lms_user_id'] = self.lms_user_id
+        request.data._mutable = False
         return super().create(request, *args, **kwargs)
 
 
