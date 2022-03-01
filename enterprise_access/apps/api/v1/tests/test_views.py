@@ -2,6 +2,7 @@
 Tests for Enterprise Access API v1 views.
 """
 
+import random
 from uuid import uuid4
 
 import ddt
@@ -33,6 +34,7 @@ from test_utils import APITest
 LICENSE_REQUESTS_LIST_ENDPOINT = reverse('api:v1:license-requests-list')
 LICENSE_REQUESTS_APPROVE_ENDPOINT = reverse('api:v1:license-requests-approve')
 LICENSE_REQUESTS_DECLINE_ENDPOINT = reverse('api:v1:license-requests-decline')
+LICENSE_REQUESTS_OVERVIEW_ENDPOINT = reverse('api:v1:license-requests-overview')
 COUPON_CODE_REQUESTS_LIST_ENDPOINT = reverse('api:v1:coupon-code-requests-list')
 COUPON_CODE_REQUESTS_APPROVE_ENDPOINT = reverse('api:v1:coupon-code-requests-approve')
 COUPON_CODE_REQUESTS_DECLINE_ENDPOINT = reverse('api:v1:coupon-code-requests-decline')
@@ -577,6 +579,53 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
             LicenseRequest,
         )
+
+    def test_overview_superuser_bad_request(self):
+        """
+        Test that a 400 response is returned if enterprise_customer_uuid
+        is not passed in as a query param when called by a superuser.
+        """
+        self.user.is_superuser = True
+        self.user.save()
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+            'context': ALL_ACCESS_CONTEXT
+        }])
+
+        url = f'{LICENSE_REQUESTS_OVERVIEW_ENDPOINT}'
+        response = self.client.get(url)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_overview_happy_path(self):
+        """
+        Test that counts of requests by state is returned.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        LicenseRequest.objects.all().delete()
+        for state, _ in SubsidyRequestStates.CHOICES:
+            LicenseRequestFactory.create_batch(
+                random.randint(1, 5),
+                enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+                lms_user_id=self.user.lms_user_id,
+                state=state
+            )
+
+        url = f'{LICENSE_REQUESTS_OVERVIEW_ENDPOINT}?enterprise_customer_uuid={self.enterprise_customer_uuid_1}'
+        response = self.client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        for overview in response.data:
+            state = overview['state']
+            count = overview['count']
+            assert count == LicenseRequest.objects.filter(
+                enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+                state=state
+            ).count()
 
 
 @ddt.ddt
@@ -1205,6 +1254,7 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
             state=SubsidyRequestStates.REQUESTED,
             lms_user_id=self.user.lms_user_id,
+            user_email=self.user.email
         )
 
         payload = {
@@ -1260,6 +1310,7 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
             state=SubsidyRequestStates.REQUESTED,
             lms_user_id=self.user.lms_user_id,
+            user_email=self.user.email
         )
 
         payload = {

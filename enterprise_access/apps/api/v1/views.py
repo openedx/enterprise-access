@@ -8,6 +8,7 @@ from celery import chain
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.db.models import Count
 from django.utils.functional import cached_property
 from django_filters.rest_framework import DjangoFilterBackend
 from edx_rbac import utils
@@ -36,7 +37,12 @@ from enterprise_access.apps.api.tasks import (
     update_coupon_code_requests_after_assignments_task,
     update_license_requests_after_assignments_task
 )
-from enterprise_access.apps.api.utils import get_enterprise_uuid_from_request_data, get_subsidy_model, validate_uuid
+from enterprise_access.apps.api.utils import (
+    get_enterprise_uuid_from_query_params,
+    get_enterprise_uuid_from_request_data,
+    get_subsidy_model,
+    validate_uuid
+)
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
@@ -77,7 +83,7 @@ class SubsidyRequestViewSet(viewsets.ModelViewSet):
     authentication_classes = (JwtAuthentication,)
 
     filter_backends = (filters.OrderingFilter, DjangoFilterBackend, SubsidyRequestFilterBackend,)
-    filterset_fields = ('uuid', 'state', 'course_id', 'enterprise_customer_uuid')
+    filterset_fields = ('uuid', 'lms_user_id', 'user_email', 'state', 'course_id', 'enterprise_customer_uuid')
     pagination_class = PaginationWithPageCount
 
     http_method_names = ['get', 'post']
@@ -91,6 +97,10 @@ class SubsidyRequestViewSet(viewsets.ModelViewSet):
     @property
     def lms_user_id(self):
         return self.decoded_jwt.get('user_id')
+
+    @property
+    def user_email(self):
+        return self.decoded_jwt.get('email')
 
     def _validate_subsidy_request_uuids(self, subsidy_request_uuids):
         """
@@ -174,7 +184,28 @@ class SubsidyRequestViewSet(viewsets.ModelViewSet):
 
         # Set the lms user id for the request
         request.data['lms_user_id'] = self.lms_user_id
+        request.data['user_email'] = self.user_email
+
         return super().create(request, *args, **kwargs)
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_query_params,
+    )
+    @action(detail=False, url_path='overview', methods=['get'])
+    def overview(self, request):
+        """
+        Returns an overview of subsidy requests count by state.
+        """
+        enterprise_customer_uuid = self.request.query_params.get('enterprise_customer_uuid')
+        if not enterprise_customer_uuid:
+            msg = 'enterprise_customer_uuid query param is required'
+            return Response(msg, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = self.filter_queryset(self.get_queryset()).filter(enterprise_customer_uuid=enterprise_customer_uuid)
+        queryset_values = queryset.values('state').annotate(count=Count('state')).order_by('-count')
+        requests_overview = list(queryset_values)
+        return Response(requests_overview, status=status.HTTP_200_OK)
 
 
 class LicenseRequestViewSet(SubsidyRequestViewSet):

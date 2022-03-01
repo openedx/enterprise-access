@@ -369,3 +369,8 @@ BRAZE_AUTO_DECLINE_NOTIFICATION_CAMPAIGN = ''
 BRAZE_API_URL = ''
 BRAZE_API_KEY = os.environ.get('BRAZE_API_KEY', '')
 BRAZE_APP_ID = os.environ.get('BRAZE_APP_ID', '')
+
+# shell_plus
+SHELL_PLUS_IMPORTS = [
+    'from enterprise_access.apps.subsidy_request.utils import localized_utcnow',
+]

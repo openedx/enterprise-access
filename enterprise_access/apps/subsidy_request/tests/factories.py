@@ -24,6 +24,7 @@ class SubsidyRequestFactory(factory.django.DjangoModelFactory):
 
     uuid = factory.LazyFunction(uuid4)
     lms_user_id = factory.LazyAttribute(lambda x: FAKER.pyint())
+    user_email = factory.Faker('email')
     course_id = factory.LazyFunction(uuid4)
     enterprise_customer_uuid = factory.LazyFunction(uuid4)
     state = SubsidyRequestStates.REQUESTED

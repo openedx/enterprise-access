@@ -34,6 +34,8 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
 
     lms_user_id = models.IntegerField()
 
+    user_email = models.EmailField()
+
     course_id = models.CharField(
         null=True,
         blank=True,
