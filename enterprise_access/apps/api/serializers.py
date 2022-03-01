@@ -22,6 +22,7 @@ class SubsidyRequestSerializer(serializers.ModelSerializer):
         fields = [
             'uuid',
             'lms_user_id',
+            'user_email',
             'course_id',
             'enterprise_customer_uuid',
             'state',
@@ -37,7 +38,6 @@ class SubsidyRequestSerializer(serializers.ModelSerializer):
             'state',
             'reviewed_at',
             'reviewer_lms_user_id',
-            'decline_reason',
             'created',
             'modified',
         ]

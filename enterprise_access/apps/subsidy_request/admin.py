@@ -16,8 +16,10 @@ class BaseSubsidyRequestAdmin:
     list_display = (
         'uuid',
         'lms_user_id',
+        'user_email',
         'enterprise_customer_uuid',
         'course_id',
+        'state',
     )
 
     list_filter = (
@@ -35,6 +37,7 @@ class BaseSubsidyRequestAdmin:
 
     fields = (
         'lms_user_id',
+        'user_email',
         'course_id',
         'enterprise_customer_uuid',
         'decline_reason',
