@@ -26,6 +26,7 @@ ECOMMERCE_URL = 'http://ecommerce.example.com'
 LICENSE_MANAGER_URL = 'http://license-manager.example.com'
 LMS_URL = 'http://edx-platform.example.com'
 ENTERPRISE_LEARNER_PORTAL_URL = 'http://enterprise-learner-portal.example.com'
+DISCOVERY_URL = 'http://discovery.example.com'
 
 BRAZE_APPROVE_NOTIFICATION_CAMPAIGN = 'test-approve-campaign'
 BRAZE_DECLINE_NOTIFICATION_CAMPAIGN = 'test-decline-campaign'
