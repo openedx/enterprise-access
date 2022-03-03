@@ -16,7 +16,7 @@ class DiscoveryApiClient(BaseOAuthClient):
     API client for calls to the Discovery service.
     """
     discovery_api_base_url = settings.DISCOVERY_URL + '/api/v1/'
-    courses_endpoint = discovery_api_base_url + 'courses/'
+    courses_endpoint = discovery_api_base_url + 'courses'
 
     def get_course_data(self, course_id):
         """
