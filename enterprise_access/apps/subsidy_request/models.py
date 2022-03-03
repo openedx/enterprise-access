@@ -140,7 +140,7 @@ class LicenseRequest(SubsidyRequest):
         """
         if self.course_id:
             return f'<LicenseRequest for user {self.user} and course {self.course_id}>'
-        return f'<LicenseRequest for user {self.user}'
+        return f'<LicenseRequest for user {self.user}>'
 
     def approve(self, reviewer):
         self.reviewer = reviewer
