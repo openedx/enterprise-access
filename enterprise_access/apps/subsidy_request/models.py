@@ -191,7 +191,7 @@ class CouponCodeRequest(SubsidyRequest):
         """
         if self.course_id:
             return f'<CouponCodeRequest for user {self.user} and course {self.course_id}>'
-        return f'<CouponCodeRequest for user {self.user}'
+        return f'<CouponCodeRequest for user {self.user}>'
 
     def approve(self, reviewer):
         self.reviewer = reviewer
