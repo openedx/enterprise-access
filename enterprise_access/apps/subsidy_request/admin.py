@@ -28,7 +28,6 @@ class BaseSubsidyRequestAdmin:
 
     read_only_fields = (
         'uuid',
-        'user',
         'decline_reason',
         'state',
         'reviewer',
