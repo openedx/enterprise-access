@@ -138,7 +138,9 @@ class LicenseRequest(SubsidyRequest):
         """
         Return human-readable string representation.
         """
-        return f'<LicenseRequest for {self.course_id}>'
+        if self.course_id:
+            return f'<LicenseRequest for user {self.user} and course {self.course_id}>'
+        return f'<LicenseRequest for user {self.user}>'
 
     def approve(self, reviewer):
         self.reviewer = reviewer
@@ -187,7 +189,9 @@ class CouponCodeRequest(SubsidyRequest):
         """
         Return human-readable string representation.
         """
-        return f'<CouponCodeRequest for {self.course_id}>'
+        if self.course_id:
+            return f'<CouponCodeRequest for user {self.user} and course {self.course_id}>'
+        return f'<CouponCodeRequest for user {self.user}>'
 
     def approve(self, reviewer):
         self.reviewer = reviewer
