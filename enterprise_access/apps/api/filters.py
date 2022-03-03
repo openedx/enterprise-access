@@ -34,7 +34,7 @@ class SubsidyRequestFilterBackend(filters.BaseFilterBackend):
             return queryset
 
         return queryset.filter(
-            Q(lms_user_id=lms_user_id_from_jwt) |
+            Q(user__lms_user_id=lms_user_id_from_jwt) |
             Q(enterprise_customer_uuid__in=accessible_enterprises_as_admin)
         )
 

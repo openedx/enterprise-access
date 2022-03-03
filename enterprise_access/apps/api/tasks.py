@@ -141,19 +141,21 @@ def send_notification_emails_for_requests(
 
     subsidy_model = get_subsidy_model(subsidy_type)
     subsidy_requests = subsidy_model.objects.filter(uuid__in=subsidy_request_uuids)
-    lms_user_ids = [subsidy_request.lms_user_id for subsidy_request in subsidy_requests]
+    lms_user_ids = [subsidy_request.user.lms_user_id for subsidy_request in subsidy_requests]
     enterprise_learner_data = _get_enterprise_learner_data(
         lms_user_ids
     )
 
     for subsidy_request in subsidy_requests:
-        user_email = enterprise_learner_data[subsidy_request.lms_user_id]['email']
+        user_email = enterprise_learner_data[subsidy_request.user.lms_user_id]['email']
         recipient = _get_aliased_recipient_object_from_email(user_email)
 
-        contact_email = enterprise_learner_data[subsidy_request.lms_user_id]['enterprise_customer']['contact_email']
+        contact_email = enterprise_learner_data[
+            subsidy_request.user.lms_user_id
+        ]['enterprise_customer']['contact_email']
         braze_trigger_properties['contact_email'] = contact_email
 
-        enterprise_slug = enterprise_learner_data[subsidy_request.lms_user_id]['enterprise_customer']['slug']
+        enterprise_slug = enterprise_learner_data[subsidy_request.user.lms_user_id]['enterprise_customer']['slug']
         course_about_page_url = '{}/{}/course/{}'.format(
             settings.ENTERPRISE_LEARNER_PORTAL_URL,
             enterprise_slug,
@@ -196,7 +198,7 @@ def assign_licenses_task(license_request_uuids, subscription_uuid):
         logger.info(f'No pending/errored license requests with uuids: {license_request_uuids} found.')
         return None
 
-    lms_user_ids = [license_request.lms_user_id for license_request in license_requests]
+    lms_user_ids = [license_request.user.lms_user_id for license_request in license_requests]
     learner_data = _get_enterprise_learner_data(lms_user_ids)
     user_emails = [user['email'] for user in learner_data.values()]
 
@@ -246,7 +248,7 @@ def update_license_requests_after_assignments_task(license_assignment_results):
     )
 
     for license_request in license_requests:
-        user_email = learner_data[str(license_request.lms_user_id)]['email']
+        user_email = learner_data[str(license_request.user.lms_user_id)]['email']
 
         if not assigned_licenses.get(user_email):
             msg = f'License was not assigned for {license_request.uuid}. {user_email} already had a license assigned.'
@@ -287,7 +289,7 @@ def assign_coupon_codes_task(coupon_code_request_uuids, coupon_id):
         logger.info(f'No pending/errored coupon code requests with uuids: {coupon_code_requests} found.')
         return None
 
-    lms_user_ids = [request.lms_user_id for request in coupon_code_requests]
+    lms_user_ids = [request.user.lms_user_id for request in coupon_code_requests]
     learner_data = _get_enterprise_learner_data(lms_user_ids)
     user_emails = [user['email'] for user in learner_data.values()]
 
@@ -335,7 +337,7 @@ def update_coupon_code_requests_after_assignments_task(coupon_code_assignment_re
     )
 
     for coupon_code_request in coupon_code_requests:
-        user_email = learner_data[str(coupon_code_request.lms_user_id)]['email']
+        user_email = learner_data[str(coupon_code_request.user.lms_user_id)]['email']
         coupon_code_request.state = SubsidyRequestStates.APPROVED
         coupon_code_request.coupon_id = coupon_id
         coupon_code_request.coupon_code = assigned_codes[user_email]

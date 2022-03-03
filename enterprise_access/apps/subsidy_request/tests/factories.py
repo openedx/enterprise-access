@@ -8,6 +8,7 @@ from uuid import uuid4
 import factory
 from faker import Faker
 
+from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
@@ -23,13 +24,12 @@ class SubsidyRequestFactory(factory.django.DjangoModelFactory):
     """
 
     uuid = factory.LazyFunction(uuid4)
-    lms_user_id = factory.LazyAttribute(lambda x: FAKER.pyint())
-    user_email = factory.Faker('email')
+    user = factory.SubFactory(UserFactory)
     course_id = factory.LazyFunction(uuid4)
     enterprise_customer_uuid = factory.LazyFunction(uuid4)
     state = SubsidyRequestStates.REQUESTED
     reviewed_at = datetime.utcnow()
-    reviewer_lms_user_id = factory.LazyAttribute(lambda x: FAKER.pyint())
+    reviewer = factory.SubFactory(UserFactory)
     decline_reason = None
 
 

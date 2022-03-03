@@ -77,11 +77,11 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         # license requests for the user
         self.user_license_request_1 = LicenseRequestFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-            lms_user_id=self.user.lms_user_id
+            user=self.user
         )
         self.user_license_request_2 = LicenseRequestFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid_2,
-            lms_user_id=self.user.lms_user_id
+            user=self.user
         )
 
         # license request under the user's enterprise but not for the user
@@ -221,7 +221,7 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             subsidy_type=SubsidyTypeChoices.LICENSE
         )
         LicenseRequestFactory(
-            lms_user_id=self.user.lms_user_id,
+            user=self.user,
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
             state=current_request_state,
         )
@@ -611,7 +611,7 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             LicenseRequestFactory.create_batch(
                 random.randint(1, 5),
                 enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-                lms_user_id=self.user.lms_user_id,
+                user=self.user,
                 state=state
             )
 
@@ -640,11 +640,11 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         # coupon code requests for the user
         self.coupon_code_request_1 = CouponCodeRequestFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-            lms_user_id=self.user.lms_user_id
+            user=self.user
         )
         self.coupon_code_request_2 = CouponCodeRequestFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid_2,
-            lms_user_id=self.user.lms_user_id
+            user=self.user
         )
 
         # coupon code request under the user's enterprise but not for the user
@@ -763,7 +763,7 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         )
         CouponCodeRequestFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-            lms_user_id=self.user.lms_user_id,
+            user=self.user,
             course_id='edx-demo'
         )
         payload = {
@@ -1253,8 +1253,7 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
         expected_declined_subsidy = previous_subsidy_object_type.objects.create(
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
             state=SubsidyRequestStates.REQUESTED,
-            lms_user_id=self.user.lms_user_id,
-            user_email=self.user.email
+            user=self.user,
         )
 
         payload = {
@@ -1309,8 +1308,7 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
         expected_declined_subsidy = previous_subsidy_object_type.objects.create(
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
             state=SubsidyRequestStates.REQUESTED,
-            lms_user_id=self.user.lms_user_id,
-            user_email=self.user.email
+            user=self.user,
         )
 
         payload = {

@@ -70,3 +70,8 @@ CORS_ORIGIN_WHITELIST = [
 ECOMMERCE_URL = 'http://edx.devstack.ecommerce:18130'
 LICENSE_MANAGER_URL = 'http://license-manager.app:18170'
 LMS_URL = 'http://edx.devstack.lms:18000'
+
+# shell_plus
+SHELL_PLUS_IMPORTS = [
+    'from enterprise_access.apps.subsidy_request.utils import localized_utcnow',
+]

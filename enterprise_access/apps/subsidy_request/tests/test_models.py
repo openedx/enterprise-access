@@ -6,14 +6,16 @@ from uuid import uuid4
 import ddt
 from django.forms import ValidationError
 from django.test import TestCase
+from pytest import mark
 
+from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.tests.factories import CouponCodeRequestFactory, LicenseRequestFactory
 
 now = datetime.utcnow()
-mock_lms_user_id = 1
 
 @ddt.ddt
+@mark.django_db
 class LicenseRequestTests(TestCase):
     """ LicenseRequest model tests. """
 
@@ -22,19 +24,20 @@ class LicenseRequestTests(TestCase):
 
     @ddt.data(
         (None, now),
-        (mock_lms_user_id, None)
+        (1, None)
     )
     @ddt.unpack
-    def test_missing_review_info(self, reviewer_lms_user_id, reviewed_at):
+    def test_missing_review_info(self, reviewer_id, reviewed_at):
         with self.assertRaises(ValidationError) as error:
+            reviewer = UserFactory(id=reviewer_id) if reviewer_id else None
             license_request = LicenseRequestFactory(
                 state=SubsidyRequestStates.PENDING,
-                reviewer_lms_user_id=reviewer_lms_user_id,
+                reviewer=reviewer,
                 reviewed_at=reviewed_at,
             )
             license_request.save()
 
-        expected_error = 'Both reviewer_lms_user_id and reviewed_at are required for a review.'
+        expected_error = 'Both reviewer and reviewed_at are required for a review.'
         print(error.exception.messages)
         assert error.exception.messages[0] == expected_error
 

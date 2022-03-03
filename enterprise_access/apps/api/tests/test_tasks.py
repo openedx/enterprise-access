@@ -43,12 +43,12 @@ class TestTasks(APITest):
         for state in self.subsidy_states_to_decline:
             self.license_requests.append(LicenseRequestFactory(
                 enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-                lms_user_id=self.user.lms_user_id,
+                user=self.user,
                 state=state
             ))
             self.coupon_code_requests.append(CouponCodeRequestFactory(
                 enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-                lms_user_id=self.user.lms_user_id,
+                user=self.user,
                 state=state
             ))
 
@@ -58,7 +58,7 @@ class TestTasks(APITest):
         """
         assert not CouponCodeRequest.objects.filter(
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-            lms_user_id=self.user.lms_user_id,
+            user=self.user,
             state=SubsidyRequestStates.DECLINED,
         ).exists()
 
@@ -70,7 +70,7 @@ class TestTasks(APITest):
 
         assert CouponCodeRequest.objects.filter(
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-            lms_user_id=self.user.lms_user_id,
+            user=self.user,
             state=SubsidyRequestStates.DECLINED,
         ).count() == 3
 
@@ -80,7 +80,7 @@ class TestTasks(APITest):
         """
         assert not LicenseRequest.objects.filter(
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-            lms_user_id=self.user.lms_user_id,
+            user=self.user,
             state=SubsidyRequestStates.DECLINED,
         ).exists()
 
@@ -92,7 +92,7 @@ class TestTasks(APITest):
 
         assert LicenseRequest.objects.filter(
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-            lms_user_id=self.user.lms_user_id,
+            user=self.user,
             state=SubsidyRequestStates.DECLINED,
         ).count() == 3
 
@@ -162,7 +162,7 @@ class TestLicenseAssignmentTasks(APITest):
         }
         self.pending_license_request = LicenseRequestFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid,
-            lms_user_id=self.user.lms_user_id,
+            user=self.user,
             state=SubsidyRequestStates.PENDING
         )
 
@@ -260,7 +260,7 @@ class TestCouponCodeAssignmentTasks(APITest):
         }
         self.pending_coupon_code_request = CouponCodeRequestFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid,
-            lms_user_id=self.user.lms_user_id,
+            user=self.user,
             state=SubsidyRequestStates.PENDING
         )
 
