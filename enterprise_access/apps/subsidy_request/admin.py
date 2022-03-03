@@ -15,8 +15,7 @@ class BaseSubsidyRequestAdmin:
 
     list_display = (
         'uuid',
-        'lms_user_id',
-        'user_email',
+        'user',
         'enterprise_customer_uuid',
         'course_id',
         'state',
@@ -29,19 +28,20 @@ class BaseSubsidyRequestAdmin:
 
     read_only_fields = (
         'uuid',
+        'user',
         'decline_reason',
         'state',
-        'reviewer_lms_user_id',
+        'reviewer',
         'reviewed_at',
     )
 
     fields = (
-        'lms_user_id',
-        'user_email',
+        'uuid',
+        'user',
         'course_id',
         'enterprise_customer_uuid',
         'decline_reason',
-        'reviewer_lms_user_id',
+        'reviewer',
         'reviewed_at',
         'state',
     )

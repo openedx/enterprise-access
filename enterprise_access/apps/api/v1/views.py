@@ -46,6 +46,7 @@ from enterprise_access.apps.api.utils import (
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
+from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
@@ -83,7 +84,7 @@ class SubsidyRequestViewSet(viewsets.ModelViewSet):
     authentication_classes = (JwtAuthentication,)
 
     filter_backends = (filters.OrderingFilter, DjangoFilterBackend, SubsidyRequestFilterBackend,)
-    filterset_fields = ('uuid', 'lms_user_id', 'user_email', 'state', 'course_id', 'enterprise_customer_uuid')
+    filterset_fields = ('uuid', 'user__email', 'state', 'course_id', 'enterprise_customer_uuid')
     pagination_class = PaginationWithPageCount
 
     http_method_names = ['get', 'post']
@@ -99,8 +100,9 @@ class SubsidyRequestViewSet(viewsets.ModelViewSet):
         return self.decoded_jwt.get('user_id')
 
     @property
-    def user_email(self):
-        return self.decoded_jwt.get('email')
+    def user(self):
+        # user should always exists at this point
+        return User.objects.get(lms_user_id=self.lms_user_id)
 
     def _validate_subsidy_request_uuids(self, subsidy_request_uuids):
         """
@@ -182,10 +184,7 @@ class SubsidyRequestViewSet(viewsets.ModelViewSet):
             logger.exception(exc)
             return Response(exc.message, exc.http_status_code)
 
-        # Set the lms user id for the request
-        request.data['lms_user_id'] = self.lms_user_id
-        request.data['user_email'] = self.user_email
-
+        request.data['user'] = self.user.id
         return super().create(request, *args, **kwargs)
 
     @permission_required(
@@ -224,7 +223,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         enterprise_customer_uuid = self.request.data.get('enterprise_customer_uuid')
 
         has_pending_request = LicenseRequest.objects.filter(
-            lms_user_id=self.lms_user_id,
+            user__lms_user_id=self.lms_user_id,
             enterprise_customer_uuid=enterprise_customer_uuid,
             state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.PENDING]
         ).first()
@@ -303,7 +302,6 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         license_request_uuids = self.request.data.get('subsidy_request_uuids')
         subscription_plan_uuid = self.request.data.get('subscription_plan_uuid')
         send_notification = self.request.data.get('send_notification')
-        reviewer_lms_user_id = self.lms_user_id
 
         try:
             self._validate_subsidy_request_uuids(license_request_uuids)
@@ -333,7 +331,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         )
         with transaction.atomic():
             for request in license_requests_to_approve:
-                request.approve(reviewer_lms_user_id)
+                request.approve(self.user)
 
         subsidy_request_uuids = [license_request.uuid for license_request in license_requests_to_approve]
         license_assignment_tasks = chain(
@@ -375,7 +373,6 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
         subsidy_request_uuids = self.request.data.get('subsidy_request_uuids')
         send_notification = self.request.data.get('send_notification')
-        reviewer_lms_user_id = self.lms_user_id
 
         try:
             self._validate_subsidy_request_uuids(subsidy_request_uuids)
@@ -403,7 +400,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         )
         with transaction.atomic():
             for subsidy_request in subsidies_to_decline:
-                subsidy_request.decline(reviewer_lms_user_id)
+                subsidy_request.decline(self.user)
 
         subsidy_request_uuids = [subsidy_request.uuid for subsidy_request in subsidies_to_decline]
         if send_notification:
@@ -438,7 +435,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         course_id = self.request.data.get('course_id')
 
         has_pending_request = CouponCodeRequest.objects.filter(
-            lms_user_id=self.lms_user_id,
+            user__lms_user_id=self.lms_user_id,
             enterprise_customer_uuid=enterprise_customer_uuid,
             state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.PENDING],
             course_id=course_id
@@ -488,7 +485,6 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         coupon_code_request_uuids = self.request.data.get('subsidy_request_uuids')
         coupon_id = self.request.data.get('coupon_id')
         send_notification = self.request.data.get('send_notification')
-        reviewer_lms_user_id = self.lms_user_id
 
         try:
             self._validate_subsidy_request_uuids(coupon_code_request_uuids)
@@ -517,7 +513,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         )
         with transaction.atomic():
             for coupon_code_request in coupon_code_requests_to_approve:
-                coupon_code_request.approve(reviewer_lms_user_id)
+                coupon_code_request.approve(self.user)
 
         subsidy_request_uuids = [coupon_code_request.uuid for coupon_code_request in  coupon_code_requests_to_approve]
         coupon_code_assignment_tasks = chain(
@@ -558,7 +554,6 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
         subsidy_request_uuids = self.request.data.get('subsidy_request_uuids')
         send_notification = self.request.data.get('send_notification')
-        reviewer_lms_user_id = self.lms_user_id
 
         try:
             self._validate_subsidy_request_uuids(subsidy_request_uuids)
@@ -586,7 +581,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         )
         with transaction.atomic():
             for subsidy_request in subsidies_to_decline:
-                subsidy_request.decline(reviewer_lms_user_id)
+                subsidy_request.decline(self.user)
 
         subsidy_request_uuids = [subsidy_request.uuid for subsidy_request in subsidies_to_decline]
         if send_notification:

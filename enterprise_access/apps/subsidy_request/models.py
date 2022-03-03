@@ -32,9 +32,11 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
         unique=True,
     )
 
-    lms_user_id = models.IntegerField()
-
-    user_email = models.EmailField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="%(app_label)s_%(class)s",
+        on_delete=models.CASCADE,
+    )
 
     course_id = models.CharField(
         null=True,
@@ -57,9 +59,12 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
         blank=True
     )
 
-    reviewer_lms_user_id = models.IntegerField(
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="reviewed_%(app_label)s_%(class)s",
+        blank=True,
         null=True,
-        blank=True
+        on_delete=models.SET_NULL,
     )
 
     decline_reason = models.CharField(
@@ -68,16 +73,16 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
         null=True,
     )
 
-    def approve(self, reviewer_lms_user_id):
+    def approve(self, reviewer):
         raise NotImplementedError
 
-    def decline(self, reviewer_lms_user_id, reason):
+    def decline(self, reviewer, reason):
         raise NotImplementedError
 
     def clean(self):
         if self.state != SubsidyRequestStates.REQUESTED:
-            if not (self.reviewed_at and self.reviewer_lms_user_id):
-                raise ValidationError('Both reviewer_lms_user_id and reviewed_at are required for a review.')
+            if not (self.reviewed_at and self.reviewer):
+                raise ValidationError('Both reviewer and reviewed_at are required for a review.')
 
         return super().clean()
 
@@ -135,14 +140,14 @@ class LicenseRequest(SubsidyRequest):
         """
         return f'<LicenseRequest for {self.course_id}>'
 
-    def approve(self, reviewer_lms_user_id):
-        self.reviewer_lms_user_id = reviewer_lms_user_id
+    def approve(self, reviewer):
+        self.reviewer = reviewer
         self.state = SubsidyRequestStates.PENDING
         self.reviewed_at = localized_utcnow()
         self.save()
 
-    def decline(self, reviewer_lms_user_id, reason=None):
-        self.reviewer_lms_user_id = reviewer_lms_user_id
+    def decline(self, reviewer, reason=None):
+        self.reviewer = reviewer
         self.state = SubsidyRequestStates.DECLINED
         self.decline_reason = reason
         self.reviewed_at = localized_utcnow()
@@ -184,14 +189,14 @@ class CouponCodeRequest(SubsidyRequest):
         """
         return f'<CouponCodeRequest for {self.course_id}>'
 
-    def approve(self, reviewer_lms_user_id):
-        self.reviewer_lms_user_id = reviewer_lms_user_id
+    def approve(self, reviewer):
+        self.reviewer = reviewer
         self.state = SubsidyRequestStates.PENDING
         self.reviewed_at = localized_utcnow()
         self.save()
 
-    def decline(self, reviewer_lms_user_id, reason=None):
-        self.reviewer_lms_user_id = reviewer_lms_user_id
+    def decline(self, reviewer, reason=None):
+        self.reviewer = reviewer
         self.state = SubsidyRequestStates.DECLINED
         self.decline_reason = reason
         self.reviewed_at = localized_utcnow()

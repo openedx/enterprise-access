@@ -17,17 +17,19 @@ class SubsidyRequestSerializer(serializers.ModelSerializer):
     Serializer for the abstract `SubsidyRequest` model.
     """
 
+    email = serializers.EmailField(read_only=True, source="user.email")
+
     class Meta:
         model = SubsidyRequest
         fields = [
             'uuid',
-            'lms_user_id',
-            'user_email',
+            'user',
+            'email',
             'course_id',
             'enterprise_customer_uuid',
             'state',
             'reviewed_at',
-            'reviewer_lms_user_id',
+            'reviewer_id',
             'decline_reason',
             'created',
             'modified',
@@ -36,8 +38,9 @@ class SubsidyRequestSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'uuid',
             'state',
+            'email',
             'reviewed_at',
-            'reviewer_lms_user_id',
+            'reviewer_id',
             'created',
             'modified',
         ]
