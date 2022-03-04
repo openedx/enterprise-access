@@ -139,6 +139,50 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         ])
         assert license_request_uuids == expected_license_request_uuids
 
+    @ddt.data(
+        ('', [choice[0] for choice in SubsidyRequestStates.CHOICES]),  # empty values equate to a skipped filter
+        (f'{SubsidyRequestStates.PENDING}', [SubsidyRequestStates.PENDING]),
+        (f',{SubsidyRequestStates.DECLINED},', [SubsidyRequestStates.DECLINED]),
+        (f'{SubsidyRequestStates.REQUESTED},{SubsidyRequestStates.ERROR}',
+            [SubsidyRequestStates.REQUESTED, SubsidyRequestStates.ERROR]
+        ),
+    )
+    @ddt.unpack
+    def test_filter_by_states(self, states, expected_states):
+        """
+        Test that requests can be filtered by a comma-delimited list of states.
+        """
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        for state, _ in SubsidyRequestStates.CHOICES:
+            LicenseRequestFactory.create_batch(
+                random.randint(1, 3),
+                enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+                user=self.user,
+                state=state
+            )
+
+        query_params = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'states': states
+        }
+        response = self.client.get(LICENSE_REQUESTS_LIST_ENDPOINT, query_params)
+        response_json = self.load_json(response.content)
+
+        license_request_uuids = sorted([lr['uuid'] for lr in response_json['results']])
+        expected_license_request_uuids = [
+            str(license_request.uuid) for license_request in LicenseRequest.objects.filter(
+                enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+                state__in=expected_states
+            ).order_by('uuid')
+        ]
+        assert license_request_uuids == expected_license_request_uuids
+
+
     def test_create_no_customer_configuration(self):
         """
         Test that a 422 response is returned when creating a request
