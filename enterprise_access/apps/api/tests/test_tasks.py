@@ -22,10 +22,10 @@ from enterprise_access.apps.subsidy_request.constants import (
 )
 from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
 from enterprise_access.apps.subsidy_request.tests.factories import CouponCodeRequestFactory, LicenseRequestFactory
-from test_utils import APITest
+from test_utils import APITestWithMockedDiscoveryApiClient
 
 
-class TestTasks(APITest):
+class TestTasks(APITestWithMockedDiscoveryApiClient):
     """
     Test tasks.
     """
@@ -147,7 +147,7 @@ class TestTasks(APITest):
         assert mock_braze_client().send_campaign_message.call_count == 1
 
 
-class TestLicenseAssignmentTasks(APITest):
+class TestLicenseAssignmentTasks(APITestWithMockedDiscoveryApiClient):
     """
     Test license assignment tasks.
     """
@@ -245,7 +245,7 @@ class TestLicenseAssignmentTasks(APITest):
         assert self.pending_license_request.license_uuid == self.mock_license_uuid
         assert self.pending_license_request.subscription_plan_uuid == self.mock_subscription_uuid
 
-class TestCouponCodeAssignmentTasks(APITest):
+class TestCouponCodeAssignmentTasks(APITestWithMockedDiscoveryApiClient):
     """
     Test coupon code assignment tasks.
     """

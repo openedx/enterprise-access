@@ -17,6 +17,7 @@ DATABASES = {
 # END IN-MEMORY TEST DATABASE
 
 # BEGIN CELERY
+CELERY_BROKER_URL = "memory://"
 CELERY_TASK_ALWAYS_EAGER = True
 results_dir = tempfile.TemporaryDirectory()
 CELERY_RESULT_BACKEND = f'file://{results_dir.name}'

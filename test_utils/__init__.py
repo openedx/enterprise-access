@@ -9,6 +9,7 @@ in multiple test modules (i.e. factoryboy factories, base test classes).
 So this package is the place to put them.
 """
 import json
+import mock
 from pytest import mark
 from rest_framework.test import APIClient, APITestCase
 from enterprise_access.apps.core.constants import SYSTEM_ENTERPRISE_ADMIN_ROLE
@@ -17,6 +18,7 @@ from enterprise_access.apps.core.tests.factories import UserFactory
 
 from edx_rest_framework_extensions.auth.jwt.cookies import jwt_cookie_name
 from edx_rest_framework_extensions.auth.jwt.tests.utils import generate_jwt_token, generate_unversioned_payload
+from django.test import TestCase
 from django.test.client import RequestFactory
 
 TEST_USERNAME = 'api_worker'
@@ -117,3 +119,34 @@ class APITest(APITestCase):
         jwt_token = generate_jwt_token(payload)
 
         self.client.cookies[jwt_cookie_name()] = jwt_token
+
+
+class APITestWithMockedDiscoveryApiClient(APITest):
+    """
+    API test class with discovery api calls in subsidy_request tasks mocked out.
+
+    We call discovery on every SubsidyRequest object save().
+    """
+    def setUp(self):
+        super().setUp()
+        self.disco_patcher = mock.patch('enterprise_access.apps.subsidy_request.tasks.DiscoveryApiClient')
+        self.mock_discovery_client = self.disco_patcher.start()
+        self.mock_discovery_client().get_course_data.return_value = {
+            'title': 'How to Bake a Pie: A Slice of Heaven',
+        }
+        self.addCleanup(self.disco_patcher.stop)
+
+
+class TestCaseWithMockedDiscoveryApiClient(TestCase):
+    """
+    Test class with discovery api calls in subsidy_request tasks mocked out.
+
+    We call discovery on every SubsidyRequest object save().
+    """
+    def setUp(self):
+        super().setUp()
+        self.disco_patcher = mock.patch('enterprise_access.apps.subsidy_request.tasks.DiscoveryApiClient')
+        self.mock_discovery_client = self.disco_patcher.start()
+        self.mock_discovery_client().get_course_data.return_value = {
+            'title': 'How to Bake a Cake: So Delicious It Should Be Illegal',
+        }

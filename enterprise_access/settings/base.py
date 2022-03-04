@@ -349,6 +349,8 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     'fanout_patterns': True,
     'fanout_prefix': True,
 }
+
+TASK_MAX_RETRIES = 3
 """############################# END CELERY CONFIG ##################################"""
 
 # Default URLS for external services
