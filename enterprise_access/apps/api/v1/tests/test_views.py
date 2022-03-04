@@ -168,7 +168,7 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
 
         query_params = {
             'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
-            'states': states
+            'state': states
         }
         response = self.client.get(LICENSE_REQUESTS_LIST_ENDPOINT, query_params)
         response_json = self.load_json(response.content)

@@ -20,7 +20,7 @@ class SubsidyRequestFilterBackend(filters.BaseFilterBackend):
         Filter queryset by comma-delimited list of states.
         """
 
-        states = request.query_params.get('states', None)
+        states = request.query_params.get('state', None)
         if states:
             states = states.strip(',').split(',')
             return queryset.filter(state__in=states)
