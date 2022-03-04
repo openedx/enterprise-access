@@ -84,7 +84,7 @@ class SubsidyRequestViewSet(viewsets.ModelViewSet):
     authentication_classes = (JwtAuthentication,)
 
     filter_backends = (filters.OrderingFilter, DjangoFilterBackend, SubsidyRequestFilterBackend, filters.SearchFilter)
-    filterset_fields = ('uuid', 'user__email', 'state', 'course_id', 'enterprise_customer_uuid')
+    filterset_fields = ('uuid', 'user__email', 'course_id', 'enterprise_customer_uuid')
     pagination_class = PaginationWithPageCount
 
     search_fields = ['user__email']
