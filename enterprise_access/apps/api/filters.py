@@ -15,7 +15,19 @@ class SubsidyRequestFilterBackend(filters.BaseFilterBackend):
     enterprises that the user is an admin of.
     """
 
-    def filter_queryset(self, request, queryset, view):
+    def _filter_by_states(self, request, queryset):
+        """
+        Filter queryset by comma-delimited list of states.
+        """
+
+        states = request.query_params.get('states', None)
+        if states:
+            states = states.strip(',').split(',')
+            return queryset.filter(state__in=states)
+
+        return queryset
+
+    def _filter_by_accessible_requests(self, request, queryset):
         """
         Filter queryset for non staff/super users.
         """
@@ -37,6 +49,13 @@ class SubsidyRequestFilterBackend(filters.BaseFilterBackend):
             Q(user__lms_user_id=lms_user_id_from_jwt) |
             Q(enterprise_customer_uuid__in=accessible_enterprises_as_admin)
         )
+
+    def filter_queryset(self, request, queryset, view):
+        queryset = self._filter_by_accessible_requests(request, queryset)
+        queryset = self._filter_by_states(request, queryset)
+
+        return queryset
+
 
 class SubsidyRequestCustomerConfigurationFilterBackend(filters.BaseFilterBackend):
     """
