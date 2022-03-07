@@ -19,11 +19,18 @@ class LicenseManagerApiClient(BaseOAuthClient):
 
     def get_subscription_overview(self, subscription_uuid):
         """
-        Call license-manager API for data about a SubscriptionPlan
+        Call license-manager API for data about a SubscriptionPlan.
+
         Arguments:
             subscription_uuid (UUID): UUID of the SubscriptionPlan in license-manager
         Returns:
             dict: Dictionary represention of json returned from API
+
+        Example response:
+        [
+            { "status": "assigned", "count": 5 },
+            { "status": "activated", "count": 20 },
+        ]
         """
         try:
             endpoint = self.subscriptions_endpoint + str(subscription_uuid) + '/licenses/overview'

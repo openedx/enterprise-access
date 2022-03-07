@@ -267,7 +267,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         """
         try:
             client = LicenseManagerApiClient()
-            subscription_overview = client.get_subscription_overview(subscription_plan_uuid)
+            status_counts = client.get_subscription_overview(subscription_plan_uuid)
         except (RequestConnectionError, HTTPError, Timeout) as exc:
             error_msg = (
                 'We were unable to approve/decline the selected license requests at this time. '
@@ -275,7 +275,6 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
                 'continue to experience issues. '
             )
             raise SubsidyRequestError(error_msg, status.HTTP_500_INTERNAL_SERVER_ERROR) from exc
-        status_counts = subscription_overview.get('results')
 
         remaining_unassigned_codes = 0
         for status_count in status_counts:

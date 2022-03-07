@@ -403,18 +403,16 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
             'context': str(self.enterprise_customer_uuid_1)
         }])
-        mock_get_sub.return_value = {
-            'results': [
-                {
-                    'status': 'assigned',
-                    'count': 13,
-                },
-                {
-                    'status': 'unassigned',
-                    'count': 0,
-                }
-            ]
-        }
+        mock_get_sub.return_value = [
+            {
+                'status': 'assigned',
+                'count': 13,
+            },
+            {
+                'status': 'unassigned',
+                'count': 0,
+            },
+        ]
         assert LicenseRequest.objects.filter(
             state=SubsidyRequestStates.PENDING
         ).count() == 0
@@ -438,18 +436,16 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
             'context': str(self.enterprise_customer_uuid_1)
         }])
-        mock_get_sub.return_value = {
-            'results': [
-                {
-                    'status': 'assigned',
-                    'count': 13,
-                },
-                {
-                    'status': 'unassigned',
-                    'count': 100000000,
-                }
-            ]
-        }
+        mock_get_sub.return_value = [
+            {
+                'status': 'assigned',
+                'count': 13,
+            },
+            {
+                'status': 'unassigned',
+                'count': 100000000,
+            },
+        ]
         assert LicenseRequest.objects.filter(
             state=SubsidyRequestStates.PENDING
         ).count() == 0
@@ -477,18 +473,16 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
             'context': str(self.enterprise_customer_uuid_1)
         }])
-        mock_get_sub.return_value = {
-            'results': [
-                {
-                    'status': 'assigned',
-                    'count': 13,
-                },
-                {
-                    'status': 'unassigned',
-                    'count': 100000000,
-                }
-            ]
-        }
+        mock_get_sub.return_value = [
+            {
+                'status': 'assigned',
+                'count': 13,
+            },
+            {
+                'status': 'unassigned',
+                'count': 100000000,
+            },
+        ]
         assert LicenseRequest.objects.filter(
             state=SubsidyRequestStates.PENDING
         ).count() == 0
