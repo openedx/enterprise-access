@@ -70,6 +70,7 @@ CORS_ORIGIN_WHITELIST = [
 ECOMMERCE_URL = 'http://edx.devstack.ecommerce:18130'
 LICENSE_MANAGER_URL = 'http://license-manager.app:18170'
 LMS_URL = 'http://edx.devstack.lms:18000'
+DISCOVERY_URL = 'http://edx.devstack.discovery:18381'
 
 # shell_plus
 SHELL_PLUS_IMPORTS = [
