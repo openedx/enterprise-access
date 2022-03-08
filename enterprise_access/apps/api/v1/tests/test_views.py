@@ -466,7 +466,7 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         mock_notify.assert_called_with(
             [self.user_license_request_1.uuid],
             settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
-            LicenseRequest,
+            SubsidyTypeChoices.LICENSE,
         )
 
         # Set via celery task on post_save event
@@ -582,7 +582,7 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         mock_notify.assert_called_with(
             [self.user_license_request_1.uuid],
             settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-            LicenseRequest,
+            SubsidyTypeChoices.LICENSE,
         )
 
     def test_overview_superuser_bad_request(self):
@@ -934,7 +934,7 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         mock_notify.assert_called_with(
             [self.coupon_code_request_1.uuid],
             settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
-            CouponCodeRequest,
+            SubsidyTypeChoices.COUPON,
         )
 
         # Set via celery task on post_save event
@@ -1049,7 +1049,7 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         mock_notify.assert_called_with(
             [self.coupon_code_request_1.uuid],
             settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-            CouponCodeRequest,
+            SubsidyTypeChoices.COUPON,
         )
 
 @ddt.ddt

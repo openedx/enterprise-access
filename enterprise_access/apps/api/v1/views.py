@@ -347,7 +347,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
                 send_notification_emails_for_requests.si(
                     subsidy_request_uuids,
                     settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
-                    LicenseRequest,
+                    SubsidyTypeChoices.LICENSE,
                 )
             )
 
@@ -407,7 +407,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
             send_notification_emails_for_requests.apply_async(
                 subsidy_request_uuids,
                 settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-                LicenseRequest,
+                SubsidyTypeChoices.LICENSE,
             )
 
         serialized_subsidy_requests = serializers.LicenseRequestSerializer(subsidies_to_decline, many=True)
@@ -529,7 +529,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
                 send_notification_emails_for_requests.si(
                     subsidy_request_uuids,
                     settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
-                    CouponCodeRequest,
+                    SubsidyTypeChoices.COUPON,
                 )
             )
 
@@ -588,7 +588,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             send_notification_emails_for_requests.apply_async(
                 subsidy_request_uuids,
                 settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-                CouponCodeRequest,
+                SubsidyTypeChoices.COUPON,
             )
 
         serialized_subsidy_requests = serializers.CouponCodeRequestSerializer(subsidies_to_decline, many=True)
