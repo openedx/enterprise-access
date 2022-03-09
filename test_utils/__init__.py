@@ -27,6 +27,9 @@ TEST_PASSWORD = 'QWERTY'
 TEST_COURSE_ID = 'edX+DemoX'
 TEST_UUID = 'd2098bfb-2c78-44f1-9eb2-b94475356a3f'
 TEST_USER_ID = 1
+COURSE_TITLE_ABOUT_PIE = 'How to Bake a Pie: A Slice of Heaven'
+COURSE_TITLE_ABOUT_CAKE = 'How to Bake a Cake: So Delicious It Should Be Illegal'
+
 
 @mark.django_db
 class APITest(APITestCase):
@@ -132,7 +135,7 @@ class APITestWithMockedDiscoveryApiClient(APITest):
         self.disco_patcher = mock.patch('enterprise_access.apps.subsidy_request.tasks.DiscoveryApiClient')
         self.mock_discovery_client = self.disco_patcher.start()
         self.mock_discovery_client().get_course_data.return_value = {
-            'title': 'How to Bake a Pie: A Slice of Heaven',
+            'title': COURSE_TITLE_ABOUT_PIE,
         }
         self.addCleanup(self.disco_patcher.stop)
 
@@ -148,5 +151,5 @@ class TestCaseWithMockedDiscoveryApiClient(TestCase):
         self.disco_patcher = mock.patch('enterprise_access.apps.subsidy_request.tasks.DiscoveryApiClient')
         self.mock_discovery_client = self.disco_patcher.start()
         self.mock_discovery_client().get_course_data.return_value = {
-            'title': 'How to Bake a Cake: So Delicious It Should Be Illegal',
+            'title': COURSE_TITLE_ABOUT_CAKE,
         }

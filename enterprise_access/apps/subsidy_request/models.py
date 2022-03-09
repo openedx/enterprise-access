@@ -49,7 +49,7 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
     course_title = models.CharField(
         null=True,
         blank=True,
-        max_length=128
+        max_length=255
     )
 
     enterprise_customer_uuid = models.UUIDField()
