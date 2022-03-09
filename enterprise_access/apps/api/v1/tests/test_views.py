@@ -29,7 +29,7 @@ from enterprise_access.apps.subsidy_request.tests.factories import (
     LicenseRequestFactory,
     SubsidyRequestCustomerConfigurationFactory
 )
-from test_utils import APITestWithMockedDiscoveryApiClient, COURSE_TITLE_ABOUT_PIE
+from test_utils import COURSE_TITLE_ABOUT_PIE, APITestWithMockedDiscoveryApiClient
 
 LICENSE_REQUESTS_LIST_ENDPOINT = reverse('api:v1:license-requests-list')
 LICENSE_REQUESTS_APPROVE_ENDPOINT = reverse('api:v1:license-requests-approve')
