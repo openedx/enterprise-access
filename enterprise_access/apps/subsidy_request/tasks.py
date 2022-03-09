@@ -10,6 +10,7 @@ from django.apps import apps
 from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClient
 from enterprise_access.apps.subsidy_request.constants import SubsidyTypeChoices
 from enterprise_access.tasks import LoggedTaskWithRetry
+from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +20,7 @@ def update_course_title_for_subsidy_request_task(subsidy_type, subsidy_request_u
     """
     Get course_title from lms and update subsidy_request with it
     """
-    if subsidy_type == SubsidyTypeChoices.LICENSE:
-        subsidy_model = apps.get_model('subsidy_request.LicenseRequest')
-    else:
-        subsidy_model = apps.get_model('subsidy_request.CouponCodeRequest')
+    subsidy_model = get_subsidy_model(subsidy_type)
     subsidy_request = subsidy_model.objects.get(uuid=subsidy_request_uuid)
 
     discovery_client = DiscoveryApiClient()
