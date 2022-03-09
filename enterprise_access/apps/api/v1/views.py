@@ -40,7 +40,6 @@ from enterprise_access.apps.api.tasks import (
 from enterprise_access.apps.api.utils import (
     get_enterprise_uuid_from_query_params,
     get_enterprise_uuid_from_request_data,
-    get_subsidy_model,
     validate_uuid
 )
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
@@ -53,6 +52,7 @@ from enterprise_access.apps.subsidy_request.models import (
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
+from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
 

@@ -7,18 +7,18 @@ from celery import shared_task
 from django.conf import settings
 
 from enterprise_access.apps.api.exceptions import MissingEnterpriseLearnerDataError
-from enterprise_access.apps.api.utils import get_subsidy_model
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
-from enterprise_access.apps.core.tasks import LoggedTaskWithRetry
 from enterprise_access.apps.subsidy_request.constants import (
     ENTERPRISE_BRAZE_ALIAS_LABEL,
     SUBSIDY_TYPE_CHANGE_DECLINATION,
     SubsidyRequestStates
 )
 from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
+from enterprise_access.tasks import LoggedTaskWithRetry
+from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
 

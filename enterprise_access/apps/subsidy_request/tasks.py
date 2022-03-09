@@ -8,8 +8,8 @@ from celery import shared_task
 from django.apps import apps
 
 from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClient
-from enterprise_access.apps.core.tasks import LoggedTaskWithRetry
 from enterprise_access.apps.subsidy_request.constants import SubsidyTypeChoices
+from enterprise_access.tasks import LoggedTaskWithRetry
 
 logger = logging.getLogger(__name__)
 
