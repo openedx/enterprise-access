@@ -3,15 +3,15 @@
 import mock
 from django.contrib.admin.sites import AdminSite
 from django.http import HttpRequest
-from django.test import TestCase
 
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_request.admin import SubsidyRequestCustomerConfigurationAdmin
 from enterprise_access.apps.subsidy_request.models import SubsidyRequestCustomerConfiguration
 from enterprise_access.apps.subsidy_request.tests.factories import SubsidyRequestCustomerConfigurationFactory
+from test_utils import TestCaseWithMockedDiscoveryApiClient
 
 
-class AdminTests(TestCase):
+class AdminTests(TestCaseWithMockedDiscoveryApiClient):
     """ Tests for admin. """
 
     @mock.patch('enterprise_access.apps.subsidy_request.admin.get_data_from_jwt_payload')

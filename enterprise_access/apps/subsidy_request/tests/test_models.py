@@ -5,18 +5,18 @@ from uuid import uuid4
 
 import ddt
 from django.forms import ValidationError
-from django.test import TestCase
 from pytest import mark
 
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.tests.factories import CouponCodeRequestFactory, LicenseRequestFactory
+from test_utils import TestCaseWithMockedDiscoveryApiClient
 
 now = datetime.utcnow()
 
 @ddt.ddt
 @mark.django_db
-class LicenseRequestTests(TestCase):
+class LicenseRequestTests(TestCaseWithMockedDiscoveryApiClient):
     """ LicenseRequest model tests. """
 
     mock_subscription_plan_uuid = uuid4()
@@ -59,8 +59,23 @@ class LicenseRequestTests(TestCase):
         expected_error = 'Both subscription_plan_uuid and license_uuid are required for a fulfilled license request.'
         assert error.exception.messages[0] == expected_error
 
+    def test_update_course_title_from_discovery(self):
+        """
+        course title data should be fetched from discovery if not set on subsidy object
+        during a save().
+        """
+        original_call_count = self.mock_discovery_client.call_count
+
+        subsidy = LicenseRequestFactory()
+        assert self.mock_discovery_client.call_count == original_call_count + 1
+
+        subsidy.refresh_from_db()
+        subsidy.save()
+        assert self.mock_discovery_client.call_count == original_call_count + 1
+
+
 @ddt.ddt
-class CouponCodeRequestTests(TestCase):
+class CouponCodeRequestTests(TestCaseWithMockedDiscoveryApiClient):
     """ CouponCodeRequest model tests. """
 
     mock_coupon_id = 123456
@@ -82,3 +97,17 @@ class CouponCodeRequestTests(TestCase):
 
         expected_error = 'Both coupon_id and coupon_code are required for a fulfilled coupon request.'
         assert error.exception.messages[0] == expected_error
+
+    def test_update_course_title_from_discovery(self):
+        """
+        course title data should be fetched from discovery if not set on subsidy object
+        during a save().
+        """
+        original_call_count = self.mock_discovery_client.call_count
+
+        subsidy = CouponCodeRequestFactory()
+        assert self.mock_discovery_client.call_count == original_call_count + 1
+
+        subsidy.refresh_from_db()
+        subsidy.save()
+        assert self.mock_discovery_client.call_count == original_call_count + 1

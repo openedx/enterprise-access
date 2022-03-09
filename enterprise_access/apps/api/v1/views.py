@@ -40,7 +40,6 @@ from enterprise_access.apps.api.tasks import (
 from enterprise_access.apps.api.utils import (
     get_enterprise_uuid_from_query_params,
     get_enterprise_uuid_from_request_data,
-    get_subsidy_model,
     validate_uuid
 )
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
@@ -53,6 +52,7 @@ from enterprise_access.apps.subsidy_request.models import (
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
+from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
 
@@ -348,7 +348,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
                 send_notification_emails_for_requests.si(
                     subsidy_request_uuids,
                     settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
-                    LicenseRequest,
+                    SubsidyTypeChoices.LICENSE,
                 )
             )
 
@@ -408,7 +408,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
             send_notification_emails_for_requests.apply_async(
                 subsidy_request_uuids,
                 settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-                LicenseRequest,
+                SubsidyTypeChoices.LICENSE,
             )
 
         serialized_subsidy_requests = serializers.LicenseRequestSerializer(subsidies_to_decline, many=True)
@@ -530,7 +530,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
                 send_notification_emails_for_requests.si(
                     subsidy_request_uuids,
                     settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
-                    CouponCodeRequest,
+                    SubsidyTypeChoices.COUPON,
                 )
             )
 
@@ -589,7 +589,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             send_notification_emails_for_requests.apply_async(
                 subsidy_request_uuids,
                 settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-                CouponCodeRequest,
+                SubsidyTypeChoices.COUPON,
             )
 
         serialized_subsidy_requests = serializers.CouponCodeRequestSerializer(subsidies_to_decline, many=True)

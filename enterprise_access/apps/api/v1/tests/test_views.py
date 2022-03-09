@@ -29,7 +29,7 @@ from enterprise_access.apps.subsidy_request.tests.factories import (
     LicenseRequestFactory,
     SubsidyRequestCustomerConfigurationFactory
 )
-from test_utils import APITest
+from test_utils import COURSE_TITLE_ABOUT_PIE, APITestWithMockedDiscoveryApiClient
 
 LICENSE_REQUESTS_LIST_ENDPOINT = reverse('api:v1:license-requests-list')
 LICENSE_REQUESTS_APPROVE_ENDPOINT = reverse('api:v1:license-requests-approve')
@@ -43,7 +43,7 @@ CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT = reverse('api:v1:customer-configurations-
 
 @ddt.ddt
 @mark.django_db
-class TestSubsidyRequestViewSet(APITest):
+class TestSubsidyRequestViewSet(APITestWithMockedDiscoveryApiClient):
     """
     Tests for SubsidyRequestViewSet.
     """
@@ -91,7 +91,6 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
 
         # license request with no associations to the user
         self.other_license_request = LicenseRequestFactory()
-
 
     def test_list_as_enterprise_learner(self):
         """
@@ -505,8 +504,11 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         mock_notify.assert_called_with(
             [self.user_license_request_1.uuid],
             settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
-            LicenseRequest,
+            SubsidyTypeChoices.LICENSE,
         )
+
+        # Set via celery task on post_save event
+        assert self.user_license_request_1.course_title == COURSE_TITLE_ABOUT_PIE
 
     def test_decline_no_subsidy_request_uuids(self):
         """ 400 thrown if no subsidy requests provided """
@@ -598,6 +600,9 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             state=SubsidyRequestStates.DECLINED
         ).count() == 1
 
+        # Set via celery task on post_save event
+        assert self.user_license_request_1.course_title == COURSE_TITLE_ABOUT_PIE
+
     @mock.patch('enterprise_access.apps.api.v1.views.send_notification_emails_for_requests.apply_async')
     def test_decline_send_notification(self, mock_notify):
         """ Test braze task called if send_notification is True """
@@ -615,7 +620,7 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         mock_notify.assert_called_with(
             [self.user_license_request_1.uuid],
             settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-            LicenseRequest,
+            SubsidyTypeChoices.LICENSE,
         )
 
     def test_overview_superuser_bad_request(self):
@@ -958,6 +963,7 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         }
         response = self.client.post(COUPON_CODE_REQUESTS_APPROVE_ENDPOINT, payload)
         assert response.status_code == status.HTTP_200_OK
+        self.coupon_code_request_1.refresh_from_db()
 
         assert CouponCodeRequest.objects.filter(
             state=SubsidyRequestStates.PENDING
@@ -966,8 +972,11 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         mock_notify.assert_called_with(
             [self.coupon_code_request_1.uuid],
             settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
-            CouponCodeRequest,
+            SubsidyTypeChoices.COUPON,
         )
+
+        # Set via celery task on post_save event
+        assert self.coupon_code_request_1.course_title == COURSE_TITLE_ABOUT_PIE
 
     def test_decline_no_subsidy_request_uuids(self):
         """ 400 thrown if no subsidy requests provided """
@@ -1058,6 +1067,9 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
             state=SubsidyRequestStates.DECLINED
         ).count() == 1
 
+        # Set via celery task on post_save event
+        assert self.coupon_code_request_1.course_title == COURSE_TITLE_ABOUT_PIE
+
     @mock.patch('enterprise_access.apps.api.v1.views.send_notification_emails_for_requests.apply_async')
     def test_decline_send_notification(self, mock_notify):
         """ Test braze task called if send_notification is True """
@@ -1075,11 +1087,11 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         mock_notify.assert_called_with(
             [self.coupon_code_request_1.uuid],
             settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-            CouponCodeRequest,
+            SubsidyTypeChoices.COUPON,
         )
 
 @ddt.ddt
-class TestSubsidyRequestCustomerConfigurationViewSet(APITest):
+class TestSubsidyRequestCustomerConfigurationViewSet(APITestWithMockedDiscoveryApiClient):
     """
     Tests for SubsidyRequestCustomerConfigurationViewSet.
     """

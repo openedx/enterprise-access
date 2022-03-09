@@ -5,6 +5,7 @@ from uuid import uuid4
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.dispatch import receiver
 from django.utils.translation import ugettext_lazy as _
 from model_utils.models import SoftDeletableModel, TimeStampedModel
 from simple_history.models import HistoricalRecords
@@ -15,6 +16,7 @@ from enterprise_access.apps.subsidy_request.constants import (
     SubsidyRequestStates,
     SubsidyTypeChoices
 )
+from enterprise_access.apps.subsidy_request.tasks import update_course_title_for_subsidy_request_task
 from enterprise_access.apps.subsidy_request.utils import localized_utcnow
 
 
@@ -42,6 +44,12 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
         null=True,
         blank=True,
         max_length=128
+    )
+
+    course_title = models.CharField(
+        null=True,
+        blank=True,
+        max_length=255
     )
 
     enterprise_customer_uuid = models.UUIDField()
@@ -249,3 +257,23 @@ class SubsidyRequestCustomerConfiguration(TimeStampedModel):
     @_history_user.setter
     def _history_user(self, value):
         self.changed_by = value
+
+
+@receiver(models.signals.post_save, sender=CouponCodeRequest)
+@receiver(models.signals.post_save, sender=LicenseRequest)
+def update_course_title_for_subsidy_request(sender, **kwargs):  # pylint: disable=unused-argument
+    """ Post save hook to grab course_title from discovery service """
+
+    subsidy_request = kwargs['instance']
+    if subsidy_request.course_title:
+        return
+
+    if isinstance(subsidy_request, CouponCodeRequest):
+        subsidy_type = SubsidyTypeChoices.COUPON
+    else:
+        subsidy_type = SubsidyTypeChoices.LICENSE
+
+    update_course_title_for_subsidy_request_task.delay(
+        subsidy_type,
+        str(subsidy_request.uuid),
+    )

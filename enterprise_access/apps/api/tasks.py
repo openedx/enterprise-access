@@ -3,17 +3,10 @@ Celery tasks for Enterprise Access API.
 """
 import logging
 
-from braze.exceptions import BrazeClientError
 from celery import shared_task
-from celery_utils.logged_task import LoggedTask
 from django.conf import settings
-from django.db import OperationalError
-from requests.exceptions import ConnectionError as RequestsConnectionError
-from requests.exceptions import HTTPError
-from requests.exceptions import Timeout as RequestsTimeoutError
 
 from enterprise_access.apps.api.exceptions import MissingEnterpriseLearnerDataError
-from enterprise_access.apps.api.utils import get_subsidy_model
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
@@ -24,27 +17,11 @@ from enterprise_access.apps.subsidy_request.constants import (
     SubsidyRequestStates
 )
 from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
+from enterprise_access.tasks import LoggedTaskWithRetry
+from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
 
-class LoggedTaskWithRetry(LoggedTask):  # pylint: disable=abstract-method
-    """
-    Shared base task that allows tasks that raise some common exceptions to retry automatically.
-    See https://docs.celeryproject.org/en/stable/userguide/tasks.html#automatic-retry-for-known-exceptions for
-    more documentation.
-    """
-    autoretry_for = (
-        RequestsConnectionError,
-        RequestsTimeoutError,
-        HTTPError,
-        OperationalError,
-        BrazeClientError,
-    )
-    retry_kwargs = {'max_retries': 3}
-    # Use exponential backoff for retrying tasks
-    retry_backoff = True
-    # Add randomness to backoff delays to prevent all tasks in queue from executing simultaneously
-    retry_jitter = True
 
 def _get_aliased_recipient_object_from_email(user_email):
     """
