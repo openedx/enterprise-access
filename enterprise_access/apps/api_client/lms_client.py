@@ -17,6 +17,26 @@ class LmsApiClient(BaseOAuthClient):
     """
     enterprise_api_base_url = settings.LMS_URL + '/enterprise/api/v1/'
     enterprise_learner_endpoint = enterprise_api_base_url + 'enterprise-learner/'
+    enterprise_customer_endpoint = enterprise_api_base_url + 'enterprise-customer/'
+
+    def get_enterprise_customer_data(self, enterprise_customer_uuid):
+        """
+        Gets the data for an EnterpriseCustomer for the given uuid.
+
+        Arguments:
+            enterprise_customer_uuid (string): id of the enterprise customer
+        Returns:
+            dictionary containing enterprise customer metadata
+        """
+
+        try:
+            endpoint = f'{self.enterprise_learner_endpoint}/{enterprise_customer_uuid}'
+            response = self.client.get(endpoint, timeout=settings.LMS_CLIENT_TIMEOUT)
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(exc)
+            raise
+
+        return response.json()
 
     def get_enterprise_learner_data(self, lms_user_ids):
         """

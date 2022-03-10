@@ -11,36 +11,13 @@ from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
-from enterprise_access.apps.subsidy_request.constants import (
-    ENTERPRISE_BRAZE_ALIAS_LABEL,
-    SUBSIDY_TYPE_CHANGE_DECLINATION,
-    SubsidyRequestStates
-)
+from enterprise_access.apps.subsidy_request.constants import SUBSIDY_TYPE_CHANGE_DECLINATION, SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
 from enterprise_access.tasks import LoggedTaskWithRetry
-from enterprise_access.utils import get_subsidy_model
+from enterprise_access.utils import get_aliased_recipient_object_from_email, get_subsidy_model
 
 logger = logging.getLogger(__name__)
 
-
-def _get_aliased_recipient_object_from_email(user_email):
-    """
-    Returns a dictionary with a braze recipient object, including
-    a braze alias object.
-
-    Args:
-        user_email (string): email of user
-
-    Returns:
-        a dictionary with a braze recipient object, including a braze alias object.
-    """
-    return {
-        'attributes': {'email': user_email},
-        'user_alias': {
-            'alias_label': ENTERPRISE_BRAZE_ALIAS_LABEL,
-            'alias_name': user_email,
-        },
-    }
 
 def _get_enterprise_learner_data(lms_user_ids):
     """
@@ -125,7 +102,7 @@ def send_notification_emails_for_requests(
 
     for subsidy_request in subsidy_requests:
         user_email = enterprise_learner_data[subsidy_request.user.lms_user_id]['email']
-        recipient = _get_aliased_recipient_object_from_email(user_email)
+        recipient = get_aliased_recipient_object_from_email(user_email)
 
         contact_email = enterprise_learner_data[
             subsidy_request.user.lms_user_id
