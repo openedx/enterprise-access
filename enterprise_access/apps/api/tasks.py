@@ -7,17 +7,33 @@ from celery import shared_task
 from django.conf import settings
 
 from enterprise_access.apps.api.exceptions import MissingEnterpriseLearnerDataError
+from enterprise_access.apps.api.serializers import CouponCodeRequestSerializer, LicenseRequestSerializer
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
-from enterprise_access.apps.subsidy_request.constants import SUBSIDY_TYPE_CHANGE_DECLINATION, SubsidyRequestStates
+from enterprise_access.apps.subsidy_request.constants import (
+    SUBSIDY_TYPE_CHANGE_DECLINATION,
+    SegmentEvents,
+    SubsidyRequestStates,
+    SubsidyTypeChoices
+)
 from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
+from enterprise_access.apps.track.segment import track_event
 from enterprise_access.tasks import LoggedTaskWithRetry
 from enterprise_access.utils import get_aliased_recipient_object_from_email, get_subsidy_model
 
 logger = logging.getLogger(__name__)
 
+def _get_serializer_by_subsidy_type(subsidy_type):
+    """
+    Returns serializer for LicenseRequest or CouponCodeRequest.
+    """
+    if subsidy_type == SubsidyTypeChoices.LICENSE:
+        return LicenseRequestSerializer
+    if subsidy_type == SubsidyTypeChoices.COUPON:
+        return CouponCodeRequestSerializer
+    return None
 
 def _get_enterprise_learner_data(lms_user_ids):
     """
@@ -54,7 +70,10 @@ def decline_enterprise_subsidy_requests_task(subsidy_request_uuids, subsidy_type
     """
 
     subsidy_model = get_subsidy_model(subsidy_type)
-    subsidy_requests = subsidy_model.objects.filter(uuid__in=subsidy_request_uuids)
+    serializer = _get_serializer_by_subsidy_type(subsidy_type)
+    event_name = SegmentEvents.SUBSIDY_REQUEST_DECLINED[subsidy_type]
+    subsidy_requests = subsidy_model.objects.filter(uuid__in=subsidy_request_uuids).select_related('user', 'reviewer')
+
     # Why I don't used subsidy_requests.update() #
     # When you run .update() on a queryset, you "lose" the objects, because by
     # nature of them being updated in the DB (update runs raw SQL),
@@ -67,6 +86,11 @@ def decline_enterprise_subsidy_requests_task(subsidy_request_uuids, subsidy_type
         subsidy_request.state = SubsidyRequestStates.DECLINED
         subsidy_request.decline_reason = SUBSIDY_TYPE_CHANGE_DECLINATION
         subsidy_request.save()
+        track_event(
+            lms_user_id=subsidy_request.user.lms_user_id,
+            event_name=event_name,
+            properties=serializer(subsidy_request).data
+        )
 
 
 @shared_task(base=LoggedTaskWithRetry)
@@ -137,7 +161,6 @@ def assign_licenses_task(license_request_uuids, subscription_uuid):
         A dict representing license assignment results in the form of:
             {
                 'license_request_uuids' (list of UUID): license request UUIDs that were processed,
-                'learner_data' (dict): dict containing user data keyed by lms_user_ids,
                 'assigned_licenses' (dict): dict containing licenses assigned keyed by lms_user_ids,
                 'subscription_uuid' (UUID): the UUID of the subscription that licenses were assigned from
             }
@@ -146,15 +169,13 @@ def assign_licenses_task(license_request_uuids, subscription_uuid):
     license_requests = LicenseRequest.objects.filter(
         uuid__in=license_request_uuids,
         state__in=[SubsidyRequestStates.PENDING, SubsidyRequestStates.ERROR]
-    )
+    ).select_related('user')
 
     if not license_requests:
         logger.info(f'No pending/errored license requests with uuids: {license_request_uuids} found.')
         return None
 
-    lms_user_ids = [license_request.user.lms_user_id for license_request in license_requests]
-    learner_data = _get_enterprise_learner_data(lms_user_ids)
-    user_emails = [user['email'] for user in learner_data.values()]
+    user_emails = [license_request.user.email for license_request in license_requests]
 
     license_manager_api_client = LicenseManagerApiClient()
     response = license_manager_api_client.assign_licenses(user_emails, subscription_uuid)
@@ -164,7 +185,6 @@ def assign_licenses_task(license_request_uuids, subscription_uuid):
 
     return {
         'license_request_uuids': license_request_uuids,
-        'learner_data': learner_data,
         'assigned_licenses': assigned_licenses,
         'subscription_uuid': subscription_uuid
     }
@@ -179,7 +199,6 @@ def update_license_requests_after_assignments_task(license_assignment_results):
         license_assignment_results (dict): a dict representing license assignment results in the form of:
             {
                 'license_request_uuids' (list of UUID): license request UUIDs that were processed,
-                'learner_data' (dict): dict containing user data keyed by lms_user_ids,
                 'assigned_licenses' (dict): dict containing licenses assigned keyed by lms_user_ids,
                 'subscription_uuid' (UUID): the UUID of the subscription that licenses were assigned from
             }
@@ -193,16 +212,15 @@ def update_license_requests_after_assignments_task(license_assignment_results):
         return
 
     license_request_uuids = license_assignment_results['license_request_uuids']
-    learner_data = license_assignment_results['learner_data']
     assigned_licenses = license_assignment_results['assigned_licenses']
     subscription_uuid = license_assignment_results['subscription_uuid']
 
     license_requests = LicenseRequest.objects.filter(
         uuid__in=license_request_uuids
-    )
+    ).select_related('user', 'reviewer')
 
     for license_request in license_requests:
-        user_email = learner_data[str(license_request.user.lms_user_id)]['email']
+        user_email = license_request.user.email
 
         if not assigned_licenses.get(user_email):
             msg = f'License was not assigned for {license_request.uuid}. {user_email} already had a license assigned.'
@@ -212,6 +230,11 @@ def update_license_requests_after_assignments_task(license_assignment_results):
             license_request.state = SubsidyRequestStates.APPROVED
             license_request.subscription_plan_uuid = subscription_uuid
             license_request.license_uuid = assigned_licenses[user_email]
+            track_event(
+                lms_user_id=license_request.user.lms_user_id,
+                event_name=SegmentEvents.LICENSE_REQUEST_APPROVED,
+                properties=LicenseRequestSerializer(license_request).data
+            )
 
     LicenseRequest.bulk_update(license_requests, ['state', 'subscription_plan_uuid', 'license_uuid'])
 
@@ -228,7 +251,6 @@ def assign_coupon_codes_task(coupon_code_request_uuids, coupon_id):
         A dict representing coupon code assignment results in the form of:
             {
                 'coupon_code_request_uuids' (list of UUID): coupon code request UUIDs that were processed,
-                'learner_data' (dict): dict containing user data keyed by lms_user_ids,
                 'assigned_codes' (dict): dict containing codes assigned keyed by lms_user_ids,
                 'coupon_id' (int): the id of the coupon that codes were assigned from
             }
@@ -237,15 +259,13 @@ def assign_coupon_codes_task(coupon_code_request_uuids, coupon_id):
     coupon_code_requests = CouponCodeRequest.objects.filter(
         uuid__in=coupon_code_request_uuids,
         state=SubsidyRequestStates.PENDING
-    )
+    ).select_related('user')
 
     if not coupon_code_requests:
         logger.info(f'No pending/errored coupon code requests with uuids: {coupon_code_requests} found.')
         return None
 
-    lms_user_ids = [request.user.lms_user_id for request in coupon_code_requests]
-    learner_data = _get_enterprise_learner_data(lms_user_ids)
-    user_emails = [user['email'] for user in learner_data.values()]
+    user_emails = [coupon_code_request.user.email for coupon_code_request in coupon_code_requests]
 
     ecommerce_api_client = EcommerceApiClient()
     response = ecommerce_api_client.assign_coupon_codes(user_emails, coupon_id)
@@ -253,7 +273,6 @@ def assign_coupon_codes_task(coupon_code_request_uuids, coupon_id):
 
     return {
         'coupon_code_request_uuids': coupon_code_request_uuids,
-        'learner_data': learner_data,
         'assigned_codes': assigned_codes,
         'coupon_id': coupon_id
     }
@@ -268,7 +287,6 @@ def update_coupon_code_requests_after_assignments_task(coupon_code_assignment_re
         coupon_code_assignment_results (dict): a dict representing coupon code assignment results in the form of:
             {
                 'coupon_code_request_uuids' (list of UUID): coupon code request UUIDs that were processed,
-                'learner_data' (dict): dict containing user data keyed by lms_user_ids,
                 'assigned_codes' (dict): dict containing codes assigned keyed by lms_user_ids,
                 'coupon_id' (int): the id of the coupon that codes were assigned from
             }
@@ -282,18 +300,22 @@ def update_coupon_code_requests_after_assignments_task(coupon_code_assignment_re
         return
 
     coupon_code_request_uuids = coupon_code_assignment_results['coupon_code_request_uuids']
-    learner_data = coupon_code_assignment_results['learner_data']
     assigned_codes = coupon_code_assignment_results['assigned_codes']
     coupon_id = coupon_code_assignment_results['coupon_id']
 
     coupon_code_requests = CouponCodeRequest.objects.filter(
         uuid__in=coupon_code_request_uuids
-    )
+    ).select_related('user', 'reviewer')
 
     for coupon_code_request in coupon_code_requests:
-        user_email = learner_data[str(coupon_code_request.user.lms_user_id)]['email']
         coupon_code_request.state = SubsidyRequestStates.APPROVED
         coupon_code_request.coupon_id = coupon_id
-        coupon_code_request.coupon_code = assigned_codes[user_email]
+        coupon_code_request.coupon_code = assigned_codes[coupon_code_request.user.email]
+
+        track_event(
+            lms_user_id=coupon_code_request.user.lms_user_id,
+            event_name=SegmentEvents.COUPON_CODE_REQUEST_APPROVED,
+            properties=CouponCodeRequestSerializer(coupon_code_request).data
+        )
 
     CouponCodeRequest.bulk_update(coupon_code_requests, ['state', 'coupon_id', 'coupon_code'])

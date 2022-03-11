@@ -9,9 +9,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count
-from django.utils.functional import cached_property
 from django_filters.rest_framework import DjangoFilterBackend
-from edx_rbac import utils
 from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from requests.exceptions import ConnectionError as RequestConnectionError
@@ -29,6 +27,7 @@ from enterprise_access.apps.api.filters import (
     SubsidyRequestCustomerConfigurationFilterBackend,
     SubsidyRequestFilterBackend
 )
+from enterprise_access.apps.api.mixins import UserDetailsFromJwtMixin
 from enterprise_access.apps.api.tasks import (
     assign_coupon_codes_task,
     assign_licenses_task,
@@ -45,13 +44,13 @@ from enterprise_access.apps.api.utils import (
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
-from enterprise_access.apps.core.models import User
-from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
+from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
+from enterprise_access.apps.track.segment import track_event
 from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
@@ -72,7 +71,7 @@ class PaginationWithPageCount(PageNumberPagination):
         return response
 
 
-class SubsidyRequestViewSet(viewsets.ModelViewSet):
+class SubsidyRequestViewSet(UserDetailsFromJwtMixin, viewsets.ModelViewSet):
     """
     Base Viewset for subsidy requests.
     """
@@ -92,19 +91,6 @@ class SubsidyRequestViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post']
 
     subsidy_type = None
-
-    @cached_property
-    def decoded_jwt(self):
-        return utils.get_decoded_jwt(self.request)
-
-    @property
-    def lms_user_id(self):
-        return self.decoded_jwt.get('user_id')
-
-    @property
-    def user(self):
-        # user should always exists at this point
-        return User.objects.get(lms_user_id=self.lms_user_id)
 
     def _validate_subsidy_request_uuids(self, subsidy_request_uuids):
         """
@@ -187,7 +173,15 @@ class SubsidyRequestViewSet(viewsets.ModelViewSet):
             return Response(exc.message, exc.http_status_code)
 
         request.data['user'] = self.user.id
-        return super().create(request, *args, **kwargs)
+        response = super().create(request, *args, **kwargs)
+
+        track_event(
+            lms_user_id=self.lms_user_id,
+            event_name=SegmentEvents.SUBSIDY_REQUEST_CREATED[self.subsidy_type],
+            properties=response.data
+        )
+
+        return response
 
     @permission_required(
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
@@ -600,7 +594,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         )
 
 
-class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
+class SubsidyRequestCustomerConfigurationViewSet(UserDetailsFromJwtMixin, viewsets.ModelViewSet):
     """ Viewset for customer configurations."""
 
     permission_classes = (permissions.IsAuthenticated,)
@@ -621,7 +615,13 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
         fn=get_enterprise_uuid_from_request_data,
     )
     def create(self, request, *args, **kwargs):
-        return super().create(request, *args, **kwargs)
+        response = super().create(request, *args, **kwargs)
+        track_event(
+            lms_user_id=self.lms_user_id,
+            event_name=SegmentEvents.SUBSIDY_REQUEST_CONFIGURATION_CREATED,
+            properties=response.data
+        )
+        return response
 
     @permission_required(
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
@@ -673,4 +673,11 @@ class SubsidyRequestCustomerConfigurationViewSet(viewsets.ModelViewSet):
 
                 tasks.delay()
 
-        return super().partial_update(request, *args, **kwargs)
+        response = super().partial_update(request, *args, **kwargs)
+
+        track_event(
+            lms_user_id=self.lms_user_id,
+            event_name=SegmentEvents.SUBSIDY_REQUEST_CONFIGURATION_UPDATED,
+            properties=response.data
+        )
+        return response

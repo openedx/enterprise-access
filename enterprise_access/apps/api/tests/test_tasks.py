@@ -4,9 +4,10 @@ Tests for Enterprise Access API tasks.
 
 from uuid import uuid4
 
+import ddt
 import mock
 
-from enterprise_access.apps.api.exceptions import MissingEnterpriseLearnerDataError
+from enterprise_access.apps.api.serializers import CouponCodeRequestSerializer, LicenseRequestSerializer
 from enterprise_access.apps.api.tasks import (
     assign_coupon_codes_task,
     assign_licenses_task,
@@ -17,15 +18,17 @@ from enterprise_access.apps.api.tasks import (
 )
 from enterprise_access.apps.subsidy_request.constants import (
     ENTERPRISE_BRAZE_ALIAS_LABEL,
+    SegmentEvents,
     SubsidyRequestStates,
     SubsidyTypeChoices
 )
 from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
 from enterprise_access.apps.subsidy_request.tests.factories import CouponCodeRequestFactory, LicenseRequestFactory
-from test_utils import APITestWithMockedDiscoveryApiClient
+from test_utils import APITestWithMocks
 
 
-class TestTasks(APITestWithMockedDiscoveryApiClient):
+@ddt.ddt
+class TestTasks(APITestWithMocks):
     """
     Test tasks.
     """
@@ -74,6 +77,22 @@ class TestTasks(APITestWithMockedDiscoveryApiClient):
             state=SubsidyRequestStates.DECLINED,
         ).count() == 3
 
+    def test_track_coupon_code_request_denials(self):
+        """
+        Verify that an event is tracked when a coupon code request is declined.
+        """
+        coupon_code_request = self.coupon_code_requests[0]
+        decline_enterprise_subsidy_requests_task(
+            [str(coupon_code_request.uuid)],
+            SubsidyTypeChoices.COUPON,
+        )
+        coupon_code_request.refresh_from_db()
+        self.mock_analytics.assert_called_once_with(
+            user_id=coupon_code_request.user.lms_user_id,
+            event=SegmentEvents.COUPON_CODE_REQUEST_DECLINED,
+            properties=CouponCodeRequestSerializer(coupon_code_request).data
+        )
+
     def test_decline_requests_task_licenses(self):
         """
         Verify all license subsidies are declined
@@ -96,17 +115,32 @@ class TestTasks(APITestWithMockedDiscoveryApiClient):
             state=SubsidyRequestStates.DECLINED,
         ).count() == 3
 
+    def test_track_license_request_denials(self):
+        """
+        Verify that an event is tracked when a license request is declined.
+        """
+        license_request = self.license_requests[0]
+        decline_enterprise_subsidy_requests_task(
+            [str(license_request.uuid)],
+            SubsidyTypeChoices.LICENSE,
+        )
+        license_request.refresh_from_db()
+        self.mock_analytics.assert_called_once_with(
+            user_id=license_request.user.lms_user_id,
+            event=SegmentEvents.LICENSE_REQUEST_DECLINED,
+            properties=LicenseRequestSerializer(license_request).data
+        )
+
     @mock.patch('enterprise_access.apps.api.tasks.LmsApiClient', return_value=mock.MagicMock())
     @mock.patch('enterprise_access.apps.api.tasks.BrazeApiClient', return_value=mock.MagicMock())
     def test_send_notification_emails_for_requests(self, mock_braze_client, mock_lms_client):
         """
         Verify send_notification_emails_for_requests hits braze client with expected args
         """
-        user_email = 'example@example.com'
 
         mock_lms_client().get_enterprise_learner_data.return_value = {
             self.user.lms_user_id: {
-                'email': user_email,
+                'email': self.user.email,
                 'enterprise_customer': {
                     'contact_email': 'example2@example.com',
                     'slug': 'test-org-for-learning'
@@ -127,10 +161,10 @@ class TestTasks(APITestWithMockedDiscoveryApiClient):
 
         # And also the same for the Braze Client
         expected_recipient = {
-            'attributes': {'email': user_email},
+            'attributes': {'email': self.user.email},
             'user_alias': {
                 'alias_label': ENTERPRISE_BRAZE_ALIAS_LABEL,
-                'alias_name': user_email,
+                'alias_name': self.user.email,
             },
         }
         expected_course_about_page_url = (
@@ -147,7 +181,7 @@ class TestTasks(APITestWithMockedDiscoveryApiClient):
         assert mock_braze_client().send_campaign_message.call_count == 1
 
 
-class TestLicenseAssignmentTasks(APITestWithMockedDiscoveryApiClient):
+class TestLicenseAssignmentTasks(APITestWithMocks):
     """
     Test license assignment tasks.
     """
@@ -169,36 +203,12 @@ class TestLicenseAssignmentTasks(APITestWithMockedDiscoveryApiClient):
         self.mock_subscription_uuid = uuid4()
         self.mock_license_uuid = uuid4()
 
-    @mock.patch('enterprise_access.apps.api.tasks.LmsApiClient', return_value=mock.MagicMock())
-    def test_get_enterprise_learner_data_error(self, mock_lms_client):
-        """
-        Verify that _get_enterprise_learner_data throws an error if the the LMS API client
-        does not return data for all lms_user_ids.
-        """
-        mock_enterprise_learner_data = {
-            1: {},
-        }
-        mock_lms_client().get_enterprise_learner_data.return_value = mock_enterprise_learner_data
-        lms_user_ids = [1,1,2]
-
-        with self.assertRaises(MissingEnterpriseLearnerDataError):
-            assign_licenses_task(
-                [self.pending_license_request.uuid],
-                self.mock_subscription_uuid
-            )
-
-        assert mock_lms_client().get_enterprise_learner_data.called_with(
-            set(lms_user_ids)
-        )
-
-    @mock.patch('enterprise_access.apps.api.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.api.tasks.LicenseManagerApiClient')
-    def test_assign_license_task(self, mock_license_manager_client, mock_lms_client):
+    def test_assign_license_task(self, mock_license_manager_client):
         """
         Verify assign_licenses_task calls License Manager to assign new licenses.
         """
 
-        mock_lms_client().get_enterprise_learner_data.return_value = self.mock_enterprise_learner_data
         mock_license_assignments = [{ 'user_email': self.user.email, 'license': self.mock_license_uuid }]
         mock_license_manager_client().assign_licenses.return_value = {
             'num_successful_assignments': 1,
@@ -211,13 +221,11 @@ class TestLicenseAssignmentTasks(APITestWithMockedDiscoveryApiClient):
             self.mock_subscription_uuid
         )
 
-        assert mock_lms_client().get_enterprise_learner_data.called_with([self.user.lms_user_id])
-        assert mock_license_manager_client().assign_licenses.called_with([self.user.email], self.mock_subscription_uuid)
+        mock_license_manager_client().assign_licenses.assert_called_with([self.user.email], self.mock_subscription_uuid)
         self.assertDictEqual(
             license_assignment_results,
             {
                 'license_request_uuids': [self.pending_license_request.uuid],
-                'learner_data': self.mock_enterprise_learner_data,
                 'assigned_licenses': {
                     assignment['user_email']: assignment['license'] for assignment in mock_license_assignments
                 },
@@ -229,7 +237,6 @@ class TestLicenseAssignmentTasks(APITestWithMockedDiscoveryApiClient):
         mock_license_assignments = [{ 'user_email': self.user.email, 'license': self.mock_license_uuid }]
         license_assignment_results = {
             'license_request_uuids': [self.pending_license_request.uuid],
-            'learner_data': { str(key): val for key, val in self.mock_enterprise_learner_data.items() },
             'assigned_licenses': {
                 assignment['user_email']: assignment['license'] for assignment in mock_license_assignments
             },
@@ -245,7 +252,13 @@ class TestLicenseAssignmentTasks(APITestWithMockedDiscoveryApiClient):
         assert self.pending_license_request.license_uuid == self.mock_license_uuid
         assert self.pending_license_request.subscription_plan_uuid == self.mock_subscription_uuid
 
-class TestCouponCodeAssignmentTasks(APITestWithMockedDiscoveryApiClient):
+        self.mock_analytics.assert_called_with(
+            user_id=self.pending_license_request.user.lms_user_id,
+            event=SegmentEvents.LICENSE_REQUEST_APPROVED,
+            properties=LicenseRequestSerializer(self.pending_license_request).data
+        )
+
+class TestCouponCodeAssignmentTasks(APITestWithMocks):
     """
     Test coupon code assignment tasks.
     """
@@ -267,13 +280,11 @@ class TestCouponCodeAssignmentTasks(APITestWithMockedDiscoveryApiClient):
         self.mock_coupon_id = 1
         self.mock_coupon_code = 'coupon_code'
 
-    @mock.patch('enterprise_access.apps.api.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.api.tasks.EcommerceApiClient')
-    def test_assign_coupon_codes_task(self, mock_ecommerce_client, mock_lms_client):
+    def test_assign_coupon_codes_task(self, mock_ecommerce_client):
         """
         Verify assign_coupon_codes_task calls Ecommerece to assign new coupon codes.
         """
-        mock_lms_client().get_enterprise_learner_data.return_value = self.mock_enterprise_learner_data
         mock_coupon_code_assignments = [{ 'user_email': self.user.email, 'code': self.mock_coupon_code }]
         mock_ecommerce_client().assign_coupon_codes.return_value = {
             'offer_assignments': mock_coupon_code_assignments
@@ -284,14 +295,12 @@ class TestCouponCodeAssignmentTasks(APITestWithMockedDiscoveryApiClient):
             self.mock_coupon_id
         )
 
-        assert mock_lms_client().get_enterprise_learner_data.called_with([self.user.lms_user_id])
-        assert mock_ecommerce_client().assign_coupon_codes.called_with([self.user.email], self.mock_coupon_id)
+        mock_ecommerce_client().assign_coupon_codes.assert_called_with([self.user.email], self.mock_coupon_id)
 
         self.assertDictEqual(
             code_assignment_results,
             {
                 'coupon_code_request_uuids': [self.pending_coupon_code_request.uuid],
-                'learner_data': self.mock_enterprise_learner_data,
                 'assigned_codes': {
                     assignment['user_email']: assignment['code'] for assignment in mock_coupon_code_assignments
                 },
@@ -303,7 +312,6 @@ class TestCouponCodeAssignmentTasks(APITestWithMockedDiscoveryApiClient):
         mock_coupon_code_assignments = [{ 'user_email': self.user.email, 'code': self.mock_coupon_code }]
         coupon_code_assignment_results = {
             'coupon_code_request_uuids': [self.pending_coupon_code_request.uuid],
-            'learner_data': { str(key): val for key, val in self.mock_enterprise_learner_data.items() },
             'assigned_codes': {
                 assignment['user_email']: assignment['code'] for assignment in mock_coupon_code_assignments
             },
@@ -318,3 +326,9 @@ class TestCouponCodeAssignmentTasks(APITestWithMockedDiscoveryApiClient):
         assert self.pending_coupon_code_request.state == SubsidyRequestStates.APPROVED
         assert self.pending_coupon_code_request.coupon_code == self.mock_coupon_code
         assert self.pending_coupon_code_request.coupon_id == self.mock_coupon_id
+
+        self.mock_analytics.assert_called_with(
+            user_id=self.pending_coupon_code_request.user.lms_user_id,
+            event=SegmentEvents.COUPON_CODE_REQUEST_APPROVED,
+            properties=CouponCodeRequestSerializer(self.pending_coupon_code_request).data
+        )

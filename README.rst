@@ -49,6 +49,12 @@ with the signature, which will be populated in your cookies when you go to an
 MFE while logged in. We can't use the edx-jwt-cookie outright because it
 won't be set by default when navigating to the django admin.
 
+Analytics
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+This project integrates with Segment and sends events through the analytics package.
+Events are dispatched in endpoints that modify relevant data by calling `track_event` in the track app.
+See `segment_events.rst <docs/segment_events.rst>`_ for more details on currently implemented events.
+
 Every time you want to contribute something in this repo
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. code-block::

@@ -12,11 +12,11 @@ from requests.exceptions import HTTPError
 
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.tests import factories
-from test_utils import APITestWithMockedDiscoveryApiClient
+from test_utils import APITestWithMocks
 
 
 @mark.django_db
-class TestManagementCommands(APITestWithMockedDiscoveryApiClient):
+class TestManagementCommands(APITestWithMocks):
     """
     Tests for Subsidy Request Management Commands.
     """
