@@ -15,10 +15,10 @@ def test_track_event_no_segment_key(mock_logger):
         "Event %s for user_id %s not tracked because SEGMENT_KEY not set", mock_event_name, mock_lms_user_id
     )
 
-@override_settings(SEGMENT_KEY=None)
+@override_settings(SEGMENT_KEY='123')
 @mock.patch('enterprise_access.apps.track.segment.logger', return_value=mock.MagicMock())
 @mock.patch('enterprise_access.apps.track.segment.analytics', return_value=mock.MagicMock())
 def test_track_event_catches_exceptions(mock_analytics, mock_logger):
     mock_analytics.track.side_effect = Exception('Something went wrong')
     track_event(mock_lms_user_id, mock_event_name, {})
-    mock_logger.exception.called_with('Something went wrong')
+    mock_logger.exception.assert_called()

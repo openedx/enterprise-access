@@ -18,7 +18,7 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
-from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
+from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LicenseRequest,
@@ -29,7 +29,7 @@ from enterprise_access.apps.subsidy_request.tests.factories import (
     LicenseRequestFactory,
     SubsidyRequestCustomerConfigurationFactory
 )
-from test_utils import COURSE_TITLE_ABOUT_PIE, APITestWithMockedDiscoveryApiClient
+from test_utils import COURSE_TITLE_ABOUT_PIE, APITestWithMocks
 
 LICENSE_REQUESTS_LIST_ENDPOINT = reverse('api:v1:license-requests-list')
 LICENSE_REQUESTS_APPROVE_ENDPOINT = reverse('api:v1:license-requests-approve')
@@ -43,7 +43,7 @@ CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT = reverse('api:v1:customer-configurations-
 
 @ddt.ddt
 @mark.django_db
-class TestSubsidyRequestViewSet(APITestWithMockedDiscoveryApiClient):
+class TestSubsidyRequestViewSet(APITestWithMocks):
     """
     Tests for SubsidyRequestViewSet.
     """
@@ -295,6 +295,12 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         response = self.client.post(LICENSE_REQUESTS_LIST_ENDPOINT, payload)
         assert response.status_code == status.HTTP_201_CREATED
 
+        self.mock_analytics.assert_called_with(
+            user_id=self.user.lms_user_id,
+            event=SegmentEvents.LICENSE_REQUEST_CREATED,
+            properties=response.data
+        )
+
     def test_create_403(self):
         """
         Test that a 403 response is returned if the user does not belong to the enterprise.
@@ -466,7 +472,7 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
     @mock.patch('enterprise_access.apps.api.v1.views.send_notification_emails_for_requests.si')
     @mock.patch('enterprise_access.apps.api.v1.views.assign_licenses_task')
     @mock.patch('enterprise_access.apps.api.v1.views.LicenseManagerApiClient.get_subscription_overview')
-    def test_approve_subsidy_request_success(self, mock_get_sub, _, mock_notify):
+    def test_approve_license_request_success(self, mock_get_sub, _, mock_notify):
         """ Test subsidy approval takes place when proper info provided"""
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -834,6 +840,12 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         response = self.client.post(COUPON_CODE_REQUESTS_LIST_ENDPOINT, payload)
         assert response.status_code == status.HTTP_201_CREATED
 
+        self.mock_analytics.assert_called_with(
+            user_id=self.user.lms_user_id,
+            event=SegmentEvents.COUPON_CODE_REQUEST_CREATED,
+            properties=response.data
+        )
+
     def test_approve_no_subsidy_request_uuids(self):
         """ 400 thrown if no subsidy requests provided """
         self.set_jwt_cookie([{
@@ -944,7 +956,7 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
     @mock.patch('enterprise_access.apps.api.v1.views.send_notification_emails_for_requests.si')
     @mock.patch('enterprise_access.apps.api.v1.views.assign_coupon_codes_task')
     @mock.patch('enterprise_access.apps.api.v1.views.EcommerceApiClient.get_coupon_overview')
-    def test_approve_subsidy_request_success(self, mock_get_coupon, _, mock_notify):
+    def test_approve_coupon_code_request_success(self, mock_get_coupon, _, mock_notify):
         """ Test subsidy approval takes place when proper info provided"""
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -1091,7 +1103,7 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         )
 
 @ddt.ddt
-class TestSubsidyRequestCustomerConfigurationViewSet(APITestWithMockedDiscoveryApiClient):
+class TestSubsidyRequestCustomerConfigurationViewSet(APITestWithMocks):
     """
     Tests for SubsidyRequestCustomerConfigurationViewSet.
     """
@@ -1160,6 +1172,12 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITestWithMockedDiscoveryA
         )
         assert customer_configuration.subsidy_requests_enabled
         assert customer_configuration.subsidy_type == SubsidyTypeChoices.COUPON
+
+        self.mock_analytics.assert_called_with(
+            user_id=self.user.lms_user_id,
+            event=SegmentEvents.SUBSIDY_REQUEST_CONFIGURATION_CREATED,
+            properties=response.data
+        )
 
     @ddt.data(
         (True, False),
@@ -1265,6 +1283,12 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITestWithMockedDiscoveryA
 
         assert customer_config.subsidy_requests_enabled
         assert customer_config.subsidy_type == SubsidyTypeChoices.COUPON
+
+        self.mock_analytics.assert_called_with(
+            user_id=self.user.lms_user_id,
+            event=SegmentEvents.SUBSIDY_REQUEST_CONFIGURATION_UPDATED,
+            properties=response.data
+        )
 
     @mock.patch('enterprise_access.apps.api.tasks.decline_enterprise_subsidy_requests_task.si')
     @ddt.data(

@@ -292,8 +292,6 @@ PLATFORM_NAME = 'Your Platform Name Here'
 # Set up logging for development use (logging to stdout)
 LOGGING = get_logger_config(debug=DEBUG)
 
-# SEGMENT CONFIGURATION
-SEGMENT_KEY = 'replace-me'
 
 """############################# BEGIN CELERY CONFIG ##################################"""
 

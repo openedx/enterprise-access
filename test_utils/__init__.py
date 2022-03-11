@@ -124,7 +124,7 @@ class APITest(APITestCase):
         self.client.cookies[jwt_cookie_name()] = jwt_token
 
 
-class APITestWithMockedDiscoveryApiClient(APITest):
+class APITestWithMocks(APITest):
     """
     API test class with discovery api calls in subsidy_request tasks mocked out.
 
@@ -137,7 +137,12 @@ class APITestWithMockedDiscoveryApiClient(APITest):
         self.mock_discovery_client().get_course_data.return_value = {
             'title': COURSE_TITLE_ABOUT_PIE,
         }
+
+        self.analytics_patcher = mock.patch('analytics.track')
+        self.mock_analytics = self.analytics_patcher.start()
+
         self.addCleanup(self.disco_patcher.stop)
+        self.addCleanup(self.analytics_patcher.stop)
 
 
 class TestCaseWithMockedDiscoveryApiClient(TestCase):

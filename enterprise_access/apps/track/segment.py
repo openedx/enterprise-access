@@ -22,7 +22,6 @@ def track_event(lms_user_id, event_name, properties):
     Returns:
         None
     """
-
     if hasattr(settings, "SEGMENT_KEY") and settings.SEGMENT_KEY:
         try:  # We should never raise an exception when not able to send a tracking event.
             analytics.track(user_id=lms_user_id, event=event_name, properties=properties)
