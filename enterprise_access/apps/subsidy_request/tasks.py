@@ -87,8 +87,8 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
 
     if not subsidy_requests:
         logger.info(
-            'No new subsidy requests. '
-            f'Not contacting admins for enterprise {enterprise_customer_uuid}.'
+            'No new subsidy requests. Not sending new requests '
+            f'email to admins for enterprise {enterprise_customer_uuid}.'
             )
         return
 
