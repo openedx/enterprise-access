@@ -37,7 +37,7 @@ def update_course_title_for_subsidy_request_task(subsidy_type, subsidy_request_u
 
 def _get_manage_requests_url(subsidy_model, enterprise_slug):
     """
-    Get a manage_learners url based on the type of subsidy.
+    Get a manage_requests url based on the type of subsidy.
 
     Args:
         subsidy_model (class):  class of the subsidy object
