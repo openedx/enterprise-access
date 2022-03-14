@@ -78,3 +78,32 @@ class TestLmsApiClient(TestCase):
             expected_url,
             timeout=settings.LMS_CLIENT_TIMEOUT,
         )
+
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_enterprise_customer_data(self, mock_oauth_client, mock_json):
+        """
+        Verify client hits the right URL for entepriseCustomerUser data.
+        """
+        mock_json.return_value = {
+            'uuid': 'some-uuid',
+            'slug': 'some-test-slug',
+        }
+        mock_oauth_client.return_value.get.return_value = Response()
+
+        client = LmsApiClient()
+        customer_data = client.get_enterprise_customer_data('some-uuid')
+
+        assert customer_data['uuid'] == 'some-uuid'
+        assert customer_data['slug'] == 'some-test-slug'
+
+        expected_url = (
+            'http://edx-platform.example.com/'
+            'enterprise/api/v1/'
+            'enterprise-customer/'
+            'some-uuid'
+        )
+        mock_oauth_client.return_value.get.assert_called_with(
+            expected_url,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )

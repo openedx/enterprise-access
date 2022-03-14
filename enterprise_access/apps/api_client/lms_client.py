@@ -30,7 +30,7 @@ class LmsApiClient(BaseOAuthClient):
         """
 
         try:
-            endpoint = f'{self.enterprise_learner_endpoint}/{enterprise_customer_uuid}'
+            endpoint = f'{self.enterprise_customer_endpoint}{enterprise_customer_uuid}'
             response = self.client.get(endpoint, timeout=settings.LMS_CLIENT_TIMEOUT)
         except requests.exceptions.HTTPError as exc:
             logger.exception(exc)
