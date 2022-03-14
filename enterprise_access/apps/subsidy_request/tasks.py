@@ -8,6 +8,7 @@ from datetime import datetime
 from celery import shared_task
 from django.apps import apps
 from django.conf import settings
+from requests.exceptions import HTTPError
 
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClient
@@ -62,17 +63,8 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
     Args:
         enterprise_customer_uuid (str): enterprise customer uuid identifier
     """
-    braze_client = BrazeApiClient()
     lms_client = LmsApiClient()
     enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-
-    contact_email = enterprise_customer_data.get('contact_email')
-    if not contact_email:
-        logger.warning(
-            f'No contact email set for {enterprise_customer_uuid}. '
-            'Not sending new subsidy requests email to admin.'
-        )
-        return
 
     config_model = apps.get_model('subsidy_request.SubsidyRequestCustomerConfiguration')
     customer_config = config_model.objects.get(
@@ -93,6 +85,13 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
 
     subsidy_requests = subsidy_requests.order_by("-created")
 
+    if not subsidy_requests:
+        logger.info(
+            'No new subsidy requests. '
+            f'Not contacting admins for enterprise {enterprise_customer_uuid}.'
+            )
+        return
+
     braze_trigger_properties = {}
     enterprise_slug = enterprise_customer_data.get('slug')
     braze_trigger_properties['manage_requests_url'] = _get_manage_requests_url(subsidy_model, enterprise_slug)
@@ -108,12 +107,22 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
             'course_title': course_title,
         })
 
-    recipient = get_aliased_recipient_object_from_email(contact_email)
-    braze_client.send_campaign_message(
-        settings.BRAZE_NEW_REQUESTS_NOTIFICATION_CAMPAIGN,
-        recipients=[recipient],
-        trigger_properties=braze_trigger_properties,
-    )
+    admin_users = lms_client.get_enterprise_admin_users(enterprise_customer_uuid)
+    recipients = [
+        get_aliased_recipient_object_from_email(admin_user['email'])
+        for admin_user in admin_users
+    ]
+
+    braze_client = BrazeApiClient()
+    try:
+        braze_client.send_campaign_message(
+            settings.BRAZE_NEW_REQUESTS_NOTIFICATION_CAMPAIGN,
+            recipients=recipients,
+            trigger_properties=braze_trigger_properties,
+        )
+    except HTTPError as exc:
+        logger.exception(exc)
+        raise
 
     customer_config.last_remind_date = datetime.now()
     customer_config.save()
