@@ -20,8 +20,8 @@ class SubsidyRequestStates:
 
 class SubsidyTypeChoices:
     """ Type of subsidies. """
-    LICENSE = 'License'
-    COUPON = 'Coupon'  # aka A la cart
+    LICENSE = 'license'
+    COUPON = 'coupon'  # aka A la cart
 
     CHOICES = (
         (LICENSE, 'License Subsidy'),
