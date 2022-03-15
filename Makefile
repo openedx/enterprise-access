@@ -185,6 +185,9 @@ app-shell: # Run the app shell as root
 db-shell: # Run the app shell as root, enter the app's database
 	docker exec -u 0 -it enterprise_access.db mysql -u root enterprise_access
 
+app-migrate:
+	docker exec -u 0 -it enterprise_access.app python manage.py migrate
+
 %-logs: # View the logs of the specified service container
 	docker-compose logs -f --tail=500 $*
 
@@ -216,3 +219,28 @@ github_docker_push: github_docker_tag github_docker_auth ## push to docker hub
 
 selfcheck: ## check that the Makefile is well-formed
 	@echo "The Makefile is well-formed."
+
+# commands to help get all enterprise services running on the main/master branch
+dev.enterprise-pull-code:
+	cd $(DEVSTACK_WORKSPACE)/edx-platform && git checkout master && git pull
+	cd $(DEVSTACK_WORKSPACE)/src/edx-enterprise && git checkout master && git pull
+	cd $(DEVSTACK_WORKSPACE)/enterprise-catalog && git checkout master && git pull
+	cd $(DEVSTACK_WORKSPACE)/license-manager && git checkout master && git pull
+	## being lazy and ignore the current repo for now, because the current branch is not main
+	## cd $(DEVSTACK_WORKSPACE)/enterprise-access && git checkout main && git pull
+	cd $(DEVSTACK_WORKSPACE)/frontend-app-admin-portal && git checkout master && git pull
+	cd $(DEVSTACK_WORKSPACE)/frontend-app-learner-portal-enterprise && git checkout master && git pull
+
+dev.enterprise-up:
+	cd $(DEVSTACK_WORKSPACE)/devstack && make dev.pull.lms+redis && make dev.up.lms+redis
+	cd $(DEVSTACK_WORKSPACE)/enterprise-catalog && make dev.up.build
+	cd $(DEVSTACK_WORKSPACE)/license-manager && make dev.up.build
+	## cd $(DEVSTACK_WORKSPACE)/enterprise-access && make dev.up.build
+
+dev.enterprise-migrate:
+	cd $(DEVSTACK_WORKSPACE)/devstack && make dev.migrate.lms
+	cd $(DEVSTACK_WORKSPACE)/enterprise-catalog && make dev.migrate
+	cd $(DEVSTACK_WORKSPACE)/license-manager && make app-migrate
+	## cd $(DEVSTACK_WORKSPACE)/enterprise-access && make app-migrate
+
+dev.enterprise-go: dev.enterprise-pull-code dev.enterprise-up dev.enterprise-migrate
