@@ -115,6 +115,10 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
         for admin_user in admin_users
     ]
 
+    logger.info(
+        f'Sending new-requests email to admins for enterprise {enterprise_customer_uuid}. '
+        f'The email includes {len(subsidy_requests)} subsidy requests.'
+    )
     braze_client = BrazeApiClient()
     try:
         braze_client.send_campaign_message(
