@@ -15,11 +15,12 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     """
     This command is intended to run as frequently as specified in a crontab. The window of time used
-    to grab requests that were made will be from the time this is last run (stored in the
-    last_updated_date field on the SubsidyRequestCustomerConfiguration model. This gives us 100%
+    to select requests to include in the email starts from the time this is last run to present.
+    The last run time is stored in the
+    last_remind_date field on the SubsidyRequestCustomerConfiguration model. This gives us 100%
     coverage of requests to email about, and also
     gives us fault tolerance if this ever fails. We can simply rerun this
-    and have it include all requests that haven't been included in an email yet).
+    and to capture all subsidy requests that haven't been included in an email yet.
 
     This DOESN'T give us fine grained control of different enterprises wanting different
     email frequencies, but that's not part of the MVP. If and when we would want that, we
