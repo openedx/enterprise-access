@@ -71,6 +71,8 @@ ECOMMERCE_URL = 'http://edx.devstack.ecommerce:18130'
 LICENSE_MANAGER_URL = 'http://license-manager.app:18170'
 LMS_URL = 'http://edx.devstack.lms:18000'
 DISCOVERY_URL = 'http://edx.devstack.discovery:18381'
+ENTERPRISE_LEARNER_PORTAL_URL = 'http://localhost:8734'
+ENTERPRISE_ADMIN_PORTAL_URL = 'http://localhost:1991'
 
 # shell_plus
 SHELL_PLUS_IMPORTS = [

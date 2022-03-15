@@ -248,6 +248,11 @@ class SubsidyRequestCustomerConfiguration(TimeStampedModel):
         null=True,
     )
 
+    last_remind_date = models.DateTimeField(
+        blank=True,
+        null=True,
+    )
+
     history = HistoricalRecords()
 
     @property
