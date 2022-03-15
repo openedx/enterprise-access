@@ -28,8 +28,8 @@ class Command(BaseCommand):
     include all use cases.
     """
     help = (
-        'Spin of celery tasks to send enterprise admins an email that lists requests that '
-        'came in since this was last run.'
+        'Spin off celery tasks to send enterprise admins an email that lists requests '
+        'that were created since this was last run.'
     )
 
     def handle(self, *args, **options):

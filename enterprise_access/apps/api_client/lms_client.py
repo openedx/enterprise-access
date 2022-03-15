@@ -76,7 +76,6 @@ class LmsApiClient(BaseOAuthClient):
                     user_data.update(ecu_id=result['id'], created=result['created'])
                     results.append(user_data)
 
-            return results
         except requests.exceptions.HTTPError as exc:
             logger.error(
                 'Failed to fetch enterprise admin users for %r because %r',
@@ -84,6 +83,8 @@ class LmsApiClient(BaseOAuthClient):
                 response.text,
             )
             raise exc
+
+        return results
 
     def get_enterprise_learner_data(self, lms_user_ids):
         """
