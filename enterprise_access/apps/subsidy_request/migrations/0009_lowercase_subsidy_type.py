@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('subsidy_request', '0008_add_last_remind_date_on_subsidyconfig'),
+        ('subsidy_request', 'add_last_remind_date_on_subsidyconfig'),
     ]
 
     operations = [
