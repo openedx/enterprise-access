@@ -399,10 +399,10 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
 
         subsidy_request_uuids = [subsidy_request.uuid for subsidy_request in subsidies_to_decline]
         if send_notification:
-            send_notification_emails_for_requests.apply_async(
+            send_notification_emails_for_requests.delay(
                 subsidy_request_uuids,
                 settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-                SubsidyTypeChoices.LICENSE,
+                SubsidyTypeChoices.LICENSE
             )
 
         serialized_subsidy_requests = serializers.LicenseRequestSerializer(subsidies_to_decline, many=True)
@@ -580,10 +580,10 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
 
         subsidy_request_uuids = [subsidy_request.uuid for subsidy_request in subsidies_to_decline]
         if send_notification:
-            send_notification_emails_for_requests.apply_async(
+            send_notification_emails_for_requests.delay(
                 subsidy_request_uuids,
                 settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-                SubsidyTypeChoices.COUPON,
+                SubsidyTypeChoices.COUPON
             )
 
         serialized_subsidy_requests = serializers.CouponCodeRequestSerializer(subsidies_to_decline, many=True)

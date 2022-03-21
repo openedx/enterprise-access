@@ -26,6 +26,7 @@ class SubsidyRequestFactory(factory.django.DjangoModelFactory):
     uuid = factory.LazyFunction(uuid4)
     user = factory.SubFactory(UserFactory)
     course_id = factory.LazyFunction(uuid4)
+    course_title = factory.LazyAttribute(lambda _: FAKER.word())
     enterprise_customer_uuid = factory.LazyFunction(uuid4)
     state = SubsidyRequestStates.REQUESTED
     reviewed_at = datetime.utcnow()
@@ -50,7 +51,7 @@ class CouponCodeRequestFactory(SubsidyRequestFactory):
     Test factory for the `CouponCodeRequest` model.
     """
 
-    coupon_id = factory.LazyAttribute(lambda x: FAKER.pyint())
+    coupon_id = factory.LazyAttribute(lambda _: FAKER.pyint())
     coupon_code = factory.LazyFunction(uuid4)
 
     class Meta:

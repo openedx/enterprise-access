@@ -66,7 +66,7 @@ class LicenseRequestTests(TestCaseWithMockedDiscoveryApiClient):
         """
         original_call_count = self.mock_discovery_client.call_count
 
-        subsidy = LicenseRequestFactory()
+        subsidy = LicenseRequestFactory(course_title=None)
         assert self.mock_discovery_client.call_count == original_call_count + 1
 
         subsidy.refresh_from_db()
@@ -105,7 +105,7 @@ class CouponCodeRequestTests(TestCaseWithMockedDiscoveryApiClient):
         """
         original_call_count = self.mock_discovery_client.call_count
 
-        subsidy = CouponCodeRequestFactory()
+        subsidy = CouponCodeRequestFactory(course_title=None)
         assert self.mock_discovery_client.call_count == original_call_count + 1
 
         subsidy.refresh_from_db()

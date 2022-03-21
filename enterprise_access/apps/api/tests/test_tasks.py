@@ -176,6 +176,7 @@ class TestTasks(APITestWithMocks):
             recipients=[expected_recipient],
             trigger_properties={
                 'contact_email': 'example2@example.com',
+                'course_title': self.license_requests[0].course_title,
                 'course_about_page_url': expected_course_about_page_url},
             )
         assert mock_braze_client().send_campaign_message.call_count == 1
