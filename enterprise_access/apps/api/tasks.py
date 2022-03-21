@@ -140,6 +140,7 @@ def send_notification_emails_for_requests(
             subsidy_request.course_id
         )
         braze_trigger_properties['course_about_page_url'] = course_about_page_url
+        braze_trigger_properties['course_title'] = subsidy_request.course_title
 
         logger.info(f'Sending braze campaign message for subsidy request {subsidy_request}')
         braze_client_instance.send_campaign_message(
