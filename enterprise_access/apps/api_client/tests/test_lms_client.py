@@ -65,33 +65,6 @@ class TestLmsApiClient(TestCase):
 
     @mock.patch('requests.Response.json')
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
-    def test_get_enterprise_customer_user_data(self, mock_oauth_client, mock_json):
-        """
-        Verify client hits the right URL for entepriseCustomerUser data.
-        """
-        mock_json.return_value = self.enterprise_learner_list_view_response
-        mock_oauth_client.return_value.get.return_value = Response()
-
-        client = LmsApiClient()
-        learner_data = client.get_enterprise_learner_data([1,2,3])
-
-        assert len(learner_data) == 3
-        assert learner_data[1]['email'] == 'user1@example.com'
-        assert learner_data[1]['enterprise_customer']['contact_email'] == 'contact@example.com'
-
-        expected_url = (
-            'http://edx-platform.example.com/'
-            'enterprise/api/v1/'
-            'enterprise-learner/'
-            '?user_ids=1,2,3'
-        )
-        mock_oauth_client.return_value.get.assert_called_with(
-            expected_url,
-            timeout=settings.LMS_CLIENT_TIMEOUT,
-        )
-
-    @mock.patch('requests.Response.json')
-    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
     def test_get_enterprise_admin_users(self, mock_oauth_client, mock_json):
         """
         Verify client hits the right URL for entepriseCustomerUser data.
@@ -130,6 +103,7 @@ class TestLmsApiClient(TestCase):
             'slug': 'some-test-slug',
         }
         mock_oauth_client.return_value.get.return_value = Response()
+        mock_oauth_client.return_value.get.return_value.status_code = 200
 
         client = LmsApiClient()
         customer_data = client.get_enterprise_customer_data('some-uuid')

@@ -32,7 +32,7 @@ from enterprise_access.apps.api.tasks import (
     assign_coupon_codes_task,
     assign_licenses_task,
     decline_enterprise_subsidy_requests_task,
-    send_notification_emails_for_requests,
+    send_notification_email_for_request,
     update_coupon_code_requests_after_assignments_task,
     update_license_requests_after_assignments_task
 )
@@ -328,30 +328,32 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
             for request in license_requests_to_approve:
                 request.approve(self.user)
 
-        subsidy_request_uuids = [license_request.uuid for license_request in license_requests_to_approve]
+        license_requests_to_approve_uuids = [
+            str(license_request.uuid) for license_request in license_requests_to_approve
+        ]
         license_assignment_tasks = chain(
             assign_licenses_task.s(
-                subsidy_request_uuids,
+                license_requests_to_approve_uuids,
                 subscription_plan_uuid
             ),
             update_license_requests_after_assignments_task.s()
         )
 
         if send_notification:
-            license_assignment_tasks.link(
-                send_notification_emails_for_requests.si(
-                    subsidy_request_uuids,
-                    settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
-                    SubsidyTypeChoices.LICENSE,
+            for license_request_uuid in license_requests_to_approve_uuids:
+                license_assignment_tasks.link(
+                    send_notification_email_for_request.si(
+                        license_request_uuid,
+                        settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
+                        SubsidyTypeChoices.LICENSE,
+                    )
                 )
-            )
 
         license_assignment_tasks.apply_async()
 
-        serialized_subsidy_requests = serializers.LicenseRequestSerializer(license_requests_to_approve, many=True)
-
+        response_data = serializers.LicenseRequestSerializer(license_requests_to_approve, many=True).data
         return Response(
-            serialized_subsidy_requests.data,
+            response_data,
             status=status.HTTP_200_OK,
         )
 
@@ -366,23 +368,23 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         """
 
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
-        subsidy_request_uuids = self.request.data.get('subsidy_request_uuids')
+        license_request_uuids = self.request.data.get('subsidy_request_uuids')
         send_notification = self.request.data.get('send_notification')
 
         try:
-            self._validate_subsidy_request_uuids(subsidy_request_uuids)
+            self._validate_subsidy_request_uuids(license_request_uuids)
         except SubsidyRequestError as exc:
             logger.exception(exc)
             return Response(exc.message, exc.http_status_code)
 
-        subsidy_requests = LicenseRequest.objects.filter(
-            uuid__in=subsidy_request_uuids,
+        license_requests = LicenseRequest.objects.filter(
+            uuid__in=license_request_uuids,
             enterprise_customer_uuid=enterprise_customer_uuid,
         )
 
         try:
             self._raise_error_if_any_requests_match_incorrect_states(
-                subsidy_requests,
+                license_requests,
                 incorrect_states=[SubsidyRequestStates.APPROVED, SubsidyRequestStates.PENDING],
                 current_action=SubsidyRequestStates.DECLINED
             )
@@ -390,25 +392,26 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
             logger.exception(exc)
             return Response(exc.message, exc.http_status_code)
 
-        subsidies_to_decline = subsidy_requests.filter(
+        license_requests_to_decline = license_requests.filter(
             state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.ERROR]
         )
         with transaction.atomic():
-            for subsidy_request in subsidies_to_decline:
-                subsidy_request.decline(self.user)
+            for license_request in license_requests_to_decline:
+                license_request.decline(self.user)
 
-        subsidy_request_uuids = [subsidy_request.uuid for subsidy_request in subsidies_to_decline]
+        declined_license_request_uuids = [str(subsidy_request.uuid) for subsidy_request in license_requests_to_decline]
+
         if send_notification:
-            send_notification_emails_for_requests.delay(
-                subsidy_request_uuids,
-                settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-                SubsidyTypeChoices.LICENSE
-            )
+            for license_request_uuid in declined_license_request_uuids:
+                send_notification_email_for_request.delay(
+                    license_request_uuid,
+                    settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
+                    SubsidyTypeChoices.LICENSE
+                )
 
-        serialized_subsidy_requests = serializers.LicenseRequestSerializer(subsidies_to_decline, many=True)
-
+        response_data = serializers.LicenseRequestSerializer(license_requests_to_decline, many=True).data
         return Response(
-            serialized_subsidy_requests.data,
+            response_data,
             status=status.HTTP_200_OK,
         )
 
@@ -510,33 +513,36 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             for coupon_code_request in coupon_code_requests_to_approve:
                 coupon_code_request.approve(self.user)
 
-        subsidy_request_uuids = [coupon_code_request.uuid for coupon_code_request in  coupon_code_requests_to_approve]
+        coupon_code_requests_to_approve_uuids = [
+            str(coupon_code_request.uuid) for coupon_code_request in  coupon_code_requests_to_approve
+        ]
         coupon_code_assignment_tasks = chain(
             assign_coupon_codes_task.s(
-                subsidy_request_uuids,
+                coupon_code_requests_to_approve_uuids,
                 coupon_id
             ),
             update_coupon_code_requests_after_assignments_task.s()
         )
 
         if send_notification:
-            coupon_code_assignment_tasks.link(
-                send_notification_emails_for_requests.si(
-                    subsidy_request_uuids,
-                    settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
-                    SubsidyTypeChoices.COUPON,
+            for coupon_code_request_uuid in coupon_code_requests_to_approve_uuids:
+                coupon_code_assignment_tasks.link(
+                    send_notification_email_for_request.si(
+                        coupon_code_request_uuid,
+                        settings.BRAZE_APPROVE_NOTIFICATION_CAMPAIGN,
+                        SubsidyTypeChoices.COUPON,
+                    )
                 )
-            )
 
         coupon_code_assignment_tasks.apply_async()
 
-        serialized_coupon_code_request = serializers.CouponCodeRequestSerializer(
+        response_data = serializers.CouponCodeRequestSerializer(
             coupon_code_requests_to_approve,
             many=True
-        )
+        ).data
 
         return Response(
-            serialized_coupon_code_request.data,
+            response_data,
             status=status.HTTP_200_OK,
         )
 
@@ -547,23 +553,23 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         """
 
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
-        subsidy_request_uuids = self.request.data.get('subsidy_request_uuids')
+        coupon_code_request_uuids = self.request.data.get('subsidy_request_uuids')
         send_notification = self.request.data.get('send_notification')
 
         try:
-            self._validate_subsidy_request_uuids(subsidy_request_uuids)
+            self._validate_subsidy_request_uuids(coupon_code_request_uuids)
         except SubsidyRequestError as exc:
             logger.exception(exc)
             return Response(exc.message, exc.http_status_code)
 
-        subsidy_requests = CouponCodeRequest.objects.filter(
-            uuid__in=subsidy_request_uuids,
+        coupon_code_requests = CouponCodeRequest.objects.filter(
+            uuid__in=coupon_code_request_uuids,
             enterprise_customer_uuid=enterprise_customer_uuid,
         )
 
         try:
             self._raise_error_if_any_requests_match_incorrect_states(
-                subsidy_requests,
+                coupon_code_requests,
                 incorrect_states=[SubsidyRequestStates.APPROVED, SubsidyRequestStates.PENDING],
                 current_action=SubsidyRequestStates.DECLINED
             )
@@ -571,25 +577,28 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             logger.exception(exc)
             return Response(exc.message, exc.http_status_code)
 
-        subsidies_to_decline = subsidy_requests.filter(
+        coupon_code_requests_to_decline = coupon_code_requests.filter(
             state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.ERROR]
         )
         with transaction.atomic():
-            for subsidy_request in subsidies_to_decline:
-                subsidy_request.decline(self.user)
+            for coupon_code_request in coupon_code_requests_to_decline:
+                coupon_code_request.decline(self.user)
 
-        subsidy_request_uuids = [subsidy_request.uuid for subsidy_request in subsidies_to_decline]
+        declined_coupon_code_request_uuids = [
+            str(coupon_code_request.uuid) for coupon_code_request in coupon_code_requests_to_decline
+        ]
+
         if send_notification:
-            send_notification_emails_for_requests.delay(
-                subsidy_request_uuids,
-                settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-                SubsidyTypeChoices.COUPON
-            )
+            for coupon_code_request_uuid in declined_coupon_code_request_uuids:
+                send_notification_email_for_request.delay(
+                    coupon_code_request_uuid,
+                    settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
+                    SubsidyTypeChoices.COUPON
+                )
 
-        serialized_subsidy_requests = serializers.CouponCodeRequestSerializer(subsidies_to_decline, many=True)
-
+        response_data = serializers.CouponCodeRequestSerializer(coupon_code_requests_to_decline, many=True).data
         return Response(
-            serialized_subsidy_requests.data,
+            response_data,
             status=status.HTTP_200_OK,
         )
 
@@ -663,13 +672,14 @@ class SubsidyRequestCustomerConfigurationViewSet(UserDetailsFromJwtMixin, viewse
                 )
 
                 if send_notification:
-                    tasks.link(
-                        send_notification_emails_for_requests.si(
-                            subsidy_request_uuids,
-                            settings.BRAZE_AUTO_DECLINE_NOTIFICATION_CAMPAIGN,
-                            current_subsidy_type,
+                    for subsidy_request_uuid in subsidy_request_uuids:
+                        tasks.link(
+                            send_notification_email_for_request.si(
+                                subsidy_request_uuid,
+                                settings.BRAZE_AUTO_DECLINE_NOTIFICATION_CAMPAIGN,
+                                current_subsidy_type,
+                            )
                         )
-                    )
 
                 tasks.delay()
 
