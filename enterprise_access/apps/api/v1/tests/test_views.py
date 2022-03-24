@@ -617,6 +617,12 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             state=SubsidyRequestStates.DECLINED
         ).count() == 1
 
+        self.mock_analytics.assert_called_with(
+            user_id=self.user_license_request_1.user.lms_user_id,
+            event=SegmentEvents.LICENSE_REQUEST_DECLINED,
+            properties=response.data[0]
+        )
+
     @mock.patch('enterprise_access.apps.api.v1.views.send_notification_email_for_request.delay')
     def test_decline_send_notification(self, mock_notify):
         """ Test braze task called if send_notification is True """
@@ -1083,6 +1089,12 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         assert CouponCodeRequest.objects.filter(
             state=SubsidyRequestStates.DECLINED
         ).count() == 1
+
+        self.mock_analytics.assert_called_with(
+            user_id=self.coupon_code_request_1.user.lms_user_id,
+            event=SegmentEvents.COUPON_CODE_REQUEST_DECLINED,
+            properties=response.data[0]
+        )
 
     @mock.patch('enterprise_access.apps.api.v1.views.send_notification_email_for_request.delay')
     def test_decline_send_notification(self, mock_notify):

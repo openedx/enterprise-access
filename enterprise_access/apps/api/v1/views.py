@@ -394,24 +394,33 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
 
         license_requests_to_decline = license_requests.filter(
             state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.ERROR]
-        )
+        ).select_related('user', 'reviewer')
+
         with transaction.atomic():
             for license_request in license_requests_to_decline:
                 license_request.decline(self.user)
 
-        declined_license_request_uuids = [str(subsidy_request.uuid) for subsidy_request in license_requests_to_decline]
+        serialized_license_requests = serializers.LicenseRequestSerializer(license_requests_to_decline, many=True).data
 
-        if send_notification:
-            for license_request_uuid in declined_license_request_uuids:
+        for serialized_license_request in serialized_license_requests:
+            license_request_uuid = serialized_license_request['uuid']
+            lms_user_id = serialized_license_request['lms_user_id']
+
+            track_event(
+                lms_user_id=lms_user_id,
+                event_name=SegmentEvents.LICENSE_REQUEST_DECLINED,
+                properties=serialized_license_request
+            )
+
+            if send_notification:
                 send_notification_email_for_request.delay(
                     license_request_uuid,
                     settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
                     SubsidyTypeChoices.LICENSE
                 )
 
-        response_data = serializers.LicenseRequestSerializer(license_requests_to_decline, many=True).data
         return Response(
-            response_data,
+            serialized_license_requests,
             status=status.HTTP_200_OK,
         )
 
@@ -579,26 +588,33 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
 
         coupon_code_requests_to_decline = coupon_code_requests.filter(
             state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.ERROR]
-        )
+        ).select_related('user', 'reviewer')
+
         with transaction.atomic():
             for coupon_code_request in coupon_code_requests_to_decline:
                 coupon_code_request.decline(self.user)
 
-        declined_coupon_code_request_uuids = [
-            str(coupon_code_request.uuid) for coupon_code_request in coupon_code_requests_to_decline
-        ]
+        serialized_coupon_code_requests = serializers.CouponCodeRequestSerializer(coupon_code_requests_to_decline, many=True).data
 
-        if send_notification:
-            for coupon_code_request_uuid in declined_coupon_code_request_uuids:
+        for serialized_coupon_code_request in serialized_coupon_code_requests:
+            coupon_code_request_uuid = serialized_coupon_code_request['uuid']
+            lms_user_id = serialized_coupon_code_request['lms_user_id']
+
+            track_event(
+                lms_user_id=lms_user_id,
+                event_name=SegmentEvents.COUPON_CODE_REQUEST_DECLINED,
+                properties=serialized_coupon_code_request
+            )
+
+            if send_notification:
                 send_notification_email_for_request.delay(
                     coupon_code_request_uuid,
                     settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
                     SubsidyTypeChoices.COUPON
                 )
 
-        response_data = serializers.CouponCodeRequestSerializer(coupon_code_requests_to_decline, many=True).data
         return Response(
-            response_data,
+            serialized_coupon_code_requests,
             status=status.HTTP_200_OK,
         )
 
