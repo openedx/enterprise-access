@@ -6,7 +6,6 @@ import logging
 from celery import shared_task
 from django.conf import settings
 
-from enterprise_access.apps.api.exceptions import MissingEnterpriseLearnerDataError
 from enterprise_access.apps.api.serializers import CouponCodeRequestSerializer, LicenseRequestSerializer
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
@@ -34,34 +33,6 @@ def _get_serializer_by_subsidy_type(subsidy_type):
     if subsidy_type == SubsidyTypeChoices.COUPON:
         return CouponCodeRequestSerializer
     return None
-
-def _get_enterprise_learner_data(lms_user_ids):
-    """
-    Call LMS API to fetch user data for the given lms_user_ids.
-
-    Args:
-        lms_user_ids (list of string): list of lms user ids
-
-    Returns:
-        A dict containing user data keyed by lms_user_ids.
-    """
-
-    lms_client = LmsApiClient()
-    unique_lms_user_ids = set(lms_user_ids)
-    learner_data = lms_client.get_enterprise_learner_data(unique_lms_user_ids)
-
-    # Sanity check to make sure that we have user data for each lms_user_id
-    missing_lms_user_ids = [
-        lms_user_id for lms_user_id in unique_lms_user_ids if lms_user_id
-        not in learner_data
-    ]
-
-    if missing_lms_user_ids:
-        msg = f'Enterprise learner data missing for lms_user_ids: {missing_lms_user_ids}.'
-        logger.error(msg)
-        raise MissingEnterpriseLearnerDataError(msg)
-
-    return learner_data
 
 @shared_task(base=LoggedTaskWithRetry)
 def decline_enterprise_subsidy_requests_task(subsidy_request_uuids, subsidy_type):
@@ -94,20 +65,20 @@ def decline_enterprise_subsidy_requests_task(subsidy_request_uuids, subsidy_type
 
 
 @shared_task(base=LoggedTaskWithRetry)
-def send_notification_emails_for_requests(
-        subsidy_request_uuids,
+def send_notification_email_for_request(
+        subsidy_request_uuid,
         braze_campaign_id,
         subsidy_type,
         braze_trigger_properties=None,
     ):
     """
-    Send emails via braze for each subsidy_request
+    Send emails via braze for the subsidy_request
 
     Args:
-        subsidy_request_uuids: list of strings containing subsidy request uuid identifiers
-        braze_campaign_id: string representation of braze campaign uuid
-        subsidy_type: string representing the type of subsidy (e.g. 'Coupon')
-        braze_trigger_properties: dictionary where keys are names of properties that
+        subsidy_request_uuid: (string) the subsidy request uuid
+        braze_campaign_id: (string) the braze campaign uuid
+        subsidy_type: (string) the type of subsidy (i.e. 'coupon')
+        braze_trigger_properties: (dict) dictionary where keys are names of properties that
             match variable names in a braze template, and values are the strings
             you wish to appear in the braze email template where the key (name)
             is found.
@@ -118,36 +89,38 @@ def send_notification_emails_for_requests(
     braze_client_instance = BrazeApiClient()
 
     subsidy_model = get_subsidy_model(subsidy_type)
-    subsidy_requests = subsidy_model.objects.filter(uuid__in=subsidy_request_uuids)
-    lms_user_ids = [subsidy_request.user.lms_user_id for subsidy_request in subsidy_requests]
-    enterprise_learner_data = _get_enterprise_learner_data(
-        lms_user_ids
+
+    try:
+        subsidy_request = subsidy_model.objects.get(uuid=subsidy_request_uuid)
+    except subsidy_model.DoesNotExist:
+        logger.warning(f'{subsidy_type} request with uuid: {subsidy_request_uuid} does not exist.')
+        return
+
+    lms_client = LmsApiClient()
+
+    user_email = subsidy_request.user.email
+    recipient = get_aliased_recipient_object_from_email(user_email)
+
+    enterprise_customer_data = lms_client.get_enterprise_customer_data(subsidy_request.enterprise_customer_uuid)
+
+    contact_email = enterprise_customer_data['contact_email']
+    braze_trigger_properties['contact_email'] = contact_email
+
+    enterprise_slug = enterprise_customer_data['slug']
+    course_about_page_url = '{}/{}/course/{}'.format(
+        settings.ENTERPRISE_LEARNER_PORTAL_URL,
+        enterprise_slug,
+        subsidy_request.course_id
     )
+    braze_trigger_properties['course_about_page_url'] = course_about_page_url
+    braze_trigger_properties['course_title'] = subsidy_request.course_title
 
-    for subsidy_request in subsidy_requests:
-        user_email = enterprise_learner_data[subsidy_request.user.lms_user_id]['email']
-        recipient = get_aliased_recipient_object_from_email(user_email)
-
-        contact_email = enterprise_learner_data[
-            subsidy_request.user.lms_user_id
-        ]['enterprise_customer']['contact_email']
-        braze_trigger_properties['contact_email'] = contact_email
-
-        enterprise_slug = enterprise_learner_data[subsidy_request.user.lms_user_id]['enterprise_customer']['slug']
-        course_about_page_url = '{}/{}/course/{}'.format(
-            settings.ENTERPRISE_LEARNER_PORTAL_URL,
-            enterprise_slug,
-            subsidy_request.course_id
-        )
-        braze_trigger_properties['course_about_page_url'] = course_about_page_url
-        braze_trigger_properties['course_title'] = subsidy_request.course_title
-
-        logger.info(f'Sending braze campaign message for subsidy request {subsidy_request}')
-        braze_client_instance.send_campaign_message(
-            braze_campaign_id,
-            recipients=[recipient],
-            trigger_properties=braze_trigger_properties,
-        )
+    logger.info(f'Sending braze campaign message for subsidy request {subsidy_request}')
+    braze_client_instance.send_campaign_message(
+        braze_campaign_id,
+        recipients=[recipient],
+        trigger_properties=braze_trigger_properties,
+    )
 
 @shared_task(base=LoggedTaskWithRetry)
 def assign_licenses_task(license_request_uuids, subscription_uuid):

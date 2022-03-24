@@ -32,11 +32,11 @@ class LmsApiClient(BaseOAuthClient):
         try:
             endpoint = f'{self.enterprise_customer_endpoint}{enterprise_customer_uuid}'
             response = self.client.get(endpoint, timeout=settings.LMS_CLIENT_TIMEOUT)
+            response.raise_for_status()
+            return response.json()
         except requests.exceptions.HTTPError as exc:
             logger.exception(exc)
             raise
-
-        return response.json()
 
     def get_enterprise_admin_users(self, enterprise_customer_uuid):
         """
@@ -85,27 +85,3 @@ class LmsApiClient(BaseOAuthClient):
             raise exc
 
         return results
-
-    def get_enterprise_learner_data(self, lms_user_ids):
-        """
-        Gets the data for EnterpriseCustomerUsers with the given lms_user_ids.
-
-        Arguments:
-            lms_user_ids (list of int): ids of the lms users
-        Returns:
-            response (dict): Dictionary containing learner data with lms_user_id as the keys
-        """
-
-        try:
-            user_ids = ','.join([str(user_id) for user_id in lms_user_ids])
-            endpoint = f'{self.enterprise_learner_endpoint}?user_ids={user_ids}'
-            response = self.client.get(endpoint, timeout=settings.LMS_CLIENT_TIMEOUT)
-            results = response.json()['results']
-            learner_data = {}
-            for result in results:
-                learner_data[result['user']['id']] = result['user']
-                learner_data[result['user']['id']]['enterprise_customer'] = result['enterprise_customer']
-            return learner_data
-        except requests.exceptions.HTTPError as exc:
-            logger.exception(exc)
-            raise

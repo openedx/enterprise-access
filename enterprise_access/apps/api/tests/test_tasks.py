@@ -12,7 +12,7 @@ from enterprise_access.apps.api.tasks import (
     assign_coupon_codes_task,
     assign_licenses_task,
     decline_enterprise_subsidy_requests_task,
-    send_notification_emails_for_requests,
+    send_notification_email_for_request,
     update_coupon_code_requests_after_assignments_task,
     update_license_requests_after_assignments_task
 )
@@ -133,31 +133,29 @@ class TestTasks(APITestWithMocks):
 
     @mock.patch('enterprise_access.apps.api.tasks.LmsApiClient', return_value=mock.MagicMock())
     @mock.patch('enterprise_access.apps.api.tasks.BrazeApiClient', return_value=mock.MagicMock())
-    def test_send_notification_emails_for_requests(self, mock_braze_client, mock_lms_client):
+    def test_send_notification_email_for_request(self, mock_braze_client, mock_lms_client):
         """
-        Verify send_notification_emails_for_requests hits braze client with expected args
+        Verify send_notification_email_for_request hits braze client with expected args
         """
 
-        mock_lms_client().get_enterprise_learner_data.return_value = {
-            self.user.lms_user_id: {
-                'email': self.user.email,
-                'enterprise_customer': {
-                    'contact_email': 'example2@example.com',
-                    'slug': 'test-org-for-learning'
-                }
-            }
+        slug = 'sluggy'
+        contact_email = 'edx@example.org'
+
+        mock_lms_client().get_enterprise_customer_data.return_value = {
+            'slug': slug,
+            'contact_email': contact_email
         }
 
-        # Run the task
-        subsidy_request_uuids = [self.license_requests[0].uuid]  # Just use 1 to prevent flakiness
-        send_notification_emails_for_requests(
-            subsidy_request_uuids,
+        send_notification_email_for_request(
+            self.license_requests[0].uuid,
             'test-campaign-id',
             SubsidyTypeChoices.LICENSE,
         )
 
         # Make sure our LMS client got called correct times and with what we expected
-        assert mock_lms_client().get_enterprise_learner_data.call_count == 1
+        mock_lms_client().get_enterprise_customer_data.assert_called_with(
+            self.license_requests[0].enterprise_customer_uuid
+        )
 
         # And also the same for the Braze Client
         expected_recipient = {
@@ -168,14 +166,14 @@ class TestTasks(APITestWithMocks):
             },
         }
         expected_course_about_page_url = (
-            'http://enterprise-learner-portal.example.com/test-org-for-learning/course/' +
+            f'http://enterprise-learner-portal.example.com/{slug}/course/' +
             self.license_requests[0].course_id
         )
         mock_braze_client().send_campaign_message.assert_any_call(
             'test-campaign-id',
             recipients=[expected_recipient],
             trigger_properties={
-                'contact_email': 'example2@example.com',
+                'contact_email': contact_email,
                 'course_title': self.license_requests[0].course_title,
                 'course_about_page_url': expected_course_about_page_url},
             )
