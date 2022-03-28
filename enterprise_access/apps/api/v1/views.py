@@ -594,7 +594,9 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             for coupon_code_request in coupon_code_requests_to_decline:
                 coupon_code_request.decline(self.user)
 
-        serialized_coupon_code_requests = serializers.CouponCodeRequestSerializer(coupon_code_requests_to_decline, many=True).data
+        serialized_coupon_code_requests = serializers.CouponCodeRequestSerializer(
+            coupon_code_requests_to_decline, many=True
+        ).data
 
         for serialized_coupon_code_request in serialized_coupon_code_requests:
             coupon_code_request_uuid = serialized_coupon_code_request['uuid']
