@@ -16,12 +16,7 @@ from enterprise_access.apps.api.tasks import (
     update_coupon_code_requests_after_assignments_task,
     update_license_requests_after_assignments_task
 )
-from enterprise_access.apps.subsidy_request.constants import (
-    ENTERPRISE_BRAZE_ALIAS_LABEL,
-    SegmentEvents,
-    SubsidyRequestStates,
-    SubsidyTypeChoices
-)
+from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
 from enterprise_access.apps.subsidy_request.tests.factories import CouponCodeRequestFactory, LicenseRequestFactory
 from test_utils import APITestWithMocks
@@ -157,21 +152,13 @@ class TestTasks(APITestWithMocks):
             self.license_requests[0].enterprise_customer_uuid
         )
 
-        # And also the same for the Braze Client
-        expected_recipient = {
-            'attributes': {'email': self.user.email},
-            'user_alias': {
-                'alias_label': ENTERPRISE_BRAZE_ALIAS_LABEL,
-                'alias_name': self.user.email,
-            },
-        }
         expected_course_about_page_url = (
             f'http://enterprise-learner-portal.example.com/{slug}/course/' +
             self.license_requests[0].course_id
         )
         mock_braze_client().send_campaign_message.assert_any_call(
             'test-campaign-id',
-            recipients=[expected_recipient],
+            emails=[self.license_requests[0].user.email],
             trigger_properties={
                 'contact_email': contact_email,
                 'course_title': self.license_requests[0].course_title,

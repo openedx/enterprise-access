@@ -33,7 +33,6 @@ SUBSIDY_TYPE_CHANGE_DECLINATION = (
     'has changed.'
 )
 
-ENTERPRISE_BRAZE_ALIAS_LABEL = 'Enterprise'  # Do Not change this, this is consistent with other uses across edX repos.
 SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE = 100
 
 # Segment events

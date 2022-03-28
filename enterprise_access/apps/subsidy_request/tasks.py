@@ -15,7 +15,7 @@ from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClien
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.tasks import LoggedTaskWithRetry
-from enterprise_access.utils import get_aliased_recipient_object_from_email, get_subsidy_model
+from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
 
@@ -110,10 +110,6 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
         })
 
     admin_users = lms_client.get_enterprise_admin_users(enterprise_customer_uuid)
-    recipients = [
-        get_aliased_recipient_object_from_email(admin_user['email'])
-        for admin_user in admin_users
-    ]
 
     logger.info(
         f'Sending new-requests email to admins for enterprise {enterprise_customer_uuid}. '
@@ -123,7 +119,7 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
     try:
         braze_client.send_campaign_message(
             settings.BRAZE_NEW_REQUESTS_NOTIFICATION_CAMPAIGN,
-            recipients=recipients,
+            emails=[admin_user['email'] for admin_user in admin_users],
             trigger_properties=braze_trigger_properties,
         )
     except HTTPError as exc:

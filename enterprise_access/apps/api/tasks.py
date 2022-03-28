@@ -20,7 +20,7 @@ from enterprise_access.apps.subsidy_request.constants import (
 from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
 from enterprise_access.apps.track.segment import track_event
 from enterprise_access.tasks import LoggedTaskWithRetry
-from enterprise_access.utils import get_aliased_recipient_object_from_email, get_subsidy_model
+from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def send_notification_email_for_request(
         braze_trigger_properties=None,
     ):
     """
-    Send emails via braze for the subsidy_request
+    Send email via braze for the subsidy_request
 
     Args:
         subsidy_request_uuid: (string) the subsidy request uuid
@@ -99,8 +99,6 @@ def send_notification_email_for_request(
     lms_client = LmsApiClient()
 
     user_email = subsidy_request.user.email
-    recipient = get_aliased_recipient_object_from_email(user_email)
-
     enterprise_customer_data = lms_client.get_enterprise_customer_data(subsidy_request.enterprise_customer_uuid)
 
     contact_email = enterprise_customer_data['contact_email']
@@ -118,7 +116,7 @@ def send_notification_email_for_request(
     logger.info(f'Sending braze campaign message for subsidy request {subsidy_request}')
     braze_client_instance.send_campaign_message(
         braze_campaign_id,
-        recipients=[recipient],
+        emails=[user_email],
         trigger_properties=braze_trigger_properties,
     )
 
