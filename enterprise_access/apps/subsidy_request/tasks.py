@@ -119,7 +119,7 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
     try:
         braze_client.send_campaign_message(
             settings.BRAZE_NEW_REQUESTS_NOTIFICATION_CAMPAIGN,
-            emails=[admin_user['email'] for admin_user in admin_users],
+            emails=[admin_user['email'].lower() for admin_user in admin_users],
             trigger_properties=braze_trigger_properties,
         )
     except HTTPError as exc:

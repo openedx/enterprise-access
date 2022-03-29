@@ -246,3 +246,48 @@ class TestManagementCommands(APITestWithMocks):
         call_command(command_name)
 
         mock_braze_client.return_value.send_campaign_message.assert_not_called()
+
+    @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_admin_users')
+    @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_customer_data')
+    @mock.patch('enterprise_access.apps.subsidy_request.tasks.BrazeApiClient')
+    def test_emails_lower_cased(self, mock_braze_client, mock_get_ent_customer_data, mock_admin_users):
+        """
+        Verify that emails are lowercased before sent to Braze.
+        """
+        mock_email_1 = 'edX+adMin1@email.com'
+        mock_email_2 = 'edX+Admin2@email.com'
+        mock_get_ent_customer_data.return_value = {
+            'uuid': self.enterprise_customer_uuid,
+            'slug': 'test-slug',
+        }
+        mock_admin_users.return_value = [
+            {
+                'id': '1',
+                'email': mock_email_1,
+            },
+            {
+                'id': '2',
+                'email': mock_email_2,
+            }
+        ]
+
+        command_name = 'send_admins_email_with_new_requests'
+
+        factories.SubsidyRequestCustomerConfigurationFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            subsidy_requests_enabled=True,
+            last_remind_date=None
+        )
+
+        factories.LicenseRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            state=SubsidyRequestStates.REQUESTED,
+        )
+
+        call_command(command_name)
+
+        call_kwargs = mock_braze_client.return_value.send_campaign_message.call_args[1]
+        actual_emails = call_kwargs['emails']
+
+        assert actual_emails[0] == mock_email_1.lower()
+        assert actual_emails[1] == mock_email_2.lower()

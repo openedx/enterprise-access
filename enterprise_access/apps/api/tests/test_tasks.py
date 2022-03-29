@@ -166,6 +166,30 @@ class TestTasks(APITestWithMocks):
             )
         assert mock_braze_client().send_campaign_message.call_count == 1
 
+    @mock.patch('enterprise_access.apps.api.tasks.LmsApiClient', return_value=mock.MagicMock())
+    @mock.patch('enterprise_access.apps.api.tasks.BrazeApiClient', return_value=mock.MagicMock())
+    def test_send_notification_email_for_request_email_lower_cased(self, mock_braze_client, _):
+        """
+        Verify that the email is lowercased before sent to Braze.
+        """
+
+        coupon_code_request = CouponCodeRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            user=self.user,
+        )
+
+        mock_email = 'edX+Learner@email.com'
+        coupon_code_request.user.email = mock_email
+        coupon_code_request.user.save()
+
+        send_notification_email_for_request(
+            coupon_code_request.uuid,
+            'test-campaign-id',
+            SubsidyTypeChoices.COUPON,
+        )
+
+        assert mock_braze_client().send_campaign_message.call_args[1]['emails'][0] == mock_email.lower()
+
 
 class TestLicenseAssignmentTasks(APITestWithMocks):
     """

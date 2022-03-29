@@ -116,7 +116,7 @@ def send_notification_email_for_request(
     logger.info(f'Sending braze campaign message for subsidy request {subsidy_request}')
     braze_client_instance.send_campaign_message(
         braze_campaign_id,
-        emails=[user_email],
+        emails=[user_email.lower()],
         trigger_properties=braze_trigger_properties,
     )
 
