@@ -124,12 +124,12 @@ class TestManagementCommands(APITestWithMocks):
         call_kwargs = mock_braze_client.return_value.send_campaign_message.call_args[1]
 
         actual_campaign_id = call_args[0]
-        actual_recipients = call_kwargs['recipients']
+        actual_emails = call_kwargs['emails']
         actual_trigger_properties = call_kwargs['trigger_properties']
 
         assert actual_campaign_id == settings.BRAZE_NEW_REQUESTS_NOTIFICATION_CAMPAIGN
-        assert actual_recipients[0]['attributes']['email'] == 'pieguy@example.com'
-        assert actual_recipients[1]['attributes']['email'] == 'cakeman@example.com'
+        assert actual_emails[0] == 'pieguy@example.com'
+        assert actual_emails[1] == 'cakeman@example.com'
         for index, request in enumerate(expected_requests):
             request.refresh_from_db()
             expected_email = request.user.email
@@ -177,11 +177,11 @@ class TestManagementCommands(APITestWithMocks):
         mock_braze_client.return_value.send_campaign_message.assert_called_once()
         call_kwargs = mock_braze_client.return_value.send_campaign_message.call_args[1]
 
-        actual_recipients = call_kwargs['recipients']
+        actual_emails = call_kwargs['emails']
         actual_trigger_properties = call_kwargs['trigger_properties']
 
-        assert actual_recipients[0]['attributes']['email'] == 'pieguy@example.com'
-        assert actual_recipients[1]['attributes']['email'] == 'cakeman@example.com'
+        assert actual_emails[0] == 'pieguy@example.com'
+        assert actual_emails[1] == 'cakeman@example.com'
         assert actual_trigger_properties['requests'][0]['user_email'] == new_request.user.email
         assert len(actual_trigger_properties['requests']) == 1
 
