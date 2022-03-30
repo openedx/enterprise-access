@@ -35,6 +35,11 @@ class User(AbstractUser):
 
     class Meta:
         get_latest_by = 'date_joined'
+        indexes = [
+            models.Index(fields=['username']),
+            models.Index(fields=['email']),
+            models.Index(fields=['lms_user_id'])
+        ]
 
     def get_full_name(self):
         return self.full_name or super().get_full_name()
