@@ -38,7 +38,6 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
         settings.AUTH_USER_MODEL,
         related_name="%(app_label)s_%(class)s",
         on_delete=models.CASCADE,
-        db_index=True
     )
 
     course_id = models.CharField(
@@ -53,17 +52,14 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
         max_length=255
     )
 
-    enterprise_customer_uuid = models.UUIDField(
-        db_index=True
-    )
+    enterprise_customer_uuid = models.UUIDField()
 
     state = models.CharField(
         max_length=25,
         blank=False,
         null=False,
         choices=SubsidyRequestStates.CHOICES,
-        default=SubsidyRequestStates.REQUESTED,
-        db_index=True
+        default=SubsidyRequestStates.REQUESTED
     )
 
     reviewed_at = models.DateTimeField(
@@ -116,10 +112,6 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
 
     class Meta:
         abstract = True
-        index_together = [
-            ['uuid', 'state'],
-            ['user', 'enterprise_customer_uuid', 'state', 'course_id']
-        ]
 
 
 class LicenseRequest(SubsidyRequest):
@@ -131,14 +123,12 @@ class LicenseRequest(SubsidyRequest):
 
     subscription_plan_uuid = models.UUIDField(
         null=True,
-        blank=True,
-        db_index=True
+        blank=True
     )
 
     license_uuid = models.UUIDField(
         null=True,
-        blank=True,
-        db_index=True
+        blank=True
     )
 
     history = HistoricalRecords()
@@ -183,8 +173,7 @@ class CouponCodeRequest(SubsidyRequest):
 
     coupon_id = models.IntegerField(
         null=True,
-        blank=True,
-        db_index=True
+        blank=True
     )
 
     coupon_code = models.CharField(
