@@ -24,6 +24,12 @@ from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
 
+def _generate_mailto_link(emails):
+    if emails:
+        return f'mailto:{",".join(emails)}'
+
+    return None
+
 def _get_serializer_by_subsidy_type(subsidy_type):
     """
     Returns serializer for LicenseRequest or CouponCodeRequest.
@@ -101,8 +107,8 @@ def send_notification_email_for_request(
     user_email = subsidy_request.user.email
     enterprise_customer_data = lms_client.get_enterprise_customer_data(subsidy_request.enterprise_customer_uuid)
 
-    contact_email = enterprise_customer_data['contact_email']
-    braze_trigger_properties['contact_email'] = contact_email
+    admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
+    braze_trigger_properties['contact_admin_link'] = _generate_mailto_link(admin_emails)
 
     enterprise_slug = enterprise_customer_data['slug']
     course_about_page_url = '{}/{}/course/{}'.format(

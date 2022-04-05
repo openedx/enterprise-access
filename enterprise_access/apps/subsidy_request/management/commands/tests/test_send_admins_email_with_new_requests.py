@@ -24,31 +24,13 @@ class TestManagementCommands(APITestWithMocks):
     def setUp(self):
         super().setUp()
         self.enterprise_customer_uuid = uuid4()
-        self.admin_learners_response = [
+        self.admin_users = [
             {
-                'id': '1',
-                'username': 'pieguy',
-                'first_name': 'pie',
-                'last_name': 'guy',
                 'email': 'pieguy@example.com',
-                'is_staff': False,
-                'is_active': False,
-                'date_joined': '2019-06-18T18:57:59.056286Z',
-                'ecu_id': '10',
-                'created': '2019-06-18T18:57:59.056286Z'
             },
             {
-                'id': '2',
-                'username': 'cakeman',
-                'first_name': 'cake',
-                'last_name': 'man',
                 'email': 'cakeman@example.com',
-                'is_staff': False,
-                'is_active': False,
-                'date_joined': '2019-06-18T18:57:59.056286Z',
-                'ecu_id': '10',
-                'created': '2019-06-18T18:57:59.056286Z'
-            },
+            }
         ]
 
     @mock.patch(
@@ -78,10 +60,9 @@ class TestManagementCommands(APITestWithMocks):
         assert mock_task.call_count == 5
         assert mock_task.called_once_with(uuids[-1])
 
-    @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_admin_users')
     @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_customer_data')
     @mock.patch('enterprise_access.apps.subsidy_request.tasks.BrazeApiClient')
-    def test_new_requests_never_sent_before(self, mock_braze_client, mock_get_ent_customer_data, mock_admin_learners):
+    def test_new_requests_never_sent_before(self, mock_braze_client, mock_get_ent_customer_data):
         """
         Verify send_admins_email_with_new_requests sends braze message including all
         subsidy requests if task has never been run before
@@ -89,8 +70,8 @@ class TestManagementCommands(APITestWithMocks):
         mock_get_ent_customer_data.return_value = {
             'uuid': self.enterprise_customer_uuid,
             'slug': 'test-slug',
+            'admin_users': self.admin_users
         }
-        mock_admin_learners.return_value = self.admin_learners_response
 
         command_name = 'send_admins_email_with_new_requests'
 
@@ -139,10 +120,9 @@ class TestManagementCommands(APITestWithMocks):
             assert actual_trigger_properties['requests'][index]['course_title'] == expected_title
             assert actual_trigger_properties['manage_requests_url'] == expected_url
 
-    @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_admin_users')
     @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_customer_data')
     @mock.patch('enterprise_access.apps.subsidy_request.tasks.BrazeApiClient')
-    def test_new_requests_task_sent_before(self, mock_braze_client, mock_get_ent_customer_data, mock_admin_learners):
+    def test_new_requests_task_sent_before(self, mock_braze_client, mock_get_ent_customer_data):
         """
         Verify requests created before the last time the last_remind_date
         don't get included in the braze email that gets sent out.
@@ -150,8 +130,8 @@ class TestManagementCommands(APITestWithMocks):
         mock_get_ent_customer_data.return_value = {
             'uuid': self.enterprise_customer_uuid,
             'slug': 'test-enterprise',
+            'admin_users': self.admin_users
         }
-        mock_admin_learners.return_value = self.admin_learners_response
 
         command_name = 'send_admins_email_with_new_requests'
 
@@ -185,18 +165,17 @@ class TestManagementCommands(APITestWithMocks):
         assert actual_trigger_properties['requests'][0]['user_email'] == new_request.user.email
         assert len(actual_trigger_properties['requests']) == 1
 
-    @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_admin_users')
     @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_customer_data')
     @mock.patch('enterprise_access.apps.subsidy_request.tasks.BrazeApiClient')
-    def test_new_requests_task_error(self, mock_braze_client, mock_get_ent_customer_data, mock_admin_learners):
+    def test_new_requests_task_error(self, mock_braze_client, mock_get_ent_customer_data):
         """
         Verify last_remind_date is not updated if braze email fails.
         """
         mock_get_ent_customer_data.return_value = {
             'uuid': self.enterprise_customer_uuid,
             'slug': 'test-enterprise',
+            'admin_users': self.admin_users
         }
-        mock_admin_learners.return_value = self.admin_learners_response
         mock_braze_client.side_effect = HTTPError
 
         command_name = 'send_admins_email_with_new_requests'
@@ -247,10 +226,9 @@ class TestManagementCommands(APITestWithMocks):
 
         mock_braze_client.return_value.send_campaign_message.assert_not_called()
 
-    @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_admin_users')
     @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_customer_data')
     @mock.patch('enterprise_access.apps.subsidy_request.tasks.BrazeApiClient')
-    def test_emails_lower_cased(self, mock_braze_client, mock_get_ent_customer_data, mock_admin_users):
+    def test_emails_lower_cased(self, mock_braze_client, mock_get_ent_customer_data):
         """
         Verify that emails are lowercased before sent to Braze.
         """
@@ -259,17 +237,14 @@ class TestManagementCommands(APITestWithMocks):
         mock_get_ent_customer_data.return_value = {
             'uuid': self.enterprise_customer_uuid,
             'slug': 'test-slug',
-        }
-        mock_admin_users.return_value = [
-            {
-                'id': '1',
+            'admin_users': [{
                 'email': mock_email_1,
             },
-            {
-                'id': '2',
-                'email': mock_email_2,
+             {
+                'email': mock_email_2
             }
-        ]
+            ]
+        }
 
         command_name = 'send_admins_email_with_new_requests'
 
