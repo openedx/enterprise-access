@@ -109,7 +109,7 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
             'course_title': course_title,
         })
 
-    admin_users = lms_client.get_enterprise_admin_users(enterprise_customer_uuid)
+    admin_users = enterprise_customer_data['admin_users']
 
     logger.info(
         f'Sending new-requests email to admins for enterprise {enterprise_customer_uuid}. '

@@ -134,11 +134,13 @@ class TestTasks(APITestWithMocks):
         """
 
         slug = 'sluggy'
-        contact_email = 'edx@example.org'
+        admin_email = 'edx@example.org'
 
         mock_lms_client().get_enterprise_customer_data.return_value = {
             'slug': slug,
-            'contact_email': contact_email
+            'admin_users': [{
+                'email': admin_email
+            }]
         }
 
         send_notification_email_for_request(
@@ -160,7 +162,7 @@ class TestTasks(APITestWithMocks):
             'test-campaign-id',
             emails=[self.license_requests[0].user.email],
             trigger_properties={
-                'contact_email': contact_email,
+                'contact_admin_link': f'mailto:{admin_email}',
                 'course_title': self.license_requests[0].course_title,
                 'course_about_page_url': expected_course_about_page_url},
             )
