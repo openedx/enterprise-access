@@ -13,6 +13,7 @@ from enterprise_access.apps.api.tasks import (
     assign_licenses_task,
     decline_enterprise_subsidy_requests_task,
     send_notification_email_for_request,
+    unlink_users_from_enterprise_task,
     update_coupon_code_requests_after_assignments_task,
     update_license_requests_after_assignments_task
 )
@@ -192,6 +193,14 @@ class TestTasks(APITestWithMocks):
 
         assert mock_braze_client().send_campaign_message.call_args[1]['emails'][0] == mock_email.lower()
 
+    @mock.patch('enterprise_access.apps.api.tasks.LmsApiClient', return_value=mock.MagicMock())
+    def test_unlink_users_from_enterprise_task(self, mock_lms_client):
+        unlink_users_from_enterprise_task(self.enterprise_customer_uuid_1, [self.user.lms_user_id])
+        mock_lms_client().unlink_users_from_enterprise.assert_called_with(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            user_emails=[self.user.email],
+            is_relinkable=False
+        )
 
 class TestLicenseAssignmentTasks(APITestWithMocks):
     """

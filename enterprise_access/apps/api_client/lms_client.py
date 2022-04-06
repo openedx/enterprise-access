@@ -85,3 +85,28 @@ class LmsApiClient(BaseOAuthClient):
             raise exc
 
         return results
+
+    def unlink_users_from_enterprise(self, enterprise_customer_uuid, user_emails, is_relinkable=True):
+        """
+        Unlink users with the given emails from the enterprise.
+
+        Arguments:
+            enterprise_customer_uuid (str): id of the enterprise customer
+            emails (list of str): emails of the users to remove
+
+        Returns:
+            None
+        """
+
+        try:
+            endpoint = f'{self.enterprise_customer_endpoint}{enterprise_customer_uuid}/unlink_users/'
+            payload = {
+                "user_emails": user_emails,
+                "is_relinkable": is_relinkable
+            }
+            response = self.client.post(endpoint, payload)
+            response.raise_for_status()
+        except requests.exceptions.HTTPError:
+            msg = 'Failed to unlink users from %s.'
+            logger.exception(msg, enterprise_customer_uuid)
+            raise

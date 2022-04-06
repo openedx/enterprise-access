@@ -2,6 +2,8 @@
 Tests for License Manager client.
 """
 
+from uuid import uuid4
+
 import mock
 from django.conf import settings
 from django.test import TestCase
@@ -120,4 +122,35 @@ class TestLmsApiClient(TestCase):
         mock_oauth_client.return_value.get.assert_called_with(
             expected_url,
             timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_unlink_users_from_enterprise(self, mock_oauth_client):
+        """
+        Verify client hits the right URL to unlink users from an enterprise.
+        """
+
+        mock_enterprise_uuid = uuid4()
+        mock_user_emails = ['abc@email.com', 'efg@email.com']
+        mock_oauth_client.return_value.get.return_value = Response()
+        mock_oauth_client.return_value.get.return_value.status_code = 200
+
+        client = LmsApiClient()
+        client.unlink_users_from_enterprise(
+            mock_enterprise_uuid,
+            mock_user_emails,
+        )
+
+        expected_url = (
+            'http://edx-platform.example.com/enterprise/api/v1/'
+            f'enterprise-customer/{mock_enterprise_uuid}/unlink_users/'
+        )
+        expected_payload = {
+            "user_emails": mock_user_emails,
+            "is_relinkable": True
+        }
+        mock_oauth_client.return_value.post.assert_called_with(
+            expected_url,
+            expected_payload
         )

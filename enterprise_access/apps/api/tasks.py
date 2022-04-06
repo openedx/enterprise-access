@@ -11,6 +11,7 @@ from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
+from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_TYPE_CHANGE_DECLINATION,
     SegmentEvents,
@@ -297,3 +298,30 @@ def update_coupon_code_requests_after_assignments_task(coupon_code_assignment_re
         )
 
     CouponCodeRequest.bulk_update(coupon_code_requests, ['state', 'coupon_id', 'coupon_code'])
+
+@shared_task(base=LoggedTaskWithRetry)
+def unlink_users_from_enterprise_task(enterprise_customer_uuid, lms_user_ids):
+    """
+    Unlink users with the given lms user ids from the enterprise.
+
+    Args:
+        enterprise_customer_uuid (UUID): the UUID of the enterprise customer
+        lms_user_ids (list of str): lms user ids of the users to unlink
+
+    Returns:
+        None
+    """
+
+    user_emails = list(
+        User.objects.filter(
+            lms_user_id__in=lms_user_ids
+        ).values_list('email', flat=True)
+    )
+
+    if user_emails:
+        lms_client = LmsApiClient()
+        lms_client.unlink_users_from_enterprise(
+            enterprise_customer_uuid=enterprise_customer_uuid,
+            user_emails=user_emails,
+            is_relinkable=False
+        )

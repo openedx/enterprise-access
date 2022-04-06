@@ -33,6 +33,7 @@ from enterprise_access.apps.api.tasks import (
     assign_licenses_task,
     decline_enterprise_subsidy_requests_task,
     send_notification_email_for_request,
+    unlink_users_from_enterprise_task,
     update_coupon_code_requests_after_assignments_task,
     update_license_requests_after_assignments_task
 )
@@ -296,7 +297,7 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
         license_request_uuids = self.request.data.get('subsidy_request_uuids')
         subscription_plan_uuid = self.request.data.get('subscription_plan_uuid')
-        send_notification = self.request.data.get('send_notification')
+        send_notification = self.request.data.get('send_notification', False)
 
         try:
             self._validate_subsidy_request_uuids(license_request_uuids)
@@ -369,7 +370,8 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
 
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
         license_request_uuids = self.request.data.get('subsidy_request_uuids')
-        send_notification = self.request.data.get('send_notification')
+        send_notification = self.request.data.get('send_notification', False)
+        unlink_users_from_enterprise = self.request.data.get('unlink_users_from_enterprise', False)
 
         try:
             self._validate_subsidy_request_uuids(license_request_uuids)
@@ -405,18 +407,32 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         for serialized_license_request in serialized_license_requests:
             license_request_uuid = serialized_license_request['uuid']
             lms_user_id = serialized_license_request['lms_user_id']
+            enterprise_customer_uuid = serialized_license_request['enterprise_customer_uuid']
 
             track_event(
                 lms_user_id=lms_user_id,
                 event_name=SegmentEvents.LICENSE_REQUEST_DECLINED,
-                properties=serialized_license_request
+                properties={
+                    **serialized_license_request,
+                    'unlinked_from_enterprise': unlink_users_from_enterprise,
+                    'notification_sent': send_notification
+                }
             )
 
             if send_notification:
                 send_notification_email_for_request.delay(
                     license_request_uuid,
                     settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-                    SubsidyTypeChoices.LICENSE
+                    SubsidyTypeChoices.LICENSE,
+                    {
+                        'unlinked_from_enterprise': unlink_users_from_enterprise
+                    }
+                )
+
+            if unlink_users_from_enterprise:
+                unlink_users_from_enterprise_task.delay(
+                    enterprise_customer_uuid,
+                    [lms_user_id]
                 )
 
         return Response(
@@ -491,7 +507,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
         coupon_code_request_uuids = self.request.data.get('subsidy_request_uuids')
         coupon_id = self.request.data.get('coupon_id')
-        send_notification = self.request.data.get('send_notification')
+        send_notification = self.request.data.get('send_notification', False)
 
         try:
             self._validate_subsidy_request_uuids(coupon_code_request_uuids)
@@ -563,7 +579,8 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
 
         enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
         coupon_code_request_uuids = self.request.data.get('subsidy_request_uuids')
-        send_notification = self.request.data.get('send_notification')
+        send_notification = self.request.data.get('send_notification', False)
+        unlink_users_from_enterprise = self.request.data.get('unlink_users_from_enterprise', False)
 
         try:
             self._validate_subsidy_request_uuids(coupon_code_request_uuids)
@@ -601,18 +618,32 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         for serialized_coupon_code_request in serialized_coupon_code_requests:
             coupon_code_request_uuid = serialized_coupon_code_request['uuid']
             lms_user_id = serialized_coupon_code_request['lms_user_id']
+            enterprise_customer_uuid = serialized_coupon_code_request['enterprise_customer_uuid']
 
             track_event(
                 lms_user_id=lms_user_id,
                 event_name=SegmentEvents.COUPON_CODE_REQUEST_DECLINED,
-                properties=serialized_coupon_code_request
+                properties={
+                    **serialized_coupon_code_request,
+                    'unlinked_from_enterprise': unlink_users_from_enterprise,
+                    'notification_sent': send_notification
+                }
             )
 
             if send_notification:
                 send_notification_email_for_request.delay(
                     coupon_code_request_uuid,
                     settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
-                    SubsidyTypeChoices.COUPON
+                    SubsidyTypeChoices.COUPON,
+                    {
+                        'unlinked_from_enterprise': unlink_users_from_enterprise
+                    }
+                )
+
+            if unlink_users_from_enterprise:
+                unlink_users_from_enterprise_task.delay(
+                    enterprise_customer_uuid,
+                    [lms_user_id]
                 )
 
         return Response(
@@ -661,7 +692,7 @@ class SubsidyRequestCustomerConfigurationViewSet(UserDetailsFromJwtMixin, viewse
         if 'subsidy_type' in request.data:
 
             subsidy_type = request.data['subsidy_type']
-            send_notification = request.data['send_notification']
+            send_notification = request.data.get('send_notification', False)
             current_subsidy_type = current_config.subsidy_type
 
             if current_subsidy_type and subsidy_type != current_subsidy_type:
