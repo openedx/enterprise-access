@@ -620,7 +620,11 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         self.mock_analytics.assert_called_with(
             user_id=self.user_license_request_1.user.lms_user_id,
             event=SegmentEvents.LICENSE_REQUEST_DECLINED,
-            properties=response.data[0]
+            properties={
+                **response.data[0],
+                'unlinked_from_enterprise': False,
+                'notification_sent': False
+            }
         )
 
     @mock.patch('enterprise_access.apps.api.v1.views.send_notification_email_for_request.delay')
@@ -641,6 +645,29 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             str(self.user_license_request_1.uuid),
             settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
             SubsidyTypeChoices.LICENSE,
+            {
+                'unlinked_from_enterprise': False
+            }
+        )
+
+    @mock.patch('enterprise_access.apps.api.v1.views.unlink_users_from_enterprise_task.delay')
+    def test_decline_unlink_users(self, mock_unlink_users_from_enterprise_task):
+        """ Test unlink_users_from_enterprise_task called if unlink_users_from_enterprise is True """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.user_license_request_1.uuid],
+            'send_notification': False,
+            'unlink_users_from_enterprise': True
+        }
+        response = self.client.post(LICENSE_REQUESTS_DECLINE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_200_OK
+        mock_unlink_users_from_enterprise_task.assert_called_with(
+            str(self.enterprise_customer_uuid_1),
+            [self.user_license_request_1.user.lms_user_id],
         )
 
     def test_overview_superuser_bad_request(self):
@@ -1093,7 +1120,11 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
         self.mock_analytics.assert_called_with(
             user_id=self.coupon_code_request_1.user.lms_user_id,
             event=SegmentEvents.COUPON_CODE_REQUEST_DECLINED,
-            properties=response.data[0]
+            properties={
+                **response.data[0],
+                'unlinked_from_enterprise': False,
+                'notification_sent': False
+            }
         )
 
     @mock.patch('enterprise_access.apps.api.v1.views.send_notification_email_for_request.delay')
@@ -1114,6 +1145,29 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
             str(self.coupon_code_request_1.uuid),
             settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
             SubsidyTypeChoices.COUPON,
+            {
+                'unlinked_from_enterprise': False
+            }
+        )
+
+    @mock.patch('enterprise_access.apps.api.v1.views.unlink_users_from_enterprise_task.delay')
+    def test_decline_unlink_users(self, mock_unlink_users_from_enterprise_task):
+        """ Test unlink_users_from_enterprise_task called if unlink_users_from_enterprise is True """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'subsidy_request_uuids': [self.coupon_code_request_1.uuid],
+            'send_notification': False,
+            'unlink_users_from_enterprise': True
+        }
+        response = self.client.post(COUPON_CODE_REQUESTS_DECLINE_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_200_OK
+        mock_unlink_users_from_enterprise_task.assert_called_with(
+            str(self.enterprise_customer_uuid_1),
+            [self.coupon_code_request_1.user.lms_user_id],
         )
 
 @ddt.ddt
