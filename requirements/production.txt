@@ -4,7 +4,7 @@
 #
 #    make upgrade
 #
-amqp==5.1.0
+amqp==5.1.1
     # via
     #   -r requirements/base.txt
     #   kombu
@@ -18,6 +18,10 @@ async-timeout==4.0.2
     # via
     #   -r requirements/base.txt
     #   redis
+attrs==21.4.0
+    # via
+    #   -r requirements/base.txt
+    #   openedx-events
 backoff==1.10.0
     # via
     #   -r requirements/base.txt
@@ -62,6 +66,8 @@ click-repl==0.2.0
     # via
     #   -r requirements/base.txt
     #   celery
+confluent-kafka==1.8.2
+    # via -r requirements/base.txt
 coreapi==2.3.3
     # via
     #   -r requirements/base.txt
@@ -106,7 +112,8 @@ django==3.2.13
     #   edx-drf-extensions
     #   edx-rbac
     #   jsonfield
-django-celery-results==2.3.0
+    #   openedx-events
+django-celery-results==2.3.1
     # via -r requirements/base.txt
 django-cors-headers==3.11.0
     # via -r requirements/base.txt
@@ -168,14 +175,19 @@ edx-drf-extensions==8.0.1
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-opaque-keys==2.3.0
+edx-opaque-keys[django]==2.3.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
+    #   openedx-events
 edx-rbac==1.7.0
     # via -r requirements/base.txt
 edx-rest-api-client==5.5.0
     # via -r requirements/base.txt
+fastavro==1.4.10
+    # via
+    #   -r requirements/base.txt
+    #   openedx-events
 future==0.18.2
     # via
     #   -r requirements/base.txt
@@ -236,6 +248,8 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
+openedx-events==0.8.2
+    # via -r requirements/base.txt
 packaging==21.3
     # via
     #   -r requirements/base.txt
