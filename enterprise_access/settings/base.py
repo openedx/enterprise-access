@@ -59,6 +59,7 @@ PROJECT_APPS = (
     'enterprise_access.apps.core',
     'enterprise_access.apps.subsidy_request',
     'enterprise_access.apps.api',
+    'enterprise_access.apps.events'
 )
 
 INSTALLED_APPS += THIRD_PARTY_APPS
@@ -357,6 +358,26 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 
 TASK_MAX_RETRIES = 3
 """############################# END CELERY CONFIG ##################################"""
+
+
+################### Kafka Related Settings ##############################
+
+KAFKA_ENABLED = False
+
+SERVICE_VARIANT = 'enterprise_access'
+
+KAFKA_BOOTSTRAP_SERVER = ''
+KAFKA_API_KEY = ''
+KAFKA_API_SECRET = ''
+SCHEMA_REGISTRY_API_KEY = ''
+SCHEMA_REGISTRY_API_SECRET=''
+SCHEMA_REGISTRY_URL=''
+KAFKA_PARTITIONS_PER_TOPIC=1
+# This number is dictated by the cluster setup
+KAFKA_REPLICATION_FACTOR_PER_TOPIC=3
+KAFKA_TOPICS = []
+
+################### End Kafka Related Settings ##############################
 
 # Default URLS for external services
 LICENSE_MANAGER_URL = ''

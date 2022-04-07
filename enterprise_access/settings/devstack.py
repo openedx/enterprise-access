@@ -78,3 +78,17 @@ ENTERPRISE_ADMIN_PORTAL_URL = 'http://localhost:1991'
 SHELL_PLUS_IMPORTS = [
     'from enterprise_access.apps.subsidy_request.utils import localized_utcnow',
 ]
+
+
+################### Kafka Related Settings ##############################
+KAFKA_ENABLED=False
+
+KAFKA_BOOTSTRAP_SERVER = 'edx.devstack.kafka:29092'
+SCHEMA_REGISTRY_URL = 'http://edx.devstack.schema-registry:8081'
+KAFKA_REPLICATION_FACTOR_PER_TOPIC=1
+
+COUPON_CODE_REQUEST_TOPIC_NAME="coupon-code-request-dev"
+LICENSE_REQUEST_TOPIC_NAME="license-request-dev"
+KAFKA_TOPICS = [COUPON_CODE_REQUEST_TOPIC_NAME, LICENSE_REQUEST_TOPIC_NAME]
+
+################### End Kafka Related Settings ##############################

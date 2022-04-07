@@ -12,6 +12,8 @@ from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClien
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.core.models import User
+from enterprise_access.apps.events.signals import COUPON_CODE_REQUEST_APPROVED
+from enterprise_access.apps.events.utils import send_coupon_code_request_event_to_event_bus
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_TYPE_CHANGE_DECLINATION,
     SegmentEvents,
@@ -296,6 +298,12 @@ def update_coupon_code_requests_after_assignments_task(coupon_code_assignment_re
             event_name=SegmentEvents.COUPON_CODE_REQUEST_APPROVED,
             properties=CouponCodeRequestSerializer(coupon_code_request).data
         )
+
+        if settings.KAFKA_ENABLED:  # pragma: no cover
+            send_coupon_code_request_event_to_event_bus(
+                COUPON_CODE_REQUEST_APPROVED.event_type,
+                CouponCodeRequestSerializer(coupon_code_request).data
+            )
 
     CouponCodeRequest.bulk_update(coupon_code_requests, ['state', 'coupon_id', 'coupon_code'])
 

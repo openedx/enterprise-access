@@ -3,6 +3,7 @@
 
 analytics-python
 celery
+confluent-kafka
 Django>=2.2          # Web application framework
 django-cors-headers
 django-celery-results
@@ -12,6 +13,7 @@ django-rest-swagger
 django-simple-history
 django-waffle
 djangorestframework
+fastavro
 edx-api-doc-tools
 edx-auth-backends
 edx-braze-client
@@ -22,6 +24,7 @@ edx-drf-extensions
 edx-rbac
 edx-rest-api-client
 mysqlclient
+openedx-events
 pytz
 redis
 rules
