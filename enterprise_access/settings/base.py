@@ -373,3 +373,11 @@ BRAZE_AUTO_DECLINE_NOTIFICATION_CAMPAIGN = ''
 BRAZE_API_URL = ''
 BRAZE_API_KEY = os.environ.get('BRAZE_API_KEY', '')
 BRAZE_APP_ID = os.environ.get('BRAZE_APP_ID', '')
+
+# Kafka Settings
+settings.KAFKA_BOOTSTRAP_SERVER = ''
+settings.SCHEMA_REGISTRY_URL = ''
+settings.SCHEMA_REGISTRY_API_KEY = ''
+settings.SCHEMA_REGISTRY_API_SECRET = ''
+settings.KAFKA_API_KEY = ''
+settings.KAFKA_API_SECRET = ''
