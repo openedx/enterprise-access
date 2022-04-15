@@ -14,8 +14,9 @@ from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
+from enterprise_access.apps.subsidy_request.utils import localized_utcnow
 from enterprise_access.tasks import LoggedTaskWithRetry
-from enterprise_access.utils import get_subsidy_model, localized_utcnow
+from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
 
