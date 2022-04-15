@@ -15,6 +15,7 @@ from enterprise_access.apps.subsidy_request.models import (
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
+from enterprise_access.apps.subsidy_request.utils import localized_utcnow
 
 FAKER = Faker()
 
@@ -29,7 +30,7 @@ class SubsidyRequestFactory(factory.django.DjangoModelFactory):
     course_title = factory.LazyAttribute(lambda _: FAKER.word())
     enterprise_customer_uuid = factory.LazyFunction(uuid4)
     state = SubsidyRequestStates.REQUESTED
-    reviewed_at = datetime.utcnow()
+    reviewed_at = localized_utcnow()
     reviewer = factory.SubFactory(UserFactory)
     decline_reason = None
 
