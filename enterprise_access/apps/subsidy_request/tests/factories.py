@@ -1,8 +1,6 @@
 """
 Factoryboy factories.
 """
-
-from datetime import datetime
 from uuid import uuid4
 
 import factory
@@ -68,7 +66,6 @@ class SubsidyRequestCustomerConfigurationFactory(factory.django.DjangoModelFacto
     subsidy_requests_enabled = True
     subsidy_type = SubsidyTypeChoices.LICENSE
     changed_by = None
-    reviewed_at = localized_utcnow()
 
     class Meta:
         model = SubsidyRequestCustomerConfiguration

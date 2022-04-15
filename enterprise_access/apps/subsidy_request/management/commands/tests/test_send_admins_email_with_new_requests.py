@@ -1,7 +1,6 @@
 """
 Tests for Subsidy Request Management commands.
 """
-from datetime import datetime
 from uuid import uuid4
 
 import mock
@@ -12,6 +11,7 @@ from requests.exceptions import HTTPError
 
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.tests import factories
+from enterprise_access.apps.subsidy_request.utils import localized_utcnow
 from test_utils import APITestWithMocks
 
 
@@ -144,7 +144,7 @@ class TestManagementCommands(APITestWithMocks):
         factories.SubsidyRequestCustomerConfigurationFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid,
             subsidy_requests_enabled=True,
-            last_remind_date=datetime.now()
+            last_remind_date=localized_utcnow()
         )
 
         new_request = factories.LicenseRequestFactory(
@@ -219,7 +219,7 @@ class TestManagementCommands(APITestWithMocks):
         factories.SubsidyRequestCustomerConfigurationFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid,
             subsidy_requests_enabled=True,
-            last_remind_date=datetime.now()
+            last_remind_date=localized_utcnow()
         )
 
         call_command(command_name)

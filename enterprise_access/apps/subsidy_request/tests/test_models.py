@@ -1,6 +1,4 @@
 """ Tests for core models. """
-
-from datetime import datetime
 from uuid import uuid4
 
 import ddt
@@ -10,9 +8,11 @@ from pytest import mark
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.tests.factories import CouponCodeRequestFactory, LicenseRequestFactory
+from enterprise_access.apps.subsidy_request.utils import localized_utcnow
 from test_utils import TestCaseWithMockedDiscoveryApiClient
 
-now = datetime.utcnow()
+
+now = localized_utcnow()
 
 @ddt.ddt
 @mark.django_db
