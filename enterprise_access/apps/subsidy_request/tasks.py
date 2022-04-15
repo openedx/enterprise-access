@@ -15,7 +15,7 @@ from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClien
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.tasks import LoggedTaskWithRetry
-from enterprise_access.utils import get_subsidy_model
+from enterprise_access.utils import get_subsidy_model, localized_utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -126,5 +126,5 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
         logger.exception(exc)
         raise
 
-    customer_config.last_remind_date = datetime.now()
+    customer_config.last_remind_date = localized_utcnow()
     customer_config.save()
