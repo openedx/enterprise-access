@@ -40,6 +40,7 @@ INSTALLED_APPS = (
     'drf_yasg',
     'edx_api_doc_tools',
     'release_util',
+    'django_celery_results',
 )
 
 THIRD_PARTY_APPS = (
@@ -112,6 +113,12 @@ DATABASES = {
         'PASSWORD': '',
         'HOST': '',  # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
         'PORT': '',  # Set to empty string for default.
+        # The default isolation level for MySQL is REPEATABLE READ, which is a little too aggressive
+        # for our needs, particularly around reading celery task state via django-celery-results.
+        # https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-committed
+        'OPTIONS': {
+            'isolation_level': 'read committed',
+        },
     }
 }
 

@@ -8,17 +8,5 @@
 # pin when possible.  Writing an issue against the offending project and
 # linking to it here is good.
 
-# pinning it to latest release supported by edx-celeryutils.
-celery==5.0.4
-
-# celery requires click<8.0 (can be removed when https://github.com/celery/celery/issues/6753 is done).
-click<8.0
-
 # Common constraints for edx repos
 -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
-
-# Copying this from a lot of our other repo's constraints files. Without doing this explicitly,
-# make upgrade fails due to putting click > 8.0 in some requirements files (that don't rely on
-# one of our edx- packages that constrain this, such as edx-celery-utils)
-celery==5.0.4
-click<8.0
