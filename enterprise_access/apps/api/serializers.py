@@ -20,6 +20,7 @@ class SubsidyRequestSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(read_only=True, source="user.email")
     lms_user_id = serializers.IntegerField(read_only=True, source="user.lms_user_id")
     reviewer_lms_user_id = serializers.IntegerField(read_only=True, source="reviewer.lms_user_id", allow_null=True)
+    course_partners = serializers.JSONField(read_only=True)
 
     class Meta:
         model = SubsidyRequest
@@ -30,6 +31,7 @@ class SubsidyRequestSerializer(serializers.ModelSerializer):
             'email',
             'course_id',
             'course_title',
+            'course_partners',
             'enterprise_customer_uuid',
             'state',
             'reviewed_at',
@@ -44,6 +46,7 @@ class SubsidyRequestSerializer(serializers.ModelSerializer):
             'lms_user_id',
             'email',
             'course_title',
+            'course_partners',
             'reviewed_at',
             'reviewer_lms_user_id',
             'created',

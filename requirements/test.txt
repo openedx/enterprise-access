@@ -135,6 +135,7 @@ distlib==0.3.4
     #   edx-drf-extensions
     #   edx-rbac
     #   jsonfield
+    #   jsonfield2
     #   openedx-events
 django-celery-results==2.3.1
     # via -r requirements/base.txt
@@ -213,7 +214,7 @@ edx-rest-api-client==5.5.0
     # via -r requirements/base.txt
 factory-boy==3.2.1
     # via -r requirements/test.in
-faker==13.3.5
+faker==13.4.0
     # via factory-boy
 fastavro==1.4.10
     # via
@@ -253,6 +254,8 @@ jsonfield==3.1.0
     # via
     #   -r requirements/base.txt
     #   edx-celeryutils
+jsonfield2==4.0.0.post0
+    # via -r requirements/base.txt
 kombu==5.2.4
     # via
     #   -r requirements/base.txt
@@ -361,7 +364,7 @@ pyparsing==3.0.8
     # via
     #   -r requirements/base.txt
     #   packaging
-pytest==7.1.1
+pytest==7.1.2
     # via
     #   pytest-cov
     #   pytest-django

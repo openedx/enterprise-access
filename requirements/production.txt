@@ -112,6 +112,7 @@ django==3.2.13
     #   edx-drf-extensions
     #   edx-rbac
     #   jsonfield
+    #   jsonfield2
     #   openedx-events
 django-celery-results==2.3.1
     # via -r requirements/base.txt
@@ -219,6 +220,8 @@ jsonfield==3.1.0
     # via
     #   -r requirements/base.txt
     #   edx-celeryutils
+jsonfield2==4.0.0.post0
+    # via -r requirements/base.txt
 kombu==5.2.4
     # via
     #   -r requirements/base.txt

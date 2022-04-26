@@ -1,5 +1,6 @@
 """ Models for subsidy_request. """
 
+import collections
 from uuid import uuid4
 
 from django.conf import settings
@@ -7,6 +8,8 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.dispatch import receiver
 from django.utils.translation import ugettext_lazy as _
+from jsonfield.encoder import JSONEncoder
+from jsonfield.fields import JSONField
 from model_utils.models import SoftDeletableModel, TimeStampedModel
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_update_with_history
@@ -16,7 +19,7 @@ from enterprise_access.apps.subsidy_request.constants import (
     SubsidyRequestStates,
     SubsidyTypeChoices
 )
-from enterprise_access.apps.subsidy_request.tasks import update_course_title_for_subsidy_request_task
+from enterprise_access.apps.subsidy_request.tasks import update_course_info_for_subsidy_request_task
 from enterprise_access.apps.subsidy_request.utils import localized_utcnow
 
 
@@ -51,6 +54,16 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
         null=True,
         blank=True,
         max_length=255
+    )
+
+    course_partners = JSONField(
+        blank=True,
+        null=True,
+        load_kwargs={'object_pairs_hook': collections.OrderedDict},
+        dump_kwargs={'indent': 4, 'cls': JSONEncoder, 'separators': (',', ':')},
+        help_text=_(
+            "List of course partner dictionaries."
+        )
     )
 
     enterprise_customer_uuid = models.UUIDField(
@@ -277,11 +290,11 @@ class SubsidyRequestCustomerConfiguration(TimeStampedModel):
 
 @receiver(models.signals.post_save, sender=CouponCodeRequest)
 @receiver(models.signals.post_save, sender=LicenseRequest)
-def update_course_title_for_subsidy_request(sender, **kwargs):  # pylint: disable=unused-argument
-    """ Post save hook to grab course_title from discovery service """
+def update_course_info_for_subsidy_request(sender, **kwargs):  # pylint: disable=unused-argument
+    """ Post save hook to grab course info from discovery service """
 
     subsidy_request = kwargs['instance']
-    if subsidy_request.course_title:
+    if subsidy_request.course_title and subsidy_request.course_partners:
         return
 
     if isinstance(subsidy_request, CouponCodeRequest):
@@ -289,7 +302,7 @@ def update_course_title_for_subsidy_request(sender, **kwargs):  # pylint: disabl
     else:
         subsidy_type = SubsidyTypeChoices.LICENSE
 
-    update_course_title_for_subsidy_request_task.delay(
+    update_course_info_for_subsidy_request_task.delay(
         subsidy_type,
         str(subsidy_request.uuid),
     )

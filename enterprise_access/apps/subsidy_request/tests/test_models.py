@@ -59,14 +59,14 @@ class LicenseRequestTests(TestCaseWithMockedDiscoveryApiClient):
         expected_error = 'Both subscription_plan_uuid and license_uuid are required for a fulfilled license request.'
         assert error.exception.messages[0] == expected_error
 
-    def test_update_course_title_from_discovery(self):
+    def test_update_course_info_from_discovery(self):
         """
-        course title data should be fetched from discovery if not set on subsidy object
+        course data should be fetched from discovery if not set on subsidy object
         during a save().
         """
         original_call_count = self.mock_discovery_client.call_count
 
-        subsidy = LicenseRequestFactory(course_title=None)
+        subsidy = LicenseRequestFactory(course_title=None, course_partners=None)
         assert self.mock_discovery_client.call_count == original_call_count + 1
 
         subsidy.refresh_from_db()
@@ -98,14 +98,14 @@ class CouponCodeRequestTests(TestCaseWithMockedDiscoveryApiClient):
         expected_error = 'Both coupon_id and coupon_code are required for a fulfilled coupon request.'
         assert error.exception.messages[0] == expected_error
 
-    def test_update_course_title_from_discovery(self):
+    def test_update_course_info_from_discovery(self):
         """
-        course title data should be fetched from discovery if not set on subsidy object
+        course data should be fetched from discovery if not set on subsidy object
         during a save().
         """
         original_call_count = self.mock_discovery_client.call_count
 
-        subsidy = CouponCodeRequestFactory(course_title=None)
+        subsidy = CouponCodeRequestFactory(course_title=None, course_partners=None)
         assert self.mock_discovery_client.call_count == original_call_count + 1
 
         subsidy.refresh_from_db()

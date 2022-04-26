@@ -27,6 +27,7 @@ class SubsidyRequestFactory(factory.django.DjangoModelFactory):
     user = factory.SubFactory(UserFactory)
     course_id = factory.LazyFunction(uuid4)
     course_title = factory.LazyAttribute(lambda _: FAKER.word())
+    course_partners = factory.LazyAttribute(lambda _: [{'uuid': uuid4(), 'name': FAKER.word()}])
     enterprise_customer_uuid = factory.LazyFunction(uuid4)
     state = SubsidyRequestStates.REQUESTED
     reviewed_at = datetime.utcnow()
