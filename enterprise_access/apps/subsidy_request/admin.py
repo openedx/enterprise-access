@@ -30,6 +30,7 @@ class BaseSubsidyRequestAdmin:
         'uuid',
         'decline_reason',
         'course_title',
+        'get_course_partners',
         'state',
         'reviewer',
         'reviewed_at',
@@ -40,12 +41,23 @@ class BaseSubsidyRequestAdmin:
         'user',
         'course_id',
         'course_title',
+        'get_course_partners',
         'enterprise_customer_uuid',
         'decline_reason',
         'reviewer',
         'reviewed_at',
         'state',
     )
+
+    def get_course_partners(self, obj):
+        """
+        Formats JSON list of course partners as human-readable partner names.
+        """
+        if not obj.course_partners:
+            return '-'
+        partner_names = [partner['name'] for partner in obj.course_partners]
+        return ', '.join(partner_names)
+    get_course_partners.short_description = 'Course partners'
 
 
 @admin.register(models.LicenseRequest)
