@@ -26,6 +26,8 @@ TEST_EMAIL = 'test@email.com'
 TEST_PASSWORD = 'QWERTY'
 TEST_COURSE_ID = 'edX+DemoX'
 TEST_UUID = 'd2098bfb-2c78-44f1-9eb2-b94475356a3f'
+TEST_PARTER_UUID = '32504a3e-7715-48ea-b9cc-ab5a75eb0271'
+TEST_PARTNER_NAME = 'edX'
 TEST_USER_ID = 1
 COURSE_TITLE_ABOUT_PIE = 'How to Bake a Pie: A Slice of Heaven'
 COURSE_TITLE_ABOUT_CAKE = 'How to Bake a Cake: So Delicious It Should Be Illegal'
@@ -136,6 +138,7 @@ class APITestWithMocks(APITest):
         self.mock_discovery_client = self.disco_patcher.start()
         self.mock_discovery_client().get_course_data.return_value = {
             'title': COURSE_TITLE_ABOUT_PIE,
+            'owners': [{'uuid': TEST_PARTER_UUID, 'name': TEST_PARTNER_NAME}],
         }
 
         self.analytics_patcher = mock.patch('analytics.track')
@@ -157,4 +160,5 @@ class TestCaseWithMockedDiscoveryApiClient(TestCase):
         self.mock_discovery_client = self.disco_patcher.start()
         self.mock_discovery_client().get_course_data.return_value = {
             'title': COURSE_TITLE_ABOUT_CAKE,
+            'owners': [{'uuid': TEST_PARTER_UUID, 'name': TEST_PARTNER_NAME}],
         }

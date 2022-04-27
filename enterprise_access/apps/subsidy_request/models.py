@@ -294,6 +294,7 @@ def update_course_info_for_subsidy_request(sender, **kwargs):  # pylint: disable
     """ Post save hook to grab course info from discovery service """
 
     subsidy_request = kwargs['instance']
+    print('!!!', subsidy_request.course_title, subsidy_request.course_partners)
     if subsidy_request.course_title and subsidy_request.course_partners:
         return
 
