@@ -9,7 +9,7 @@ services:
     networks:
       - devstack_default
     volumes:
-      - enterprise_access_mysql:/var/lib/mysql
+      - enterprise_access_mysql8:/var/lib/mysql
 
   memcache:
     image: memcached:1.4.24
@@ -77,4 +77,4 @@ networks:
     external: true
 
 volumes:
-  enterprise_access_mysql:
+  enterprise_access_mysql8:
