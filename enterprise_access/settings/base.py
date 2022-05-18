@@ -40,12 +40,12 @@ INSTALLED_APPS = (
     'drf_yasg',
     'edx_api_doc_tools',
     'release_util',
-    'django_celery_results',
 )
 
 THIRD_PARTY_APPS = (
     'corsheaders',
     'csrf.apps.CsrfAppConfig',  # Enables frontend apps to retrieve CSRF tokens
+    'django_celery_results',
     'django_filters',
     'rest_framework',
     'rest_framework_swagger',
@@ -343,7 +343,7 @@ CELERY_BROKER_URL = '{}://{}:{}@{}/{}'.format(
     CELERY_BROKER_HOSTNAME,
     CELERY_BROKER_VHOST
 )
-CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+CELERY_RESULT_BACKEND = 'django-db'
 
 # Celery task time limits.
 # Tasks will be asked to quit after four minutes, and un-gracefully killed
