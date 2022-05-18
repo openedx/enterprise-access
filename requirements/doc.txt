@@ -12,11 +12,11 @@ amqp==5.1.1
     #   kombu
 analytics-python==1.4.0
     # via -r requirements/test.txt
-asgiref==3.5.0
+asgiref==3.5.2
     # via
     #   -r requirements/test.txt
     #   django
-astroid==2.11.3
+astroid==2.11.5
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -55,11 +55,12 @@ cffi==1.15.0
     # via
     #   -r requirements/test.txt
     #   cryptography
+    #   pynacl
 charset-normalizer==2.0.12
     # via
     #   -r requirements/test.txt
     #   requests
-click==8.1.2
+click==8.1.3
     # via
     #   -r requirements/test.txt
     #   celery
@@ -68,6 +69,7 @@ click==8.1.2
     #   click-plugins
     #   click-repl
     #   code-annotations
+    #   edx-django-utils
     #   edx-lint
 click-didyoumean==0.3.0
     # via
@@ -102,11 +104,11 @@ coreschema==0.0.4
     #   -r requirements/test.txt
     #   coreapi
     #   drf-yasg
-coverage[toml]==6.3.2
+coverage[toml]==6.3.3
     # via
     #   -r requirements/test.txt
     #   pytest-cov
-cryptography==36.0.2
+cryptography==37.0.2
     # via
     #   -r requirements/test.txt
     #   pyjwt
@@ -154,7 +156,7 @@ django==3.2.13
     #   openedx-events
 django-celery-results==2.3.1
     # via -r requirements/test.txt
-django-cors-headers==3.11.0
+django-cors-headers==3.12.0
     # via -r requirements/test.txt
 django-crum==0.7.9
     # via
@@ -175,7 +177,9 @@ django-model-utils==4.2.0
 django-rest-swagger==2.2.0
     # via -r requirements/test.txt
 django-simple-history==3.0.0
-    # via -r requirements/test.txt
+    # via
+    #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
+    #   -r requirements/test.txt
 django-waffle==2.4.1
     # via
     #   -r requirements/test.txt
@@ -189,7 +193,7 @@ djangorestframework==3.13.1
     #   drf-yasg
     #   edx-api-doc-tools
     #   edx-drf-extensions
-doc8==0.11.1
+doc8==0.11.2
     # via -r requirements/doc.in
 docutils==0.17.1
     # via
@@ -215,7 +219,7 @@ edx-celeryutils==1.2.1
     # via -r requirements/test.txt
 edx-django-release-util==1.2.0
     # via -r requirements/test.txt
-edx-django-utils==4.6.0
+edx-django-utils==4.8.1
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
@@ -239,15 +243,15 @@ edx-sphinx-theme==3.0.0
     # via -r requirements/doc.in
 factory-boy==3.2.1
     # via -r requirements/test.txt
-faker==13.4.0
+faker==13.11.1
     # via
     #   -r requirements/test.txt
     #   factory-boy
-fastavro==1.4.10
+fastavro==1.4.12
     # via
     #   -r requirements/test.txt
     #   openedx-events
-filelock==3.6.0
+filelock==3.7.0
     # via
     #   -r requirements/test.txt
     #   tox
@@ -281,7 +285,7 @@ itypes==1.2.0
     # via
     #   -r requirements/test.txt
     #   coreapi
-jinja2==3.1.1
+jinja2==3.1.2
     # via
     #   -r requirements/test.txt
     #   code-annotations
@@ -330,7 +334,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==0.8.2
+openedx-events==0.9.0
     # via -r requirements/test.txt
 packaging==21.3
     # via
@@ -340,7 +344,7 @@ packaging==21.3
     #   redis
     #   sphinx
     #   tox
-pbr==5.8.1
+pbr==5.9.0
     # via
     #   -r requirements/test.txt
     #   stevedore
@@ -384,7 +388,7 @@ pyjwkest==1.4.2
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
-pyjwt[crypto]==2.3.0
+pyjwt[crypto]==2.4.0
     # via
     #   -r requirements/test.txt
     #   drf-jwt
@@ -392,7 +396,7 @@ pyjwt[crypto]==2.3.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==2.13.7
+pylint==2.13.9
     # via
     #   -r requirements/test.txt
     #   edx-lint
@@ -416,7 +420,11 @@ pymongo==3.12.3
     # via
     #   -r requirements/test.txt
     #   edx-opaque-keys
-pyparsing==3.0.8
+pynacl==1.5.0
+    # via
+    #   -r requirements/test.txt
+    #   edx-django-utils
+pyparsing==3.0.9
     # via
     #   -r requirements/test.txt
     #   packaging
@@ -435,7 +443,7 @@ python-dateutil==2.8.2
     #   analytics-python
     #   edx-drf-extensions
     #   faker
-python-slugify==6.1.1
+python-slugify==6.1.2
     # via
     #   -r requirements/test.txt
     #   code-annotations
@@ -457,7 +465,7 @@ pyyaml==6.0
     #   edx-django-release-util
 readme-renderer==35.0
     # via -r requirements/doc.in
-redis==4.2.2
+redis==4.3.1
     # via -r requirements/test.txt
 requests==2.27.1
     # via
@@ -600,7 +608,7 @@ wcwidth==0.2.5
     #   prompt-toolkit
 webencodings==0.5.1
     # via bleach
-wrapt==1.14.0
+wrapt==1.14.1
     # via
     #   -r requirements/test.txt
     #   astroid
