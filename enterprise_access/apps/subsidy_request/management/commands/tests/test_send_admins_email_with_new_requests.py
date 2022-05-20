@@ -26,9 +26,11 @@ class TestManagementCommands(APITestWithMocks):
         self.enterprise_customer_uuid = uuid4()
         self.admin_users = [
             {
+                'lms_user_id': 1,
                 'email': 'pieguy@example.com',
             },
             {
+                'lms_user_id': 2,
                 'email': 'cakeman@example.com',
             }
         ]
@@ -98,6 +100,18 @@ class TestManagementCommands(APITestWithMocks):
             state=SubsidyRequestStates.ERROR,
         )
 
+        mock_admin_recipient_1 = {
+            'external_user_id': 1
+        }
+
+        mock_admin_recipient_2 = {
+            'external_user_id': 2
+        }
+
+        mock_braze_client.return_value.create_recipient.side_effect = [
+            mock_admin_recipient_1, mock_admin_recipient_2
+        ]
+
         call_command(command_name)
 
         mock_braze_client.return_value.send_campaign_message.assert_called_once()
@@ -105,12 +119,12 @@ class TestManagementCommands(APITestWithMocks):
         call_kwargs = mock_braze_client.return_value.send_campaign_message.call_args[1]
 
         actual_campaign_id = call_args[0]
-        actual_emails = call_kwargs['emails']
+        actual_recipients = call_kwargs['recipients']
         actual_trigger_properties = call_kwargs['trigger_properties']
 
         assert actual_campaign_id == settings.BRAZE_NEW_REQUESTS_NOTIFICATION_CAMPAIGN
-        assert actual_emails[0] == 'pieguy@example.com'
-        assert actual_emails[1] == 'cakeman@example.com'
+        assert actual_recipients[0] == mock_admin_recipient_1
+        assert actual_recipients[1] == mock_admin_recipient_2
         for index, request in enumerate(expected_requests):
             request.refresh_from_db()
             expected_email = request.user.email
@@ -152,16 +166,28 @@ class TestManagementCommands(APITestWithMocks):
             state=SubsidyRequestStates.REQUESTED,
         )
 
+        mock_admin_recipient_1 = {
+            'external_user_id': 1
+        }
+
+        mock_admin_recipient_2 = {
+            'external_user_id': 2
+        }
+
+        mock_braze_client.return_value.create_recipient.side_effect = [
+            mock_admin_recipient_1, mock_admin_recipient_2
+        ]
+
         call_command(command_name)
 
         mock_braze_client.return_value.send_campaign_message.assert_called_once()
         call_kwargs = mock_braze_client.return_value.send_campaign_message.call_args[1]
 
-        actual_emails = call_kwargs['emails']
+        actual_recipients = call_kwargs['recipients']
         actual_trigger_properties = call_kwargs['trigger_properties']
 
-        assert actual_emails[0] == 'pieguy@example.com'
-        assert actual_emails[1] == 'cakeman@example.com'
+        assert actual_recipients[0] == mock_admin_recipient_1
+        assert actual_recipients[1] == mock_admin_recipient_2
         assert actual_trigger_properties['requests'][0]['user_email'] == new_request.user.email
         assert len(actual_trigger_properties['requests']) == 1
 
@@ -225,44 +251,3 @@ class TestManagementCommands(APITestWithMocks):
         call_command(command_name)
 
         mock_braze_client.return_value.send_campaign_message.assert_not_called()
-
-    @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_customer_data')
-    @mock.patch('enterprise_access.apps.subsidy_request.tasks.BrazeApiClient')
-    def test_emails_lower_cased(self, mock_braze_client, mock_get_ent_customer_data):
-        """
-        Verify that emails are lowercased before sent to Braze.
-        """
-        mock_email_1 = 'edX+adMin1@email.com'
-        mock_email_2 = 'edX+Admin2@email.com'
-        mock_get_ent_customer_data.return_value = {
-            'uuid': self.enterprise_customer_uuid,
-            'slug': 'test-slug',
-            'admin_users': [{
-                'email': mock_email_1,
-            },
-             {
-                'email': mock_email_2
-            }
-            ]
-        }
-
-        command_name = 'send_admins_email_with_new_requests'
-
-        factories.SubsidyRequestCustomerConfigurationFactory(
-            enterprise_customer_uuid=self.enterprise_customer_uuid,
-            subsidy_requests_enabled=True,
-            last_remind_date=None
-        )
-
-        factories.LicenseRequestFactory(
-            enterprise_customer_uuid=self.enterprise_customer_uuid,
-            state=SubsidyRequestStates.REQUESTED,
-        )
-
-        call_command(command_name)
-
-        call_kwargs = mock_braze_client.return_value.send_campaign_message.call_args[1]
-        actual_emails = call_kwargs['emails']
-
-        assert actual_emails[0] == mock_email_1.lower()
-        assert actual_emails[1] == mock_email_2.lower()

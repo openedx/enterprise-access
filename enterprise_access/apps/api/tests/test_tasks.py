@@ -140,9 +140,18 @@ class TestTasks(APITestWithMocks):
         mock_lms_client().get_enterprise_customer_data.return_value = {
             'slug': slug,
             'admin_users': [{
-                'email': admin_email
+                'email': admin_email,
+                'lms_user_id': 1
             }]
         }
+
+        mock_recipient = {
+            'external_user_id': 1
+        }
+
+        mock_admin_mailto = f'mailto:{admin_email}'
+        mock_braze_client().create_recipient.return_value = mock_recipient
+        mock_braze_client().generate_mailto_link.return_value = mock_admin_mailto
 
         send_notification_email_for_request(
             self.license_requests[0].uuid,
@@ -161,37 +170,14 @@ class TestTasks(APITestWithMocks):
         )
         mock_braze_client().send_campaign_message.assert_any_call(
             'test-campaign-id',
-            emails=[self.license_requests[0].user.email],
+            recipients=[mock_recipient],
             trigger_properties={
-                'contact_admin_link': f'mailto:{admin_email}',
+                'contact_admin_link': mock_admin_mailto,
                 'course_title': self.license_requests[0].course_title,
-                'course_about_page_url': expected_course_about_page_url},
-            )
+                'course_about_page_url': expected_course_about_page_url
+            },
+        )
         assert mock_braze_client().send_campaign_message.call_count == 1
-
-    @mock.patch('enterprise_access.apps.api.tasks.LmsApiClient', return_value=mock.MagicMock())
-    @mock.patch('enterprise_access.apps.api.tasks.BrazeApiClient', return_value=mock.MagicMock())
-    def test_send_notification_email_for_request_email_lower_cased(self, mock_braze_client, _):
-        """
-        Verify that the email is lowercased before sent to Braze.
-        """
-
-        coupon_code_request = CouponCodeRequestFactory(
-            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
-            user=self.user,
-        )
-
-        mock_email = 'edX+Learner@email.com'
-        coupon_code_request.user.email = mock_email
-        coupon_code_request.user.save()
-
-        send_notification_email_for_request(
-            coupon_code_request.uuid,
-            'test-campaign-id',
-            SubsidyTypeChoices.COUPON,
-        )
-
-        assert mock_braze_client().send_campaign_message.call_args[1]['emails'][0] == mock_email.lower()
 
     @mock.patch('enterprise_access.apps.api.tasks.LmsApiClient', return_value=mock.MagicMock())
     def test_unlink_users_from_enterprise_task(self, mock_lms_client):

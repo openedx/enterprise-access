@@ -124,10 +124,17 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
         f'The email includes {len(subsidy_requests)} subsidy requests.'
     )
     braze_client = BrazeApiClient()
+    recipients = [
+        braze_client.create_recipient(
+         user_email=admin_user['email'],
+         lms_user_id=admin_user['lms_user_id']
+        )
+        for admin_user in admin_users
+    ]
     try:
         braze_client.send_campaign_message(
             settings.BRAZE_NEW_REQUESTS_NOTIFICATION_CAMPAIGN,
-            emails=[admin_user['email'].lower() for admin_user in admin_users],
+            recipients=recipients,
             trigger_properties=braze_trigger_properties,
         )
     except HTTPError as exc:
