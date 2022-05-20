@@ -27,11 +27,6 @@ from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
 
-def _generate_mailto_link(emails):
-    if emails:
-        return f'mailto:{",".join(emails)}'
-
-    return None
 
 def _get_serializer_by_subsidy_type(subsidy_type):
     """
@@ -42,6 +37,7 @@ def _get_serializer_by_subsidy_type(subsidy_type):
     if subsidy_type == SubsidyTypeChoices.COUPON:
         return CouponCodeRequestSerializer
     return None
+
 
 @shared_task(base=LoggedTaskWithRetry)
 def decline_enterprise_subsidy_requests_task(subsidy_request_uuids, subsidy_type):
@@ -107,11 +103,12 @@ def send_notification_email_for_request(
 
     lms_client = LmsApiClient()
 
-    user_email = subsidy_request.user.email
+    user = subsidy_request.user
+    recipient = braze_client_instance.create_recipient(user_email=user.email, lms_user_id=user.lms_user_id)
     enterprise_customer_data = lms_client.get_enterprise_customer_data(subsidy_request.enterprise_customer_uuid)
 
     admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
-    braze_trigger_properties['contact_admin_link'] = _generate_mailto_link(admin_emails)
+    braze_trigger_properties['contact_admin_link'] = braze_client_instance.generate_mailto_link(admin_emails)
 
     enterprise_slug = enterprise_customer_data['slug']
     course_about_page_url = '{}/{}/course/{}'.format(
@@ -125,7 +122,7 @@ def send_notification_email_for_request(
     logger.info(f'Sending braze campaign message for subsidy request {subsidy_request}')
     braze_client_instance.send_campaign_message(
         braze_campaign_id,
-        emails=[user_email.lower()],
+        recipients=[recipient],
         trigger_properties=braze_trigger_properties,
     )
 
