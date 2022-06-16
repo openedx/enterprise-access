@@ -86,3 +86,10 @@ COPY . /edx/app/enterprise-access
 FROM app as newrelic
 RUN pip install newrelic
 CMD newrelic-admin run-program gunicorn --workers=2 --name enterprise-access -c /edx/app/enterprise-access/enterprise_access/docker_gunicorn_configuration.py --log-file - --max-requests=1000 enterprise_access.wsgi:application
+
+FROM app as devstack
+USER root
+COPY requirements/dev.txt /edx/app/enterprise-access/requirements/dev.txt
+RUN pip install -r requirements/dev.txt
+USER app
+CMD gunicorn --workers=2 --name enterprise-access -c /edx/app/enterprise-access/enterprise_access/docker_gunicorn_configuration.py --log-file - --max-requests=1000 enterprise_access.wsgi:application
