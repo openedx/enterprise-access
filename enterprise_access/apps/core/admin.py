@@ -3,11 +3,12 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import ugettext_lazy as _
+from djangoql.admin import DjangoQLSearchMixin
 
 from enterprise_access.apps.core.models import User
 
 
-class CustomUserAdmin(UserAdmin):
+class CustomUserAdmin(DjangoQLSearchMixin, UserAdmin):
     """ Admin configuration for the custom User model. """
     list_display = ('username', 'email', 'full_name', 'first_name', 'last_name', 'is_staff', 'lms_user_id')
     fieldsets = (
