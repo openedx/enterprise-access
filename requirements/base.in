@@ -5,6 +5,7 @@ analytics-python
 celery
 confluent-kafka
 Django>=2.2          # Web application framework
+djangoql
 django-cors-headers
 django-celery-results
 django-extensions

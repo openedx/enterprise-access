@@ -3,6 +3,7 @@
 import logging
 
 from django.contrib import admin
+from djangoql.admin import DjangoQLSearchMixin
 
 from enterprise_access.apps.subsidy_request import models
 from enterprise_access.apps.subsidy_request.utils import get_data_from_jwt_payload, get_user_from_request_session
@@ -10,7 +11,7 @@ from enterprise_access.apps.subsidy_request.utils import get_data_from_jwt_paylo
 logger = logging.getLogger(__name__)
 
 
-class BaseSubsidyRequestAdmin:
+class BaseSubsidyRequestAdmin(DjangoQLSearchMixin):
     """ Base admin configuration for the subsidy request models. """
 
     list_display = (
@@ -117,7 +118,7 @@ class CouponCodeRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
 
 
 @admin.register(models.SubsidyRequestCustomerConfiguration)
-class SubsidyRequestCustomerConfigurationAdmin(admin.ModelAdmin):
+class SubsidyRequestCustomerConfigurationAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     """ Admin configuration for the SubsidyRequestCustomerConfiguration model. """
     writable_fields = [
         'subsidy_requests_enabled',
