@@ -38,7 +38,7 @@ class Command(BaseCommand):
             '--batch-size',
             action='store',
             dest='batch_size',
-            default=5,
+            default=25,
             help='How many tasks to kick start before sleeping.',
             type=int,
         )
@@ -46,7 +46,7 @@ class Command(BaseCommand):
             '--sleep-duration',
             action='store',
             dest='sleep_duration',
-            default=3,
+            default=5,
             help='How long to sleep between batches.',
             type=int,
         )
