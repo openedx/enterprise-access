@@ -3,6 +3,7 @@ Management command to send admins email with new subsidy requests.
 """
 
 import logging
+from time import sleep
 
 from django.core.management.base import BaseCommand
 
@@ -32,8 +33,33 @@ class Command(BaseCommand):
         'Spin off celery tasks to send enterprise admins an email that lists requests '
         'that were created since this was last run.'
     )
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--batch-size',
+            action='store',
+            dest='batch_size',
+            default=5,
+            help='How many tasks to kick start before sleeping.',
+            type=int,
+        )
+        parser.add_argument(
+            '--sleep-duration',
+            action='store',
+            dest='sleep_duration',
+            default=3,
+            help='How long to sleep between batches.',
+            type=int,
+        )
+
+    def _we_should_sleep(self, task_number, batch_size):
+        if not task_number % batch_size:
+            return True
+        return False
 
     def handle(self, *args, **options):
+        batch_size = options['batch_size']
+        sleep_duration = options['sleep_duration']
+
         enterprise_customer_uuids = SubsidyRequestCustomerConfiguration.objects.filter(
             subsidy_requests_enabled=True
         ).values_list(
@@ -41,5 +67,8 @@ class Command(BaseCommand):
             flat=True,
         )
 
-        for enterprise_customer_uuid in enterprise_customer_uuids:
+        for task_number, enterprise_customer_uuid in enumerate(enterprise_customer_uuids):
             send_admins_email_with_new_requests_task.delay(enterprise_customer_uuid)
+
+            if self._we_should_sleep(task_number + 1, batch_size):
+                sleep(sleep_duration)

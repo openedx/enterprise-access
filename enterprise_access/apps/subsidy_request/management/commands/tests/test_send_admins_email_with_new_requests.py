@@ -35,12 +35,16 @@ class TestManagementCommands(APITestWithMocks):
             }
         ]
 
+    @mock.patch('enterprise_access.apps.subsidy_request.management.commands'
+        '.send_admins_email_with_new_requests'
+        '.sleep'
+    )
     @mock.patch(
         'enterprise_access.apps.subsidy_request.management.commands'
         '.send_admins_email_with_new_requests.send_admins_email_with_new_requests_task'
         '.delay'
     )
-    def test_new_requests_command_task_count(self, mock_task):
+    def test_new_requests_command_task_count(self, mock_task, mock_sleep):
         """
         Verify send_admins_email_with_new_requests spins off right amount of celery tasks
         """
@@ -57,10 +61,11 @@ class TestManagementCommands(APITestWithMocks):
                 enterprise_customer_uuid=uuid4(),
                 subsidy_requests_enabled=False,
             )
-        call_command(command_name)
+        call_command(command_name, '--batch-size=3')
 
         assert mock_task.call_count == 5
         assert mock_task.called_once_with(uuids[-1])
+        assert mock_sleep.call_count == 1
 
     @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_customer_data')
     @mock.patch('enterprise_access.apps.subsidy_request.tasks.BrazeApiClient')
@@ -112,7 +117,7 @@ class TestManagementCommands(APITestWithMocks):
             mock_admin_recipient_1, mock_admin_recipient_2
         ]
 
-        call_command(command_name)
+        call_command(command_name, '--batch-size=100')
 
         mock_braze_client.return_value.send_campaign_message.assert_called_once()
         call_args = mock_braze_client.return_value.send_campaign_message.call_args[0]
@@ -178,7 +183,7 @@ class TestManagementCommands(APITestWithMocks):
             mock_admin_recipient_1, mock_admin_recipient_2
         ]
 
-        call_command(command_name)
+        call_command(command_name, '--batch-size=100')
 
         mock_braze_client.return_value.send_campaign_message.assert_called_once()
         call_kwargs = mock_braze_client.return_value.send_campaign_message.call_args[1]
@@ -218,7 +223,7 @@ class TestManagementCommands(APITestWithMocks):
             last_remind_date=None
         )
 
-        call_command(command_name)
+        call_command(command_name, '--batch-size=100')
 
         config.refresh_from_db()
         assert config.last_remind_date is None
@@ -248,6 +253,6 @@ class TestManagementCommands(APITestWithMocks):
             last_remind_date=datetime.now()
         )
 
-        call_command(command_name)
+        call_command(command_name, '--batch-size=100')
 
         mock_braze_client.return_value.send_campaign_message.assert_not_called()
