@@ -73,9 +73,6 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
     Raises:
         HTTPError if Braze client callfails with an HTTPError
     """
-    lms_client = LmsApiClient()
-    enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-
     config_model = apps.get_model('subsidy_request.SubsidyRequestCustomerConfiguration')
     customer_config = config_model.objects.get(
         enterprise_customer_uuid=enterprise_customer_uuid,
@@ -102,8 +99,10 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
             )
         return
 
-    braze_trigger_properties = {}
+    lms_client = LmsApiClient()
+    enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
     enterprise_slug = enterprise_customer_data.get('slug')
+    braze_trigger_properties = {}
     braze_trigger_properties['manage_requests_url'] = _get_manage_requests_url(subsidy_model, enterprise_slug)
 
     braze_trigger_properties['requests'] = []
