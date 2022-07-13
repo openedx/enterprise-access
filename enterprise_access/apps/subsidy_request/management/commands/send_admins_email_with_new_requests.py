@@ -52,9 +52,7 @@ class Command(BaseCommand):
         )
 
     def _we_should_sleep(self, task_number, batch_size):
-        if task_number % batch_size:
-            return False
-        return True
+        return task_number % batch_size > 0
 
     def handle(self, *args, **options):
         batch_size = options['batch_size']
