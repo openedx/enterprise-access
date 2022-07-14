@@ -8,7 +8,6 @@ from datetime import datetime
 from celery import shared_task
 from django.apps import apps
 from django.conf import settings
-from requests.exceptions import HTTPError
 
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClient
@@ -120,7 +119,8 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
 
     logger.info(
         f'Sending new-requests email to admins for enterprise {enterprise_customer_uuid}. '
-        f'The email includes {len(subsidy_requests)} subsidy requests.'
+        f'The email includes {len(subsidy_requests)} subsidy requests. '
+        f'Sending to: {admin_users}'
     )
     braze_client = BrazeApiClient()
     recipients = [
@@ -136,8 +136,8 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
             recipients=recipients,
             trigger_properties=braze_trigger_properties,
         )
-    except HTTPError as exc:
-        logger.exception(exc)
+    except:
+        logger.exception(f'Exception sending braze campaign email message for enterprise {enterprise_customer_uuid}.')
         raise
 
     customer_config.last_remind_date = datetime.now()
