@@ -95,7 +95,7 @@ coreschema==0.0.4
     #   -r requirements/base.txt
     #   coreapi
     #   drf-yasg
-coverage[toml]==6.4.1
+coverage[toml]==6.4.2
     # via
     #   -r requirements/test.in
     #   pytest-cov
@@ -117,7 +117,7 @@ deprecated==1.2.13
     #   redis
 dill==0.3.5.1
     # via pylint
-distlib==0.3.4
+distlib==0.3.5
     # via virtualenv
     # via
     #   -r requirements/base.txt
@@ -182,7 +182,7 @@ drf-jwt==1.19.2
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
-drf-yasg==1.20.0
+drf-yasg==1.21.0
     # via
     #   -r requirements/base.txt
     #   edx-api-doc-tools
@@ -402,6 +402,7 @@ pytz==2022.1
     #   celery
     #   django
     #   djangorestframework
+    #   drf-yasg
 pyyaml==6.0
     # via
     #   -r requirements/base.txt
@@ -474,7 +475,7 @@ sqlparse==0.4.2
     # via
     #   -r requirements/base.txt
     #   django
-stevedore==3.5.0
+stevedore==4.0.0
     # via
     #   -r requirements/base.txt
     #   code-annotations

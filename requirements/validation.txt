@@ -129,7 +129,7 @@ coreschema==0.0.4
     #   -r requirements/test.txt
     #   coreapi
     #   drf-yasg
-coverage[toml]==6.4.1
+coverage[toml]==6.4.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -161,7 +161,7 @@ dill==0.3.5.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pylint
-distlib==0.3.4
+distlib==0.3.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -256,7 +256,7 @@ drf-jwt==1.19.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-drf-extensions
-drf-yasg==1.20.0
+drf-yasg==1.21.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -386,7 +386,7 @@ jsonfield2==4.0.0.post0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-keyring==23.6.0
+keyring==23.7.0
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -603,6 +603,7 @@ pytz==2022.1
     #   celery
     #   django
     #   djangorestframework
+    #   drf-yasg
 pyyaml==6.0
     # via
     #   -r requirements/quality.txt
@@ -718,7 +719,7 @@ sqlparse==0.4.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django
-stevedore==3.5.0
+stevedore==4.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -799,7 +800,7 @@ wrapt==1.14.1
     #   -r requirements/test.txt
     #   astroid
     #   deprecated
-zipp==3.8.0
+zipp==3.8.1
     # via
     #   -r requirements/quality.txt
     #   importlib-metadata
