@@ -19,26 +19,6 @@ from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
 
-
-def _get_manage_requests_url(subsidy_model, enterprise_slug):
-    """
-    Get a manage_requests url based on the type of subsidy.
-
-    Args:
-        subsidy_model (class):  class of the subsidy object
-        enterprise_slug (string): slug of the enterprise's name
-    Returns:
-        string: a url to the manage learners page.
-    """
-    if subsidy_model == apps.get_model('subsidy_request.LicenseRequest'):
-        subsidy_string = 'subscriptions'
-    else:
-        subsidy_string = 'coupons'
-
-    url = f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}/admin/{subsidy_string}/manage-requests'
-    return url
-
-
 @shared_task(base=LoggedTaskWithRetry)
 def psg_send_admins_email_with_new_requests_task(enterprise_customer_uuid):
     """
@@ -80,7 +60,14 @@ def psg_send_admins_email_with_new_requests_task(enterprise_customer_uuid):
 
     braze_trigger_properties = {}
     enterprise_slug = enterprise_customer_data['slug']
-    braze_trigger_properties['manage_requests_url'] = _get_manage_requests_url(subsidy_model, enterprise_slug)
+
+    if subsidy_model == apps.get_model('subsidy_request.LicenseRequest'):
+        subsidy_string = 'subscriptions'
+    else:
+        subsidy_string = 'coupons'
+
+    url = f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}/admin/{subsidy_string}/manage-requests'
+    braze_trigger_properties['manage_requests_url'] = url
 
     braze_trigger_properties['requests'] = []
     for subsidy_request in subsidy_requests:
