@@ -7,7 +7,7 @@ import logging
 from django.core.management.base import BaseCommand
 
 from enterprise_access.apps.subsidy_request.models import SubsidyRequestCustomerConfiguration
-from enterprise_access.apps.subsidy_request.tasks import send_admins_email_with_new_requests_task
+from enterprise_access.apps.subsidy_request.tasks import psg_send_admins_email_with_new_requests
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +34,10 @@ class Command(BaseCommand):
     )
 
     def handle(self, *args, **options):
-        enterprise_customer_uuids = SubsidyRequestCustomerConfiguration.objects.filter(
+        configs = SubsidyRequestCustomerConfiguration.objects.filter(
             subsidy_requests_enabled=True
-        ).values_list(
-            'enterprise_customer_uuid',
-            flat=True,
         )
 
-        for enterprise_customer_uuid in enterprise_customer_uuids:
+        for config in configs:
+            enterprise_customer_uuid = config.enterprise_customer_uuid
             send_admins_email_with_new_requests_task.delay(enterprise_customer_uuid)
