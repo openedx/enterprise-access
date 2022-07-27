@@ -136,6 +136,7 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
             recipients=recipients,
             trigger_properties=braze_trigger_properties,
         )
+
     except Exception:
         logger.exception(f'Exception sending braze campaign email message for enterprise {enterprise_customer_uuid}.')
         raise
