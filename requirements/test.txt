@@ -22,7 +22,7 @@ async-timeout==4.0.2
     # via
     #   -r requirements/base.txt
     #   redis
-attrs==21.4.0
+attrs==22.1.0
     # via
     #   -r requirements/base.txt
     #   openedx-events
@@ -95,7 +95,7 @@ coreschema==0.0.4
     #   -r requirements/base.txt
     #   coreapi
     #   drf-yasg
-coverage[toml]==6.4.1
+coverage[toml]==6.4.2
     # via
     #   -r requirements/test.in
     #   pytest-cov
@@ -117,7 +117,7 @@ deprecated==1.2.13
     #   redis
 dill==0.3.5.1
     # via pylint
-distlib==0.3.4
+distlib==0.3.5
     # via virtualenv
     # via
     #   -r requirements/base.txt
@@ -163,7 +163,7 @@ django-rest-swagger==2.2.0
     # via -r requirements/base.txt
 django-simple-history==3.0.0
     # via -r requirements/base.txt
-django-waffle==2.5.0
+django-waffle==2.6.0
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -182,7 +182,7 @@ drf-jwt==1.19.2
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
-drf-yasg==1.20.0
+drf-yasg==1.21.3
     # via
     #   -r requirements/base.txt
     #   edx-api-doc-tools
@@ -218,9 +218,9 @@ edx-rest-api-client==5.5.0
     # via -r requirements/base.txt
 factory-boy==3.2.1
     # via -r requirements/test.in
-faker==13.15.0
+faker==13.15.1
     # via factory-boy
-fastavro==1.5.2
+fastavro==1.5.4
     # via
     #   -r requirements/base.txt
     #   openedx-events
@@ -280,7 +280,7 @@ monotonic==1.6
     #   analytics-python
 mysqlclient==2.1.1
     # via -r requirements/base.txt
-newrelic==7.14.0.177
+newrelic==7.16.0.178
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -293,7 +293,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
-openedx-events==0.10.0
+openedx-events==0.11.1
     # via -r requirements/base.txt
 packaging==21.3
     # via
@@ -350,7 +350,7 @@ pyjwt[crypto]==2.4.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==2.14.4
+pylint==2.14.5
     # via
     #   edx-lint
     #   pylint-celery
@@ -402,6 +402,7 @@ pytz==2022.1
     #   celery
     #   django
     #   djangorestframework
+    #   drf-yasg
 pyyaml==6.0
     # via
     #   -r requirements/base.txt
@@ -456,7 +457,6 @@ six==1.16.0
     #   pyjwkest
     #   python-dateutil
     #   tox
-    #   virtualenv
 slumber==0.7.1
     # via
     #   -r requirements/base.txt
@@ -474,7 +474,7 @@ sqlparse==0.4.2
     # via
     #   -r requirements/base.txt
     #   django
-stevedore==3.5.0
+stevedore==4.0.0
     # via
     #   -r requirements/base.txt
     #   code-annotations
@@ -502,7 +502,7 @@ uritemplate==4.1.1
     #   -r requirements/base.txt
     #   coreapi
     #   drf-yasg
-urllib3==1.26.10
+urllib3==1.26.11
     # via
     #   -r requirements/base.txt
     #   requests
@@ -512,7 +512,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.15.1
+virtualenv==20.16.2
     # via tox
 wcwidth==0.2.5
     # via

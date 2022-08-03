@@ -29,7 +29,7 @@ async-timeout==4.0.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   redis
-attrs==21.4.0
+attrs==22.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -129,7 +129,7 @@ coreschema==0.0.4
     #   -r requirements/test.txt
     #   coreapi
     #   drf-yasg
-coverage[toml]==6.4.1
+coverage[toml]==6.4.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -161,7 +161,7 @@ dill==0.3.5.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pylint
-distlib==0.3.4
+distlib==0.3.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -228,7 +228,7 @@ django-simple-history==3.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-django-waffle==2.5.0
+django-waffle==2.6.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -256,7 +256,7 @@ drf-jwt==1.19.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-drf-extensions
-drf-yasg==1.20.0
+drf-yasg==1.21.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -314,12 +314,12 @@ factory-boy==3.2.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==13.15.0
+faker==13.15.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   factory-boy
-fastavro==1.5.2
+fastavro==1.5.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -386,7 +386,7 @@ jsonfield2==4.0.0.post0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-keyring==23.6.0
+keyring==23.7.0
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -423,7 +423,7 @@ mysqlclient==2.1.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-newrelic==7.14.0.177
+newrelic==7.16.0.178
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -439,7 +439,7 @@ openapi-codec==1.3.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==0.10.0
+openedx-events==0.11.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -493,7 +493,7 @@ py==1.11.0
     #   -r requirements/test.txt
     #   pytest
     #   tox
-pycodestyle==2.8.0
+pycodestyle==2.9.0
     # via -r requirements/quality.txt
 pycparser==2.21
     # via
@@ -526,7 +526,7 @@ pyjwt[crypto]==2.4.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==2.14.4
+pylint==2.14.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -603,6 +603,7 @@ pytz==2022.1
     #   celery
     #   django
     #   djangorestframework
+    #   drf-yasg
 pyyaml==6.0
     # via
     #   -r requirements/quality.txt
@@ -692,7 +693,6 @@ six==1.16.0
     #   pyjwkest
     #   python-dateutil
     #   tox
-    #   virtualenv
 slumber==0.7.1
     # via
     #   -r requirements/quality.txt
@@ -718,7 +718,7 @@ sqlparse==0.4.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django
-stevedore==3.5.0
+stevedore==4.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -766,7 +766,7 @@ uritemplate==4.1.1
     #   -r requirements/test.txt
     #   coreapi
     #   drf-yasg
-urllib3==1.26.10
+urllib3==1.26.11
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -779,7 +779,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.15.1
+virtualenv==20.16.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -799,7 +799,7 @@ wrapt==1.14.1
     #   -r requirements/test.txt
     #   astroid
     #   deprecated
-zipp==3.8.0
+zipp==3.8.1
     # via
     #   -r requirements/quality.txt
     #   importlib-metadata
