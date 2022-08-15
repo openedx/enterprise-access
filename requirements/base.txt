@@ -44,7 +44,7 @@ click-plugins==1.1.1
     # via celery
 click-repl==0.2.0
     # via celery
-confluent-kafka==1.9.0
+confluent-kafka==1.9.2
     # via -r requirements/base.in
 coreapi==2.3.3
     # via
@@ -65,7 +65,7 @@ defusedxml==0.7.1
     #   social-auth-core
 deprecated==1.2.13
     # via redis
-django==3.2.14
+django==3.2.15
     # via
     #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/base.in
@@ -197,7 +197,7 @@ packaging==21.3
     # via
     #   drf-yasg
     #   redis
-pbr==5.9.0
+pbr==5.10.0
     # via stevedore
 ply==3.11
     # via djangoql
@@ -230,7 +230,7 @@ python-dateutil==2.8.2
     #   edx-drf-extensions
 python3-openid==3.2.0
     # via social-auth-core
-pytz==2022.1
+pytz==2022.2.1
     # via
     #   -r requirements/base.in
     #   celery

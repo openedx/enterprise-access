@@ -101,7 +101,7 @@ commonmark==0.9.1
     # via
     #   -r requirements/validation.txt
     #   rich
-confluent-kafka==1.9.0
+confluent-kafka==1.9.2
     # via -r requirements/validation.txt
 coreapi==2.3.3
     # via
@@ -114,7 +114,7 @@ coreschema==0.0.4
     #   -r requirements/validation.txt
     #   coreapi
     #   drf-yasg
-coverage[toml]==6.4.2
+coverage[toml]==6.4.3
     # via
     #   -r requirements/validation.txt
     #   pytest-cov
@@ -124,7 +124,7 @@ cryptography==37.0.4
     #   pyjwt
     #   secretstorage
     #   social-auth-core
-ddt==1.5.0
+ddt==1.6.0
     # via -r requirements/validation.txt
 defusedxml==0.7.1
     # via
@@ -145,7 +145,7 @@ distlib==0.3.5
     # via
     #   -r requirements/validation.txt
     #   virtualenv
-django==3.2.14
+django==3.2.15
     # via
     #   -r requirements/validation.txt
     #   django-cors-headers
@@ -255,7 +255,7 @@ edx-rest-api-client==5.5.0
     # via -r requirements/validation.txt
 factory-boy==3.2.1
     # via -r requirements/validation.txt
-faker==13.15.1
+faker==14.0.0
     # via
     #   -r requirements/validation.txt
     #   factory-boy
@@ -263,7 +263,7 @@ fastavro==1.5.4
     # via
     #   -r requirements/validation.txt
     #   openedx-events
-filelock==3.7.1
+filelock==3.8.0
     # via
     #   -r requirements/validation.txt
     #   tox
@@ -315,7 +315,7 @@ jsonfield==3.1.0
     #   edx-celeryutils
 jsonfield2==4.0.0.post0
     # via -r requirements/validation.txt
-keyring==23.7.0
+keyring==23.8.2
     # via
     #   -r requirements/validation.txt
     #   twine
@@ -369,7 +369,7 @@ packaging==21.3
     #   tox
 path==16.4.0
     # via edx-i18n-tools
-pbr==5.9.0
+pbr==5.10.0
     # via
     #   -r requirements/validation.txt
     #   stevedore
@@ -413,7 +413,7 @@ py==1.11.0
     #   -r requirements/validation.txt
     #   pytest
     #   tox
-pycodestyle==2.9.0
+pycodestyle==2.9.1
     # via -r requirements/validation.txt
 pycparser==2.21
     # via
@@ -499,7 +499,7 @@ python3-openid==3.2.0
     # via
     #   -r requirements/validation.txt
     #   social-auth-core
-pytz==2022.1
+pytz==2022.2.1
     # via
     #   -r requirements/validation.txt
     #   celery
@@ -512,7 +512,7 @@ pyyaml==6.0
     #   code-annotations
     #   edx-django-release-util
     #   edx-i18n-tools
-readme-renderer==35.0
+readme-renderer==36.0
     # via
     #   -r requirements/validation.txt
     #   twine
@@ -557,7 +557,7 @@ ruamel-yaml-clib==0.2.6
     #   ruamel-yaml
 rules==3.3
     # via -r requirements/validation.txt
-secretstorage==3.3.2
+secretstorage==3.3.3
     # via
     #   -r requirements/validation.txt
     #   keyring
@@ -629,7 +629,7 @@ tomli==2.0.1
     #   pep517
     #   pylint
     #   pytest
-tomlkit==0.11.1
+tomlkit==0.11.4
     # via
     #   -r requirements/validation.txt
     #   pylint
@@ -659,7 +659,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.16.2
+virtualenv==20.16.3
     # via
     #   -r requirements/validation.txt
     #   tox
