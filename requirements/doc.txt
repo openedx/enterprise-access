@@ -91,7 +91,7 @@ code-annotations==1.3.0
     # via
     #   -r requirements/test.txt
     #   edx-lint
-confluent-kafka==1.9.0
+confluent-kafka==1.9.2
     # via -r requirements/test.txt
 coreapi==2.3.3
     # via
@@ -104,7 +104,7 @@ coreschema==0.0.4
     #   -r requirements/test.txt
     #   coreapi
     #   drf-yasg
-coverage[toml]==6.4.2
+coverage[toml]==6.4.3
     # via
     #   -r requirements/test.txt
     #   pytest-cov
@@ -113,7 +113,7 @@ cryptography==37.0.4
     #   -r requirements/test.txt
     #   pyjwt
     #   social-auth-core
-ddt==1.5.0
+ddt==1.6.0
     # via -r requirements/test.txt
 defusedxml==0.7.1
     # via
@@ -132,7 +132,7 @@ distlib==0.3.5
     # via
     #   -r requirements/test.txt
     #   virtualenv
-django==3.2.14
+django==3.2.15
     # via
     #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/test.txt
@@ -245,7 +245,7 @@ edx-sphinx-theme==3.0.0
     # via -r requirements/doc.in
 factory-boy==3.2.1
     # via -r requirements/test.txt
-faker==13.15.1
+faker==14.0.0
     # via
     #   -r requirements/test.txt
     #   factory-boy
@@ -253,7 +253,7 @@ fastavro==1.5.4
     # via
     #   -r requirements/test.txt
     #   openedx-events
-filelock==3.7.1
+filelock==3.8.0
     # via
     #   -r requirements/test.txt
     #   tox
@@ -346,7 +346,7 @@ packaging==21.3
     #   redis
     #   sphinx
     #   tox
-pbr==5.9.0
+pbr==5.10.0
     # via
     #   -r requirements/test.txt
     #   stevedore
@@ -457,7 +457,7 @@ python3-openid==3.2.0
     # via
     #   -r requirements/test.txt
     #   social-auth-core
-pytz==2022.1
+pytz==2022.2.1
     # via
     #   -r requirements/test.txt
     #   babel
@@ -470,7 +470,7 @@ pyyaml==6.0
     #   -r requirements/test.txt
     #   code-annotations
     #   edx-django-release-util
-readme-renderer==35.0
+readme-renderer==36.0
     # via -r requirements/doc.in
 redis==4.3.4
     # via -r requirements/test.txt
@@ -583,7 +583,7 @@ tomli==2.0.1
     #   doc8
     #   pylint
     #   pytest
-tomlkit==0.11.1
+tomlkit==0.11.4
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -609,7 +609,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.16.2
+virtualenv==20.16.3
     # via
     #   -r requirements/test.txt
     #   tox
