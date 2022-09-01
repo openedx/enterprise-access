@@ -14,7 +14,7 @@ asgiref==3.5.2
     # via
     #   -r requirements/base.txt
     #   django
-astroid==2.11.7
+astroid==2.12.5
     # via
     #   pylint
     #   pylint-celery
@@ -49,7 +49,7 @@ cffi==1.15.1
     #   -r requirements/base.txt
     #   cryptography
     #   pynacl
-charset-normalizer==2.1.0
+charset-normalizer==2.1.1
     # via
     #   -r requirements/base.txt
     #   requests
@@ -95,7 +95,7 @@ coreschema==0.0.4
     #   -r requirements/base.txt
     #   coreapi
     #   drf-yasg
-coverage[toml]==6.4.3
+coverage[toml]==6.4.4
     # via
     #   -r requirements/test.in
     #   pytest-cov
@@ -117,7 +117,7 @@ deprecated==1.2.13
     #   redis
 dill==0.3.5.1
     # via pylint
-distlib==0.3.5
+distlib==0.3.6
     # via virtualenv
     # via
     #   -r requirements/base.txt
@@ -163,7 +163,7 @@ django-rest-swagger==2.2.0
     # via -r requirements/base.txt
 django-simple-history==3.0.0
     # via -r requirements/base.txt
-django-waffle==2.6.0
+django-waffle==3.0.0
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -201,7 +201,7 @@ edx-django-utils==5.0.0
     #   -r requirements/base.txt
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.0.1
+edx-drf-extensions==8.2.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
@@ -218,9 +218,9 @@ edx-rest-api-client==5.5.0
     # via -r requirements/base.txt
 factory-boy==3.2.1
     # via -r requirements/test.in
-faker==14.0.0
+faker==14.2.0
     # via factory-boy
-fastavro==1.5.4
+fastavro==1.6.0
     # via
     #   -r requirements/base.txt
     #   openedx-events
@@ -280,7 +280,7 @@ monotonic==1.6
     #   analytics-python
 mysqlclient==2.1.1
     # via -r requirements/base.txt
-newrelic==7.16.0.178
+newrelic==8.0.0.179
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -293,7 +293,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
-openedx-events==0.11.1
+openedx-events==0.12.0
     # via -r requirements/base.txt
 packaging==21.3
     # via
@@ -350,7 +350,7 @@ pyjwt[crypto]==2.4.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==2.14.5
+pylint==2.15.0
     # via
     #   edx-lint
     #   pylint-celery
@@ -502,7 +502,7 @@ uritemplate==4.1.1
     #   -r requirements/base.txt
     #   coreapi
     #   drf-yasg
-urllib3==1.26.11
+urllib3==1.26.12
     # via
     #   -r requirements/base.txt
     #   requests
@@ -512,7 +512,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.16.3
+virtualenv==20.16.4
     # via tox
 wcwidth==0.2.5
     # via
@@ -523,6 +523,3 @@ wrapt==1.14.1
     #   -r requirements/base.txt
     #   astroid
     #   deprecated
-
-# The following packages are considered to be unsafe in a requirements file:
-# setuptools
