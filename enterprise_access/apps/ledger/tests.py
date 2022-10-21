@@ -47,9 +47,8 @@ def test_multiple_reversals():
     reversal = api.reverse_full_transaction(tx_1, idempotency_key='reversal-1')
     assert ledger.balance() == 0
 
-    second_reversal = api.reverse_full_transaction(tx_1, idempotency_key='reversal-2')
-    assert ledger.balance() == 0
-    assert reversal == second_reversal
+    with pytest.raises(Exception):
+        second_reversal = api.reverse_full_transaction(tx_1, idempotency_key='reversal-2')
 
     third_reversal = api.reverse_full_transaction(tx_1, idempotency_key='reversal-1')
     assert ledger.balance() == 0

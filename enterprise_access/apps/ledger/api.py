@@ -12,22 +12,22 @@ def create_transaction(ledger, quantity, idempotency_key, **metadata):
     (course id, ledger, user) are unique.
     Or support an idempotency key.
     """
-    # TODO: make this happen with repeatable read isolation level
-    # or an app-level lock
-    # e.g. https://stackoverflow.com/questions/27386738/per-transaction-isolation-level-in-django-orm
-
-    # TODO: select first and return for idempotency
+    # Note that the default isolation level for MySQL provided by Django is `repeatable read`.
+    # Therefore...this is good.  Because reasons.  TODO: better explanation.
     with atomic(durable=True):
         balance = ledger.balance()
         if (quantity < 0) and ((balance + quantity) < 0):
             raise Exception("d'oh!")
 
-        return models.Transaction.objects.create(
+        transaction, _ = models.Transaction.objects.get_or_create(
             ledger=ledger,
             idempotency_key=idempotency_key,
-            quantity=quantity,
-            metadata=metadata,
+            defaults={
+                'quantity': quantity,
+                'metadata': metadata,
+            },
         )
+        return transaction
 
 
 def reverse_full_transaction(transaction, idempotency_key, **metadata):
@@ -41,16 +41,15 @@ def reverse_full_transaction(transaction, idempotency_key, **metadata):
         # if there is a reversal: return, no work to do here
         # if not, write a reversal for the transaction
         transaction.refresh_from_db()
-        try:
-            return transaction.reversal
-        except:
-            # TODO no bare except
-            return models.Reversal.objects.create(
-                transaction=transaction,
-                idempotency_key=idempotency_key,
-                quantity=transaction.quantity * -1,
-                metadata=metadata,
-            )
+        reversal, _ = models.Reversal.objects.get_or_create(
+            transaction=transaction,
+            idempotency_key=idempotency_key,
+            defaults={
+                'quantity': transaction.quantity * -1,
+                'metadata': metadata,
+            },
+        )
+        return reversal
 
 
 

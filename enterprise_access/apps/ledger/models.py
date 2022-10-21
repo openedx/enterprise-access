@@ -14,13 +14,13 @@ from model_utils.models import SoftDeletableModel, TimeStampedModel
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_update_with_history
 
-# Units on the ledger model - probably yes.
+# Units on the ledger model - probably yes. TODO: say why
 # Unit conversion - price/seat is captured somewhere, is it in here?
 # This is currently single-entry - should it be double-entry?
 # Do we need an account representing SF, one representing entitlements or enrollments, and the transaction
 # moves between those two accounts?
 # Are transactions immutable? Yes.
-# Let's not persist aggregates - the transactions are the only truth.
+# Let's not persist aggregates - the transactions are the only truth. TODO: say why
 
 # Create your models here.
 

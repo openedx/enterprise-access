@@ -108,6 +108,7 @@ WSGI_APPLICATION = 'enterprise_access.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 # Set this value in the environment-specific files (e.g. local.py, production.py, test.py)
+# Note that the default isolation level for MySQL provided by Django is `repeatable read`.
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.',
@@ -116,12 +117,6 @@ DATABASES = {
         'PASSWORD': '',
         'HOST': '',  # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
         'PORT': '',  # Set to empty string for default.
-        # The default isolation level for MySQL is REPEATABLE READ, which is a little too aggressive
-        # for our needs, particularly around reading celery task state via django-celery-results.
-        # https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-committed
-        'OPTIONS': {
-            'isolation_level': 'read committed',
-        },
     }
 }
 
