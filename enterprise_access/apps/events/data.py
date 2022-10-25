@@ -7,8 +7,7 @@ from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from django.conf import settings
 
-# TODO (EVENT BUS):
-# Move the CouponCodeRequestData class to openedx_events and use the Attr<->Avro bridge as a serializer
+# TODO: Move the CouponCodeRequestData class to openedx_events and use the Attr<->Avro bridge as a serializer
 
 
 @attr.s(frozen=True)
