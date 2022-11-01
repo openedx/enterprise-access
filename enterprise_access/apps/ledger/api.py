@@ -67,3 +67,12 @@ def create_ledger(unit, idempotency_key, **metadata):
 
 def update_ledger(ledger, **metadata):
     pass
+
+
+def create_idempotency_key_for_subsidy(subsidy_record):
+    return f'subsidy-{subsidy_record.uuid}'
+
+
+def create_idempotency_key_for_transaction(subsidy_record, quantity, **metadata):
+    key_for_subsidy = create_idempotency_key_for_subsidy(subsidy_record)
+    return f'{key_for_subsidy}-{quantity}-{metadata}'

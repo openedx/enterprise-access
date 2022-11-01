@@ -5,6 +5,8 @@ import pytest
 
 from enterprise_access.apps.subsidy.models import *
 from enterprise_access.apps.ledger.models import Ledger, Transaction, Reversal, UnitChoices
+from enterprise_access.apps.subsidy import api as subsidy_api
+from enterprise_access.apps.ledger import api as ledger_api
 
 @pytest.fixture
 def group_a():
@@ -21,12 +23,27 @@ def catalog_a():
 
 
 @pytest.fixture
+def ledger_fixture():
+    ledger_idp_key = uuid4()
+    ledger = ledger_api.create_ledger(
+        unit=UnitChoices.SEATS,
+        idempotency_key=ledger_idp_key,
+    )
+    ledger_api.create_transaction(
+        ledger,
+        quantity=100,
+        idempotency_key=f'ledger-{ledger_idp_key}-init-100',
+    )
+    return ledger
+
+
+@pytest.fixture
 def subscription_subsidy():
-    return SubscriptionSubsidy.objects.create(
-        starting_balance=10000,
-        subsidy_type='subscription',
-        subscription_plan_uuid=uuid4(),
+    return subsidy_api.create_subscription_subsidy(
         customer_uuid=uuid4(),
+        subscription_plan_uuid=uuid4(),
+        unit=UnitChoices.SEATS,
+        starting_balance=100,
     )
 
 
@@ -36,7 +53,7 @@ def policy_fixture(group_a, subscription_subsidy, catalog_a):
         group_uuid=group_a['uuid'],
         subsidy=subscription_subsidy,
         catalog_uuid=catalog_a['uuid'],
-        total_value=5000,
+        total_value=50,
     )
     # make it so any learner is always in the group for this policy
     policy.group_client.get_groups_for_learner.return_value = [
@@ -47,12 +64,12 @@ def policy_fixture(group_a, subscription_subsidy, catalog_a):
 
 @pytest.mark.django_db
 def test_create_subsidy_happy_path(subscription_subsidy):
-    assert subscription_subsidy.subsidy_type == 'subscription'
+    assert subscription_subsidy.unit == UnitChoices.SEATS
 
 
 @pytest.mark.django_db
 def test_subscription_subsidy_policy_happy_paths(policy_fixture):
-    assert policy_fixture.total_value == 5000
+    assert policy_fixture.total_value == 50
     some_learner_id = 'abcde12345'
     assert policy_fixture.get_license_for_learner(some_learner_id)['uuid'] is not None
 
@@ -60,7 +77,7 @@ def test_subscription_subsidy_policy_happy_paths(policy_fixture):
     # make the learner not have a license yet.
     policy_fixture.subsidy.subscription_client.get_license_for_learner.return_value = None
     # makes is_redeemable() return True
-    policy_fixture.subsidy.subscription_client.get_plan_metadata.return_value = {'licenses': {'pending': 45}}
+    policy_fixture.subsidy.subscription_client.get_plan_metadata.return_value = {'licenses': {'pending': 50}}
 
     assert policy_fixture.is_learner_entitled_to_policy(some_learner_id)
 

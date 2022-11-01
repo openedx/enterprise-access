@@ -26,7 +26,19 @@ def now():
     return UTC.localize(datetime.utcnow())
 
 
-class Subsidy(TimeStampedModel):
+class TimeStampedModelWithUuid(TimeStampedModel):
+    class Meta:
+        abstract = True
+
+    uuid = models.UUIDField(
+        primary_key=True,
+        default=uuid4,
+        editable=False,
+        unique=True,
+    )
+
+
+class Subsidy(TimeStampedModelWithUuid):
     """
     """
     class Meta:
@@ -35,7 +47,6 @@ class Subsidy(TimeStampedModel):
     starting_balance = models.BigIntegerField(
         null=False, blank=False,
     )
-    subsidy_type = models.CharField(max_length=255, null=False, blank=False)
     ledger = models.ForeignKey(Ledger, null=True, on_delete=models.SET_NULL)
     unit = models.CharField(
         max_length=255,
@@ -58,8 +69,7 @@ class Subsidy(TimeStampedModel):
 
 
     def current_balance(self):
-        # returns integer, cents
-        pass
+        return self.ledger.balance()
 
     def get_content_metadata(self, content_key):
         """
@@ -138,6 +148,13 @@ class LearnerCreditSubsidy(Subsidy):
 class SubscriptionSubsidy(Subsidy):
     subscription_plan_uuid = models.UUIDField(null=False, blank=False, db_index=True)
 
+    class Meta:
+        # The choice of what a subsidy is unique on dictates behavior
+        # that we can implement around the lifecycle of the subsidy.
+        # For instance, making this type of subsidy unique on the (customer, plan id, unit)
+        # means that every renewal or roll-over of a plan must result in a new plan id.
+        unique_together = []
+
     @property
     def subscription_client(self):
         mock_client = mock.MagicMock()
@@ -188,16 +205,9 @@ class SubscriptionSubsidy(Subsidy):
         )
 
 
-class SubsidyAccessMethod(TimeStampedModel):
+class SubsidyAccessMethod(TimeStampedModelWithUuid):
+    """    
     """
-    
-    """
-    uuid = models.UUIDField(
-        primary_key=True,
-        default=uuid4,
-        editable=False,
-        unique=True,
-    )
     # e.g. for licenses, this is just "license"
     method_label = models.CharField(
         max_length=255,
@@ -210,19 +220,13 @@ class SubsidyAccessMethod(TimeStampedModel):
         pass
 
 
-class SubsidyAccessPolicy(TimeStampedModel):
+class SubsidyAccessPolicy(TimeStampedModelWithUuid):
     """
     (group, subsidy, catalog, access method, and optional total value)
     """
     class Meta:
         abstract = True
 
-    uuid = models.UUIDField(
-        primary_key=True,
-        default=uuid4,
-        editable=False,
-        unique=True,
-    )
     group_uuid = models.UUIDField(null=True, blank=True, db_index=True)
     # children must define this FK, probably
     # subsidy = models.ForeignKey(Subsidy, on_delete=models.SET_NULL)
