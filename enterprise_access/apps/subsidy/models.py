@@ -123,9 +123,6 @@ class Subsidy(TimeStampedModelWithUuid):
             metadata=metadata,
         )
 
-    def create_redemption(self, learner_id, content_metadata, transaction, **kwargs):
-        raise NotImplementedError
-
     def commit_transaction(self, transaction, reference_id):
         transaction.reference_id = reference_id
         transaction.save()
@@ -134,7 +131,16 @@ class Subsidy(TimeStampedModelWithUuid):
         # delete it, or set some state?
         pass
 
-    def is_redeemable(self, learner_id, content_key, redemption_datetime):
+    def is_entitled(self, learner_id):
+        raise NotImplementedError
+
+    def create_entitlement(self, learner_id, **kwargs):
+        raise NotImplementedError
+
+    def is_redeemable(self, learner_id, content_key, redemption_datetime=None):
+        raise NotImplementedError
+
+    def create_redemption(self, learner_id, content_key, transaction=None, **kwargs):
         raise NotImplementedError
 
 
@@ -161,6 +167,7 @@ class SubscriptionSubsidy(Subsidy):
         mock_client.get_plan_metadata.return_value = {
             'licenses': {
                 'pending': 0,
+                'total': 0,
             },
         }
         mock_client.create_license.return_value = uuid4()
@@ -170,7 +177,7 @@ class SubscriptionSubsidy(Subsidy):
         }
         return mock_client
 
-    def is_redeemable(self, learner_id):
+    def is_entitled(self, learner_id):
         """
         1. Is there a license unit available in this subsidy?
         """
@@ -179,8 +186,8 @@ class SubscriptionSubsidy(Subsidy):
         )
         return plan_metadata['licenses']['pending'] > 0
 
-        
-    def create_redemption(self, learner_id, **kwargs):
+
+    def create_entitlement(self, learner_id, **kwargs):
         """
         Calls an subscription API client to grant a license as a redemption
         for this subsidy.
@@ -191,10 +198,16 @@ class SubscriptionSubsidy(Subsidy):
         )
         return license_metadata
 
+    def is_redeemable(self, learner_id, content_key, redemption_datetime=None):
+        return bool(self.get_license_for_learner(learner_id))
+
+    def create_redemption(self, learner_id, content_key, transaction=None, **kwargs):
+        return True
+
     def get_quantity_for_content(self, content_metadata):
         return 1
 
-    def bulk_create_redemption(self, *args, **kwargs):
+    def bulk_create_entitlement(self, *args, **kwargs):
         # TODO
         pass
 
@@ -206,7 +219,7 @@ class SubscriptionSubsidy(Subsidy):
 
 
 class SubsidyAccessMethod(TimeStampedModelWithUuid):
-    """    
+    """
     """
     # e.g. for licenses, this is just "license"
     method_label = models.CharField(
@@ -303,32 +316,26 @@ class SubsidyAccessPolicy(TimeStampedModelWithUuid):
         except:
             raise
 
-    def is_learner_entitled_to_policy(self, learner_id):
+    def is_learner_entitled_to_subsidy(self, learner_id):
         raise NotImplementedError
 
-    def give_entitlement(self, learner_id):
-        raise NotImplementedError
-        
-    def is_learner_entitled_to_content_in_policy(self, learner_id, content_key):
-        raise NotImplementedError
-        
-    def give_entitlement_for_content(self, learner_id, content_key):
+    def give_entitlement_to_subsidy(self, learner_id):
         raise NotImplementedError
 
-    
+    def can_learner_redeem_for_content(self, learner_id, content_key):
+        raise NotImplementedError
+
+    def redeem_for_content(self, learner_id, content_key):
+        raise NotImplementedError
+
+
 class SubscriptionAccessPolicy(SubsidyAccessPolicy):
     """
     """
     subsidy = models.ForeignKey(SubscriptionSubsidy, null=True, on_delete=models.SET_NULL)
 
-    def get_license_for_learner(self, learner_id):
-        """
-        Fetch any existing, active, current license for this learner/customer pair.
-        """
-        return self.subsidy.get_license_for_learner(learner_id)
-
-    def is_learner_entitled_to_policy(self, learner_id):
-        if self.get_license_for_learner(learner_id):
+    def is_learner_entitled_to_subsidy(self, learner_id):
+        if self.subsidy.get_license_for_learner(learner_id):
             return True
 
         group_uuids = {
@@ -336,29 +343,28 @@ class SubscriptionAccessPolicy(SubsidyAccessPolicy):
             in self.group_client.get_groups_for_learner(learner_id, self.subsidy.customer_uuid)
         }
         if self.group_uuid in group_uuids:
-            if self.subsidy.is_redeemable(learner_id):
+            if self.subsidy.is_entitled(learner_id):
                 return True
 
         return False
 
-    def give_entitlement(self, learner_id):
-        if _license := self.get_license_for_learner(learner_id):
+    def give_entitlement_to_subsidy(self, learner_id):
+        if _license := self.subsidy.get_license_for_learner(learner_id):
             return _license
 
-        return self.subsidy.create_redemption(learner_id)
+        return self.subsidy.create_entitlement(learner_id)
 
-    def is_learner_entitled_to_content_in_policy(self, learner_id, content_key):
+    def can_learner_redeem_for_content(self, learner_id, content_key):
         """
         1. is the content in this policy's catalog?
         2. does the learner have a license?
         """
         if self.catalog_client.catalog_contains_content(self.catalog_uuid, content_key):
-            if self.get_license_for_learner(learner_id):
-                return True
+            return self.subsidy.is_redeemable(learner_id, content_key)
 
         return False
 
-    def give_entitlement_for_content(self, learner_id, content_key):
-        if self.is_learner_entitled_to_content_in_policy(learner_id, content_key):
-            return True
+    def redeem_for_content(self, learner_id, content_key):
+        if self.can_learner_redeem_for_content(learner_id, content_key):
+            return self.subsidy.create_redemption(learner_id, content_key)
         return False

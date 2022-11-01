@@ -1,4 +1,6 @@
 # The python API.
+import hashlib
+from uuid import uuid4
 from django.db.transaction import atomic
 from enterprise_access.apps.ledger import models
 
@@ -75,4 +77,5 @@ def create_idempotency_key_for_subsidy(subsidy_record):
 
 def create_idempotency_key_for_transaction(subsidy_record, quantity, **metadata):
     key_for_subsidy = create_idempotency_key_for_subsidy(subsidy_record)
-    return f'{key_for_subsidy}-{quantity}-{metadata}'
+    hashed_metadata = hashlib.md5(str(metadata).encode()).hexdigest()
+    return f'{key_for_subsidy}-{quantity}-{hashed_metadata}'
