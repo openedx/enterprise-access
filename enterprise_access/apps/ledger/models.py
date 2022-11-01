@@ -111,6 +111,16 @@ class Transaction(TimeStampedModel):
         null=False,
         blank=False,
     )
+    reference_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text=(
+            "The identifier of the item acquired via the transaction."
+            "e.g. a course enrollment ID, an entitlement ID, a subscription license ID."
+        ),
+    )
     metadata = JSONField(
         blank=True,
         null=True,

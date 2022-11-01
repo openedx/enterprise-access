@@ -62,6 +62,7 @@ PROJECT_APPS = (
     'enterprise_access.apps.api',
     'enterprise_access.apps.events',
     'enterprise_access.apps.ledger',
+    'enterprise_access.apps.subsidy',
 )
 
 INSTALLED_APPS += THIRD_PARTY_APPS
