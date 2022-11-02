@@ -133,6 +133,10 @@ class LearnerCreditSubsidy(Subsidy):
         return self.is_entitled(learner_id) and price_less_than_balance
 
     def create_redemption(self, learner_id, content_key, transaction=None, **kwargs):
+        """
+        Actual enrollment happens downstream of this.
+        commit a transaction here.
+        """
         raise NotImplementedError
 
 
@@ -177,6 +181,8 @@ class SubscriptionSubsidy(Subsidy):
         Calls an subscription API client to grant a license as a redemption
         for this subsidy.
         """
+        # TODO: this is really license assignment.  licenses are created
+        # when the plan is created.
         license_metadata = self.subscription_client.create_license(
             self.subscription_plan_uuid,
             learner_id,
