@@ -158,4 +158,15 @@ def test_learner_credit_policy_entitlement(learner_credit_policy_fixture):
 def test_learner_credit_policy_is_redeemable(learner_credit_policy_fixture):
     # TODO: make multiple subsidies, only one of which would actually
     # allow a learner to enroll in a content.
-    pass
+    balance_before_entitlement = learner_credit_policy_fixture.subsidy.current_balance()
+
+    quantity = 1000
+    learner_credit_policy_fixture.catalog_client.get_content_metadata.return_value = {
+        'price': quantity / 10,
+    }
+    learner_credit_policy_fixture.catalog_client.catalog_contains_content.return_value = True
+    learner_credit_policy_fixture.can_learner_redeem_for_content('a-learner-id', 'some-content-key')
+    learner_credit_policy_fixture.redeem_for_content('a-learner-id', 'some-content-key')
+
+    current_balance = learner_credit_policy_fixture.subsidy.current_balance()
+    assert balance_before_entitlement == (current_balance + quantity)

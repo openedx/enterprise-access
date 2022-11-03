@@ -1,10 +1,6 @@
 # The python API.
-import hashlib
-from uuid import uuid4
 from django.db.transaction import atomic
 from enterprise_access.apps.ledger import models
-
-
 
 
 def create_transaction(ledger, quantity, idempotency_key, **metadata):
@@ -54,7 +50,6 @@ def reverse_full_transaction(transaction, idempotency_key, **metadata):
         return reversal
 
 
-
 def create_ledger(unit, idempotency_key, **metadata):
     """
     Idempotency key here, too.
@@ -69,13 +64,3 @@ def create_ledger(unit, idempotency_key, **metadata):
 
 def update_ledger(ledger, **metadata):
     pass
-
-
-def create_idempotency_key_for_subsidy(subsidy_record):
-    return f'subsidy-{subsidy_record.uuid}'
-
-
-def create_idempotency_key_for_transaction(subsidy_record, quantity, **metadata):
-    key_for_subsidy = create_idempotency_key_for_subsidy(subsidy_record)
-    hashed_metadata = hashlib.md5(str(metadata).encode()).hexdigest()
-    return f'{key_for_subsidy}-{quantity}-{hashed_metadata}'
