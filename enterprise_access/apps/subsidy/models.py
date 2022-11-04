@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 from functools import lru_cache
 import mock
 from uuid import uuid4
@@ -16,6 +16,8 @@ from enterprise_access.apps.ledger.models import Ledger, UnitChoices
 MOCK_GROUP_CLIENT = mock.MagicMock()
 MOCK_CATALOG_CLIENT = mock.MagicMock()
 MOCK_ENROLLMENT_CLIENT = mock.MagicMock()
+
+CENTS_PER_DOLLAR = 100
 
 
 def now():
@@ -71,7 +73,7 @@ class Subsidy(TimeStampedModelWithUuid):
         return self.ledger.balance()
 
     def create_transaction(self, idempotency_key, quantity, metadata):
-        ledger_api.create_transaction(
+        return ledger_api.create_transaction(
             ledger=self.ledger,
             quantity=quantity,
             idempotency_key=idempotency_key,
@@ -104,10 +106,10 @@ class LearnerCreditSubsidy(Subsidy):
 
     @lru_cache(maxsize=128)
     def price_for_content(self, content_key):
-        return self.catalog_client.get_content_metadata(content_key).get('price')
+        return self.catalog_client.get_content_metadata(content_key).get('price') * CENTS_PER_DOLLAR
 
     def is_redeemable(self, learner_id, content_key, redemption_datetime=None):
-        return self.current_balance() > self.price_for_content(content_key)
+        return self.current_balance() >= self.price_for_content(content_key)
 
     def redeem(self, learner_id, content_key, **kwargs):
         """
@@ -130,13 +132,18 @@ class LearnerCreditSubsidy(Subsidy):
             learner_id=learner_id,
             content_key=content_key,
         )
-        transaction = self.create_transaction(idempotency_key, quantity, transaction_metadata)
+        transaction = self.create_transaction(
+            idempotency_key,
+            quantity * -1,
+            transaction_metadata,
+        )
 
         try:
             reference_id = self.enrollment_client.enroll(learner_id, content_key, transaction)
             self.commit_transaction(transaction, reference_id)
-        except Exception:
+        except Exception as exc:
             self.rollback_transaction(transaction)
+            raise exc
 
         return transaction
 
@@ -238,7 +245,7 @@ class SubsidyAccessPolicy(TimeStampedModelWithUuid):
         if not self.catalog_client.catalog_contains_content(self.catalog_uuid, content_key):
             return False
 
-        if not self.group_client.group_contains_learner(self.group_id, learner_id):
+        if not self.group_client.group_contains_learner(self.group_uuid, learner_id):
             return False
 
         elif self.subsidy.is_redeemable(learner_id, content_key):
