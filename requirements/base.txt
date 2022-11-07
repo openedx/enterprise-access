@@ -155,7 +155,7 @@ edx-rbac==1.7.0
     # via -r requirements/base.in
 edx-rest-api-client==5.5.0
     # via -r requirements/base.in
-fastavro==1.6.1
+fastavro==1.7.0
     # via
     #   -r requirements/base.in
     #   openedx-events
@@ -183,27 +183,27 @@ monotonic==1.6
     # via analytics-python
 mysqlclient==2.1.1
     # via -r requirements/base.in
-newrelic==8.2.1
+newrelic==8.4.0
     # via edx-django-utils
-oauthlib==3.2.1
+oauthlib==3.2.2
     # via
     #   requests-oauthlib
     #   social-auth-core
 openapi-codec==1.3.2
     # via django-rest-swagger
-openedx-events==1.0.0
+openedx-events==3.0.1
     # via -r requirements/base.in
 packaging==21.3
     # via
     #   drf-yasg
     #   redis
-pbr==5.10.0
+pbr==5.11.0
     # via stevedore
 ply==3.11
     # via djangoql
 prompt-toolkit==3.0.31
     # via click-repl
-psutil==5.9.2
+psutil==5.9.3
     # via edx-django-utils
 pycparser==2.21
     # via cffi
@@ -211,7 +211,7 @@ pycryptodomex==3.15.0
     # via pyjwkest
 pyjwkest==1.4.2
     # via edx-drf-extensions
-pyjwt[crypto]==2.5.0
+pyjwt[crypto]==2.6.0
     # via
     #   drf-jwt
     #   edx-auth-backends
@@ -230,7 +230,7 @@ python-dateutil==2.8.2
     #   edx-drf-extensions
 python3-openid==3.2.0
     # via social-auth-core
-pytz==2022.4
+pytz==2022.6
     # via
     #   -r requirements/base.in
     #   celery
@@ -255,7 +255,7 @@ requests-oauthlib==1.3.1
     # via social-auth-core
 ruamel-yaml==0.17.21
     # via drf-yasg
-ruamel-yaml-clib==0.2.6
+ruamel-yaml-clib==0.2.7
     # via ruamel-yaml
 rules==3.3
     # via -r requirements/base.in
@@ -283,12 +283,10 @@ social-auth-core==4.3.0
     #   social-auth-app-django
 sqlparse==0.4.3
     # via django
-stevedore==4.0.1
+stevedore==4.1.0
     # via
     #   edx-django-utils
     #   edx-opaque-keys
-types-cryptography==3.3.23
-    # via pyjwt
 uritemplate==4.1.1
     # via
     #   coreapi
