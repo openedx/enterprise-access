@@ -1,13 +1,14 @@
 from datetime import datetime
+import math
 from functools import lru_cache
 import mock
 from uuid import uuid4
 
 from pytz import UTC
 
-from django.db import models
-from model_utils.models import TimeStampedModel
+from django.db import models, transaction
 
+from enterprise_access.utils import TimeStampedModelWithUuid
 from enterprise_access.apps.ledger import api as ledger_api
 from enterprise_access.apps.ledger.utils import create_idempotency_key_for_transaction
 from enterprise_access.apps.ledger.models import Ledger, UnitChoices
@@ -22,18 +23,6 @@ CENTS_PER_DOLLAR = 100
 
 def now():
     return UTC.localize(datetime.utcnow())
-
-
-class TimeStampedModelWithUuid(TimeStampedModel):
-    class Meta:
-        abstract = True
-
-    uuid = models.UUIDField(
-        primary_key=True,
-        default=uuid4,
-        editable=False,
-        unique=True,
-    )
 
 
 class Subsidy(TimeStampedModelWithUuid):
@@ -88,12 +77,34 @@ class Subsidy(TimeStampedModelWithUuid):
         # delete it, or set some state?
         pass
 
+    def redeem(self, learner_id, content_key, **kwargs):
+        if not (redemption := self.has_redeemed(learner_id, content_key, **kwargs)):
+            redemption = self.create_redemption(learner_id, content_key, **kwargs)
+        return redemption
+
     def is_redeemable(self, learner_id, content_key, redemption_datetime=None):
         raise NotImplementedError
 
-    def redeem(self, learner_id, content_key, **kwargs):
-        # The subsidy should determine the redemption quantity
+    def has_redeemed(self, learner_id, content_key, **kwargs):
         raise NotImplementedError
+
+    def create_redemption(self, learner_id, content_key, **kwargs):
+        raise NotImplementedError
+
+    def all_transactions(self):
+        return self.ledger.transactions
+
+    def transactions_for_learner(self, lms_user_id):
+        return self.all_transactions().filter(lms_user_id=lms_user_id)
+
+    def transactions_for_content(self, content_uuid):
+        return self.all_transactions().filter(content_uuid=content_uuid)
+
+    def transactions_for_learner_and_content(self, lms_user_id, content_uuid):
+        return self.all_transactions().filter(
+            lms_user_id=lms_user_id,
+            content_uuid=content_uuid,
+        )
 
 
 class LearnerCreditSubsidy(Subsidy):
@@ -111,7 +122,10 @@ class LearnerCreditSubsidy(Subsidy):
     def is_redeemable(self, learner_id, content_key, redemption_datetime=None):
         return self.current_balance() >= self.price_for_content(content_key)
 
-    def redeem(self, learner_id, content_key, **kwargs):
+    def has_redeemed(self, learner_id, content_key, **kwargs):
+        return self.transactions_for_learner_and_content(learner_id, content_key)
+
+    def create_redemption(self, learner_id, content_key, **kwargs):
         """
         Actual enrollment happens downstream of this.
         commit a transaction here.
@@ -201,19 +215,19 @@ class SubscriptionSubsidy(Subsidy):
         )
         return license_metadata
 
-    def is_redeemable(self, learner_id, content_key, redemption_datetime=None):
-        return self.get_license_for_learner(learner_id) or self.is_license_available(learner_id)
+    def has_redeemed(self, learner_id, content_key, **kwargs):
+        return self.get_license_for_learner(learner_id)
 
-    def redeem(self, learner_id, content_key, **kwargs):        # pylint: disable=unused-argument
+    def is_redeemable(self, learner_id, content_key, redemption_datetime=None):
+        return self.has_redeemed(learner_id, content_key) or self.is_license_available(learner_id)
+
+    def create_redemption(self, learner_id, content_key, **kwargs):        # pylint: disable=unused-argument
         """
         For subscription subsidies, a redemption is either the fact that the
         learner is already assigned a license for the plan, or the result
         of assigning an available license to the learner.
         """
-        assigned_license = self.get_license_for_learner(learner_id)
-        if not assigned_license:
-            assigned_license = self.assign_license(learner_id)
-        return assigned_license
+        return self.assign_license(learner_id)
 
 
 class SubsidyAccessPolicy(TimeStampedModelWithUuid):
@@ -271,7 +285,33 @@ class LearnerCreditAccessPolicy(SubsidyAccessPolicy):
     subsidy = models.ForeignKey(LearnerCreditSubsidy, null=True, on_delete=models.SET_NULL)
 
 
-"""
-TODO: There are different flavors of LearnerCreditAccessPolicy
-that correspond to different policy rules.
-"""
+class PerLearnerEnrollmentCapLearnerCreditAccessPolicy(LearnerCreditAccessPolicy):
+    """
+    Example policy that limits the number of enrollments (really) transactions
+    that a learner is entitled to in a subsidy.
+    """
+    per_learner_cap = models.IntegerField(
+        blank=True,
+        default=0,
+    )
+
+    def is_entitled(self, learner_id, content_key):
+        with transaction.atomic():
+            if self.subsidy.transactions_for_learner(learner_id).count() < self.per_learner_cap:
+                return super().is_entitled(learner_id, content_key)
+            else:
+                return False
+
+
+class LicenseRequestAccessPolicy(SubscriptionAccessPolicy):
+    """
+    """
+    def request_redemption(self, learner_id, content_key):
+        pass
+
+    def use_entitlement(self, learner_id, content_key):
+        if self.is_entitled(learner_id, content_key):
+            self.request_redemption(learner_id, content_key)
+            # Not this
+            # return self.subsidy.redeem(learner_id, content_key)
+        return False

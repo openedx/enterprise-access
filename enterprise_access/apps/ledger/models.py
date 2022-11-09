@@ -14,6 +14,8 @@ from model_utils.models import SoftDeletableModel, TimeStampedModel
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_update_with_history
 
+from enterprise_access.utils import TimeStampedModelWithUuid
+
 # Units on the ledger model - probably yes. TODO: say why
 # Unit conversion - price/seat is captured somewhere, is it in here?
 # This is currently single-entry - should it be double-entry?
@@ -82,34 +84,48 @@ class Ledger(TimeStampedModel):
             return agg['total_quantity']
 
 
-class Transaction(TimeStampedModel):
-    """
-    Represents a quantity moving in or out of the ledger.  It's purely in USD-cents for now.
-    """
+class BaseTransaction(TimeStampedModelWithUuid):
     class Meta:
-        unique_together = [('ledger', 'idempotency_key')]
+        abstract = True
 
-    uuid = models.UUIDField(
-        primary_key=True,
-        default=uuid4,
-        editable=False,
-        unique=True,
-    )
     idempotency_key = models.CharField(
         max_length=255,
         blank=False,
         null=False,
         db_index=True,
     )
+    quantity = models.BigIntegerField(
+        null=False,
+        blank=False,
+    )
+    metadata = JSONField(
+        blank=True,
+        null=True,
+    )
+
+
+class Transaction(BaseTransaction):
+    """
+    Represents a quantity moving in or out of the ledger.  It's purely in USD-cents for now.
+    """
+    class Meta:
+        unique_together = [('ledger', 'idempotency_key')]
+
     ledger = models.ForeignKey(
         Ledger,
         related_name='transactions',
         null=True,
         on_delete=models.SET_NULL,
     )
-    quantity = models.BigIntegerField(
-        null=False,
-        blank=False,
+    lms_user_id = models.IntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    content_uuid = models.UUIDField(
+        null=True,
+        blank=True,
+        db_index=True,
     )
     reference_id = models.CharField(
         max_length=255,
@@ -121,44 +137,20 @@ class Transaction(TimeStampedModel):
             "e.g. a course enrollment ID, an entitlement ID, a subscription license ID."
         ),
     )
-    metadata = JSONField(
-        blank=True,
-        null=True,
-    )
 
 
-class Reversal(TimeStampedModel):
+class Reversal(BaseTransaction):
     """
     Represents a reversal of some or all of a transaction, but no more.
     """
     class Meta:
         unique_together = [('transaction', 'idempotency_key')]
 
-    uuid = models.UUIDField(
-        primary_key=True,
-        default=uuid4,
-        editable=False,
-        unique=True,
-    )
-    idempotency_key = models.CharField(
-        max_length=255,
-        blank=False,
-        null=False,
-        db_index=True,
-    )
     transaction = models.OneToOneField(
         Transaction,
         related_name='reversal',
         null=True,
         on_delete=models.SET_NULL,
     )
-    # these are always the opposite sign of the transaction (i.e. negative)
-    # have to enforce this somehow...
-    quantity = models.IntegerField(
-        null=False,
-        blank=False,
-    )
-    metadata = JSONField(
-        blank=True,
-        null=True,
-    )
+    # Reversal quantities should always have the opposite sign of the transaction (i.e. negative)
+    # We have to enforce this somehow...

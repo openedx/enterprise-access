@@ -132,11 +132,13 @@ def test_learner_credit_policy_entitlement(learner_credit_policy_fixture):
         'price': 100,
     }
     reference_id = 'the-enrollment-id'
+    some_content_key = uuid4()
+    some_learner_id = 123456
     learner_credit_policy_fixture.subsidy.enrollment_client.enroll.return_value = reference_id
-    assert learner_credit_policy_fixture.is_entitled('a-learner-id', 'some-content-key')
+    assert learner_credit_policy_fixture.is_entitled(some_learner_id, some_content_key)
 
     balance_before_entitlement = learner_credit_policy_fixture.subsidy.current_balance()
-    assert learner_credit_policy_fixture.use_entitlement('a-learner-id', 'some-content-key')
+    assert learner_credit_policy_fixture.use_entitlement(some_learner_id, some_content_key)
     assert learner_credit_policy_fixture.subsidy.current_balance() == balance_before_entitlement - (100 * 100)
 
 
