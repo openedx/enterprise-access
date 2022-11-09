@@ -90,11 +90,11 @@ def test_create_subsidy_happy_path(subscription_fixture):
 @pytest.mark.django_db
 def test_subscription_fixture_policy_happy_paths(subs_policy_fixture):
     some_learner_id = 'abcde12345'
-    assert subs_policy_fixture.subsidy.get_license_for_learner(some_learner_id)['uuid'] is not None
+    assert subs_policy_fixture.subsidy._get_license_for_learner(some_learner_id)['uuid'] is not None
 
     # Test the flow for checking if a learner is entitled to a subscription plan's license
     # make the learner not have a license yet.
-    subs_policy_fixture.subsidy.subscription_client.get_license_for_learner.return_value = None
+    subs_policy_fixture.subsidy.subscription_client._get_license_for_learner.return_value = None
     # makes is_redeemable() return True
     subs_policy_fixture.subsidy.subscription_client.get_plan_metadata.return_value = {'licenses': {'pending': 50}}
 
