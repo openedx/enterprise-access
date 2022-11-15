@@ -55,7 +55,7 @@ coreschema==0.0.4
     # via
     #   coreapi
     #   drf-yasg
-cryptography==38.0.1
+cryptography==38.0.3
     # via
     #   pyjwt
     #   social-auth-core
@@ -132,7 +132,7 @@ edx-api-doc-tools==1.6.0
     # via -r requirements/base.in
 edx-auth-backends==4.1.0
     # via -r requirements/base.in
-edx-braze-client==0.1.4
+edx-braze-client==0.1.5
     # via -r requirements/base.in
 edx-celeryutils==1.2.1
     # via -r requirements/base.in
@@ -201,9 +201,9 @@ pbr==5.11.0
     # via stevedore
 ply==3.11
     # via djangoql
-prompt-toolkit==3.0.31
+prompt-toolkit==3.0.32
     # via click-repl
-psutil==5.9.3
+psutil==5.9.4
     # via edx-django-utils
 pycparser==2.21
     # via cffi
@@ -218,7 +218,7 @@ pyjwt[crypto]==2.6.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pymongo==3.12.3
+pymongo==3.13.0
     # via edx-opaque-keys
 pynacl==1.5.0
     # via edx-django-utils
@@ -261,7 +261,7 @@ rules==3.3
     # via -r requirements/base.in
 semantic-version==2.10.0
     # via edx-drf-extensions
-simplejson==3.17.6
+simplejson==3.18.0
     # via django-rest-swagger
 six==1.16.0
     # via
@@ -283,7 +283,7 @@ social-auth-core==4.3.0
     #   social-auth-app-django
 sqlparse==0.4.3
     # via django
-stevedore==4.1.0
+stevedore==4.1.1
     # via
     #   edx-django-utils
     #   edx-opaque-keys

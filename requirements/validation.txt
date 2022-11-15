@@ -134,7 +134,7 @@ coverage[toml]==6.5.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pytest-cov
-cryptography==38.0.1
+cryptography==38.0.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -269,7 +269,7 @@ edx-auth-backends==4.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-edx-braze-client==0.1.4
+edx-braze-client==0.1.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -310,7 +310,7 @@ edx-rest-api-client==5.5.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-exceptiongroup==1.0.0
+exceptiongroup==1.0.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -319,7 +319,7 @@ factory-boy==3.2.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==15.1.1
+faker==15.3.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -395,7 +395,7 @@ jsonfield2==4.0.0.post0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-keyring==23.9.3
+keyring==23.11.0
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -473,7 +473,7 @@ pkginfo==1.8.3
     # via
     #   -r requirements/quality.txt
     #   twine
-platformdirs==2.5.2
+platformdirs==2.5.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -490,12 +490,12 @@ ply==3.11
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   djangoql
-prompt-toolkit==3.0.31
+prompt-toolkit==3.0.32
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   click-repl
-psutil==5.9.3
+psutil==5.9.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -562,7 +562,7 @@ pylint-plugin-utils==0.7
     #   -r requirements/test.txt
     #   pylint-celery
     #   pylint-django
-pymongo==3.12.3
+pymongo==3.13.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -684,7 +684,7 @@ semantic-version==2.10.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-drf-extensions
-simplejson==3.17.6
+simplejson==3.18.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -730,7 +730,7 @@ sqlparse==0.4.3
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django
-stevedore==4.1.0
+stevedore==4.1.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -755,7 +755,7 @@ tomlkit==0.11.6
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pylint
-tox==3.27.0
+tox==3.27.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -787,7 +787,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.16.6
+virtualenv==20.16.7
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
