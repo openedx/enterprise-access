@@ -42,3 +42,11 @@ test cases:
 .. code-block:: bash
 
     $ make coverage
+
+To run pytest manually and generate a coverage report for a specified module,
+use the ``pytest.local.ini`` configuration file, which does not "force" pytest to
+report on coverage for the entire project:
+
+.. code-block:: bash
+
+    $ pytest -x enterprise_access/apps/events/  --cov=enterprise_access.apps.events -c pytest.local.ini
