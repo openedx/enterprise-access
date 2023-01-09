@@ -18,7 +18,7 @@ asgiref==3.5.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django
-astroid==2.12.12
+astroid==2.12.13
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -134,7 +134,7 @@ coverage[toml]==6.5.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pytest-cov
-cryptography==38.0.1
+cryptography==38.0.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -151,11 +151,6 @@ defusedxml==0.7.1
     #   -r requirements/test.txt
     #   python3-openid
     #   social-auth-core
-deprecated==1.2.13
-    # via
-    #   -r requirements/quality.txt
-    #   -r requirements/test.txt
-    #   redis
 dill==0.3.6
     # via
     #   -r requirements/quality.txt
@@ -214,7 +209,7 @@ django-filter==22.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-django-model-utils==4.2.0
+django-model-utils==4.3.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -269,7 +264,7 @@ edx-auth-backends==4.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-edx-braze-client==0.1.4
+edx-braze-client==0.1.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -310,7 +305,7 @@ edx-rest-api-client==5.5.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-exceptiongroup==1.0.0
+exceptiongroup==1.0.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -319,7 +314,7 @@ factory-boy==3.2.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==15.1.1
+faker==15.3.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -346,7 +341,7 @@ idna==3.4
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   requests
-importlib-metadata==5.0.0
+importlib-metadata==5.1.0
     # via
     #   -r requirements/quality.txt
     #   keyring
@@ -395,7 +390,7 @@ jsonfield2==4.0.0.post0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-keyring==23.9.3
+keyring==23.11.0
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -452,7 +447,7 @@ openapi-codec==1.3.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==3.0.1
+openedx-events==3.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -469,11 +464,11 @@ pbr==5.11.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   stevedore
-pkginfo==1.8.3
+pkginfo==1.9.2
     # via
     #   -r requirements/quality.txt
     #   twine
-platformdirs==2.5.2
+platformdirs==2.5.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -490,12 +485,12 @@ ply==3.11
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   djangoql
-prompt-toolkit==3.0.31
+prompt-toolkit==3.0.33
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   click-repl
-psutil==5.9.3
+psutil==5.9.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -505,14 +500,14 @@ py==1.11.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   tox
-pycodestyle==2.9.1
+pycodestyle==2.10.0
     # via -r requirements/quality.txt
 pycparser==2.21
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   cffi
-pycryptodomex==3.15.0
+pycryptodomex==3.16.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -538,7 +533,7 @@ pyjwt[crypto]==2.6.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==2.15.5
+pylint==2.15.7
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -562,7 +557,7 @@ pylint-plugin-utils==0.7
     #   -r requirements/test.txt
     #   pylint-celery
     #   pylint-django
-pymongo==3.12.3
+pymongo==3.13.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -598,7 +593,7 @@ python-dateutil==2.8.2
     #   analytics-python
     #   edx-drf-extensions
     #   faker
-python-slugify==6.1.2
+python-slugify==7.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -626,7 +621,7 @@ readme-renderer==37.3
     # via
     #   -r requirements/quality.txt
     #   twine
-redis==4.3.4
+redis==4.3.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -684,7 +679,7 @@ semantic-version==2.10.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-drf-extensions
-simplejson==3.17.6
+simplejson==3.18.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -730,7 +725,7 @@ sqlparse==0.4.3
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django
-stevedore==4.1.0
+stevedore==4.1.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -755,7 +750,7 @@ tomlkit==0.11.6
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pylint
-tox==3.27.0
+tox==3.27.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -774,7 +769,7 @@ uritemplate==4.1.1
     #   -r requirements/test.txt
     #   coreapi
     #   drf-yasg
-urllib3==1.26.12
+urllib3==1.26.13
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -787,7 +782,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.16.6
+virtualenv==20.17.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -806,8 +801,7 @@ wrapt==1.14.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   astroid
-    #   deprecated
-zipp==3.10.0
+zipp==3.11.0
     # via
     #   -r requirements/quality.txt
     #   importlib-metadata
