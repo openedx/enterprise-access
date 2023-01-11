@@ -146,6 +146,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API for controlling request-based access to enterprise subsidized enrollments.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'POSTPROCESSING_HOOKS': []
 }
 
 # SWAGGER_SETTINGS = {
