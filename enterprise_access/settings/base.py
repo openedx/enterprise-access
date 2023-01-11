@@ -148,6 +148,10 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
+# SWAGGER_SETTINGS = {
+#     'DEFAULT_SCHEMA_GENERATOR_CLASS': 'enterprise_access.oas.CustomSchemaGenerator',
+# }
+
 # Internationalization
 # https://docs.djangoproject.com/en/dev/topics/i18n/
 
