@@ -146,7 +146,8 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API for controlling request-based access to enterprise subsidized enrollments.',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
-    'POSTPROCESSING_HOOKS': []
+    'ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE': False,
+    'POSTPROCESSING_HOOKS': ['enterprise_access.oas.postprocess_schema_enums']
 }
 
 # SWAGGER_SETTINGS = {
