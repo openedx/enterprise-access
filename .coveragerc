@@ -5,6 +5,7 @@ source=enterprise_access
 omit =
     enterprise_access/settings*
     enterprise_access/conf*
+    enterprise_access/apps/subsidy_access_policy/mocks.py
     *wsgi.py
     *migrations*
     *admin.py

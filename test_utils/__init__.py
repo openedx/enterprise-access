@@ -9,17 +9,17 @@ in multiple test modules (i.e. factoryboy factories, base test classes).
 So this package is the place to put them.
 """
 import json
+
 import mock
-from pytest import mark
-from rest_framework.test import APIClient, APITestCase
-from enterprise_access.apps.core.constants import SYSTEM_ENTERPRISE_ADMIN_ROLE
-
-from enterprise_access.apps.core.tests.factories import UserFactory
-
-from edx_rest_framework_extensions.auth.jwt.cookies import jwt_cookie_name
-from edx_rest_framework_extensions.auth.jwt.tests.utils import generate_jwt_token, generate_unversioned_payload
 from django.test import TestCase
 from django.test.client import RequestFactory
+from edx_rest_framework_extensions.auth.jwt.cookies import jwt_cookie_name
+from edx_rest_framework_extensions.auth.jwt.tests.utils import generate_jwt_token, generate_unversioned_payload
+from pytest import mark
+from rest_framework.test import APIClient, APITestCase
+
+from enterprise_access.apps.core.constants import SYSTEM_ENTERPRISE_ADMIN_ROLE
+from enterprise_access.apps.core.tests.factories import UserFactory
 
 TEST_USERNAME = 'api_worker'
 TEST_EMAIL = 'test@email.com'
