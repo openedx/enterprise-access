@@ -1,0 +1,100 @@
+openapi: 3.0.3
+info:
+  title: Enterprise Access API
+  version: 1.0.0
+  description: API for controlling request-based access to enterprise subsidized enrollments.
+paths:
+  /a/:
+    get:
+      operationId: a_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - a
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAList'
+          description: ''
+  /a/selection/:
+    get:
+      operationId: a_selection_retrieve
+      tags:
+      - a
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/B'
+          description: ''
+components:
+  schemas:
+    A:
+      type: object
+      properties:
+        language:
+          $ref: '#/components/schemas/LanguageEnum'
+        vote:
+          $ref: '#/components/schemas/VoteEnum'
+      required:
+      - language
+      - vote
+    B:
+      type: object
+      properties:
+        language:
+          allOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          nullable: true
+      required:
+      - language
+    LanguageEnum:
+      enum:
+      - en
+      - es
+      - ru
+      - cn
+      type: string
+    PaginatedAList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/A'
+    VoteEnum:
+      enum:
+      - 1
+      - 0
+      - -1
+      type: integer
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: enterprise_access_sessionid
