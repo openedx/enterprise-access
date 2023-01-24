@@ -346,7 +346,7 @@ mdurl==0.1.2
     # via
     #   -r requirements/validation.txt
     #   markdown-it-py
-mock==5.0.1
+mock==4.0.3
     # via -r requirements/validation.txt
 monotonic==1.6
     # via
