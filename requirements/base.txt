@@ -13,7 +13,9 @@ asgiref==3.6.0
 async-timeout==4.0.2
     # via redis
 attrs==22.2.0
-    # via openedx-events
+    # via
+    #   jsonschema
+    #   openedx-events
 backoff==1.10.0
     # via analytics-python
 billiard==3.6.4.0
@@ -75,6 +77,7 @@ django==3.2.16
     #   django-model-utils
     #   djangorestframework
     #   drf-jwt
+    #   drf-spectacular
     #   drf-yasg
     #   edx-api-doc-tools
     #   edx-auth-backends
@@ -120,11 +123,14 @@ djangorestframework==3.14.0
     #   -r requirements/base.in
     #   django-rest-swagger
     #   drf-jwt
+    #   drf-spectacular
     #   drf-yasg
     #   edx-api-doc-tools
     #   edx-drf-extensions
 drf-jwt==1.19.2
     # via edx-drf-extensions
+drf-spectacular==0.25.1
+    # via -r requirements/base.in
 drf-yasg==1.21.4
     # via edx-api-doc-tools
 edx-api-doc-tools==1.6.0
@@ -162,8 +168,12 @@ future==0.18.3
     # via pyjwkest
 idna==3.4
     # via requests
+importlib-resources==5.10.2
+    # via jsonschema
 inflection==0.5.1
-    # via drf-yasg
+    # via
+    #   drf-spectacular
+    #   drf-yasg
 itypes==1.2.0
     # via coreapi
 jinja2==3.1.2
@@ -172,6 +182,8 @@ jsonfield==3.1.0
     # via edx-celeryutils
 jsonfield2==4.0.0.post0
     # via -r requirements/base.in
+jsonschema==4.17.3
+    # via drf-spectacular
 kombu==5.2.4
     # via celery
 markupsafe==2.1.2
@@ -188,12 +200,14 @@ oauthlib==3.2.2
     #   social-auth-core
 openapi-codec==1.3.2
     # via django-rest-swagger
-openedx-events==4.1.1
+openedx-events==4.2.0
     # via -r requirements/base.in
 packaging==23.0
     # via drf-yasg
 pbr==5.11.1
     # via stevedore
+pkgutil-resolve-name==1.3.10
+    # via jsonschema
 ply==3.11
     # via djangoql
 prompt-toolkit==3.0.36
@@ -217,6 +231,8 @@ pymongo==3.13.0
     # via edx-opaque-keys
 pynacl==1.5.0
     # via edx-django-utils
+pyrsistent==0.19.3
+    # via jsonschema
 python-dateutil==2.8.2
     # via
     #   analytics-python
@@ -231,7 +247,9 @@ pytz==2022.7.1
     #   djangorestframework
     #   drf-yasg
 pyyaml==6.0
-    # via edx-django-release-util
+    # via
+    #   drf-spectacular
+    #   edx-django-release-util
 redis==4.4.2
     # via -r requirements/base.in
 requests==2.28.2
@@ -283,6 +301,7 @@ stevedore==4.1.1
 uritemplate==4.1.1
     # via
     #   coreapi
+    #   drf-spectacular
     #   drf-yasg
 urllib3==1.26.14
     # via requests
@@ -293,3 +312,5 @@ vine==5.0.0
     #   kombu
 wcwidth==0.2.6
     # via prompt-toolkit
+zipp==3.11.0
+    # via importlib-resources

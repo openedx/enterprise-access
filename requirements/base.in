@@ -30,3 +30,4 @@ openedx-events
 pytz
 redis
 rules
+drf-spectacular

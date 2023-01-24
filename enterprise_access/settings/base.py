@@ -37,6 +37,8 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    'drf_spectacular',
     'drf_yasg',
     'edx_api_doc_tools',
     'release_util',
@@ -135,10 +137,18 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
         'rest_framework.permissions.IsAdminUser',
     ],
-    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'PAGE_SIZE': 100,
     'TEST_REQUEST_DEFAULT_FORMAT': 'json',
 }
+
+# DRF Spectacular settings
+SPECTACULAR_SETTINGS = {
+     'TITLE': 'Enterprise Access API',
+     'DESCRIPTION': 'API for controlling request-based access to enterprise subsidized enrollments.',
+     'VERSION': '1.0.0',
+     'SERVE_INCLUDE_SCHEMA': False,
+ }
 
 # Internationalization
 # https://docs.djangoproject.com/en/dev/topics/i18n/
