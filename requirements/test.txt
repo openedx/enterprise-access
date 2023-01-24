@@ -95,8 +95,9 @@ coreschema==0.0.4
     #   -r requirements/base.txt
     #   coreapi
     #   drf-yasg
-coverage[toml]==7.0.5
+coverage[toml]==6.5.0
     # via
+    #   -c requirements/constraints.txt
     #   -r requirements/test.in
     #   pytest-cov
 cryptography==38.0.4
