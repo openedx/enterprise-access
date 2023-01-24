@@ -273,8 +273,10 @@ markupsafe==2.1.2
     #   jinja2
 mccabe==0.7.0
     # via pylint
-mock==5.0.1
-    # via -r requirements/test.in
+mock==4.0.3
+    # via
+    #   -c requirements/constraints.txt
+    #   -r requirements/test.in
 monotonic==1.6
     # via
     #   -r requirements/base.txt
