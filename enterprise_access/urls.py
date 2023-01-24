@@ -21,6 +21,8 @@ from auth_backends.urls import oauth2_urlpatterns
 from django.conf import settings
 from django.conf.urls import include, url
 from django.contrib import admin
+from django.urls import path
+from drf_spectacular.views import SpectacularAPIView
 from edx_api_doc_tools import make_api_info, make_docs_urls
 from rest_framework_swagger.views import get_swagger_view
 
@@ -37,6 +39,7 @@ urlpatterns = oauth2_urlpatterns + make_docs_urls(api_info) + [
     url(r'^auto_auth/$', core_views.AutoAuth.as_view(), name='auto_auth'),
     url(r'', include('csrf.urls')),  # Include csrf urls from edx-drf-extensions
     url(r'^health/$', core_views.health, name='health'),
+    path('api/schema/', SpectacularAPIView.as_view(), name='openapi_schema'),
 ]
 
 if settings.DEBUG and os.environ.get('ENABLE_DJANGO_TOOLBAR', False):  # pragma: no cover

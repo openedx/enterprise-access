@@ -33,6 +33,7 @@ attrs==22.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
+    #   jsonschema
     #   openedx-events
     #   pytest
 backoff==1.10.0
@@ -168,6 +169,7 @@ django==3.2.16
     #   django-model-utils
     #   djangorestframework
     #   drf-jwt
+    #   drf-spectacular
     #   drf-yasg
     #   edx-api-doc-tools
     #   edx-auth-backends
@@ -235,6 +237,7 @@ djangorestframework==3.14.0
     #   -r requirements/test.txt
     #   django-rest-swagger
     #   drf-jwt
+    #   drf-spectacular
     #   drf-yasg
     #   edx-api-doc-tools
     #   edx-drf-extensions
@@ -247,6 +250,10 @@ drf-jwt==1.19.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-drf-extensions
+drf-spectacular==0.25.1
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
 drf-yasg==1.21.4
     # via
     #   -r requirements/quality.txt
@@ -310,7 +317,7 @@ factory-boy==3.2.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==16.6.0
+faker==16.6.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -344,11 +351,14 @@ importlib-metadata==6.0.0
 importlib-resources==5.10.2
     # via
     #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   jsonschema
     #   keyring
 inflection==0.5.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
+    #   drf-spectacular
     #   drf-yasg
 iniconfig==2.0.0
     # via
@@ -389,6 +399,11 @@ jsonfield2==4.0.0.post0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
+jsonschema==4.17.3
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   drf-spectacular
 keyring==23.13.1
     # via
     #   -r requirements/quality.txt
@@ -454,7 +469,7 @@ openapi-codec==1.3.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==4.1.1
+openedx-events==4.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -474,6 +489,11 @@ pkginfo==1.9.6
     # via
     #   -r requirements/quality.txt
     #   twine
+pkgutil-resolve-name==1.3.10
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   jsonschema
 platformdirs==2.6.2
     # via
     #   -r requirements/quality.txt
@@ -573,6 +593,11 @@ pynacl==1.5.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-django-utils
+pyrsistent==0.19.3
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   jsonschema
 pytest==7.2.1
     # via
     #   -r requirements/quality.txt
@@ -617,6 +642,7 @@ pyyaml==6.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   code-annotations
+    #   drf-spectacular
     #   edx-django-release-util
 readme-renderer==37.3
     # via
@@ -769,6 +795,7 @@ uritemplate==4.1.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   coreapi
+    #   drf-spectacular
     #   drf-yasg
 urllib3==1.26.14
     # via
@@ -805,5 +832,6 @@ wrapt==1.14.1
 zipp==3.11.0
     # via
     #   -r requirements/quality.txt
+    #   -r requirements/test.txt
     #   importlib-metadata
     #   importlib-resources
