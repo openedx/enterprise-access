@@ -190,7 +190,7 @@ edx-rbac==1.7.0
     # via -r requirements/base.txt
 edx-rest-api-client==5.5.0
     # via -r requirements/base.txt
-fastavro==1.7.0
+fastavro==1.7.1
     # via
     #   -r requirements/base.txt
     #   openedx-events
@@ -200,7 +200,7 @@ future==0.18.3
     #   pyjwkest
 gevent==22.10.2
     # via -r requirements/production.in
-greenlet==2.0.1
+greenlet==2.0.2
     # via gevent
 gunicorn==20.1.0
     # via -r requirements/production.in
@@ -294,7 +294,7 @@ pycparser==2.21
     # via
     #   -r requirements/base.txt
     #   cffi
-pycryptodomex==3.16.0
+pycryptodomex==3.17
     # via
     #   -r requirements/base.txt
     #   pyjwkest
@@ -435,7 +435,7 @@ wcwidth==0.2.6
     # via
     #   -r requirements/base.txt
     #   prompt-toolkit
-zipp==3.11.0
+zipp==3.12.0
     # via
     #   -r requirements/base.txt
     #   importlib-resources

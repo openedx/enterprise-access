@@ -160,7 +160,7 @@ edx-rbac==1.7.0
     # via -r requirements/base.in
 edx-rest-api-client==5.5.0
     # via -r requirements/base.in
-fastavro==1.7.0
+fastavro==1.7.1
     # via
     #   -r requirements/base.in
     #   openedx-events
@@ -216,7 +216,7 @@ psutil==5.9.4
     # via edx-django-utils
 pycparser==2.21
     # via cffi
-pycryptodomex==3.16.0
+pycryptodomex==3.17
     # via pyjwkest
 pyjwkest==1.4.2
     # via edx-drf-extensions
@@ -312,5 +312,5 @@ vine==5.0.0
     #   kombu
 wcwidth==0.2.6
     # via prompt-toolkit
-zipp==3.11.0
+zipp==3.12.0
     # via importlib-resources
