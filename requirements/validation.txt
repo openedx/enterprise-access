@@ -18,7 +18,7 @@ asgiref==3.6.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django
-astroid==2.13.3
+astroid==2.13.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -322,7 +322,7 @@ faker==16.6.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   factory-boy
-fastavro==1.7.0
+fastavro==1.7.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -365,7 +365,7 @@ iniconfig==2.0.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pytest
-isort==5.11.4
+isort==5.12.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -533,7 +533,7 @@ pycparser==2.21
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   cffi
-pycryptodomex==3.16.0
+pycryptodomex==3.17
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -619,7 +619,7 @@ python-dateutil==2.8.2
     #   analytics-python
     #   edx-drf-extensions
     #   faker
-python-slugify==7.0.0
+python-slugify==8.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -679,7 +679,7 @@ rfc3986==2.0.0
     # via
     #   -r requirements/quality.txt
     #   twine
-rich==13.2.0
+rich==13.3.1
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -829,7 +829,7 @@ wrapt==1.14.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   astroid
-zipp==3.11.0
+zipp==3.12.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt

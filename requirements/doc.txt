@@ -16,7 +16,7 @@ asgiref==3.6.0
     # via
     #   -r requirements/test.txt
     #   django
-astroid==2.13.3
+astroid==2.13.5
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -256,7 +256,7 @@ faker==16.6.1
     # via
     #   -r requirements/test.txt
     #   factory-boy
-fastavro==1.7.0
+fastavro==1.7.1
     # via
     #   -r requirements/test.txt
     #   openedx-events
@@ -290,7 +290,7 @@ iniconfig==2.0.0
     # via
     #   -r requirements/test.txt
     #   pytest
-isort==5.11.4
+isort==5.12.0
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -400,7 +400,7 @@ pycparser==2.21
     # via
     #   -r requirements/test.txt
     #   cffi
-pycryptodomex==3.16.0
+pycryptodomex==3.17
     # via
     #   -r requirements/test.txt
     #   pyjwkest
@@ -468,7 +468,7 @@ python-dateutil==2.8.2
     #   analytics-python
     #   edx-drf-extensions
     #   faker
-python-slugify==7.0.0
+python-slugify==8.0.0
     # via
     #   -r requirements/test.txt
     #   code-annotations
@@ -570,7 +570,7 @@ sphinxcontrib-applehelp==1.0.4
     # via sphinx
 sphinxcontrib-devhelp==1.0.2
     # via sphinx
-sphinxcontrib-htmlhelp==2.0.0
+sphinxcontrib-htmlhelp==2.0.1
     # via sphinx
 sphinxcontrib-jsmath==1.0.1
     # via sphinx
@@ -644,7 +644,7 @@ wrapt==1.14.1
     # via
     #   -r requirements/test.txt
     #   astroid
-zipp==3.11.0
+zipp==3.12.0
     # via
     #   -r requirements/test.txt
     #   importlib-metadata

@@ -14,7 +14,7 @@ asgiref==3.6.0
     # via
     #   -r requirements/validation.txt
     #   django
-astroid==2.13.3
+astroid==2.13.5
     # via
     #   -r requirements/validation.txt
     #   pylint
@@ -260,7 +260,7 @@ faker==16.6.1
     # via
     #   -r requirements/validation.txt
     #   factory-boy
-fastavro==1.7.0
+fastavro==1.7.1
     # via
     #   -r requirements/validation.txt
     #   openedx-events
@@ -296,7 +296,7 @@ iniconfig==2.0.0
     # via
     #   -r requirements/validation.txt
     #   pytest
-isort==5.11.4
+isort==5.12.0
     # via
     #   -r requirements/validation.txt
     #   pylint
@@ -398,7 +398,7 @@ pbr==5.11.1
     # via
     #   -r requirements/validation.txt
     #   stevedore
-pip-tools==6.12.1
+pip-tools==6.12.2
     # via -r requirements/pip-tools.txt
 pkginfo==1.9.6
     # via
@@ -443,7 +443,7 @@ pycparser==2.21
     # via
     #   -r requirements/validation.txt
     #   cffi
-pycryptodomex==3.16.0
+pycryptodomex==3.17
     # via
     #   -r requirements/validation.txt
     #   pyjwkest
@@ -518,7 +518,7 @@ python-dateutil==2.8.2
     #   analytics-python
     #   edx-drf-extensions
     #   faker
-python-slugify==7.0.0
+python-slugify==8.0.0
     # via
     #   -r requirements/validation.txt
     #   code-annotations
@@ -571,7 +571,7 @@ rfc3986==2.0.0
     # via
     #   -r requirements/validation.txt
     #   twine
-rich==13.2.0
+rich==13.3.1
     # via
     #   -r requirements/validation.txt
     #   twine
@@ -705,7 +705,7 @@ wrapt==1.14.1
     # via
     #   -r requirements/validation.txt
     #   astroid
-zipp==3.11.0
+zipp==3.12.0
     # via
     #   -r requirements/validation.txt
     #   importlib-metadata
