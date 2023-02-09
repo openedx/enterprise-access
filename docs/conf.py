@@ -38,7 +38,7 @@ def get_version(*file_paths):
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(REPO_ROOT)
 
-VERSION = get_version('../enterprise_access', '__init__.py')
+VERSION = '0.1'
 
 
 # If extensions (or modules to document with autodoc) are in another directory,
