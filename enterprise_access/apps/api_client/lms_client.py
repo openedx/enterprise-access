@@ -110,3 +110,34 @@ class LmsApiClient(BaseOAuthClient):
             msg = 'Failed to unlink users from %s.'
             logger.exception(msg, enterprise_customer_uuid)
             raise
+
+    def enterprise_contains_learner(self, enterprise_customer_uuid, learner_id):
+        """
+        Verify if `learner_id` is a part of an enterprise represented by `enterprise_customer_uuid`.
+
+        Arguments:
+            enterprise_customer_uuid (UUID): UUID of the enterprise customer.
+            learner_id (int): LMS user id of a learner.
+
+        Returns:
+            bool: True if learner is linked with enterprise else False
+        """
+
+        result = False
+        ec_uuid = str(enterprise_customer_uuid)
+        query_params = {'enterprise_customer_uuid': ec_uuid, 'user_ids': learner_id}
+
+        try:
+            url = self.enterprise_learner_endpoint + query_params
+            response = self.client.get(url, params=query_params, timeout=settings.LMS_CLIENT_TIMEOUT)
+            response.raise_for_status()
+            json_response = response.json()
+            results = json_response.get('results')
+            if results and results['enterprise_customer']['uuid'] == ec_uuid and results['user']['id'] == learner_id:
+                result = True
+        except requests.exceptions.HTTPError:
+            logger.exception('Failed to fetch data from LMS. URL: [%s].', url)
+        except KeyError:
+            logger.exception('Incorrect data received from LMS. [%s]', url)
+
+        return result

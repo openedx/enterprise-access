@@ -38,7 +38,7 @@ that "fulfills" the ledger transaction.
 Inputs
 ------
 
-- ``customer-id`` (POST data, required): The uuid of the customer. For now it will be an enterprise customer uuid.
+- ``group_id`` (POST data, required): The uuid of the customer. For now it will be an enterprise customer uuid.
 - ``learner_id`` (POST data, required): The user for whom the transaction is written and for which a enrollment should occur.
 - ``content_key`` (POST data, required): The content for which a enrollment is created.
 

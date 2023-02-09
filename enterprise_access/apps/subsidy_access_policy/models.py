@@ -7,8 +7,14 @@ from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
 
-from enterprise_access.apps.subsidy_access_policy.constants import AccessMethods
+from enterprise_access.apps.subsidy_access_policy.constants import (
+    AccessMethods,
+    CREDIT_POLICY_TYPE_PRIORITY,
+    SUBSCRIPTION_POLICY_TYPE_PRIORITY,
+)
 from enterprise_access.apps.subsidy_access_policy.mocks import catalog_client, group_client, subsidy_client
+from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
+from enterprise_access.apps.api_client.lms_client import LmsApiClient
 
 
 class PolicyManager(models.Manager):
@@ -97,9 +103,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Check that a given learner can redeem the given content.
         """
-        if not catalog_client.catalog_contains_content(self.catalog_uuid, content_key):
+        enterprise_catalog_api_client = EnterpriseCatalogApiClient()
+        lms_api_client = LmsApiClient()
+
+        if not enterprise_catalog_api_client.contains_content_items(self.catalog_uuid, [content_key]):
             return False
-        if not group_client.group_contains_learner(self.group_uuid, learner_id):
+        if not lms_api_client.enterprise_contains_learner(self.group_uuid, learner_id):
             return False
         if not subsidy_client.can_redeem(self.subsidy_uuid, learner_id, content_key):
             return False
@@ -129,6 +138,46 @@ class SubsidyAccessPolicy(TimeStampedModel):
         else:
             raise ValueError(f"unknown access method {self.access_method}")
 
+    @staticmethod
+    def resolve_policy(redeemable_policies):
+        """
+        Select one out of multiple policies which have already been deemed redeemable.
+
+        Prefer learner credit policies, and prefer smaller balances.
+
+        Deficiencies:
+        - if multiple policies with matching subsidies tie for first place, the
+            result is non-deterministic.
+        - if multiple policies with identical balances tie for first place, the
+            result is non-deterministic.
+
+        Spec:
+        https://2u-internal.atlassian.net/wiki/spaces/SOL/pages/229212214/Commission+Subsidy+Access+Policy+API#Policy-Resolver
+        """
+
+        # for each policy we need current balance
+        # policies don't have direct access to subsidy balance, must call subsidy api to get current balance but
+        # instead of making a call for each policy we can implement a specific endpoint in enterprise-subsidy
+        # to get current balance for multiple subsidies.
+        # For example, the new implementation could be something look like below
+        # ```
+        #   subsidy_uuids = [redeemable_policy.subsidy_uuid for redeemable_policy in redeemable_policies]
+        #   subsidies_balance = subsidy_client.get_current_balance(subsidy_uuids)
+        #   sorted_policies = sorted(
+        #       redeemable_policies,
+        #       key=lambda p: (p.priority, subsidies_balance[p.subsidy_uuid]),
+        #    )
+        # ```
+
+        sorted_policies = sorted(
+            redeemable_policies,
+            # p.priority is a class property that's a lower number for
+            # LearnerCreditAccessPolicy and higher for SubscriptionAccessPolicy.
+            key=lambda p: (p.priority, p.subsidy.balance),
+        )
+        # Simply pick the first policy:
+        return sorted_policies[0]
+
 
 class SubscriptionAccessPolicy(SubsidyAccessPolicy):
     """
@@ -153,6 +202,10 @@ class SubscriptionAccessPolicy(SubsidyAccessPolicy):
                 return super().can_redeem(learner_id, content_key)
 
         return False
+
+    @property
+    def priority(self):
+        return SUBSCRIPTION_POLICY_TYPE_PRIORITY
 
 
 class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy):
