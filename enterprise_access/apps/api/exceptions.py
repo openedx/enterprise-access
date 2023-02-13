@@ -15,3 +15,6 @@ class SubsidyRequestCreationError(SubsidyRequestError):
     """
     An exception indicating that a subsidy request cannot be created.
     """
+
+class NoRedeemablePolicyFound(Exception):
+    pass

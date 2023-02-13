@@ -4,6 +4,9 @@ Serializers for Enterprise Access API v1.
 
 from rest_framework import serializers
 
+from opaque_keys import InvalidKeyError
+from opaque_keys.edx.keys import CourseKey
+
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LicenseRequest,
@@ -117,3 +120,20 @@ class SubsidyRequestCustomerConfigurationSerializer(serializers.ModelSerializer)
         # Pop enterprise_customer_uuid so that it's read-only for updates.
         validated_data.pop('enterprise_customer_uuid', None)
         return super().update(instance, validated_data)
+
+
+class PolicyRedeemRequestSerializer(serializers.Serializer):
+    group_id = serializers.UUIDField(required=True)
+    learner_id = serializers.IntegerField(required=True)
+    content_key = serializers.CharField(required=True)
+
+    def validate_content_key(self, value):
+        """
+        Validate `content_key`.
+        """
+        try:
+            CourseKey.from_string(value)
+        except InvalidKeyError:
+            raise serializers.ValidationError(f"Invalid course key: {value}")
+
+        return value

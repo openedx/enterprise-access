@@ -175,7 +175,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
             # LearnerCreditAccessPolicy and higher for SubscriptionAccessPolicy.
             key=lambda p: (p.priority, p.subsidy.balance),
         )
-        # Simply pick the first policy:
         return sorted_policies[0]
 
 
