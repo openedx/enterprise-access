@@ -126,3 +126,89 @@ class LicenseRequestData:
     subscription_plan_uuid = attr.ib(type=str)
     decline_reason = attr.ib(type=str, default=None)
     license_uuid = attr.ib(type=str, default=None)
+
+
+@attr.s(frozen=True)
+class AccessPolicyData:
+    """
+    Attributes defined for a AccessPolicy object.
+    """
+
+    uuid = attr.ib(type=str)
+    active = attr.ib(type=bool)
+    group_uuid = attr.ib(type=str)
+    catalog_uuid = attr.ib(type=str)
+    subsidy_uuid = attr.ib(type=str)
+    access_method = attr.ib(type=str)
+
+
+class AccessPolicyEvent:
+    """
+    Access policy creation and update events to be put on event bus.
+    """
+
+    AVRO_SCHEMA = """
+        {
+            "namespace": "enterprise_access.apps.subsidy_access_policy",
+            "name": "AccessPolicyEvent",
+            "type": "record",
+            "fields": [
+                {"name": "uuid", "type": "string"},
+                {"name": "active", "type": "boolean"},
+                {"name": "group_uuid", "type": "string"},
+                {"name": "subsidy_uuid", "type": "string"},
+                {"name": "access_method", "type": "string"}
+            ]
+        }
+    """
+
+    def __init__(self, *args, **kwargs):
+        self.uuid = kwargs['uuid']
+        self.active = kwargs['active']
+        self.group_uuid = kwargs['group_uuid']
+        self.subsidy_uuid = kwargs['subsidy_uuid']
+        self.access_method = kwargs['access_method']
+
+    @staticmethod
+    def from_dict(dict_instance, ctx):  # pylint: disable=unused-argument
+        return AccessPolicyEvent(**dict_instance)
+
+    @staticmethod
+    def to_dict(obj, ctx):  # pylint: disable=unused-argument
+        return {
+            'uuid': obj.uuid,
+            'active': obj.active,
+            'group_uuid': obj.group_uuid,
+            'subsidy_uuid': obj.subsidy_uuid,
+            'access_method': obj.access_method,
+        }
+
+
+class AccessPolicyEventSerializer:
+    """
+    Wrapper class used to ensure a single instance of the AccessPolicyEventSerializer.
+    This avoids errors on startup.
+    """
+    KAFKA_SCHEMA_REGISTRY_CONFIG = {
+        'url': getattr(settings, 'SCHEMA_REGISTRY_URL', ''),
+        'basic.auth.user.info': f"{getattr(settings, 'SCHEMA_REGISTRY_API_KEY', '')}"
+                                f":{getattr(settings, 'SCHEMA_REGISTRY_API_SECRET', '')}",
+    }
+    SERIALIZER = None
+
+    @classmethod
+    def get_serializer(cls):
+        """
+        Get or create a single instance of the AccessPolicyEventSerializer serializer
+        to be used throughout the life of the app.
+
+        :return: AvroSerializer
+        """
+        if cls.SERIALIZER is None:
+            cls.SERIALIZER = AvroSerializer(
+                schema_str=AccessPolicyEvent.AVRO_SCHEMA,
+                schema_registry_client=SchemaRegistryClient(cls.KAFKA_SCHEMA_REGISTRY_CONFIG),
+                to_dict=AccessPolicyEvent.to_dict
+            )
+
+        return cls.SERIALIZER

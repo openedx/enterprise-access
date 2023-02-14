@@ -37,3 +37,22 @@ BRAZE_NEW_REQUESTS_NOTIFICATION_CAMPAIGN = 'test-new-subsidy-campaign'
 
 # SEGMENT CONFIGURATION
 SEGMENT_KEY = 'test-key'
+
+################### Kafka Related Settings ##############################
+KAFKA_ENABLED = False
+
+KAFKA_BOOTSTRAP_SERVER = 'edx.devstack.kafka:29092'
+SCHEMA_REGISTRY_URL = 'http://edx.devstack.schema-registry:8081'
+KAFKA_REPLICATION_FACTOR_PER_TOPIC = 1
+
+COUPON_CODE_REQUEST_TOPIC_NAME = "coupon-code-request-dev"
+LICENSE_REQUEST_TOPIC_NAME = "license-request-dev"
+ACCESS_POLICY_TOPIC_NAME = "access-policy-dev"
+KAFKA_TOPICS = [
+    COUPON_CODE_REQUEST_TOPIC_NAME,
+    LICENSE_REQUEST_TOPIC_NAME,
+
+    # Access policy events
+    ACCESS_POLICY_TOPIC_NAME,
+]
+################### End Kafka Related Settings ##############################
