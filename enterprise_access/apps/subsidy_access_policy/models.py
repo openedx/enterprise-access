@@ -1,6 +1,6 @@
 """ Models for subsidy_access_policy """
 
-from abc import abstractmethod
+import sys
 from uuid import uuid4
 
 from django.db import models
@@ -11,18 +11,21 @@ from enterprise_access.apps.subsidy_access_policy.constants import AccessMethods
 from enterprise_access.apps.subsidy_access_policy.mocks import catalog_client, group_client, subsidy_client
 
 
+class PolicyManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(policy_type=self.model.__name__)
+
+
 class SubsidyAccessPolicy(TimeStampedModel):
     """
     Tie together information used to control access to a subsidy.
-    This abstract model joins group, catalog, and access method.
+    This model joins group, catalog, and access method.
 
-    .. no_pii:
+    .. no_pii: This model has no PII
     """
-    class Meta:
-        """
-        Metaclass for SubsidyAccessPolicy.
-        """
-        abstract = True
+
+    POLICY_FIELD_NAME = 'policy_type'
+    policy_type = models.CharField(max_length=64)
 
     uuid = models.UUIDField(
         primary_key=True,
@@ -30,26 +33,66 @@ class SubsidyAccessPolicy(TimeStampedModel):
         editable=False,
         unique=True,
     )
+    description = models.TextField(help_text="Brief description about a specific policy.")
     active = models.BooleanField(default=False)
-    group_uuid = models.UUIDField(null=True, blank=True, db_index=True)
-    catalog_uuid = models.UUIDField(null=True, blank=True, db_index=True)
-    subsidy_uuid = models.UUIDField(null=False, blank=False, db_index=True)
+    group_uuid = models.UUIDField(db_index=True)
+    catalog_uuid = models.UUIDField(db_index=True)
+    subsidy_uuid = models.UUIDField(db_index=True)
     access_method = models.CharField(
-        max_length=25,
-        blank=False,
-        null=False,
+        max_length=32,
         choices=AccessMethods.CHOICES,
         default=AccessMethods.DIRECT,
-        db_index=True
     )
+
+    per_learner_enrollment_limit = models.IntegerField(
+        null=True,
+        blank=True,
+        default=0,
+    )
+    per_learner_spend_limit = models.IntegerField(
+        null=True,
+        blank=True,
+        default=0,
+    )
+    spend_limit = models.IntegerField(
+        null=True,
+        blank=True,
+        default=0,
+    )
+
     history = HistoricalRecords()
 
-    @property
-    def enterprise_customer_uuid(self):
-        "Returns the enterprise_customer_uuid. Equivalent to the group uuid at present"
-        return self.group_uuid
+    def save(self, *args, **kwargs):
+        """
+        Override to persist policy type.
+        """
+        # TODO: find a better way to do this. Raising an exception will cause 500
+        if type(self).__name__ == SubsidyAccessPolicy.__name__:
+            # it doesn't make sense to create an object of SubsidyAccessPolicy because it is not a concrete policy
+            raise TypeError("Can not create object of class SubsidyAccessPolicy")
 
-    @abstractmethod
+        self.policy_type = type(self).__name__
+        super().save(*args, **kwargs)
+
+    def __new__(cls, *args, **kwargs):
+        """
+        Override to create object of correct policy type.
+        """
+        # Implementation is taken from https://stackoverflow.com/a/60894618
+        proxy_class = cls
+        try:
+            # get proxy name, either from kwargs or from args
+            policy_type = kwargs.get(cls.POLICY_FIELD_NAME)
+            if policy_type is None:
+                policy_name_field_index = cls._meta.fields.index(
+                    cls._meta.get_field(cls.POLICY_FIELD_NAME)
+                )
+                policy_type = args[policy_name_field_index]
+            # get proxy class, by name, from current module
+            proxy_class = getattr(sys.modules[__name__], policy_type)
+        finally:
+            return super().__new__(proxy_class)  # pylint: disable=lost-exception
+
     def can_redeem(self, learner_id, content_key):
         """
         Check that a given learner can redeem the given content.
@@ -69,11 +112,10 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Returns:
             A ledger transaction id, or None if the subsidy was not redeemed.
         """
-        if self.can_redeem(learner_id, content_key):
-            if self.access_method == AccessMethods.DIRECT:
-                return subsidy_client.redeem(self.subsidy_uuid, learner_id, content_key)
-            if self.access_method == AccessMethods.REQUEST:
-                return subsidy_client.request_redemption(self.subsidy_uuid, learner_id, content_key)
+        if self.access_method == AccessMethods.DIRECT:
+            return subsidy_client.redeem(self.subsidy_uuid, learner_id, content_key)
+        if self.access_method == AccessMethods.REQUEST:
+            return subsidy_client.request_redemption(self.subsidy_uuid, learner_id, content_key)
         return None
 
     def has_redeemed(self, learner_id, content_key):
@@ -92,8 +134,14 @@ class SubscriptionAccessPolicy(SubsidyAccessPolicy):
     """
     A subsidy access policy for subscriptions.
 
-    .. no_pii:
+    .. no_pii: This model has no PII
     """
+    objects = PolicyManager()
+    class Meta:
+        """
+        Metaclass for SubscriptionAccessPolicy.
+        """
+        proxy = True
 
     def can_redeem(self, learner_id, content_key):
         if subsidy_client.get_license_for_learner(self.subsidy_uuid, learner_id):
@@ -107,45 +155,19 @@ class SubscriptionAccessPolicy(SubsidyAccessPolicy):
         return False
 
 
-class LearnerCreditAccessPolicy(SubsidyAccessPolicy):
-    """
-    A subsidy access policy for learner credit.
-
-    .. no_pii:
-    """
-    class Meta:
-        """
-        Metaclass for LearnerCreditAccessPolicy.
-        """
-        abstract = True
-
-    def can_redeem(self, learner_id, content_key): # lint-amnesty, pylint: disable=useless-parent-delegation
-        """
-        Check that a given learner can redeem the given content.
-        """
-        return super().can_redeem(learner_id, content_key)
-
-
-class LicenseRequestAccessPolicy(SubscriptionAccessPolicy):
-    """
-    A subsidy access policy for subscriptions with a request type access method.
-    """
-
-
-class LicenseAccessPolicy(SubscriptionAccessPolicy):
-    """
-    A subsidy access policy for subscriptions with a direct type access method.
-    """
-
-
-class PerLearnerEnrollmentCapLearnerCreditAccessPolicy(LearnerCreditAccessPolicy):
+class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy):
     """
     Policy that limits the number of enrollments transactions for a learner in a subsidy.
+
+    .. no_pii: This model has no PII
     """
-    per_learner_enrollment_limit = models.IntegerField(
-        blank=True,
-        default=0,
-    )
+
+    objects = PolicyManager()
+    class Meta:
+        """
+        Metaclass for PerLearnerEnrollmentCreditAccessPolicy.
+        """
+        proxy = True
 
     def can_redeem(self, learner_id, content_key):
         learner_transaction_count = subsidy_client.transactions_for_learner(
@@ -158,14 +180,19 @@ class PerLearnerEnrollmentCapLearnerCreditAccessPolicy(LearnerCreditAccessPolicy
         return False
 
 
-class PerLearnerSpendCapLearnerCreditAccessPolicy(LearnerCreditAccessPolicy):
+class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy):
     """
     Policy that limits the amount of learner spend for enrollment transactions.
+
+    .. no_pii: This model has no PII
     """
-    per_learner_spend_limit = models.IntegerField(
-        blank=True,
-        default=0,
-    )
+
+    objects = PolicyManager()
+    class Meta:
+        """
+        Metaclass for PerLearnerSpendCreditAccessPolicy.
+        """
+        proxy = True
 
     def can_redeem(self, learner_id, content_key):
         spent_amount = subsidy_client.amount_spent_for_learner(
@@ -179,23 +206,28 @@ class PerLearnerSpendCapLearnerCreditAccessPolicy(LearnerCreditAccessPolicy):
         return False
 
 
-class CappedEnrollmentLearnerCreditAccessPolicy(LearnerCreditAccessPolicy):
+class CappedEnrollmentLearnerCreditAccessPolicy(SubsidyAccessPolicy):
     """
-    Policy that limits the maximum amount that can be spent aggregated across all users covered by this policy
+    Policy that limits the maximum amount that can be spent aggregated across all users covered by this policy.
+
+    .. no_pii: This model has no PII
     """
-    spend_limit = models.IntegerField(
-        blank=True,
-        default=0,
-    )
+
+    objects = PolicyManager()
+    class Meta:
+        """
+        Metaclass for CappedEnrollmentLearnerCreditAccessPolicy.
+        """
+        proxy = True
 
     def can_redeem(self, learner_id, content_key):
-            group_amount_spent = subsidy_client.amount_spent_for_group_and_catalog(
-                subsidy_uuid = self.subsidy_uuid,
-                group_uuid = self.group_uuid,
-                catalog_uuid = self.catalog_uuid,
-                )
-            course_price = catalog_client.get_course_price(content_key)
-            if  (group_amount_spent + course_price) < self.spend_limit:
-                return super().can_redeem(learner_id, content_key)
+        group_amount_spent = subsidy_client.amount_spent_for_group_and_catalog(
+            subsidy_uuid = self.subsidy_uuid,
+            group_uuid = self.group_uuid,
+            catalog_uuid = self.catalog_uuid,
+            )
+        course_price = catalog_client.get_course_price(content_key)
+        if  (group_amount_spent + course_price) < self.spend_limit:
+            return super().can_redeem(learner_id, content_key)
 
-            return False
+        return False
