@@ -45,14 +45,16 @@ KAFKA_BOOTSTRAP_SERVER = 'edx.devstack.kafka:29092'
 SCHEMA_REGISTRY_URL = 'http://edx.devstack.schema-registry:8081'
 KAFKA_REPLICATION_FACTOR_PER_TOPIC = 1
 
-COUPON_CODE_REQUEST_TOPIC_NAME = "coupon-code-request-dev"
-LICENSE_REQUEST_TOPIC_NAME = "license-request-dev"
-ACCESS_POLICY_TOPIC_NAME = "access-policy-dev"
+COUPON_CODE_REQUEST_TOPIC_NAME = "coupon-code-request-test"
+LICENSE_REQUEST_TOPIC_NAME = "license-request-test"
+ACCESS_POLICY_TOPIC_NAME = "access-policy-test"
+SUBSIDY_REDEMPTION_TOPIC_NAME = "subsidy-redemption-test"
 KAFKA_TOPICS = [
     COUPON_CODE_REQUEST_TOPIC_NAME,
     LICENSE_REQUEST_TOPIC_NAME,
 
     # Access policy events
     ACCESS_POLICY_TOPIC_NAME,
+    SUBSIDY_REDEMPTION_TOPIC_NAME,
 ]
 ################### End Kafka Related Settings ##############################

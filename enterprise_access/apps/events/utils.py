@@ -15,7 +15,9 @@ from enterprise_access.apps.events.data import (
     AccessPolicyEvent,
     AccessPolicyEventSerializer,
     CouponCodeRequestEvent,
-    CouponCodeRequestEventSerializer
+    CouponCodeRequestEventSerializer,
+    SubsidyRedemptionEvent,
+    SubsidyRedemptionSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -139,6 +141,27 @@ def send_access_policy_event_to_event_bus(event_name, event_properties):
             settings.ACCESS_POLICY_TOPIC_NAME,
             key=str(event_name),
             value=AccessPolicyEvent(**event_properties),
+            on_delivery=verify_event
+        )
+        event_producer.poll()
+    except ValueSerializationError as vse:
+        logger.exception(vse)
+
+
+def send_subsidy_redemption_event_to_event_bus(event_name, event_properties):
+    """
+    Sends subsidy redemption and reversal events to the event bus.
+    """
+    try:
+        event_producer = ProducerFactory.get_or_create_event_producer(
+            settings.SUBSIDY_REDEMPTION_TOPIC_NAME,
+            StringSerializer('utf-8'),
+            SubsidyRedemptionSerializer.get_serializer()
+        )
+        event_producer.produce(
+            settings.SUBSIDY_REDEMPTION_TOPIC_NAME,
+            key=str(event_name),
+            value=SubsidyRedemptionEvent(**event_properties),
             on_delivery=verify_event
         )
         event_producer.poll()

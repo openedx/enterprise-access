@@ -90,12 +90,14 @@ KAFKA_REPLICATION_FACTOR_PER_TOPIC = 1
 COUPON_CODE_REQUEST_TOPIC_NAME = "coupon-code-request-dev"
 LICENSE_REQUEST_TOPIC_NAME = "license-request-dev"
 ACCESS_POLICY_TOPIC_NAME = "access-policy-dev"
+SUBSIDY_REDEMPTION_TOPIC_NAME = "subsidy-redemption-dev"
 KAFKA_TOPICS = [
     COUPON_CODE_REQUEST_TOPIC_NAME,
     LICENSE_REQUEST_TOPIC_NAME,
 
     # Access policy events
     ACCESS_POLICY_TOPIC_NAME,
+    SUBSIDY_REDEMPTION_TOPIC_NAME,
 ]
 
 ################### End Kafka Related Settings ##############################

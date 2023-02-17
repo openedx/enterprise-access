@@ -4,7 +4,7 @@ Custom signals definitions that represent enterprise-access events.
 
 from openedx_events.tooling import OpenEdxPublicSignal
 
-from .data import AccessPolicyData, CouponCodeRequestData, LicenseRequestData
+from .data import AccessPolicyData, CouponCodeRequestData, LicenseRequestData, SubsidyRedemption
 
 # TODO: Move the signals to openedx_events
 
@@ -40,5 +40,20 @@ ACCESS_POLICY_DELETED = OpenEdxPublicSignal(
     event_type="org.openedx.enterprise.access.access-policy.deleted.v1",
     data={
         "access-policy": AccessPolicyData,
+    }
+)
+
+
+SUBSIDY_REDEEMED = OpenEdxPublicSignal(
+    event_type="org.openedx.enterprise.access.subsidy.redeemed.v1",
+    data={
+        "redemption": SubsidyRedemption,
+    }
+)
+
+SUBSIDY_REDEMPTION_REVERSED = OpenEdxPublicSignal(
+    event_type="org.openedx.enterprise.access.subsidy.redemption-reversed.v1",
+    data={
+        "redemption": SubsidyRedemption,
     }
 )
