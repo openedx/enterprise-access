@@ -10,20 +10,17 @@ from faker import Faker
 from enterprise_access.apps.subsidy_access_policy.constants import AccessMethods
 from enterprise_access.apps.subsidy_access_policy.models import (
     CappedEnrollmentLearnerCreditAccessPolicy,
-    LearnerCreditAccessPolicy,
-    LicenseAccessPolicy,
-    LicenseRequestAccessPolicy,
-    PerLearnerEnrollmentCapLearnerCreditAccessPolicy,
-    PerLearnerSpendCapLearnerCreditAccessPolicy,
+    PerLearnerEnrollmentCreditAccessPolicy,
+    PerLearnerSpendCreditAccessPolicy,
     SubscriptionAccessPolicy
 )
 
 FAKER = Faker()
 
+
 class SubsidyAccessPolicyFactory(factory.django.DjangoModelFactory):
     """
-    Base Test factory for the `SubscriptionAccessPolicy` `LearnerCreditAccessPolicy`
-    `PerLearnerEnrollmentCapLearnerCreditAccessPolicy` LicenseRequestAccessPolicy models.
+    Base Test factory for the `SubscriptionAccessPolicy` `PerLearnerEnrollmentCreditAccessPolicy` models.
     """
 
     uuid = factory.LazyFunction(uuid4)
@@ -42,54 +39,27 @@ class SubscriptionAccessPolicyFactory(SubsidyAccessPolicyFactory):
         model = SubscriptionAccessPolicy
 
 
-class LicenseRequestAccessPolicyFactory(SubscriptionAccessPolicyFactory):
+class PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(SubsidyAccessPolicyFactory):
     """
-    Test factory for the `LicenseRequestAccessPolicy` model.
-    """
-    access_method = AccessMethods.REQUEST
-
-    class Meta:
-        model = LicenseRequestAccessPolicy
-
-
-class LicenseAccessPolicyFactory(SubscriptionAccessPolicyFactory):
-    """
-    Test factory for the `LicenseAccessPolicy` model.
-    """
-    access_method = AccessMethods.DIRECT
-
-    class Meta:
-        model = LicenseAccessPolicy
-
-
-class LearnerCreditAccessPolicyFactory(SubsidyAccessPolicyFactory):
-    """
-    Test factory for the `LearnerCreditAccessPolicy` model.
-    """
-    class Meta:
-        model = LearnerCreditAccessPolicy
-
-class PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(LearnerCreditAccessPolicyFactory):
-    """
-    Test factory for the `PerLearnerEnrollmentCapLearnerCreditAccessPolicy` model.
+    Test factory for the `PerLearnerEnrollmentCreditAccessPolicy` model.
     """
     per_learner_enrollment_limit = factory.LazyAttribute(lambda _: FAKER.pyint())
 
     class Meta:
-        model = PerLearnerEnrollmentCapLearnerCreditAccessPolicy
+        model = PerLearnerEnrollmentCreditAccessPolicy
 
 
-class PerLearnerSpendCapLearnerCreditAccessPolicyFactory(LearnerCreditAccessPolicyFactory):
+class PerLearnerSpendCapLearnerCreditAccessPolicyFactory(SubsidyAccessPolicyFactory):
     """
-    Test factory for the `PerLearnerSpendCapLearnerCreditAccessPolicy` model.
+    Test factory for the `PerLearnerSpendCreditAccessPolicy` model.
     """
     per_learner_spend_limit = factory.LazyAttribute(lambda _: FAKER.pyint())
 
     class Meta:
-        model = PerLearnerSpendCapLearnerCreditAccessPolicy
+        model = PerLearnerSpendCreditAccessPolicy
 
 
-class CappedEnrollmentLearnerCreditAccessPolicyFactory(LearnerCreditAccessPolicyFactory):
+class CappedEnrollmentLearnerCreditAccessPolicyFactory(SubsidyAccessPolicyFactory):
     """
     Test factory for the `CappedEnrollmentLearnerCreditAccessPolicy` model.
     """

@@ -7,12 +7,19 @@ import factory
 from django.test import TestCase
 
 from enterprise_access.apps.core.tests.factories import UserFactory
+from enterprise_access.apps.subsidy_access_policy.constants import AccessMethods
+from enterprise_access.apps.subsidy_access_policy.models import (
+    CappedEnrollmentLearnerCreditAccessPolicy,
+    PerLearnerEnrollmentCreditAccessPolicy,
+    PerLearnerSpendCreditAccessPolicy,
+    SubscriptionAccessPolicy,
+    SubsidyAccessPolicy
+)
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     CappedEnrollmentLearnerCreditAccessPolicyFactory,
-    LicenseAccessPolicyFactory,
-    LicenseRequestAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
-    PerLearnerSpendCapLearnerCreditAccessPolicyFactory
+    PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
+    SubscriptionAccessPolicyFactory
 )
 
 
@@ -26,6 +33,75 @@ class SubsidyAccessPolicyTests(TestCase):
     user = factory.SubFactory(UserFactory)
     course_id = factory.LazyFunction(uuid4)
 
+    def test_can_not_create_parent_model_object(self, *args):
+        """
+        Verify that correct exception raised when we try to create object of SubsidyAccessPolicy
+        """
+        with self.assertRaises(TypeError):
+            SubsidyAccessPolicy.objects.create(
+                description='Base policy',
+                group_uuid='7c9daa69-519c-4313-ad81-90862bc08ca1',
+                catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08c21',
+                subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3',
+            )
+
+    def test_parent_model_queryset_has_correct_policy_type_objects(self, *args):
+        """
+        Verify that correct parent model queryset has policy type objects.
+        """
+        valid_policy_types = [
+            'PerLearnerSpendCreditAccessPolicy',
+            'PerLearnerEnrollmentCreditAccessPolicy',
+            'CappedEnrollmentLearnerCreditAccessPolicy',
+            'SubscriptionAccessPolicy',
+        ]
+
+        PerLearnerSpendCreditAccessPolicy.objects.create(
+            group_uuid='7c9daa69-519c-4313-ad81-90862bc08ca1',
+            catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08ca2',
+            subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3'
+        )
+        PerLearnerEnrollmentCreditAccessPolicy.objects.create(
+            group_uuid='7c9daa69-519c-4313-ad81-90862bc08ca2',
+            catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3',
+            subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca4'
+        )
+        CappedEnrollmentLearnerCreditAccessPolicy.objects.create(
+            group_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3',
+            catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08ca4',
+            subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca5'
+        )
+        SubscriptionAccessPolicy.objects.create(
+            group_uuid='7c9daa69-519c-4313-ad81-90862bc08ca4',
+            catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08ca5',
+            subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca6'
+        )
+
+        created_policy_types = []
+        all_policies = SubsidyAccessPolicy.objects.all()
+        for policy in all_policies:
+            created_policy_types.append(policy.__class__.__name__)
+
+        self.assertEqual(
+            sorted(created_policy_types),
+            sorted(valid_policy_types)
+        )
+
+    def test_object_creation_with_policy_type_in_kwarg(self, *args):
+        """
+        Verify that correct policy object has been created with policy type in kwarg.
+        """
+        expected_policy_type = 'PerLearnerSpendCreditAccessPolicy'
+
+        policy = SubsidyAccessPolicy.objects.create(
+            group_uuid='7c9daa69-519c-4313-ad81-90862bc08ca1',
+            catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08ca2',
+            subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3',
+            policy_type=expected_policy_type
+        )
+
+        self.assertEqual(policy.__class__.__name__, expected_policy_type)
+
     @ddt.data(
         (False, True, True, True, False, False, False),
         (True, False, True, True, False, False, False),
@@ -37,7 +113,7 @@ class SubsidyAccessPolicyTests(TestCase):
         (True, True, True, False, True, False, True)
     )
     @ddt.unpack
-    def test_license_access_policy_can_redeem(
+    def test_subscription_access_policy_can_redeem(
         self,
         catalog_contains_content,
         group_contains_learner,
@@ -51,34 +127,40 @@ class SubsidyAccessPolicyTests(TestCase):
         mock_group_client
         ):
         """
-        Test the can_redeem method of LicenseAccessPolicy model
+        Test the can_redeem method of SubscriptionAccessPolicy model
         """
         mock_catalog_client.catalog_contains_content.return_value = catalog_contains_content
         mock_group_client.group_contains_learner.return_value = group_contains_learner
         mock_subsidy_client.can_redeem.return_value = is_redeemable
         mock_subsidy_client.get_license_for_learner.return_value = is_license_for_learner
-        license_access_policy = LicenseAccessPolicyFactory()
+        subscription_access_policy = SubscriptionAccessPolicyFactory()
         self.assertEqual(
-            license_access_policy.can_redeem(self.user, self.course_id),
+            subscription_access_policy.can_redeem(self.user, self.course_id),
             can_redeem_via_learner_license
             )
         # test for redemption via group license
         mock_subsidy_client.get_license_for_learner.return_value = False
-        license_access_policy.group_uuid = 'test-uuid'
-        mock_group_client.get_groups_for_learner.return_value = [license_access_policy.enterprise_customer_uuid]
+        subscription_access_policy.group_uuid = 'test-uuid'
+        mock_group_client.get_groups_for_learner.return_value = [subscription_access_policy.group_uuid]
         mock_subsidy_client.get_license_for_group.return_value = is_license_for_group
         self.assertEqual(
-            license_access_policy.can_redeem(self.user, self.course_id),
+            subscription_access_policy.can_redeem(self.user, self.course_id),
             can_redeem_via_group_license
             )
 
+    def test_subscription_access_policy_redeem_with_invalid_access_method(self, *args):
+        """
+        Test the redeem method of SubscriptionAccessPolicy.redeem method returns None for invalid access method.
+        """
+        subscription_access_policy = SubscriptionAccessPolicyFactory(access_method=AccessMethods.ASSIGNED)
+        self.assertIsNone(subscription_access_policy.redeem(self.user, self.course_id))
 
     @ddt.data(
         (True, True, False, None, None),
         (True, True, True, 999, 999)
     )
     @ddt.unpack
-    def test_license_access_policy_redeem(
+    def test_subscription_access_policy_redeem(
         self,
         catalog_contains_content,
         group_contains_learner,
@@ -90,64 +172,21 @@ class SubsidyAccessPolicyTests(TestCase):
         mock_group_client
         ):
         """
-        Test the redeem method of LicenseAccessPolicy model
+        Test the redeem method of SubscriptionAccessPolicy model
         """
         mock_catalog_client.catalog_contains_content.return_value = catalog_contains_content
         mock_group_client.group_contains_learner.return_value = group_contains_learner
         mock_subsidy_client.can_redeem.return_value = is_redeemable
         mock_subsidy_client.redeem.return_value = ledger_transaction_id
-        license_access_policy = LicenseAccessPolicyFactory()
-        self.assertEqual(license_access_policy.redeem(self.user, self.course_id), redeem_return_value)
-
-    def test_license_access_policy_has_redeemed(
-        self,
-        mock_catalog_client, # lint-amnesty, pylint: disable=unused-argument
-        mock_subsidy_client,
-        mock_group_client # lint-amnesty, pylint: disable=unused-argument
-        ):
-        """
-        Test the has_redeemed method of LicenseAccessPolicy model
-        """
-        license_access_policy = LicenseAccessPolicyFactory()
-        mock_subsidy_client.has_redeemed.return_value = True
-        self.assertTrue(license_access_policy.has_redeemed(self.user, self.course_id))
-
-        license_access_policy.access_method = 'unknown_test_method'
-        with self.assertRaises(ValueError):
-            license_access_policy.has_redeemed(self.user, self.course_id)
-
-    @ddt.data(
-        (False, True, True, False),
-        (True, False, True, False),
-        (True, True, False, False),
-        (True, True, True, True)
-    )
-    @ddt.unpack
-    def test_license_request_access_policy_can_redeem(
-        self,
-        catalog_contains_content,
-        group_contains_learner,
-        is_redeemable,
-        can_redeem,
-        mock_catalog_client,
-        mock_subsidy_client,
-        mock_group_client
-        ):
-        """
-        Test the can_redeem method of LicenseRequestAccessPolicy model
-        """
-        mock_catalog_client.catalog_contains_content.return_value = catalog_contains_content
-        mock_group_client.group_contains_learner.return_value = group_contains_learner
-        mock_subsidy_client.can_redeem.return_value = is_redeemable
-        license_request_access_policy = LicenseRequestAccessPolicyFactory()
-        self.assertEqual(license_request_access_policy.can_redeem(self.user, self.course_id), can_redeem)
+        subscription_access_policy = SubscriptionAccessPolicyFactory()
+        self.assertEqual(subscription_access_policy.redeem(self.user, self.course_id), redeem_return_value)
 
     @ddt.data(
         (True, True, False, None, None),
         (True, True, True, 999, 999)
     )
     @ddt.unpack
-    def test_license_request_access_policy_redeem(
+    def test_subscription_request_access_policy_redeem(
         self,
         catalog_contains_content,
         group_contains_learner,
@@ -159,19 +198,37 @@ class SubsidyAccessPolicyTests(TestCase):
         mock_group_client
         ):
         """
-        Test the redeem method of LicenseRequestAccessPolicy model
+        Test the redeem method of SubscriptionAccessPolicy model
         """
         mock_catalog_client.catalog_contains_content.return_value = catalog_contains_content
         mock_group_client.group_contains_learner.return_value = group_contains_learner
         mock_subsidy_client.can_redeem.return_value = is_redeemable
         mock_subsidy_client.request_redemption.return_value = ledger_transaction_id
-        license_request_access_policy = LicenseRequestAccessPolicyFactory()
+        subscription_access_policy = SubscriptionAccessPolicyFactory(access_method=AccessMethods.REQUEST)
         self.assertEqual(
-            license_request_access_policy.redeem(self.user, self.course_id),
+            subscription_access_policy.redeem(self.user, self.course_id),
             request_redemption_return_value
             )
 
-    def test_license_request_access_policy_has_redeemed(
+
+    def test_subscription_access_policy_has_redeemed(
+        self,
+        mock_catalog_client, # lint-amnesty, pylint: disable=unused-argument
+        mock_subsidy_client,
+        mock_group_client # lint-amnesty, pylint: disable=unused-argument
+        ):
+        """
+        Test the has_redeemed method of SubscriptionAccessPolicy model
+        """
+        subscription_access_policy = SubscriptionAccessPolicyFactory()
+        mock_subsidy_client.has_redeemed.return_value = True
+        self.assertTrue(subscription_access_policy.has_redeemed(self.user, self.course_id))
+
+        subscription_access_policy.access_method = 'unknown_test_method'
+        with self.assertRaises(ValueError):
+            subscription_access_policy.has_redeemed(self.user, self.course_id)
+
+    def test_subscription_request_access_policy_has_redeemed(
         self,
         mock_catalog_client, # lint-amnesty, pylint: disable=unused-argument
         mock_subsidy_client,
@@ -180,13 +237,13 @@ class SubsidyAccessPolicyTests(TestCase):
         """
         Test the has_redeemed method of LicenseRequestAccessPolicy model
         """
-        license_request_access_policy = LicenseRequestAccessPolicyFactory()
+        subscription_request_access_policy = SubscriptionAccessPolicyFactory(access_method=AccessMethods.REQUEST)
         mock_subsidy_client.has_requested.return_value = True
-        self.assertTrue(license_request_access_policy.has_redeemed(self.user, self.course_id))
+        self.assertTrue(subscription_request_access_policy.has_redeemed(self.user, self.course_id))
 
-        license_request_access_policy.access_method = 'unknown_test_method'
+        subscription_request_access_policy.access_method = 'unknown_test_method'
         with self.assertRaises(ValueError):
-            license_request_access_policy.has_redeemed(self.user, self.course_id)
+            subscription_request_access_policy.has_redeemed(self.user, self.course_id)
 
     @ddt.data(
         (True, True, True, 6, False),
@@ -269,7 +326,7 @@ class SubsidyAccessPolicyTests(TestCase):
         mock_group_client
         ):
         """
-        Test the can_redeem method of CappedEnrollmentLearnerCreditAccessPolicy model
+        Test the can_redeem method of CappedEnrollmentLearnerCreditAccessPolicyFactory model
         """
         mock_catalog_client.catalog_contains_content.return_value = catalog_contains_content
         mock_catalog_client.get_course_price.return_value = 10
