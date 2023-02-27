@@ -390,7 +390,20 @@ SCHEMA_REGISTRY_URL = ''
 KAFKA_PARTITIONS_PER_TOPIC = 1
 # This number is dictated by the cluster setup
 KAFKA_REPLICATION_FACTOR_PER_TOPIC = 3
-KAFKA_TOPICS = []
+
+COUPON_CODE_REQUEST_TOPIC_NAME = "coupon-code-request"
+LICENSE_REQUEST_TOPIC_NAME = "license-request"
+ACCESS_POLICY_TOPIC_NAME = "access-policy"
+SUBSIDY_REDEMPTION_TOPIC_NAME = "subsidy-redemption"
+KAFKA_TOPICS = [
+    COUPON_CODE_REQUEST_TOPIC_NAME,
+    LICENSE_REQUEST_TOPIC_NAME,
+
+    # Access policy events
+    ACCESS_POLICY_TOPIC_NAME,
+    SUBSIDY_REDEMPTION_TOPIC_NAME,
+]
+
 
 ################### End Kafka Related Settings ##############################
 

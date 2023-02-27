@@ -11,6 +11,7 @@ from enterprise_access.apps.events.utils import create_topics
 
 logger = logging.getLogger(__name__)
 
+
 class EventsConfig(AppConfig):
     """
     Application Configuration for the events app.
