@@ -19,9 +19,9 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ParseError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from rest_framework.generics import get_object_or_404
 
 from django.http.response import Http404
-from rest_framework.views import APIView
 
 from enterprise_access.apps.api import serializers
 from enterprise_access.apps.api.constants import LICENSE_UNASSIGNED_STATUS
@@ -58,7 +58,7 @@ from enterprise_access.apps.subsidy_request.models import (
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
-from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy, LearnerCreditAccessPolicy
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.track.segment import track_event
 from enterprise_access.utils import get_subsidy_model
 
@@ -750,56 +750,62 @@ class SubsidyRequestCustomerConfigurationViewSet(UserDetailsFromJwtMixin, viewse
         return response
 
 
-class AccessPolicyRedeemAPIView(APIView):
+class SubsidyAccessPolicyViewset(viewsets.GenericViewSet):
     """
-    API to redeem a policy.
+    Viewset for Subsidy Access Policy APIs.
     """
     authentication_classes = [JwtAuthentication]
     permission_classes = [permissions.IsAuthenticated]
+    lookup_url_kwarg = 'uuid'
 
-    @permission_required(
-        constants.REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION,
-        fn=lambda request: request.data.get('group_id')
-    )
-    def post(self, request, format=None):
+    def redeemable_policies(self, group_uuid, learner_id, content_key):
         """
-        Policy redeem endpoint.
+        Return all redeemable policies.
         """
-        # Get all redeemable polices
-            # For each policy
-                # Check group membership of learner
-                # Check content in catalog
-                # Check redeemability of content in subsidy
-        # Use policy resolver to pick first redeemable policy
-        # Call Subsidy API to redeem subsidy for the redeemable policy
-        serializer = serializers.PolicyRedeemRequestSerializer(data=request.data)
+        redeemable_policies = []
+        all_policies = SubsidyAccessPolicy.objects.filter(group_uuid=group_uuid)
+        for policy in all_policies:
+            if policy.can_redeem(learner_id, content_key):
+                redeemable_policies.append(policy)
+
+        return redeemable_policies
+
+    def list(self, request):
+        """
+        Return a list of all redeemable policies for given `group_uuid`, `learner_id` and `content_key`
+        """
+        serializer = serializers.SubsidiyAccessPolicyRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         group_uuid = serializer.data['group_id']
         learner_id = serializer.data['learner_id']
         content_key = serializer.data['content_key']
 
-        try:
-            policy_to_redeem = self.redeemable_policy(group_uuid, learner_id, content_key)
-        except NoRedeemablePolicyFound as no_redeemable_policy_found:
-            raise Http404('No Redeemable Policy found.')
+        redeemable_policies = self.redeemable_policies(group_uuid, learner_id, content_key)
+        response_data = serializers.SubsidyAccessPolicyRedeemableSerializer(redeemable_policies, many=True).data
 
-        response = policy_to_redeem.redeem(learner_id, content_key)
-        return Response(response)
+        return Response(
+            response_data,
+            status=status.HTTP_200_OK,
+        )
 
-    def redeemable_policy(self, group_uuid, learner_id, content_key):
-        redeemable_learner_credit_policies = []
-        learner_credit_policies = LearnerCreditAccessPolicy.get_policies(group_uuid)
-        for learner_credit_policy in learner_credit_policies:
-            if learner_credit_policy.can_redeem(learner_id, content_key):
-                redeemable_learner_credit_policies.append(learner_credit_policy)
+    @action(detail=True, methods=['post'])
+    def redeem(self, request, *args, **kwargs):
+        """
+        Redeem a policy for given `group_uuid`, `learner_id` and `content_key`
+        """
+        policy = get_object_or_404(SubsidyAccessPolicy, pk=kwargs.get('uuid'))
 
-        if not redeemable_learner_credit_policies:
-            raise NoRedeemablePolicyFound(
-                'No Redeemable Policy found. GroupId: [%s], LearnerId: [%s], ContentKey: [%s]' %
-                (group_uuid, learner_id, content_key)
-            )
+        serializer = serializers.SubsidiyAccessPolicyRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        policy_to_redeem = SubsidyAccessPolicy.resolve_policy(redeemable_learner_credit_policies)
+        learner_id = serializer.data['learner_id']
+        content_key = serializer.data['content_key']
 
-        return policy_to_redeem
+        if policy.can_redeem(learner_id, content_key):
+            response = policy.redeem(learner_id, content_key)
+
+        return Response(
+            response,
+            status=status.HTTP_200_OK,
+        )

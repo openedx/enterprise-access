@@ -36,3 +36,16 @@ class DiscoveryApiClient(BaseOAuthClient):
             raise
 
         return response.json()
+
+    def get_course_price(self, course_id):
+        """
+        Return the course price for a course.
+
+        Arguments:
+            course_id (string): id of the course (e.g. AB+CD101).
+
+        Returns:
+            course_price (float): course price
+        """
+        course_data = self.get_course_data(course_id)
+        return course_data['entitlements'][0]['price']

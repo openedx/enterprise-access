@@ -3,6 +3,7 @@ Serializers for Enterprise Access API v1.
 """
 
 from rest_framework import serializers
+from django.urls import reverse
 
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
@@ -13,6 +14,7 @@ from enterprise_access.apps.subsidy_request.models import (
     SubsidyRequest,
     SubsidyRequestCustomerConfiguration
 )
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 
 
 class SubsidyRequestSerializer(serializers.ModelSerializer):
@@ -122,8 +124,8 @@ class SubsidyRequestCustomerConfigurationSerializer(serializers.ModelSerializer)
         return super().update(instance, validated_data)
 
 
-class PolicyRedeemRequestSerializer(serializers.Serializer):
-    group_id = serializers.UUIDField(required=True)
+class SubsidiyAccessPolicyRequestSerializer(serializers.Serializer):
+    group_id = serializers.UUIDField(required=False)
     learner_id = serializers.IntegerField(required=True)
     content_key = serializers.CharField(required=True)
 
@@ -137,3 +139,15 @@ class PolicyRedeemRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError(f"Invalid course key: {value}")
 
         return value
+
+
+class SubsidyAccessPolicyRedeemableSerializer(serializers.ModelSerializer):
+
+    policy_redemption_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SubsidyAccessPolicy
+        exclude = ('created', 'modified')
+
+    def get_policy_redemption_url(self, obj):
+        return reverse('api:v1:policy-redeem', kwargs={'uuid': obj.uuid})

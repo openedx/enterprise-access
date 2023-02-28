@@ -12,8 +12,9 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     CREDIT_POLICY_TYPE_PRIORITY,
     SUBSCRIPTION_POLICY_TYPE_PRIORITY,
 )
-from enterprise_access.apps.subsidy_access_policy.mocks import catalog_client, group_client, subsidy_client
+from enterprise_access.apps.subsidy_access_policy.mocks import group_client, subsidy_client
 from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
+from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 
 
@@ -31,7 +32,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
     """
 
     POLICY_FIELD_NAME = 'policy_type'
-    policy_type = models.CharField(max_length=64)
+    policy_type = models.CharField(max_length=64, editable=False)
 
     uuid = models.UUIDField(
         primary_key=True,
@@ -251,7 +252,7 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy):
             subsidy_uuid = self.subsidy_uuid,
             learner_id = learner_id,
             )
-        course_price = catalog_client.get_course_price(content_key)
+        course_price = DiscoveryApiClient().get_course_price(content_key)
         if (spent_amount + course_price) < self.per_learner_spend_limit:
             return super().can_redeem(learner_id, content_key)
 
@@ -278,7 +279,7 @@ class CappedEnrollmentLearnerCreditAccessPolicy(SubsidyAccessPolicy):
             group_uuid = self.group_uuid,
             catalog_uuid = self.catalog_uuid,
             )
-        course_price = catalog_client.get_course_price(content_key)
+        course_price = DiscoveryApiClient().get_course_price(content_key)
         if  (group_amount_spent + course_price) < self.spend_limit:
             return super().can_redeem(learner_id, content_key)
 
