@@ -26,7 +26,9 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
 @ddt.ddt
 @patch('enterprise_access.apps.subsidy_access_policy.models.group_client')
 @patch('enterprise_access.apps.subsidy_access_policy.models.subsidy_client')
-@patch('enterprise_access.apps.subsidy_access_policy.models.catalog_client')
+@patch('enterprise_access.apps.subsidy_access_policy.models.EnterpriseCatalogApiClient')
+@patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
+@patch('enterprise_access.apps.subsidy_access_policy.models.DiscoveryApiClient')
 class SubsidyAccessPolicyTests(TestCase):
     """ SubsidyAccessPolicy model tests. """
 
@@ -116,21 +118,27 @@ class SubsidyAccessPolicyTests(TestCase):
     def test_subscription_access_policy_can_redeem(
         self,
         catalog_contains_content,
-        group_contains_learner,
+        enterprise_contains_learner,
         is_redeemable,
         is_license_for_learner,
         is_license_for_group,
         can_redeem_via_learner_license,
         can_redeem_via_group_license,
+        mock_discovery_client,
+        mock_lms_client,
         mock_catalog_client,
         mock_subsidy_client,
-        mock_group_client
+        mock_group_client,
         ):
         """
         Test the can_redeem method of SubscriptionAccessPolicy model
         """
-        mock_catalog_client.catalog_contains_content.return_value = catalog_contains_content
-        mock_group_client.group_contains_learner.return_value = group_contains_learner
+        mock_catalog_client_instance = mock_catalog_client.return_value
+        mock_catalog_client_instance.contains_content_items.return_value = catalog_contains_content
+        mock_discovery_client_instance = mock_discovery_client.return_value
+        mock_discovery_client_instance.get_course_price.return_value = 10
+        mock_lms_client_instance = mock_lms_client.return_value
+        mock_lms_client_instance.enterprise_contains_learner.return_value = enterprise_contains_learner
         mock_subsidy_client.can_redeem.return_value = is_redeemable
         mock_subsidy_client.get_license_for_learner.return_value = is_license_for_learner
         subscription_access_policy = SubscriptionAccessPolicyFactory()
@@ -163,19 +171,22 @@ class SubsidyAccessPolicyTests(TestCase):
     def test_subscription_access_policy_redeem(
         self,
         catalog_contains_content,
-        group_contains_learner,
+        enterprise_contains_learner,
         is_redeemable,
         ledger_transaction_id,
         redeem_return_value,
+        mock_discovery_client, # lint-amnesty, pylint: disable=unused-argument
+        mock_lms_client,
         mock_catalog_client,
         mock_subsidy_client,
-        mock_group_client
+        *args
         ):
         """
         Test the redeem method of SubscriptionAccessPolicy model
         """
         mock_catalog_client.catalog_contains_content.return_value = catalog_contains_content
-        mock_group_client.group_contains_learner.return_value = group_contains_learner
+        mock_lms_client_instance = mock_lms_client.return_value
+        mock_lms_client_instance.enterprise_contains_learner.return_value = enterprise_contains_learner
         mock_subsidy_client.can_redeem.return_value = is_redeemable
         mock_subsidy_client.redeem.return_value = ledger_transaction_id
         subscription_access_policy = SubscriptionAccessPolicyFactory()
@@ -189,19 +200,22 @@ class SubsidyAccessPolicyTests(TestCase):
     def test_subscription_request_access_policy_redeem(
         self,
         catalog_contains_content,
-        group_contains_learner,
+        enterprise_contains_learner,
         is_redeemable,
         ledger_transaction_id,
         request_redemption_return_value,
+        mock_discovery_client, # lint-amnesty, pylint: disable=unused-argument
+        mock_lms_client,
         mock_catalog_client,
         mock_subsidy_client,
-        mock_group_client
+        *args
         ):
         """
         Test the redeem method of SubscriptionAccessPolicy model
         """
         mock_catalog_client.catalog_contains_content.return_value = catalog_contains_content
-        mock_group_client.group_contains_learner.return_value = group_contains_learner
+        mock_lms_client_instance = mock_lms_client.return_value
+        mock_lms_client_instance.enterprise_contains_learner.return_value = enterprise_contains_learner
         mock_subsidy_client.can_redeem.return_value = is_redeemable
         mock_subsidy_client.request_redemption.return_value = ledger_transaction_id
         subscription_access_policy = SubscriptionAccessPolicyFactory(access_method=AccessMethods.REQUEST)
@@ -213,9 +227,11 @@ class SubsidyAccessPolicyTests(TestCase):
 
     def test_subscription_access_policy_has_redeemed(
         self,
+        mock_discovery_client, # lint-amnesty, pylint: disable=unused-argument
+        mock_lms_client, # lint-amnesty, pylint: disable=unused-argument
         mock_catalog_client, # lint-amnesty, pylint: disable=unused-argument
         mock_subsidy_client,
-        mock_group_client # lint-amnesty, pylint: disable=unused-argument
+        *args
         ):
         """
         Test the has_redeemed method of SubscriptionAccessPolicy model
@@ -230,9 +246,11 @@ class SubsidyAccessPolicyTests(TestCase):
 
     def test_subscription_request_access_policy_has_redeemed(
         self,
+        mock_discovery_client, # lint-amnesty, pylint: disable=unused-argument
+        mock_lms_client, # lint-amnesty, pylint: disable=unused-argument
         mock_catalog_client, # lint-amnesty, pylint: disable=unused-argument
         mock_subsidy_client,
-        mock_group_client # lint-amnesty, pylint: disable=unused-argument
+        *args
         ):
         """
         Test the has_redeemed method of LicenseRequestAccessPolicy model
@@ -254,21 +272,24 @@ class SubsidyAccessPolicyTests(TestCase):
     def test_per_learner_enrollment_cap_learner_credit_access_policy_can_redeem(
         self,
         catalog_contains_content,
-        group_contains_learner,
+        enterprise_contains_learner,
         is_redeemable,
         transactions_for_learner,
         can_redeem,
+        mock_discovery_client, # lint-amnesty, pylint: disable=unused-argument
+        mock_lms_client,
         mock_catalog_client,
         mock_subsidy_client,
-        mock_group_client
+        *args
         ):
         """
         Test the can_redeem method of PerLearnerEnrollmentCapLearnerCreditAccessPolicy model
         """
         mock_catalog_client.catalog_contains_content.return_value = catalog_contains_content
-        mock_group_client.group_contains_learner.return_value = group_contains_learner
+        mock_lms_client_instance = mock_lms_client.return_value
+        mock_lms_client_instance.enterprise_contains_learner.return_value = enterprise_contains_learner
         mock_subsidy_client.can_redeem.return_value = is_redeemable
-        mock_subsidy_client.transactions_for_learner.return_value.count.return_value = transactions_for_learner
+        mock_subsidy_client.transactions_for_learner.return_value = transactions_for_learner
         per_learner_enrollment_cap_learner_credit_access_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory() # lint-amnesty, pylint: disable=line-too-long
         per_learner_enrollment_cap_learner_credit_access_policy.per_learner_enrollment_limit = 5
         self.assertEqual(
@@ -285,20 +306,24 @@ class SubsidyAccessPolicyTests(TestCase):
     def test_per_learner_spend_cap_learner_credit_access_policy_can_redeem(
         self,
         catalog_contains_content,
-        group_contains_learner,
+        enterprise_contains_learner,
         is_redeemable,
         amount_spent_for_learner,
         can_redeem,
+        mock_discovery_client,
+        mock_lms_client,
         mock_catalog_client,
         mock_subsidy_client,
-        mock_group_client
+        *args
         ):
         """
         Test the can_redeem method of PerLearnerSpendCapLearnerCreditAccessPolicy model
         """
         mock_catalog_client.catalog_contains_content.return_value = catalog_contains_content
-        mock_catalog_client.get_course_price.return_value = 10
-        mock_group_client.group_contains_learner.return_value = group_contains_learner
+        mock_discovery_client_instance = mock_discovery_client.return_value
+        mock_discovery_client_instance.get_course_price.return_value = 10
+        mock_lms_client_instance = mock_lms_client.return_value
+        mock_lms_client_instance.enterprise_contains_learner.return_value = enterprise_contains_learner
         mock_subsidy_client.can_redeem.return_value = is_redeemable
         mock_subsidy_client.amount_spent_for_learner.return_value = amount_spent_for_learner
         per_learner_spend_cap_learner_credit_access_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory()
@@ -317,20 +342,24 @@ class SubsidyAccessPolicyTests(TestCase):
     def test_capped_enrollment_learner_credit_access_policy_can_redeem(
         self,
         catalog_contains_content,
-        group_contains_learner,
+        enterprise_contains_learner,
         is_redeemable,
         amount_spent_for_group_and_catalog,
         can_redeem,
+        mock_discovery_client,
+        mock_lms_client,
         mock_catalog_client,
         mock_subsidy_client,
-        mock_group_client
+        *args
         ):
         """
         Test the can_redeem method of CappedEnrollmentLearnerCreditAccessPolicyFactory model
         """
+        mock_discovery_client_instance = mock_discovery_client.return_value
+        mock_discovery_client_instance.get_course_price.return_value = 10
         mock_catalog_client.catalog_contains_content.return_value = catalog_contains_content
-        mock_catalog_client.get_course_price.return_value = 10
-        mock_group_client.group_contains_learner.return_value = group_contains_learner
+        mock_lms_client_instance = mock_lms_client.return_value
+        mock_lms_client_instance.enterprise_contains_learner.return_value = enterprise_contains_learner
         mock_subsidy_client.can_redeem.return_value = is_redeemable
         mock_subsidy_client.amount_spent_for_group_and_catalog.return_value = amount_spent_for_group_and_catalog
         capped_enrollment_learner_credit_access_policy = CappedEnrollmentLearnerCreditAccessPolicyFactory()

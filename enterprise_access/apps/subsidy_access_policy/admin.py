@@ -2,8 +2,8 @@
 
 
 from django.contrib import admin
-from enterprise_access.apps.subsidy_access_policy import models
 
+from enterprise_access.apps.subsidy_access_policy import models
 
 admin.site.register(models.SubscriptionAccessPolicy)
 admin.site.register(models.PerLearnerEnrollmentCreditAccessPolicy)

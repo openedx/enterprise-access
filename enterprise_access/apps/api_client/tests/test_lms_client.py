@@ -154,3 +154,38 @@ class TestLmsApiClient(TestCase):
             expected_url,
             expected_payload
         )
+
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_enterprise_contains_learner(self, mock_oauth_client, mock_json):
+        """
+        Verify enterprise_contains_learner works as expected.
+        """
+        mock_enterprise_uuid = str(uuid4())
+        user_id = 1234
+        mock_oauth_client.return_value.get.return_value = Response()
+        mock_oauth_client.return_value.get.return_value.status_code = 200
+
+        mock_json.return_value = {
+            'results': [
+                {
+                    'enterprise_customer': {
+                        'uuid': mock_enterprise_uuid
+                    },
+                    'user': {
+                        'id': user_id
+                    }
+                }
+            ]
+        }
+
+        query_params = {'enterprise_customer_uuid': mock_enterprise_uuid, 'user_ids': user_id}
+        client = LmsApiClient()
+        enterprise_contains_learner = client.enterprise_contains_learner(mock_enterprise_uuid, user_id)
+        assert enterprise_contains_learner
+
+        mock_oauth_client.return_value.get.assert_called_with(
+            'http://edx-platform.example.com/enterprise/api/v1/enterprise-learner/',
+            params=query_params,
+            timeout=settings.LMS_CLIENT_TIMEOUT
+        )

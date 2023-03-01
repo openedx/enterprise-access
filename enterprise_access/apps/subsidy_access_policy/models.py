@@ -7,15 +7,15 @@ from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
 
+from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClient
+from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
+from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.subsidy_access_policy.constants import (
-    AccessMethods,
     CREDIT_POLICY_TYPE_PRIORITY,
     SUBSCRIPTION_POLICY_TYPE_PRIORITY,
+    AccessMethods
 )
 from enterprise_access.apps.subsidy_access_policy.mocks import group_client, subsidy_client
-from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
-from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClient
-from enterprise_access.apps.api_client.lms_client import LmsApiClient
 
 
 class PolicyManager(models.Manager):
@@ -160,21 +160,11 @@ class SubsidyAccessPolicy(TimeStampedModel):
         # policies don't have direct access to subsidy balance, must call subsidy api to get current balance but
         # instead of making a call for each policy we can implement a specific endpoint in enterprise-subsidy
         # to get current balance for multiple subsidies.
-        # For example, the new implementation could be something look like below
-        # ```
-        #   subsidy_uuids = [redeemable_policy.subsidy_uuid for redeemable_policy in redeemable_policies]
-        #   subsidies_balance = subsidy_client.get_current_balance(subsidy_uuids)
-        #   sorted_policies = sorted(
-        #       redeemable_policies,
-        #       key=lambda p: (p.priority, subsidies_balance[p.subsidy_uuid]),
-        #    )
-        # ```
-
+        subsidy_uuids = [redeemable_policy.subsidy_uuid for redeemable_policy in redeemable_policies]
+        subsidies_balance = subsidy_client.get_current_balance(subsidy_uuids)
         sorted_policies = sorted(
             redeemable_policies,
-            # p.priority is a class property that's a lower number for
-            # LearnerCreditAccessPolicy and higher for SubscriptionAccessPolicy.
-            key=lambda p: (p.priority, p.subsidy.balance),
+            key=lambda p: (p.priority, subsidies_balance[p.subsidy_uuid]),
         )
         return sorted_policies[0]
 
@@ -208,7 +198,17 @@ class SubscriptionAccessPolicy(SubsidyAccessPolicy):
         return SUBSCRIPTION_POLICY_TYPE_PRIORITY
 
 
-class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy):
+class CreditPolicyMixin:
+    """
+    Mixin class for credit type policies.
+    """
+
+    @property
+    def priority(self):
+        return CREDIT_POLICY_TYPE_PRIORITY
+
+
+class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
     """
     Policy that limits the number of enrollments transactions for a learner in a subsidy.
 
@@ -226,14 +226,14 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy):
         learner_transaction_count = subsidy_client.transactions_for_learner(
             subsidy_uuid = self.subsidy_uuid,
             learner_id = learner_id,
-            ).count()
+        )
         if learner_transaction_count < self.per_learner_enrollment_limit:
             return super().can_redeem(learner_id, content_key)
 
         return False
 
 
-class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy):
+class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
     """
     Policy that limits the amount of learner spend for enrollment transactions.
 
@@ -259,7 +259,7 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy):
         return False
 
 
-class CappedEnrollmentLearnerCreditAccessPolicy(SubsidyAccessPolicy):
+class CappedEnrollmentLearnerCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
     """
     Policy that limits the maximum amount that can be spent aggregated across all users covered by this policy.
 

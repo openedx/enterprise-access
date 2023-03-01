@@ -21,7 +21,7 @@ class EnterpriseCatalogApiClient(BaseOAuthClient):
         Arguments:
             catalog_uuid (UUID): UUID of the enterprise catalog to check.
             content_ids (list of str): List of content ids to check whether the catalog contains. The endpoint does not
-                differentiate between course_run_ids and program_uuids so they can be used interchangeably. 
+            differentiate between course_run_ids and program_uuids so they can be used interchangeably.
 
         Returns:
             bool: Whether the given content_ids were found in the specified enterprise catalog.

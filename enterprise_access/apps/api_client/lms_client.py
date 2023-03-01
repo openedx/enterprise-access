@@ -128,11 +128,12 @@ class LmsApiClient(BaseOAuthClient):
         query_params = {'enterprise_customer_uuid': ec_uuid, 'user_ids': learner_id}
 
         try:
-            url = self.enterprise_learner_endpoint + query_params
+            url = self.enterprise_learner_endpoint
             response = self.client.get(url, params=query_params, timeout=settings.LMS_CLIENT_TIMEOUT)
             response.raise_for_status()
             json_response = response.json()
             results = json_response.get('results')
+            results = results and results[0]
             if results and results['enterprise_customer']['uuid'] == ec_uuid and results['user']['id'] == learner_id:
                 result = True
         except requests.exceptions.HTTPError:

@@ -19,17 +19,13 @@ from requests.exceptions import HTTPError, Timeout
 from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ParseError
+from rest_framework.generics import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
-from rest_framework.generics import get_object_or_404
-
 
 from enterprise_access.apps.api import serializers
 from enterprise_access.apps.api.constants import LICENSE_UNASSIGNED_STATUS
-from enterprise_access.apps.api.exceptions import (
-    SubsidyRequestCreationError,
-    SubsidyRequestError,
-)
+from enterprise_access.apps.api.exceptions import SubsidyRequestCreationError, SubsidyRequestError
 from enterprise_access.apps.api.filters import (
     SubsidyRequestCustomerConfigurationFilterBackend,
     SubsidyRequestFilterBackend
@@ -52,13 +48,13 @@ from enterprise_access.apps.api.utils import (
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
-from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.track.segment import track_event
 from enterprise_access.utils import get_subsidy_model
 
@@ -811,7 +807,7 @@ class SubsidyAccessPolicyViewset(PermissionRequiredMixin, viewsets.GenericViewSe
     @action(detail=True, methods=['post'])
     def redeem(self, request, *args, **kwargs):
         """
-        Redeem a policy for given `group_uuid`, `learner_id` and `content_key`
+        Redeem a policy for given `learner_id` and `content_key`
         """
         policy = get_object_or_404(SubsidyAccessPolicy, pk=kwargs.get('uuid'))
 

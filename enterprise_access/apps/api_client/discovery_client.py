@@ -48,4 +48,4 @@ class DiscoveryApiClient(BaseOAuthClient):
             course_price (float): course price
         """
         course_data = self.get_course_data(course_id)
-        return course_data['entitlements'][0]['price']
+        return float(course_data['entitlements'][0]['price'])

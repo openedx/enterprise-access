@@ -3,7 +3,7 @@ Tests for Enterprise Access API v1 views.
 """
 
 import random
-from unittest.mock import call
+from unittest.mock import call, patch
 from uuid import uuid4
 
 import ddt
@@ -13,11 +13,15 @@ from pytest import mark
 from rest_framework import status
 from rest_framework.reverse import reverse
 
+from enterprise_access.apps.api.serializers import SubsidyAccessPolicyRedeemableSerializer
 from enterprise_access.apps.core.constants import (
     ALL_ACCESS_CONTEXT,
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
+)
+from enterprise_access.apps.subsidy_access_policy.tests.factories import (
+    PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory
 )
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
@@ -40,6 +44,7 @@ COUPON_CODE_REQUESTS_LIST_ENDPOINT = reverse('api:v1:coupon-code-requests-list')
 COUPON_CODE_REQUESTS_APPROVE_ENDPOINT = reverse('api:v1:coupon-code-requests-approve')
 COUPON_CODE_REQUESTS_DECLINE_ENDPOINT = reverse('api:v1:coupon-code-requests-decline')
 CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT = reverse('api:v1:customer-configurations-list')
+SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:policy-list')
 
 
 @ddt.ddt
@@ -1516,3 +1521,127 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITestWithMocks):
 
         mock_decline_enterprise_subsidy_requests_task.assert_not_called()
         mock_send_notification_email_for_request.assert_not_called()
+
+
+@ddt.ddt
+class TestSubsidyAccessPolicyViewset(TestSubsidyRequestViewSet):
+    """
+    Tests for SubsidyAccessPolicyViewset.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        self.enterprise_uuid = '12aacfee-8ffa-4cb3-bed1-059565a57f06'
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': self.enterprise_uuid,
+        }])
+
+        self.redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            group_uuid=self.enterprise_uuid
+        )
+        self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
+
+        self.subsidy_access_policy_redeem_endpoint = reverse(
+            'api:v1:policy-redeem',
+            kwargs={'uuid': self.redeemable_policy.uuid}
+        )
+
+        self.setup_mocks()
+
+    def setup_mocks(self):
+        """
+        Setup mocks for different api clients.
+        """
+        subsidy_client_path = 'enterprise_access.apps.subsidy_access_policy.models.subsidy_client'
+        subsidy_client_patcher = patch(subsidy_client_path)
+        subsidy_client = subsidy_client_patcher.start()
+        subsidy_client.can_redeem.return_value = True
+        subsidy_client.transactions_for_learner.return_value = 2
+        subsidy_client.redeem.return_value = {'id': 1111}
+
+        catalog_client_path = 'enterprise_access.apps.subsidy_access_policy.models.EnterpriseCatalogApiClient'
+        enterprise_catalog_client_patcher = patch(catalog_client_path)
+        enterprise_catalog_client = enterprise_catalog_client_patcher.start()
+        enterprise_catalog_client_instance = enterprise_catalog_client.return_value
+        enterprise_catalog_client_instance.contains_content_items.return_value = True
+
+        lms_client_patcher = patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
+        lms_client = lms_client_patcher.start()
+        lms_client_instance = lms_client.return_value
+        lms_client_instance.enterprise_contains_learner.return_value = True
+
+        self.addCleanup(lms_client_patcher.stop)
+        self.addCleanup(subsidy_client_patcher.stop)
+        self.addCleanup(enterprise_catalog_client_patcher.stop)
+
+    def test_list_all_redeemable_only_policies(self):
+        """
+        Verify that SubsidyAccessPolicyViewset list endpoint return all redeemable policies
+        """
+        query_params = {
+            'group_id': self.enterprise_uuid,
+            'learner_id': '1234',
+            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
+        }
+        response = self.client.get(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, query_params)
+        response_json = self.load_json(response.content)
+
+        # Verify that api response only includes the redeemable policies
+        assert response_json == [
+            dict(SubsidyAccessPolicyRedeemableSerializer([self.redeemable_policy], many=True).data[0])
+        ]
+
+        # Verify that api response dosn't include non-redeemable policies
+        for policy in response_json:
+            assert policy['uuid'] != self.non_redeemable_policy.uuid
+
+    @ddt.data(
+        (
+            {
+                'group_id': '12aacfee-8ffa-4cb3-bed1-059565a57f06'
+            },
+            {
+                'content_key': ['This field is required.'],
+                'learner_id': ['This field is required.']
+            }
+        ),
+        (
+            {
+                'group_id': '12aacfee-8ffa-4cb3-bed1-059565a57f06',
+                'learner_id': '1234',
+                'content_key': 'content_key',
+            },
+            {'content_key': ['Invalid course key: content_key']}
+        ),
+        (
+            {
+                'learner_id': '1234',
+                'content_key': 'content_key',
+            },
+            {'detail': 'MISSING: requests.has_learner_or_admin_access'}
+        )
+    )
+    @ddt.unpack
+    def test_list_endpoint_with_invalid_data(self, query_params, expected_result):
+        """
+        Verify that SubsidyAccessPolicyViewset list raises correct exception if request data is invalid.
+        """
+        response = self.client.get(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, query_params)
+        response_json = self.load_json(response.content)
+
+        assert response_json == expected_result
+
+    def test_redeem_policy(self):
+        """
+        Verify that SubsidyAccessPolicyViewset redeem endpoint works as expected
+        """
+        payload = {
+            'learner_id': '1234',
+            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
+        }
+        response = self.client.post(self.subsidy_access_policy_redeem_endpoint, payload)
+        response_json = self.load_json(response.content)
+        assert response_json == {'id': 1111}
