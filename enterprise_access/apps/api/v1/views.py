@@ -3,14 +3,16 @@ Views for Enterprise Access API v1.
 """
 
 import logging
+from contextlib import suppress
 
 from celery import chain
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
 from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
 from edx_rbac.decorators import permission_required
+from edx_rbac.mixins import PermissionRequiredMixin
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from requests.exceptions import ConnectionError as RequestConnectionError
 from requests.exceptions import HTTPError, Timeout
@@ -21,14 +23,12 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.generics import get_object_or_404
 
-from django.http.response import Http404
 
 from enterprise_access.apps.api import serializers
 from enterprise_access.apps.api.constants import LICENSE_UNASSIGNED_STATUS
 from enterprise_access.apps.api.exceptions import (
     SubsidyRequestCreationError,
     SubsidyRequestError,
-    NoRedeemablePolicyFound,
 )
 from enterprise_access.apps.api.filters import (
     SubsidyRequestCustomerConfigurationFilterBackend,
@@ -750,13 +750,32 @@ class SubsidyRequestCustomerConfigurationViewSet(UserDetailsFromJwtMixin, viewse
         return response
 
 
-class SubsidyAccessPolicyViewset(viewsets.GenericViewSet):
+class SubsidyAccessPolicyViewset(PermissionRequiredMixin, viewsets.GenericViewSet):
     """
     Viewset for Subsidy Access Policy APIs.
     """
     authentication_classes = [JwtAuthentication]
     permission_classes = [permissions.IsAuthenticated]
     lookup_url_kwarg = 'uuid'
+    permission_required = 'requests.has_learner_or_admin_access'
+
+    def get_permission_object(self):
+        """
+        Returns the enterprise uuid to verify that requesting user possess the enterprise learner or admin role.
+        """
+        enterprise_uuid = ''
+
+        if self.action == 'list':
+            enterprise_uuid = self.request.query_params.get('group_id')
+
+        if self.action == 'redeem':
+            policy_uuid = self.kwargs.get('uuid')
+            with suppress(ValidationError):  # Ignore if `policy_uuid` is not a valid uuid
+                policy = SubsidyAccessPolicy.objects.filter(uuid=policy_uuid).first()
+                if policy:
+                    enterprise_uuid = policy.group_uuid
+
+        return enterprise_uuid
 
     def redeemable_policies(self, group_uuid, learner_id, content_key):
         """
@@ -774,7 +793,7 @@ class SubsidyAccessPolicyViewset(viewsets.GenericViewSet):
         """
         Return a list of all redeemable policies for given `group_uuid`, `learner_id` and `content_key`
         """
-        serializer = serializers.SubsidiyAccessPolicyRequestSerializer(data=request.query_params)
+        serializer = serializers.SubsidiyAccessPolicyListSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         group_uuid = serializer.data['group_id']
@@ -796,7 +815,7 @@ class SubsidyAccessPolicyViewset(viewsets.GenericViewSet):
         """
         policy = get_object_or_404(SubsidyAccessPolicy, pk=kwargs.get('uuid'))
 
-        serializer = serializers.SubsidiyAccessPolicyRequestSerializer(data=request.data)
+        serializer = serializers.SubsidiyAccessPolicyRedeemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         learner_id = serializer.data['learner_id']

@@ -124,8 +124,7 @@ class SubsidyRequestCustomerConfigurationSerializer(serializers.ModelSerializer)
         return super().update(instance, validated_data)
 
 
-class SubsidiyAccessPolicyRequestSerializer(serializers.Serializer):
-    group_id = serializers.UUIDField(required=False)
+class SubsidiyAccessPolicyRedeemSerializer(serializers.Serializer):
     learner_id = serializers.IntegerField(required=True)
     content_key = serializers.CharField(required=True)
 
@@ -139,6 +138,9 @@ class SubsidiyAccessPolicyRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError(f"Invalid course key: {value}")
 
         return value
+
+class SubsidiyAccessPolicyListSerializer(SubsidiyAccessPolicyRedeemSerializer):
+    group_id = serializers.UUIDField(required=True)
 
 
 class SubsidyAccessPolicyRedeemableSerializer(serializers.ModelSerializer):
