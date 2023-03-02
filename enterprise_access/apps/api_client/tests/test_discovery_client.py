@@ -53,3 +53,31 @@ class TestDiscoveryApiClient(TestCase):
             expected_url,
             timeout=settings.DISCOVERY_CLIENT_TIMEOUT,
         )
+
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_course_price(self, mock_oauth_client, mock_json):
+        mock_json.return_value = {
+            'key': 'AB+CD101',
+            'uuid': '31d82348-b8f4-417a-85b0-1a7640623810',
+            'title': 'How to Bake a Pie: A Slice of Heaven',
+            'course_runs': {
+                'more_stuff_not_listed_here?': True
+            },
+            'enterprise_customer': {
+                'contact_email': 'contact@example.com',
+            },
+            'image': None,
+            'short_description': '',
+            'url_slug': 'aa-test',
+            'full_description': '',
+            'level_type': None,
+            'more_stuff_not_listed_here?': True,
+            "entitlements": [{'mode': 'verified', 'price': '199.00', 'currency': 'USD', 'sku': '3964E13',}]
+        }
+        mock_oauth_client.return_value.get.return_value = Response()
+
+        client = DiscoveryApiClient()
+        course_price = client.get_course_price('AB+CD101')
+
+        assert course_price == 199.00

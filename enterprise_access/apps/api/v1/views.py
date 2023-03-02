@@ -3,20 +3,23 @@ Views for Enterprise Access API v1.
 """
 
 import logging
+from contextlib import suppress
 
 from celery import chain
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
 from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
 from edx_rbac.decorators import permission_required
+from edx_rbac.mixins import PermissionRequiredMixin
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from requests.exceptions import ConnectionError as RequestConnectionError
 from requests.exceptions import HTTPError, Timeout
 from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ParseError
+from rest_framework.generics import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
@@ -45,6 +48,7 @@ from enterprise_access.apps.api.utils import (
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
@@ -740,3 +744,83 @@ class SubsidyRequestCustomerConfigurationViewSet(UserDetailsFromJwtMixin, viewse
             properties=response.data
         )
         return response
+
+
+class SubsidyAccessPolicyViewset(PermissionRequiredMixin, viewsets.GenericViewSet):
+    """
+    Viewset for Subsidy Access Policy APIs.
+    """
+    authentication_classes = [JwtAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_url_kwarg = 'uuid'
+    permission_required = 'requests.has_learner_or_admin_access'
+
+    def get_permission_object(self):
+        """
+        Returns the enterprise uuid to verify that requesting user possess the enterprise learner or admin role.
+        """
+        enterprise_uuid = ''
+
+        if self.action == 'list':
+            enterprise_uuid = self.request.query_params.get('group_id')
+
+        if self.action == 'redeem':
+            policy_uuid = self.kwargs.get('uuid')
+            with suppress(ValidationError):  # Ignore if `policy_uuid` is not a valid uuid
+                policy = SubsidyAccessPolicy.objects.filter(uuid=policy_uuid).first()
+                if policy:
+                    enterprise_uuid = policy.group_uuid
+
+        return enterprise_uuid
+
+    def redeemable_policies(self, group_uuid, learner_id, content_key):
+        """
+        Return all redeemable policies.
+        """
+        redeemable_policies = []
+        all_policies = SubsidyAccessPolicy.objects.filter(group_uuid=group_uuid)
+        for policy in all_policies:
+            if policy.can_redeem(learner_id, content_key):
+                redeemable_policies.append(policy)
+
+        return redeemable_policies
+
+    def list(self, request):
+        """
+        Return a list of all redeemable policies for given `group_uuid`, `learner_id` and `content_key`
+        """
+        serializer = serializers.SubsidiyAccessPolicyListSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        group_uuid = serializer.data['group_id']
+        learner_id = serializer.data['learner_id']
+        content_key = serializer.data['content_key']
+
+        redeemable_policies = self.redeemable_policies(group_uuid, learner_id, content_key)
+        response_data = serializers.SubsidyAccessPolicyRedeemableSerializer(redeemable_policies, many=True).data
+
+        return Response(
+            response_data,
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=['post'])
+    def redeem(self, request, *args, **kwargs):
+        """
+        Redeem a policy for given `learner_id` and `content_key`
+        """
+        policy = get_object_or_404(SubsidyAccessPolicy, pk=kwargs.get('uuid'))
+
+        serializer = serializers.SubsidiyAccessPolicyRedeemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        learner_id = serializer.data['learner_id']
+        content_key = serializer.data['content_key']
+
+        if policy.can_redeem(learner_id, content_key):
+            response = policy.redeem(learner_id, content_key)
+
+        return Response(
+            response,
+            status=status.HTTP_200_OK,
+        )

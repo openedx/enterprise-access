@@ -84,3 +84,8 @@ class subsidy_client():
     def amount_spent_for_group_and_catalog(cls, subsidy_uuid, group_uuid, catalog_uuid):
         """Subsidy service api"""
         return mock.MagicMock(subsidy_uuid, group_uuid, catalog_uuid)
+
+    @classmethod
+    def get_current_balance(cls, subsidy_uuids):
+        """Returns current balance for each subsidy"""
+        return mock.MagicMock(subsidy_uuids)

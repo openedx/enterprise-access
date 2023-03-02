@@ -139,6 +139,7 @@ class APITestWithMocks(APITest):
         self.mock_discovery_client().get_course_data.return_value = {
             'title': COURSE_TITLE_ABOUT_PIE,
             'owners': [{'uuid': TEST_PARTER_UUID, 'name': TEST_PARTNER_NAME}],
+            "entitlements": [{'mode': 'verified', 'price': '199.00', 'currency': 'USD', 'sku': '3964E13',}]
         }
 
         self.analytics_patcher = mock.patch('analytics.track')

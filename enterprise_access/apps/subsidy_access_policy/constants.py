@@ -24,3 +24,7 @@ class SegmentEvents:
 
     SUBSIDY_ACCESS_POLICY_CREATED = 'edx.server.enterprise-access.enrollment-lifecycle.subsidy-access-policy.created'
     SUBSIDY_ACCESS_POLICY_REDEEMED = 'edx.server.enterprise-access.enrollment-lifecycle.subsidy-access-policy.redeemed'
+
+
+CREDIT_POLICY_TYPE_PRIORITY = 1
+SUBSCRIPTION_POLICY_TYPE_PRIORITY = 2

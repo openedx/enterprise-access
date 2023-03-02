@@ -2,8 +2,12 @@
 Serializers for Enterprise Access API v1.
 """
 
+from django.urls import reverse
+from opaque_keys import InvalidKeyError
+from opaque_keys.edx.keys import CourseKey
 from rest_framework import serializers
 
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LicenseRequest,
@@ -117,3 +121,43 @@ class SubsidyRequestCustomerConfigurationSerializer(serializers.ModelSerializer)
         # Pop enterprise_customer_uuid so that it's read-only for updates.
         validated_data.pop('enterprise_customer_uuid', None)
         return super().update(instance, validated_data)
+
+
+class SubsidiyAccessPolicyRedeemSerializer(serializers.Serializer):  # pylint: disable=abstract-method
+    """
+    Serializer to validate policy redeem request POST data.
+    """
+    learner_id = serializers.IntegerField(required=True)
+    content_key = serializers.CharField(required=True)
+
+    def validate_content_key(self, value):
+        """
+        Validate `content_key`.
+        """
+        try:
+            CourseKey.from_string(value)
+        except InvalidKeyError as exc:
+            raise serializers.ValidationError(f"Invalid course key: {value}") from exc
+
+        return value
+
+class SubsidiyAccessPolicyListSerializer(SubsidiyAccessPolicyRedeemSerializer):  # pylint: disable=abstract-method
+    """
+    Serializer to validate policy request GET query params.
+    """
+    group_id = serializers.UUIDField(required=True)
+
+
+class SubsidyAccessPolicyRedeemableSerializer(serializers.ModelSerializer):
+    """
+    Serializer to transform response for policy redeem GET endpoint.
+    """
+
+    policy_redemption_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SubsidyAccessPolicy
+        exclude = ('created', 'modified')
+
+    def get_policy_redemption_url(self, obj):
+        return reverse('api:v1:policy-redeem', kwargs={'uuid': obj.uuid})
