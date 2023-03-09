@@ -4,11 +4,7 @@ Utility functions for Enterprise Access API.
 
 from uuid import UUID
 
-from edx_django_utils.cache.utils import (
-    DEFAULT_TIMEOUT,
-    TieredCache,
-    get_cache_key,
-)
+from edx_django_utils.cache.utils import DEFAULT_TIMEOUT, TieredCache, get_cache_key
 from rest_framework.exceptions import ParseError
 
 

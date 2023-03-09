@@ -7,6 +7,7 @@ from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
 
+from enterprise_access.apps.api.utils import acquire_subsidy_policy_lock, release_subsidy_policy_lock
 from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClient
 from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
@@ -16,6 +17,8 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     AccessMethods
 )
 from enterprise_access.apps.subsidy_access_policy.mocks import group_client, subsidy_client
+
+SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS = 300
 
 
 class PolicyManager(models.Manager):
@@ -138,6 +141,24 @@ class SubsidyAccessPolicy(TimeStampedModel):
             return subsidy_client.has_requested(self.subsidy_uuid, learner_id, content_key)
         else:
             raise ValueError(f"unknown access method {self.access_method}")
+
+    def acquire_lock(self, learner_id, content_key):  # pylint: disable=unused-argument
+        """
+        Acquire a lock for transaction isolation.
+        """
+        return acquire_subsidy_policy_lock(
+                self.uuid,
+                django_cache_timeout=SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS,
+            )
+
+    def release_lock(self, learner_id, content_key):  # pylint: disable=unused-argument
+        """
+        Release a previously acquired lock for transaction isolation.
+        """
+        return release_subsidy_policy_lock(
+                self.uuid,
+                django_cache_timeout=SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS,
+            )
 
     @staticmethod
     def resolve_policy(redeemable_policies):

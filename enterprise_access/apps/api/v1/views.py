@@ -41,10 +41,8 @@ from enterprise_access.apps.api.tasks import (
     update_license_requests_after_assignments_task
 )
 from enterprise_access.apps.api.utils import (
-    acquire_subsidy_policy_lock,
     get_enterprise_uuid_from_query_params,
     get_enterprise_uuid_from_request_data,
-    release_subsidy_policy_lock,
     validate_uuid
 )
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
@@ -61,8 +59,6 @@ from enterprise_access.apps.track.segment import track_event
 from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
-
-SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS = 300
 
 
 class PaginationWithPageCount(PageNumberPagination):
@@ -820,11 +816,9 @@ class SubsidyAccessPolicyViewset(PermissionRequiredMixin, viewsets.GenericViewSe
 
         learner_id = serializer.data['learner_id']
         content_key = serializer.data['content_key']
+        lock_acquired = False
         try:
-            lock_acquired = acquire_subsidy_policy_lock(
-                policy.uuid,
-                django_cache_timeout=SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS,
-            )
+            lock_acquired = policy.acquire_lock(learner_id, content_key)
             if not lock_acquired:
                 return Response(
                     data='Enrollment currently locked for this subsidy.',
@@ -839,4 +833,4 @@ class SubsidyAccessPolicyViewset(PermissionRequiredMixin, viewsets.GenericViewSe
             )
         finally:
             if lock_acquired:
-                release_subsidy_policy_lock(policy.uuid)
+                policy.release_lock(learner_id, content_key)

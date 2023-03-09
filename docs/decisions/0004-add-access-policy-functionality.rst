@@ -285,10 +285,7 @@ if the learner level locks are warranted.
 .. code-block:: python
 
   try:
-    lock_acquired = acquire_subsidy_policy_lock(
-      policy.uuid,
-      django_cache_timeout=SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS,
-    )
+    lock_acquired = policy.acquire_lock(learner_id, content_key)
     if not lock_acquired:
       return Response(
           data='Enrollment currently locked for this subsidy.',
@@ -303,7 +300,7 @@ if the learner level locks are warranted.
     )
   finally:
     if lock_acquired:
-      release_subsidy_policy_lock(policy.uuid)
+      policy.release_lock(learner_id, content_key)
 
 Benefits of the overall design
 ==============================
