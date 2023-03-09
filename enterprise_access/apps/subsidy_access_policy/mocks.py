@@ -37,55 +37,103 @@ class subsidy_client():
     """
     @classmethod
     def can_redeem(cls, subsidy_uuid, learner_id, content_key):
-        """Subsidy service api"""
+        """
+        Subsidy service api
+        enterprise-subsidy service call:
+        GET /api/v1/subsidies/[subsidy-uuid]/can_redeem/
+
+        TODO: Does not yet have an implementation in enterprise-subsidy.
+        """
         return mock.MagicMock(subsidy_uuid, learner_id, content_key)
 
     @classmethod
     def redeem(cls, subsidy_uuid, learner_id, content_key):
-        """Subsidy service api"""
+        """
+        Subsidy service api
+
+        POST /api/v1/transactions/
+        This has an implementation.
+        """
         return mock.MagicMock(subsidy_uuid, learner_id, content_key)
 
     @classmethod
     def request_redemption(cls, subsidy_uuid, learner_id, content_key):
-        """Subsidy service api"""
+        """
+        Subsidy service api
+        This is about browse and request, we don't need this for MVP.
+        """
         return mock.MagicMock(subsidy_uuid, learner_id, content_key)
 
     @classmethod
     def has_redeemed(cls, subsidy_uuid, learner_id, content_key):
-        """Subsidy service api"""
+        """
+        Subsidy service api
+
+        Theoretically GET /api/v1/transactions/?subsidy_uuid=...&content_key=...&learner_id=...
+
+        TODO: there's a list endpoint, but no filtering support yet.
+        """
         return mock.MagicMock(subsidy_uuid, learner_id, content_key)
 
     @classmethod
     def has_requested(cls, subsidy_uuid, learner_id, content_key):
-        """Subsidy service api"""
+        """
+        Don't need this for MVP.
+        Subsidy service api
+        """
         return mock.MagicMock(subsidy_uuid, learner_id, content_key)
 
     @classmethod
     def get_license_for_learner(cls, subsidy_uuid, learner_id):
-        """Subsidy service api"""
+        """
+        Don't need this for MVP.
+        Subsidy service api
+        """
         return mock.MagicMock(subsidy_uuid, learner_id)
 
     @classmethod
     def get_license_for_group(cls, subsidy_uuid, group_uuid):
-        """Subsidy service api"""
+        """
+        Don't need this for MVP.
+        Subsidy service api
+        """
         return mock.MagicMock(subsidy_uuid, group_uuid)
 
     @classmethod
     def transactions_for_learner(cls, subsidy_uuid, learner_id):
-        """Subsidy service api"""
+        """
+        Subsidy service api
+
+        Theoretically GET /api/v1/transactions/?subsidy_uuid=...&content_key=...&learner_id=...
+
+        TODO: there's a list endpoint, but no filtering support yet (in this case for learner_id)
+        """
         return mock.MagicMock(subsidy_uuid, learner_id)
 
     @classmethod
     def amount_spent_for_learner(cls, subsidy_uuid, learner_id):
-        """Subsidy service api"""
+        """
+        Subsidy service api
+        This might be something that just calls transactions_for_learner() and sums the quantities.
+        """
         return mock.MagicMock(subsidy_uuid, learner_id)
 
     @classmethod
     def amount_spent_for_group_and_catalog(cls, subsidy_uuid, group_uuid, catalog_uuid):
-        """Subsidy service api"""
+        """
+        Don't need for MVP because there's no group yet, and get_current_balance() below
+        will satisfy knowing the entire balance for a customer's subsidy.
+        Subsidy service api
+        """
         return mock.MagicMock(subsidy_uuid, group_uuid, catalog_uuid)
 
     @classmethod
     def get_current_balance(cls, subsidy_uuids):
-        """Returns current balance for each subsidy"""
+        """
+        Returns current balance for each subsidy
+
+        Will call /api/v1/subsidies/{subsidy_uuid}
+
+        TODO: need to serialize the current balance into the response payload.
+        """
         return mock.MagicMock(subsidy_uuids)
