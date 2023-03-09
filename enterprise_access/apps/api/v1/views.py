@@ -16,7 +16,9 @@ from edx_rbac.mixins import PermissionRequiredMixin
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from requests.exceptions import ConnectionError as RequestConnectionError
 from requests.exceptions import HTTPError, Timeout
-from rest_framework import filters, permissions, status, viewsets
+from rest_framework import filters, permissions
+from rest_framework import serializers as rest_serializers
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ParseError
 from rest_framework.generics import get_object_or_404
@@ -748,7 +750,91 @@ class SubsidyRequestCustomerConfigurationViewSet(UserDetailsFromJwtMixin, viewse
         return response
 
 
-class SubsidyAccessPolicyViewset(PermissionRequiredMixin, viewsets.GenericViewSet):
+class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelViewSet):
+    """
+     Viewset for Subsidy Access Policy CRUD operations.
+     """
+
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = serializers.SubsidyAccessPolicyCRUDSerializer
+    authentication_classes = (JwtAuthentication,)
+    filter_backends = (filters.OrderingFilter, DjangoFilterBackend,)
+    filterset_fields = ('group_uuid', 'policy_type',)
+    pagination_class = PaginationWithPageCount
+    http_method_names = ['get', 'post', 'patch', 'delete']
+    lookup_field = 'uuid'
+    permission_required = 'requests.has_admin_access'
+
+    @property
+    def requested_group_uuid(self):
+        """
+        The group_uuid from request params or post body
+        """
+        group_uuid = None
+        if self.action in ('retrieve', 'partial_update', 'destroy'):
+            policy_uuid = self.kwargs.get('uuid')
+            if policy_uuid:
+                try:
+                    policy = SubsidyAccessPolicy.objects.get(uuid=policy_uuid)
+                    group_uuid = str(policy.group_uuid)
+                except ObjectDoesNotExist:
+                    group_uuid = None
+        elif self.action == 'create':
+            group_uuid = self.request.POST.get('group_uuid') or self.request.data.get('group_uuid')
+        else:
+            group_uuid = self.request.query_params.get('group_uuid', None)
+        return group_uuid
+
+    def get_permission_object(self):
+        """
+        Returns the enterprise_uuid (group_uuid) to verify that requesting user possess the enterprise admin role.
+        """
+        return self.requested_group_uuid
+
+    def create(self, request, *args, **kwargs):
+        """
+        create action for SubsidyAccessPolicyCRUDViewset. Handles creation of policy after validation
+        """
+        policy_data = request.data
+        serializer = self.get_serializer(data=policy_data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, *args, **kwargs):
+        """
+        Used for http patch method. Updates the policy data passed in request after validation.
+        """
+        policy_data_from_request = request.data
+        policy_uuid_from_url = self.kwargs.get('uuid')
+        if policy_data_from_request.get('uuid') != policy_uuid_from_url:
+            raise rest_serializers.ValidationError('"policy_uuid" cannot be changed')
+        policy = get_object_or_404(SubsidyAccessPolicy, pk=policy_uuid_from_url)
+        serializer = self.get_serializer(policy, data=policy_data_from_request, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+
+    def list(self, request, *args, **kwargs):
+        """
+        List action for SubsidyAccessPolicyCRUDViewset. Show all policies linked with the group uuid passed in request.
+        """
+        group_uuid = self.requested_group_uuid
+        if not group_uuid:
+            raise rest_serializers.ValidationError('"group_uuid" query param is required')
+        return super().list(request, *args, **kwargs)
+
+    def get_queryset(self):
+        """
+        Queryset for the SubsidyAccessPolicyCRUDViewset. The admins should only be able to perform CRUD operations
+        on the enterprise's policies they belong to.
+        """
+        queryset = SubsidyAccessPolicy.objects.order_by('-created')
+        group_uuid = self.requested_group_uuid
+        return queryset.filter(group_uuid=group_uuid)
+
+
+class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.GenericViewSet):
     """
     Viewset for Subsidy Access Policy APIs.
     """
@@ -791,7 +877,7 @@ class SubsidyAccessPolicyViewset(PermissionRequiredMixin, viewsets.GenericViewSe
         """
         Return a list of all redeemable policies for given `group_uuid`, `learner_id` and `content_key`
         """
-        serializer = serializers.SubsidyAccessPolicyListSerializer(data=request.query_params)
+        serializer = serializers.SubsidyAccessPolicyRedeemListSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         group_uuid = serializer.data['group_id']

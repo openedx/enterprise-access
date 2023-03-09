@@ -66,9 +66,9 @@ A sample response can be seen below.
 Permissions
 -----------
 
-enterprise_learner
+enterprise_learner or enterprise_admin
   Should only create the transaction if the requesting user has implicit (JWT) or explicit (DB-defined)
-  ``enterprise_learner`` role assigned.
+  ``enterprise_learner`` or ``enterprise_admin`` role assigned.
 
 POST access policy redeem transaction
 ======================================
@@ -93,3 +93,145 @@ Permissions
 enterprise_learner
   Should only create the transaction if the requesting user has implicit (JWT) or explicit (DB-defined)
   ``enterprise_learner`` role assigned.
+
+
+CRUD operations on SubsidyAccessPolicy
+======================================
+
+GET **/api/v1/admin/policy/**
+
+List all policies linked to a group.
+
+Inputs
+------
+
+- ``group_uuid`` (Query Param, required): The uuid of the customer. For now it will be an enterprise customer uuid.
+
+Outputs
+-------
+A sample response can be seen below.
+
+::
+
+   [
+        {
+            "uuid": "d0cd25f9-0b73-49c3-8299-dc9751a12ef5",
+            "policy_type": "PerLearnerEnrollmentCreditAccessPolicy",
+            "description": "sdad",
+            "active": true,
+            "group_uuid": "214cf999-5964-4a2e-afa8-c62461558211",
+            "catalog_uuid": "214cf999-5964-4a2e-afa8-c62461558315",
+            "subsidy_uuid": "214cf999-5964-4a2e-afa8-c62461342198",
+            "access_method": "direct",
+            "per_learner_enrollment_limit": 0,
+            "per_learner_spend_limit": 0,
+            "spend_limit": 5
+        },
+        {
+            "uuid": "a16b960d-0ddd-4af2-a596-9991cd5508da",
+            "policy_type": "CappedEnrollmentLearnerCreditAccessPolicy",
+            "description": "sdad",
+            "active": true,
+            "group_uuid": "214cf999-5964-4a2e-afa8-c62461558211",
+            "catalog_uuid": "214cf999-5964-4a2e-afa8-c62461558315",
+            "subsidy_uuid": "214cf999-5964-4a2e-afa8-c62461342198",
+            "access_method": "direct",
+            "per_learner_enrollment_limit": 3,
+            "per_learner_spend_limit": 0,
+            "spend_limit": 0
+        },
+]
+
+Permissions
+-----------
+
+enterprise_admin
+  Should only create the transaction if the requesting user has implicit (JWT) or explicit (DB-defined) ``enterprise_admin`` role assigned.
+
+
+**GET /api/v1/admin/policy/<policy_uuid>/**
+
+Retrieve a subsidy access policy instance.
+
+Inputs
+------
+
+- ``policy_uuid`` (URL, required): The uuid of the customer. For now it will be an enterprise customer uuid.
+
+Outputs
+-------
+A sample response can be seen below.
+
+::
+
+    {
+        "uuid": "d0cd25f9-0b73-49c3-8299-dc9751a12ef5",
+        "policy_type": "PerLearnerEnrollmentCreditAccessPolicy",
+        "description": "sdad",
+        "active": true,
+        "group_uuid": "214cf999-5964-4a2e-afa8-c62461558211",
+        "catalog_uuid": "214cf999-5964-4a2e-afa8-c62461558315",
+        "subsidy_uuid": "214cf999-5964-4a2e-afa8-c62461342198",
+        "access_method": "direct",
+        "per_learner_enrollment_limit": 3,
+        "per_learner_spend_limit": 0,
+        "spend_limit": 0
+    }
+
+Permissions
+-----------
+
+enterprise_admin
+  Should only create the transaction if the requesting user has implicit (JWT) or explicit (DB-defined) ``enterprise_admin`` role assigned.
+
+**POST /api/v1/admin/policy/**
+
+Create a subsidy access policy instance after validating the request data.
+
+Inputs
+------
+
+- ``payload`` (request data, required): Payload data for POST request.
+
+A sample **request** can be seen below.
+
+::
+
+    {
+        "policy_type": "PerLearnerEnrollmentCreditAccessPolicy",
+        "description": "updated description",
+        "active": true,
+        "group_uuid": "214cf999-5964-4a2e-afa8-c62461558211",
+        "catalog_uuid": "214cf999-5964-4a2e-afa8-c62461558315",
+        "subsidy_uuid": "214cf999-5964-4a2e-afa8-c62461342198",
+        "access_method": "direct",
+        "per_learner_enrollment_limit": 3,
+        "per_learner_spend_limit": 0,
+        "spend_limit": 0
+    }
+
+Outputs
+-------
+A sample response can be seen below.
+
+::
+
+    {
+        "policy_type": "PerLearnerEnrollmentCreditAccessPolicy",
+        "description": "updated description",
+        "active": true,
+        "group_uuid": "214cf999-5964-4a2e-afa8-c62461558211",
+        "catalog_uuid": "214cf999-5964-4a2e-afa8-c62461558315",
+        "subsidy_uuid": "214cf999-5964-4a2e-afa8-c62461342198",
+        "access_method": "direct",
+        "per_learner_enrollment_limit": 3,
+        "per_learner_spend_limit": 0,
+        "spend_limit": 0
+    }
+
+
+Permissions
+-----------
+
+enterprise_admin
+  Should only create the transaction if the requesting user has implicit (JWT) or explicit (DB-defined) ``enterprise_admin`` role assigned.
