@@ -1,7 +1,6 @@
 """
 Tests for Enterprise Access API v1 views.
 """
-
 import random
 from unittest.mock import call, patch
 from uuid import uuid4
@@ -13,15 +12,25 @@ from pytest import mark
 from rest_framework import status
 from rest_framework.reverse import reverse
 
-from enterprise_access.apps.api.serializers import SubsidyAccessPolicyRedeemableSerializer
+from enterprise_access.apps.api.serializers import (
+    SubsidyAccessPolicyCRUDSerializer,
+    SubsidyAccessPolicyRedeemableSerializer
+)
 from enterprise_access.apps.core.constants import (
     ALL_ACCESS_CONTEXT,
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
+from enterprise_access.apps.subsidy_access_policy.constants import (
+    PER_LEARNER_SPEND_CREDIT,
+    SUBSCRIPTION_ACCESS,
+    AccessMethods
+)
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
-    PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory
+    PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
+    SubscriptionAccessPolicyFactory
 )
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
@@ -45,7 +54,7 @@ COUPON_CODE_REQUESTS_APPROVE_ENDPOINT = reverse('api:v1:coupon-code-requests-app
 COUPON_CODE_REQUESTS_DECLINE_ENDPOINT = reverse('api:v1:coupon-code-requests-decline')
 CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT = reverse('api:v1:customer-configurations-list')
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:policy-list')
-
+SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT = reverse('api:v1:admin-policy-list')
 
 @ddt.ddt
 @mark.django_db
@@ -1524,9 +1533,9 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITestWithMocks):
 
 
 @ddt.ddt
-class TestSubsidyAccessPolicyViewset(TestSubsidyRequestViewSet):
+class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
     """
-    Tests for SubsidyAccessPolicyViewset.
+    Tests for SubsidyAccessPolicyRedeemViewset.
     """
 
     def setUp(self):
@@ -1579,7 +1588,7 @@ class TestSubsidyAccessPolicyViewset(TestSubsidyRequestViewSet):
 
     def test_list_all_redeemable_only_policies(self):
         """
-        Verify that SubsidyAccessPolicyViewset list endpoint return all redeemable policies
+        Verify that SubsidyAccessPolicyRedeemViewset list endpoint return all redeemable policies
         """
         query_params = {
             'group_id': self.enterprise_uuid,
@@ -1627,7 +1636,7 @@ class TestSubsidyAccessPolicyViewset(TestSubsidyRequestViewSet):
     @ddt.unpack
     def test_list_endpoint_with_invalid_data(self, query_params, expected_result):
         """
-        Verify that SubsidyAccessPolicyViewset list raises correct exception if request data is invalid.
+        Verify that SubsidyAccessPolicyRedeemViewset list raises correct exception if request data is invalid.
         """
         response = self.client.get(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, query_params)
         response_json = self.load_json(response.content)
@@ -1636,7 +1645,7 @@ class TestSubsidyAccessPolicyViewset(TestSubsidyRequestViewSet):
 
     def test_redeem_policy(self):
         """
-        Verify that SubsidyAccessPolicyViewset redeem endpoint works as expected
+        Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint works as expected
         """
         payload = {
             'learner_id': '1234',
@@ -1645,3 +1654,248 @@ class TestSubsidyAccessPolicyViewset(TestSubsidyRequestViewSet):
         response = self.client.post(self.subsidy_access_policy_redeem_endpoint, payload)
         response_json = self.load_json(response.content)
         assert response_json == {'id': 1111}
+
+
+@ddt.ddt
+class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
+    """
+    Tests for SubsidyAccessPolicyCRUDViewset.
+    """
+    def setUp(self):
+        super().setUp()
+
+        self.enterprise_customer_uuid_1 = uuid4()
+        self.enterprise_customer_uuid_2 = uuid4()
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': self.enterprise_customer_uuid_1,
+        }])
+        self.policy_1 = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            group_uuid=self.enterprise_customer_uuid_1
+        )
+        self.policy_2 = SubscriptionAccessPolicyFactory(group_uuid=self.enterprise_customer_uuid_1)
+        self.policy_with_different_group_uuid = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
+
+    def test_list_policies_for_enterprise(self):
+        """
+        Verify that SubsidyAccessPolicyCRUDViewset list endpoint returns all policies that belong to the enterprise
+        the admin is linked to.
+        """
+        query_params = {
+            'group_uuid': self.enterprise_customer_uuid_1,
+        }
+        response = self.client.get(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, query_params, format='json')
+        response_json = self.load_json(response.content)
+        # Verify that api response only includes the policies linked to the enterprise admin belongs to.
+        assert response.data['results'] == SubsidyAccessPolicyCRUDSerializer([self.policy_2, self.policy_1],
+                                                                             many=True).data
+        # Verify that api response does not include policies that belong to another enterprise
+        for policy in response_json['results']:
+            assert policy['uuid'] != self.policy_with_different_group_uuid.uuid
+
+    def test_list_without_group_uuid_query_param(self):
+        """
+        Verify that SubsidyAccessPolicyCRUDViewset list endpoint without group_uuid returns a validation error
+        """
+        self.user.is_superuser = True
+        self.user.save()
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+            'context': ALL_ACCESS_CONTEXT
+        }])
+
+        query_params = {}
+        response = self.client.get(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, query_params, format='json')
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json() == ['"group_uuid" query param is required']
+
+    def test_list_403_for_non_admin_users(self):
+        """
+        Test that a 403 response is returned if the user is not an admin of the enterprise.
+        """
+        self.set_jwt_cookie(roles_and_contexts=[
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+                'context': str(self.enterprise_customer_uuid_1)
+            },
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+                'context': str(self.enterprise_customer_uuid_2)
+            }
+        ])
+        query_params = {
+            'group_uuid': self.enterprise_customer_uuid_1,
+        }
+        response = self.client.get(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, query_params, format='json')
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_create_policy_for_enterprise(self):
+        """
+        Verify that SubsidyAccessPolicyCRUDViewset create endpoint creates a Subsidy Policy with given request data.
+        """
+        payload = {
+            'policy_type': 'PerLearnerSpendCreditAccessPolicy',
+            'access_method': AccessMethods.DIRECT,
+            'description': 'edx-demo',
+            'active': 'true',
+            'group_uuid': str(self.enterprise_customer_uuid_1),
+            'catalog_uuid': str(uuid4()),
+            'subsidy_uuid': str(uuid4()),
+            'per_learner_enrollment_limit': '0',
+            'per_learner_spend_limit': '20',
+            'spend_limit': '0',
+        }
+        response = self.client.post(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, payload, format='json')
+        assert response.status_code == status.HTTP_201_CREATED
+        assert SubsidyAccessPolicy.objects.filter(group_uuid=self.enterprise_customer_uuid_1).count() \
+               == 3
+
+    def test_create_with_invalid_policy_type(self):
+        """
+        Verify that SubsidyAccessPolicyCRUDViewset create endpoint validates invalid policy_type.
+        """
+        payload = {
+            'policy_type': 'invalid-policy',
+            'access_method': AccessMethods.DIRECT,
+            'description': 'edx-demo',
+            'active': 'true',
+            'group_uuid': str(self.enterprise_customer_uuid_1),
+            'catalog_uuid': str(uuid4()),
+            'subsidy_uuid': str(uuid4()),
+            'per_learner_enrollment_limit': '0',
+            'per_learner_spend_limit': '20',
+            'spend_limit': '0',
+        }
+        response = self.client.post(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, payload, format='json')
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_validate_limits_for_non_credit_policy_type(self):
+        """
+        Verify that SubsidyAccessPolicyCRUDViewset validate method set all credit limits to 0
+        if request has any non-zero values for limits.
+        """
+        payload = {
+            'policy_type': SUBSCRIPTION_ACCESS,
+            'access_method': AccessMethods.DIRECT,
+            'description': 'edx-demo',
+            'active': 'true',
+            'group_uuid': str(self.enterprise_customer_uuid_1),
+            'catalog_uuid': str(uuid4()),
+            'subsidy_uuid': str(uuid4()),
+            'per_learner_enrollment_limit': 20,
+            'per_learner_spend_limit': 20,
+            'spend_limit': 20,
+        }
+        response = self.client.post(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, payload, format='json')
+        response_json = response.json()
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response_json['per_learner_enrollment_limit'] == 0
+        assert response_json['per_learner_spend_limit'] == 0
+        assert response_json['spend_limit'] == 0
+
+    def test_create_403_for_non_admin_users(self):
+        """
+        Test that a 403 response is returned if the user is not an admin of the enterprise for creation operation.
+        """
+        self.set_jwt_cookie(roles_and_contexts=[
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+                'context': str(self.enterprise_customer_uuid_1)
+            },
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+                'context': str(self.enterprise_customer_uuid_2)
+            }
+        ])
+        payload = {'uuid': 'some-uuid'}
+        response = self.client.post(
+            SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT,
+            payload,
+            format='json'
+        )
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_partial_update_policy_for_enterprise(self):
+        """
+        Verify that SubsidyAccessPolicyCRUDViewset partial_update endpoint updates a
+        Subsidy Policy with given request data.
+        """
+        new_access_method = AccessMethods.REQUEST
+        new_policy_type = PER_LEARNER_SPEND_CREDIT
+        new_description = 'new_description'
+        new_active_value = 'False'
+        new_spend_limit = 300
+        payload = {
+            'uuid': str(self.policy_1.uuid),
+            'policy_type': new_policy_type,
+            'access_method': new_access_method,
+            'description': new_description,
+            'active': new_active_value,
+            'group_uuid': str(self.enterprise_customer_uuid_1),
+            'catalog_uuid': str(uuid4()),
+            'subsidy_uuid': str(uuid4()),
+            'per_learner_enrollment_limit': '0',
+            'per_learner_spend_limit': new_spend_limit,
+            'spend_limit': '0',
+        }
+        response = self.client.patch(f'{SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT}{self.policy_1.uuid}/', payload)
+        response_json = response.json()
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        assert response_json['access_method'] == new_access_method
+        assert response_json['description'] == new_description
+        assert str(response_json['active']) == new_active_value
+        assert response_json['per_learner_spend_limit'] == new_spend_limit
+
+    def test_partial_update_with_invalid_policy_type(self):
+        """
+        Verify that SubsidyAccessPolicyCRUDViewset partial_update endpoint returns validation error for invalid
+        policy_type.
+        """
+        invalid_policy = 'invalid-policy'
+        payload = {
+            'uuid': str(self.policy_1.uuid),
+            'policy_type': invalid_policy,
+        }
+        response = self.client.patch(f'{SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT}{self.policy_1.uuid}/', payload)
+        expected_message_body = {'policy_type': ['"invalid-policy" is not a valid choice.']}
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json() == expected_message_body
+
+    def test_partial_update_with_invalid_policy_uuid(self):
+        """
+        Verify that SubsidyAccessPolicyCRUDViewset partial_update endpoint returns 403 for invalid
+        policy_uuid.
+        """
+        invalid_policy = str(uuid4())
+        response = self.client.patch(f'{SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT}{invalid_policy}/', {})
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_partial_update_policy_uuid(self):
+        """
+        Verify that SubsidyAccessPolicyCRUDViewset partial_update method does not allow
+        changing policy_uuid.
+        """
+        new_access_method = AccessMethods.REQUEST
+        new_policy_type = PER_LEARNER_SPEND_CREDIT
+        new_description = 'new_description'
+        new_active_value = 'False'
+        new_spend_limit = 300
+        payload = {
+            'uuid': str(uuid4()),
+            'policy_type': new_policy_type,
+            'access_method': new_access_method,
+            'description': new_description,
+            'active': new_active_value,
+            'group_uuid': str(self.enterprise_customer_uuid_1),
+            'catalog_uuid': str(uuid4()),
+            'subsidy_uuid': str(uuid4()),
+            'per_learner_enrollment_limit': '0',
+            'per_learner_spend_limit': new_spend_limit,
+            'spend_limit': '0',
+        }
+        response = self.client.patch(f'{SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT}{self.policy_1.uuid}/', payload)
+        response_json = response.json()
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response_json == ['"policy_uuid" cannot be changed']
