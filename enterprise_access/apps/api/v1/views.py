@@ -816,11 +816,21 @@ class SubsidyAccessPolicyViewset(PermissionRequiredMixin, viewsets.GenericViewSe
 
         learner_id = serializer.data['learner_id']
         content_key = serializer.data['content_key']
+        lock_acquired = False
+        try:
+            lock_acquired = policy.acquire_lock(learner_id, content_key)
+            if not lock_acquired:
+                return Response(
+                    data='Enrollment currently locked for this subsidy.',
+                    status=status.HTTP_423_LOCKED,
+                )
+            if policy.can_redeem(learner_id, content_key):
+                response = policy.redeem(learner_id, content_key)
 
-        if policy.can_redeem(learner_id, content_key):
-            response = policy.redeem(learner_id, content_key)
-
-        return Response(
-            response,
-            status=status.HTTP_200_OK,
-        )
+            return Response(
+                response,
+                status=status.HTTP_200_OK,
+            )
+        finally:
+            if lock_acquired:
+                policy.release_lock(learner_id, content_key)

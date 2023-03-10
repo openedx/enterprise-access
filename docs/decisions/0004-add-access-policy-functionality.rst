@@ -270,6 +270,38 @@ then after that prioritizing subsidies with smaller balances.  Here’s a protot
      # Simply pick the first policy:
      return sorted_policies[0]
 
+Concurrency and Transaction Isolation
+=====================================
+The following measures are proposed to ensure transaction isolation for a given redemption:
+Access policy level lock: Applied at the entire policy level, this lock ensures that no other redemption
+against a policy can execute concurrently and exceed the per-policy limits on enrollment or spend.
+Learner specific lock: Applied on a combined instance of a learner and policy, this lock ensures that no other
+redemption against the same learner can execute concurrently and exceed the per learner limits on enrollment or spend.
+Incase of a policy with more than one limit e.g. both at the policy and learner levels, the more restrictive
+policy level lock can be used.
+As a start, policy level locks will be implemented with active monitoring of http 423 status codes to see
+if the learner level locks are warranted.
+
+.. code-block:: python
+
+  try:
+    lock_acquired = policy.acquire_lock(learner_id, content_key)
+    if not lock_acquired:
+      return Response(
+          data='Enrollment currently locked for this subsidy.',
+          status=status.HTTP_423_LOCKED,
+      )
+    if policy.can_redeem(learner_id, content_key):
+      response = policy.redeem(learner_id, content_key)
+
+    return Response(
+      response,
+      status=status.HTTP_200_OK,
+    )
+  finally:
+    if lock_acquired:
+      policy.release_lock(learner_id, content_key)
+
 Benefits of the overall design
 ==============================
 The proposed design supports a few characteristics:
