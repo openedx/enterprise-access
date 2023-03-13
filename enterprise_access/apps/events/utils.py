@@ -152,21 +152,22 @@ def send_subsidy_redemption_event_to_event_bus(event_name, event_properties):
     """
     Sends subsidy redemption and reversal events to the event bus.
     """
-    try:
-        event_producer = ProducerFactory.get_or_create_event_producer(
-            settings.SUBSIDY_REDEMPTION_TOPIC_NAME,
-            StringSerializer('utf-8'),
-            SubsidyRedemptionSerializer.get_serializer()
-        )
-        event_producer.produce(
-            settings.SUBSIDY_REDEMPTION_TOPIC_NAME,
-            key=str(event_name),
-            value=SubsidyRedemptionEvent(**event_properties),
-            on_delivery=verify_event
-        )
-        event_producer.poll()
-    except ValueSerializationError as vse:
-        logger.exception(vse)
+    if settings.KAFKA_ENABLED:  # pragma: no cover
+        try:
+            event_producer = ProducerFactory.get_or_create_event_producer(
+                settings.SUBSIDY_REDEMPTION_TOPIC_NAME,
+                StringSerializer('utf-8'),
+                SubsidyRedemptionSerializer.get_serializer()
+            )
+            event_producer.produce(
+                settings.SUBSIDY_REDEMPTION_TOPIC_NAME,
+                key=str(event_name),
+                value=SubsidyRedemptionEvent(**event_properties),
+                on_delivery=verify_event
+            )
+            event_producer.poll()
+        except ValueSerializationError as vse:
+            logger.exception(vse)
 
 
 def verify_event(err, evt):

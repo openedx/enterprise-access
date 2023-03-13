@@ -123,7 +123,7 @@ class SubsidyRequestCustomerConfigurationSerializer(serializers.ModelSerializer)
         return super().update(instance, validated_data)
 
 
-class SubsidiyAccessPolicyRedeemSerializer(serializers.Serializer):  # pylint: disable=abstract-method
+class SubsidyAccessPolicyRedeemSerializer(serializers.Serializer):  # pylint: disable=abstract-method
     """
     Serializer to validate policy redeem request POST data.
     """
@@ -141,7 +141,7 @@ class SubsidiyAccessPolicyRedeemSerializer(serializers.Serializer):  # pylint: d
 
         return value
 
-class SubsidiyAccessPolicyListSerializer(SubsidiyAccessPolicyRedeemSerializer):  # pylint: disable=abstract-method
+class SubsidyAccessPolicyListSerializer(SubsidyAccessPolicyRedeemSerializer):  # pylint: disable=abstract-method
     """
     Serializer to validate policy request GET query params.
     """

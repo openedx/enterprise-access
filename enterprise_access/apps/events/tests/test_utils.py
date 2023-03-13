@@ -8,6 +8,7 @@ import mock
 from confluent_kafka.error import ValueSerializationError
 from django.conf import settings
 from django.test import TestCase
+from django.test.utils import override_settings
 from faker import Faker
 
 from enterprise_access.apps.events.signals import ACCESS_POLICY_CREATED, SUBSIDY_REDEEMED
@@ -25,7 +26,7 @@ class UtilsTests(TestCase):
     """
     Unit tests for the utility functions.
     """
-
+    @override_settings(KAFKA_ENABLED=True)
     @mock.patch('enterprise_access.apps.events.utils.logger', return_value=mock.MagicMock())
     @mock.patch('enterprise_access.apps.events.utils.SerializingProducer', return_value=mock.MagicMock())
     def test_send_access_policy_event_to_event_bus(self, mock_serializing_producer, mock_logger):
@@ -63,6 +64,7 @@ class UtilsTests(TestCase):
         )
         assert mock_logger.exception.call_count == 1
 
+    @override_settings(KAFKA_ENABLED=True)
     @mock.patch('enterprise_access.apps.events.utils.logger', return_value=mock.MagicMock())
     @mock.patch('enterprise_access.apps.events.utils.SerializingProducer', return_value=mock.MagicMock())
     def test_send_subsidy_redemption_event_to_event_bus(self, mock_serializing_producer, mock_logger):
