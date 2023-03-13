@@ -43,11 +43,26 @@ class SubsidyAccessPolicy(TimeStampedModel):
         editable=False,
         unique=True,
     )
+    enterprise_customer_uuid = models.UUIDField(
+        db_index=True,
+        null=True,
+        blank=False,
+        help_text=(
+            "The owning Enterprise Customer's UUID.  Cannot be blank or null."
+        ),
+    )
     description = models.TextField(help_text="Brief description about a specific policy.")
     active = models.BooleanField(default=False)
-    group_uuid = models.UUIDField(db_index=True)
     catalog_uuid = models.UUIDField(db_index=True)
     subsidy_uuid = models.UUIDField(db_index=True)
+    group_uuid = models.UUIDField(
+        db_index=True,
+        null=True,
+        blank=True,
+        help_text=(
+            "Optional, currently useless field for future Enterprise Groups implementation."
+        ),
+    )
     access_method = models.CharField(
         max_length=32,
         choices=AccessMethods.CHOICES,
@@ -112,7 +127,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         if not enterprise_catalog_api_client.contains_content_items(self.catalog_uuid, [content_key]):
             return False
-        if not lms_api_client.enterprise_contains_learner(self.group_uuid, learner_id):
+        if not lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, learner_id):
             return False
         if not subsidy_client.can_redeem(self.subsidy_uuid, learner_id, content_key):
             return False
