@@ -48,6 +48,8 @@ from enterprise_access.apps.api.utils import (
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
+from enterprise_access.apps.events.signals import SUBSIDY_REDEEMED
+from enterprise_access.apps.events.utils import send_subsidy_redemption_event_to_event_bus
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
@@ -789,7 +791,7 @@ class SubsidyAccessPolicyViewset(PermissionRequiredMixin, viewsets.GenericViewSe
         """
         Return a list of all redeemable policies for given `group_uuid`, `learner_id` and `content_key`
         """
-        serializer = serializers.SubsidiyAccessPolicyListSerializer(data=request.query_params)
+        serializer = serializers.SubsidyAccessPolicyListSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         group_uuid = serializer.data['group_id']
@@ -811,7 +813,7 @@ class SubsidyAccessPolicyViewset(PermissionRequiredMixin, viewsets.GenericViewSe
         """
         policy = get_object_or_404(SubsidyAccessPolicy, pk=kwargs.get('uuid'))
 
-        serializer = serializers.SubsidiyAccessPolicyRedeemSerializer(data=request.data)
+        serializer = serializers.SubsidyAccessPolicyRedeemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         learner_id = serializer.data['learner_id']
@@ -826,7 +828,10 @@ class SubsidyAccessPolicyViewset(PermissionRequiredMixin, viewsets.GenericViewSe
                 )
             if policy.can_redeem(learner_id, content_key):
                 response = policy.redeem(learner_id, content_key)
-
+                send_subsidy_redemption_event_to_event_bus(
+                    SUBSIDY_REDEEMED.event_type,
+                    serializer.data
+                )
             return Response(
                 response,
                 status=status.HTTP_200_OK,
