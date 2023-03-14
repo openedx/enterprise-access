@@ -50,8 +50,11 @@ from enterprise_access.apps.api.utils import (
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
-from enterprise_access.apps.events.signals import SUBSIDY_REDEEMED
-from enterprise_access.apps.events.utils import send_subsidy_redemption_event_to_event_bus
+from enterprise_access.apps.events.signals import ACCESS_POLICY_CREATED, ACCESS_POLICY_UPDATED, SUBSIDY_REDEEMED
+from enterprise_access.apps.events.utils import (
+    send_access_policy_event_to_event_bus,
+    send_subsidy_redemption_event_to_event_bus
+)
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
@@ -799,6 +802,10 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         serializer = self.get_serializer(data=policy_data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        send_access_policy_event_to_event_bus(
+            ACCESS_POLICY_CREATED.event_type,
+            serializer.data
+        )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, *args, **kwargs):
@@ -813,6 +820,10 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         serializer = self.get_serializer(policy, data=policy_data_from_request, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        send_access_policy_event_to_event_bus(
+            ACCESS_POLICY_UPDATED.event_type,
+            serializer.data
+        )
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
     def list(self, request, *args, **kwargs):
