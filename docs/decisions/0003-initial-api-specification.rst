@@ -94,6 +94,29 @@ enterprise_learner
   Should only create the transaction if the requesting user has implicit (JWT) or explicit (DB-defined)
   ``enterprise_learner`` role assigned.
 
+GET access policy redemption
+===============================
+**/api/v1/policy/redemption/**
+
+Return a list of all redemptions belong to a learner for a given `group_id`, `learner_id` and `content_key`.
+
+Inputs
+------
+
+- ``group_id`` (Query Param, required): The uuid of the customer. For now it will be an enterprise customer uuid.
+- ``learner_id`` (Query Param, required): The lms user id for whom we need to check redemptions for.
+- ``content_key`` (Query Param, required): The content for which a enrollment is created.
+
+Outputs
+-------
+Not Finalized
+
+Permissions
+-----------
+
+enterprise_learner
+  Requesting user has implicit (JWT) or explicit (DB-defined) ``enterprise_learner`` role assigned.
+
 
 CRUD operations on SubsidyAccessPolicy
 ======================================
