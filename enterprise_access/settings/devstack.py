@@ -74,6 +74,7 @@ DISCOVERY_URL = 'http://edx.devstack.discovery:18381'
 ENTERPRISE_LEARNER_PORTAL_URL = 'http://localhost:8734'
 ENTERPRISE_ADMIN_PORTAL_URL = 'http://localhost:1991'
 ENTERPRISE_CATALOG_URL = 'http://localhost:18160'
+ENTERPRISE_SUBSIDY_URL = 'http://enterprise_subsidy.app:18280'
 
 # shell_plus
 SHELL_PLUS_IMPORTS = [
