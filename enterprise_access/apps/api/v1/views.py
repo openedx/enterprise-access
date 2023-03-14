@@ -849,7 +849,7 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
         """
         enterprise_uuid = ''
 
-        if self.action == 'list':
+        if self.action in ('list', 'redemption'):
             enterprise_uuid = self.request.query_params.get('group_id')
 
         if self.action == 'redeem':
@@ -925,3 +925,26 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
         finally:
             if lock_acquired:
                 policy.release_lock(learner_id, content_key)
+
+    @action(detail=False, methods=['get'])
+    def redemption(self, request, *args, **kwargs):
+        """
+        Return redemption records for given `group_id`, `learner_id` and `content_key`
+        """
+        serializer = serializers.SubsidyAccessPolicyRedeemListSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        group_uuid = serializer.data['group_id']
+        learner_id = serializer.data['learner_id']
+        content_key = serializer.data['content_key']
+
+        redemptions = []
+        policies = SubsidyAccessPolicy.objects.filter(group_uuid=group_uuid)
+        for policy in policies:
+            redemption = policy.has_redeemed(learner_id, content_key)
+            redemptions.append(redemption)
+
+        return Response(
+            redemptions,
+            status=status.HTTP_200_OK,
+        )

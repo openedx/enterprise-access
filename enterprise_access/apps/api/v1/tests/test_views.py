@@ -1557,6 +1557,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
             'api:v1:policy-redeem',
             kwargs={'uuid': self.redeemable_policy.uuid}
         )
+        self.subsidy_access_policy_redemption_endpoint = reverse('api:v1:policy-redemption')
 
         self.setup_mocks()
 
@@ -1570,6 +1571,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         subsidy_client.can_redeem.return_value = True
         subsidy_client.transactions_for_learner.return_value = 2
         subsidy_client.redeem.return_value = {'id': 1111}
+        subsidy_client.has_redeemed.return_value = {'id': 1111}
 
         catalog_client_path = 'enterprise_access.apps.subsidy_access_policy.models.EnterpriseCatalogApiClient'
         enterprise_catalog_client_patcher = patch(catalog_client_path)
@@ -1654,6 +1656,19 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         response = self.client.post(self.subsidy_access_policy_redeem_endpoint, payload)
         response_json = self.load_json(response.content)
         assert response_json == {'id': 1111}
+
+    def test_redemption_endpoint(self):
+        """
+        Verify that SubsidyAccessPolicyViewset redemption endpoint works as expected
+        """
+        query_params = {
+            'group_id': self.enterprise_uuid,
+            'learner_id': '1234',
+            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
+        }
+        response = self.client.get(self.subsidy_access_policy_redemption_endpoint, query_params)
+        response_json = self.load_json(response.content)
+        assert response_json == [{'id': 1111}]
 
 
 @ddt.ddt
