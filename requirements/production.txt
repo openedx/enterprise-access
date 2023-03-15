@@ -45,7 +45,7 @@ cffi==1.15.1
     #   -r requirements/base.txt
     #   cryptography
     #   pynacl
-charset-normalizer==3.0.1
+charset-normalizer==3.1.0
     # via
     #   -r requirements/base.txt
     #   requests
@@ -92,9 +92,10 @@ defusedxml==0.7.1
     #   -r requirements/base.txt
     #   python3-openid
     #   social-auth-core
-django==3.2.16
+django==3.2.18
     # via
     #   -r requirements/base.txt
+    #   django-celery-results
     #   django-cors-headers
     #   django-crum
     #   django-extensions
@@ -114,9 +115,9 @@ django==3.2.16
     #   jsonfield
     #   jsonfield2
     #   openedx-events
-django-celery-results==2.4.0
+django-celery-results==2.5.0
     # via -r requirements/base.txt
-django-cors-headers==3.13.0
+django-cors-headers==3.14.0
     # via -r requirements/base.txt
 django-crum==0.7.9
     # via
@@ -156,9 +157,9 @@ drf-jwt==1.19.2
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
-drf-spectacular==0.25.1
+drf-spectacular==0.26.0
     # via -r requirements/base.txt
-drf-yasg==1.21.4
+drf-yasg==1.21.5
     # via
     #   -r requirements/base.txt
     #   edx-api-doc-tools
@@ -166,7 +167,7 @@ edx-api-doc-tools==1.6.0
     # via -r requirements/base.txt
 edx-auth-backends==4.1.0
     # via -r requirements/base.txt
-edx-braze-client==0.1.5
+edx-braze-client==0.1.6
     # via -r requirements/base.txt
 edx-celeryutils==1.2.2
     # via -r requirements/base.txt
@@ -190,7 +191,7 @@ edx-rbac==1.7.0
     # via -r requirements/base.txt
 edx-rest-api-client==5.5.0
     # via -r requirements/base.txt
-fastavro==1.7.1
+fastavro==1.7.3
     # via
     #   -r requirements/base.txt
     #   openedx-events
@@ -208,7 +209,7 @@ idna==3.4
     # via
     #   -r requirements/base.txt
     #   requests
-importlib-resources==5.10.2
+importlib-resources==5.12.0
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -251,7 +252,7 @@ mysqlclient==2.1.1
     # via
     #   -r requirements/base.txt
     #   -r requirements/production.in
-newrelic==8.5.0
+newrelic==8.7.0
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -264,7 +265,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
-openedx-events==4.2.0
+openedx-events==7.0.0
     # via -r requirements/base.txt
 packaging==23.0
     # via
@@ -282,7 +283,7 @@ ply==3.11
     # via
     #   -r requirements/base.txt
     #   djangoql
-prompt-toolkit==3.0.36
+prompt-toolkit==3.0.38
     # via
     #   -r requirements/base.txt
     #   click-repl
@@ -346,7 +347,7 @@ pyyaml==6.0
     #   -r requirements/production.in
     #   drf-spectacular
     #   edx-django-release-util
-redis==4.4.2
+redis==4.5.1
     # via -r requirements/base.txt
 requests==2.28.2
     # via
@@ -377,7 +378,7 @@ semantic-version==2.10.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
-simplejson==3.18.1
+simplejson==3.18.4
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
@@ -410,7 +411,7 @@ sqlparse==0.4.3
     # via
     #   -r requirements/base.txt
     #   django
-stevedore==4.1.1
+stevedore==5.0.0
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -421,7 +422,7 @@ uritemplate==4.1.1
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==1.26.14
+urllib3==1.26.15
     # via
     #   -r requirements/base.txt
     #   requests
@@ -435,7 +436,7 @@ wcwidth==0.2.6
     # via
     #   -r requirements/base.txt
     #   prompt-toolkit
-zipp==3.12.0
+zipp==3.15.0
     # via
     #   -r requirements/base.txt
     #   importlib-resources
