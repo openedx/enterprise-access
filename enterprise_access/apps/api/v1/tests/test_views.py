@@ -1549,13 +1549,13 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         }])
 
         self.redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
-            group_uuid=self.enterprise_uuid
+            enterprise_customer_uuid=self.enterprise_uuid
         )
         self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
 
         self.subsidy_access_policy_redeem_endpoint = reverse(
             'api:v1:policy-redeem',
-            kwargs={'uuid': self.redeemable_policy.uuid}
+            kwargs={'policy_uuid': self.redeemable_policy.uuid}
         )
         self.subsidy_access_policy_redemption_endpoint = reverse('api:v1:policy-redemption')
 
@@ -1593,7 +1593,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         Verify that SubsidyAccessPolicyRedeemViewset list endpoint return all redeemable policies
         """
         query_params = {
-            'group_id': self.enterprise_uuid,
+            'enterprise_customer_uuid': self.enterprise_uuid,
             'learner_id': '1234',
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
         }
@@ -1612,7 +1612,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
     @ddt.data(
         (
             {
-                'group_id': '12aacfee-8ffa-4cb3-bed1-059565a57f06'
+                'enterprise_customer_uuid': '12aacfee-8ffa-4cb3-bed1-059565a57f06'
             },
             {
                 'content_key': ['This field is required.'],
@@ -1621,7 +1621,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         ),
         (
             {
-                'group_id': '12aacfee-8ffa-4cb3-bed1-059565a57f06',
+                'enterprise_customer_uuid': '12aacfee-8ffa-4cb3-bed1-059565a57f06',
                 'learner_id': '1234',
                 'content_key': 'content_key',
             },
@@ -1662,7 +1662,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         Verify that SubsidyAccessPolicyViewset redemption endpoint works as expected
         """
         query_params = {
-            'group_id': self.enterprise_uuid,
+            'enterprise_customer_uuid': self.enterprise_uuid,
             'learner_id': '1234',
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
         }
@@ -1687,10 +1687,10 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
             'context': self.enterprise_customer_uuid_1,
         }])
         self.policy_1 = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
-            group_uuid=self.enterprise_customer_uuid_1
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1
         )
-        self.policy_2 = SubscriptionAccessPolicyFactory(group_uuid=self.enterprise_customer_uuid_1)
-        self.policy_with_different_group_uuid = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
+        self.policy_2 = SubscriptionAccessPolicyFactory(enterprise_customer_uuid=self.enterprise_customer_uuid_1)
+        self.policy_with_different_enterprise_customer_uuid = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
 
     def test_list_policies_for_enterprise(self):
         """
@@ -1698,7 +1698,7 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
         the admin is linked to.
         """
         query_params = {
-            'group_uuid': self.enterprise_customer_uuid_1,
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
         }
         response = self.client.get(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, query_params, format='json')
         response_json = self.load_json(response.content)
@@ -1707,11 +1707,11 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
                                                                              many=True).data
         # Verify that api response does not include policies that belong to another enterprise
         for policy in response_json['results']:
-            assert policy['uuid'] != self.policy_with_different_group_uuid.uuid
+            assert policy['uuid'] != self.policy_with_different_enterprise_customer_uuid.uuid
 
-    def test_list_without_group_uuid_query_param(self):
+    def test_list_without_enterprise_customer_uuid_query_param(self):
         """
-        Verify that SubsidyAccessPolicyCRUDViewset list endpoint without group_uuid returns a validation error
+        Verify that SubsidyAccessPolicyCRUDViewset list endpoint without enterprise_customer_uuid returns an error
         """
         self.user.is_superuser = True
         self.user.save()
@@ -1724,7 +1724,7 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
         query_params = {}
         response = self.client.get(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, query_params, format='json')
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.json() == ['"group_uuid" query param is required']
+        assert response.json() == ['"enterprise_customer_uuid" query param is required']
 
     def test_list_403_for_non_admin_users(self):
         """
@@ -1741,7 +1741,7 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
             }
         ])
         query_params = {
-            'group_uuid': self.enterprise_customer_uuid_1,
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
         }
         response = self.client.get(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, query_params, format='json')
         assert response.status_code == status.HTTP_403_FORBIDDEN
@@ -1755,7 +1755,7 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
             'access_method': AccessMethods.DIRECT,
             'description': 'edx-demo',
             'active': 'true',
-            'group_uuid': str(self.enterprise_customer_uuid_1),
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
             'catalog_uuid': str(uuid4()),
             'subsidy_uuid': str(uuid4()),
             'per_learner_enrollment_limit': '0',
@@ -1764,7 +1764,7 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
         }
         response = self.client.post(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, payload, format='json')
         assert response.status_code == status.HTTP_201_CREATED
-        assert SubsidyAccessPolicy.objects.filter(group_uuid=self.enterprise_customer_uuid_1).count() \
+        assert SubsidyAccessPolicy.objects.filter(enterprise_customer_uuid=self.enterprise_customer_uuid_1).count() \
                == 3
 
     def test_create_with_invalid_policy_type(self):
@@ -1776,7 +1776,7 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
             'access_method': AccessMethods.DIRECT,
             'description': 'edx-demo',
             'active': 'true',
-            'group_uuid': str(self.enterprise_customer_uuid_1),
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
             'catalog_uuid': str(uuid4()),
             'subsidy_uuid': str(uuid4()),
             'per_learner_enrollment_limit': '0',
@@ -1796,7 +1796,7 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
             'access_method': AccessMethods.DIRECT,
             'description': 'edx-demo',
             'active': 'true',
-            'group_uuid': str(self.enterprise_customer_uuid_1),
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
             'catalog_uuid': str(uuid4()),
             'subsidy_uuid': str(uuid4()),
             'per_learner_enrollment_limit': 20,
@@ -1848,7 +1848,7 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
             'access_method': new_access_method,
             'description': new_description,
             'active': new_active_value,
-            'group_uuid': str(self.enterprise_customer_uuid_1),
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
             'catalog_uuid': str(uuid4()),
             'subsidy_uuid': str(uuid4()),
             'per_learner_enrollment_limit': '0',
@@ -1903,7 +1903,7 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
             'access_method': new_access_method,
             'description': new_description,
             'active': new_active_value,
-            'group_uuid': str(self.enterprise_customer_uuid_1),
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
             'catalog_uuid': str(uuid4()),
             'subsidy_uuid': str(uuid4()),
             'per_learner_enrollment_limit': '0',

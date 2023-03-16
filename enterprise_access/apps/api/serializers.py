@@ -162,7 +162,7 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
     policy_type = serializers.ChoiceField(choices=PolicyTypes.CHOICES)
     description = serializers.CharField(max_length=None, min_length=None, allow_blank=False, trim_whitespace=True)
     active = serializers.BooleanField()
-    group_uuid = serializers.UUIDField(allow_null=False, required=True)
+    enterprise_customer_uuid = serializers.UUIDField(allow_null=False, required=True)
     catalog_uuid = serializers.UUIDField(allow_null=False)
     subsidy_uuid = serializers.UUIDField(allow_null=False)
     access_method = serializers.ChoiceField(choices=AccessMethods.CHOICES)
@@ -178,7 +178,7 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
             'policy_type',
             'description',
             'active',
-            'group_uuid',
+            'enterprise_customer_uuid',
             'catalog_uuid',
             'subsidy_uuid',
             'access_method',
@@ -214,7 +214,7 @@ class SubsidyAccessPolicyRedeemListSerializer(SubsidyAccessPolicyRedeemSerialize
     """
     Serializer to validate policy request GET query params.
     """
-    group_id = serializers.UUIDField(required=True)
+    enterprise_customer_uuid = serializers.UUIDField(required=True)
 
 
 class SubsidyAccessPolicyRedeemableSerializer(serializers.ModelSerializer):
@@ -229,4 +229,4 @@ class SubsidyAccessPolicyRedeemableSerializer(serializers.ModelSerializer):
         exclude = ('created', 'modified')
 
     def get_policy_redemption_url(self, obj):
-        return reverse('api:v1:policy-redeem', kwargs={'uuid': obj.uuid})
+        return reverse('api:v1:policy-redeem', kwargs={'policy_uuid': obj.uuid})
