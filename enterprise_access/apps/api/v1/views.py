@@ -762,37 +762,37 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
     serializer_class = serializers.SubsidyAccessPolicyCRUDSerializer
     authentication_classes = (JwtAuthentication,)
     filter_backends = (filters.OrderingFilter, DjangoFilterBackend,)
-    filterset_fields = ('group_uuid', 'policy_type',)
+    filterset_fields = ('enterprise_customer_uuid', 'policy_type',)
     pagination_class = PaginationWithPageCount
     http_method_names = ['get', 'post', 'patch', 'delete']
     lookup_field = 'uuid'
     permission_required = 'requests.has_admin_access'
 
     @property
-    def requested_group_uuid(self):
+    def requested_enterprise_customer_uuid(self):
         """
-        The group_uuid from request params or post body
+        The enterprise_customer_uuid from request params or post body
         """
-        group_uuid = None
+        enterprise_customer_uuid = None
         if self.action in ('retrieve', 'partial_update', 'destroy'):
             policy_uuid = self.kwargs.get('uuid')
             if policy_uuid:
                 try:
                     policy = SubsidyAccessPolicy.objects.get(uuid=policy_uuid)
-                    group_uuid = str(policy.group_uuid)
+                    enterprise_customer_uuid = str(policy.enterprise_customer_uuid)
                 except ObjectDoesNotExist:
-                    group_uuid = None
+                    enterprise_customer_uuid = None
         elif self.action == 'create':
-            group_uuid = self.request.POST.get('group_uuid') or self.request.data.get('group_uuid')
+            enterprise_customer_uuid = self.request.data.get('enterprise_customer_uuid')
         else:
-            group_uuid = self.request.query_params.get('group_uuid', None)
-        return group_uuid
+            enterprise_customer_uuid = self.request.query_params.get('enterprise_customer_uuid', None)
+        return enterprise_customer_uuid
 
     def get_permission_object(self):
         """
-        Returns the enterprise_uuid (group_uuid) to verify that requesting user possess the enterprise admin role.
+        Returns the enterprise_customer_uuid to verify that requesting user possess the enterprise admin role.
         """
-        return self.requested_group_uuid
+        return self.requested_enterprise_customer_uuid
 
     def create(self, request, *args, **kwargs):
         """
@@ -830,9 +830,9 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         """
         List action for SubsidyAccessPolicyCRUDViewset. Show all policies linked with the group uuid passed in request.
         """
-        group_uuid = self.requested_group_uuid
-        if not group_uuid:
-            raise rest_serializers.ValidationError('"group_uuid" query param is required')
+        enterprise_customer_uuid = self.requested_enterprise_customer_uuid
+        if not enterprise_customer_uuid:
+            raise rest_serializers.ValidationError('"enterprise_customer_uuid" query param is required')
         return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -841,8 +841,8 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         on the enterprise's policies they belong to.
         """
         queryset = SubsidyAccessPolicy.objects.order_by('-created')
-        group_uuid = self.requested_group_uuid
-        return queryset.filter(group_uuid=group_uuid)
+        enterprise_customer_uuid = self.requested_enterprise_customer_uuid
+        return queryset.filter(enterprise_customer_uuid=enterprise_customer_uuid)
 
 
 class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.GenericViewSet):
@@ -851,7 +851,7 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
     """
     authentication_classes = [JwtAuthentication]
     permission_classes = [permissions.IsAuthenticated]
-    lookup_url_kwarg = 'uuid'
+    lookup_url_kwarg = 'policy_uuid'
     permission_required = 'requests.has_learner_or_admin_access'
 
     def get_permission_object(self):
@@ -861,23 +861,23 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
         enterprise_uuid = ''
 
         if self.action in ('list', 'redemption'):
-            enterprise_uuid = self.request.query_params.get('group_id')
+            enterprise_uuid = self.request.query_params.get('enterprise_customer_uuid')
 
         if self.action == 'redeem':
-            policy_uuid = self.kwargs.get('uuid')
+            policy_uuid = self.kwargs.get('policy_uuid')
             with suppress(ValidationError):  # Ignore if `policy_uuid` is not a valid uuid
                 policy = SubsidyAccessPolicy.objects.filter(uuid=policy_uuid).first()
                 if policy:
-                    enterprise_uuid = policy.group_uuid
+                    enterprise_uuid = policy.enterprise_customer_uuid
 
         return enterprise_uuid
 
-    def redeemable_policies(self, group_uuid, learner_id, content_key):
+    def redeemable_policies(self, enterprise_customer_uuid, learner_id, content_key):
         """
         Return all redeemable policies.
         """
         redeemable_policies = []
-        all_policies = SubsidyAccessPolicy.objects.filter(group_uuid=group_uuid)
+        all_policies = SubsidyAccessPolicy.objects.filter(enterprise_customer_uuid=enterprise_customer_uuid)
         for policy in all_policies:
             if policy.can_redeem(learner_id, content_key):
                 redeemable_policies.append(policy)
@@ -886,16 +886,16 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
 
     def list(self, request):
         """
-        Return a list of all redeemable policies for given `group_uuid`, `learner_id` and `content_key`
+        Return a list of all redeemable policies for given `enterprise_customer_uuid`, `learner_id` and `content_key`
         """
         serializer = serializers.SubsidyAccessPolicyRedeemListSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
-        group_uuid = serializer.data['group_id']
+        enterprise_customer_uuid = serializer.data['enterprise_customer_uuid']
         learner_id = serializer.data['learner_id']
         content_key = serializer.data['content_key']
 
-        redeemable_policies = self.redeemable_policies(group_uuid, learner_id, content_key)
+        redeemable_policies = self.redeemable_policies(enterprise_customer_uuid, learner_id, content_key)
         response_data = serializers.SubsidyAccessPolicyRedeemableSerializer(redeemable_policies, many=True).data
 
         return Response(
@@ -908,7 +908,7 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
         """
         Redeem a policy for given `learner_id` and `content_key`
         """
-        policy = get_object_or_404(SubsidyAccessPolicy, pk=kwargs.get('uuid'))
+        policy = get_object_or_404(SubsidyAccessPolicy, pk=kwargs.get('policy_uuid'))
 
         serializer = serializers.SubsidyAccessPolicyRedeemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -940,17 +940,17 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
     @action(detail=False, methods=['get'])
     def redemption(self, request, *args, **kwargs):
         """
-        Return redemption records for given `group_id`, `learner_id` and `content_key`
+        Return redemption records for given `enterprise_customer_uuid`, `learner_id` and `content_key`
         """
         serializer = serializers.SubsidyAccessPolicyRedeemListSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
-        group_uuid = serializer.data['group_id']
+        enterprise_customer_uuid = serializer.data['enterprise_customer_uuid']
         learner_id = serializer.data['learner_id']
         content_key = serializer.data['content_key']
 
         redemptions = []
-        policies = SubsidyAccessPolicy.objects.filter(group_uuid=group_uuid)
+        policies = SubsidyAccessPolicy.objects.filter(enterprise_customer_uuid=enterprise_customer_uuid)
         for policy in policies:
             redemption = policy.has_redeemed(learner_id, content_key)
             redemptions.append(redemption)
