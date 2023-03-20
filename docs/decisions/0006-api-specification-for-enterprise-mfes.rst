@@ -39,6 +39,9 @@ list of redeemable policies, which would mean the client  (e.g., enterprise lear
 logic to make a choice of which redeemable policy to attempt a redemption. This new API endpoint would thus remove the
 need for such business logic in the client given the subsidy access policy choice is abstracted into the API layer instead.
 
+The redemption fulfillment status is retrieved from the ``/api/v1/transactions/<transaction_uuid>/`` API endpoint in ``enterprise-subsidy``,
+which returns an individual transaction and its current state (i.e., ``created``, ``pending``, ``committed``).
+
 *Inputs (query parameters):*
 
 * ``lms_user_id``
