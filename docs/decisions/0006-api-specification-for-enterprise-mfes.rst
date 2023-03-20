@@ -26,6 +26,11 @@ the learner is already enrolled in the course (i.e., a prior redemption has been
 fulfilled) and/or which subsidy access policy should be used to redeem the course when a learner
 clicks the "Enroll" button.
 
+This API endpoint differs from the current one spec'd in the 0003 Initial API Specification in that
+it makes a decision of which subsidy access policy should be redeemed for a given course in the event
+a learner has multiple redeemable subsidy access policies. As such, less business logic is needed on
+the client (e.g., the enterprise learner portal).
+
 *Inputs:*
 
 * `lms_user_id`
@@ -33,11 +38,27 @@ clicks the "Enroll" button.
 
 *Outputs:*
 
-* A single, redeemable subsidy access policy.
-* Redemption status of the single, redeemable subsidy access policy.
+* A single, redeemable subsidy access policy (if any).
+* Redemption status of the single, redeemable subsidy access policy (if any).
+* List of error(s) around why there is no redeemable subsidy access policy.
 
 Sample API responses
 ^^^^^^^^^^^^^^^^^^^^
+
+*No redeemable subsidy access policies available to the learner:*
+
+::
+
+  {
+    "redemption": null,
+    "subsidy_access_policy": null,
+    "errors": [
+      {
+        "code": 400,
+        "message": "Insufficient balance remaining",
+      }
+    ]
+  }
 
 *Redeemable subsidy access policy that has not yet been redeemed and/or fulfilled:*
 
@@ -56,7 +77,8 @@ Sample API responses
       "access_method": "direct",
       "spent_limit": 10000,
       "per_learner_spend_limit": 200,
-    }
+    },
+    "errors": []
   }
 
 *Redeemable subsidy access policy that has been redeemed but is pending fulfillment:*
@@ -68,9 +90,8 @@ Sample API responses
       "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
       "status": "pending",
       "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-      "courseware_redirect_url": null,
-      "error_status_code": null,
-      "error_message": null,
+      "redirect_url": null,
+      "errors": []
     },
     "subsidy_access_policy": {
       "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
@@ -84,6 +105,7 @@ Sample API responses
       "spent_limit": 10000,
       "per_learner_spend_limit": 200,
     },
+    "errors": []
   }
 
 *Redeemable subsidy access policy that has been successfully redeemed and fulfilled:*
@@ -95,9 +117,8 @@ Sample API responses
       "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
       "status": "fulfilled",
       "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-      "courseware_redirect_url": "https://learning.edx.org",
-      "error_status_code": null,
-      "error_message": null,
+      "redirect_url": "https://learning.edx.org/course/course-v1:ImperialX+dacc003+3T2019/home",
+      "errors": []
     },
     "subsidy_access_policy": {
       "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
@@ -111,6 +132,7 @@ Sample API responses
       "spent_limit": 10000,
       "per_learner_spend_limit": 200,
     },
+    "errors": []
   }
 
 *Redeemable subsidy access policy that has been redeemed, but failed during fulfillment:*
@@ -122,9 +144,13 @@ Sample API responses
       "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
       "status": "error",
       "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-      "courseware_redirect_url": null,
-      "error_status_code": 400,
-      "error_message": "Something went wrong. Please try again.",
+      "redirect_url": null,
+      "errors": [
+        {
+          "code": 500,
+          "message": "Something went wrong. Please try again.",
+        }
+      ]
     },
     "subsidy_access_policy": {
       "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
@@ -138,6 +164,7 @@ Sample API responses
       "spent_limit": 10000,
       "per_learner_spend_limit": 200,
     },
+    "errors": []
   }
 
 Retrieve the fulfillment status for a policy redemption
@@ -146,20 +173,23 @@ Retrieve the fulfillment status for a policy redemption
 **/api/v1/enterprise-customer/<enterprise_customer_uuid>/policy/<policy_uuid>/redemptions/<redemption_uuid>/**
 
 When the policy-specific `redeem` endpoint is called (e.g., when learner clicks "Enroll" button on course page), it returns
-with a redemption UUID that may be used to query against to understand the status of the redemption's fulfillment which, by
-design, may be asynchronous.
-
-As such, this API endpoint intends to be used to check the fulfillment status of a redemption to communicate to consumers that
+with a redemption (transaction) UUID that may be used to query against to understand the status of the redemption's fulfillment which, by
+design, may be asynchronous. As such, this API endpoint intends to be used to check the fulfillment status of a redemption to communicate to consumers that
 any side effects from the redemption have been successfully completed.
 
 *Inputs:*
 
-None other than the arguments in the URL path for the endpoint.
+None, other than the arguments in the URL path for the endpoint.
 
 *Outputs:*
 
-* A single, redeemable subsidy access policy.
-* Redemption status of the single, redeemable subsidy access policy.
+Metadata around the redemption fulfillment status, including:
+
+* Redemption/transaction UUID
+* Status (fulfilled, pending, error)
+* Path to the API endpoint to re-check the redemption's fulfillment status
+* Redirect URL (optional), e.g. on successful fulfillment, this might be URL to courseware.
+* List of errors, each with status code and error message (potentially to be displayed in the UI).
 
 Sample API responses
 ^^^^^^^^^^^^^^^^^^^^
@@ -172,9 +202,8 @@ Sample API responses
     "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
     "status": "fulfilled",
     "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-    "courseware_redirect_url": "https://learning.edx.org",
-    "error_status_code": null,
-    "error_message": null,
+    "redirect_url": "https://learning.edx.org/course/course-v1:ImperialX+dacc003+3T2019/home",
+    "errors": []
   }
 
 *Redemption with pending fulfillment*
@@ -185,12 +214,11 @@ Sample API responses
     "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
     "status": "pending",
     "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-    "courseware_redirect_url": null,
-    "error_status_code": null,
-    "error_message": null,
+    "redirect_url": null,
+    "errors": []
   }
 
-*Redemption with error during fulfillment*
+*Redemption with error(s) during fulfillment*
 
 ::
 
@@ -198,7 +226,11 @@ Sample API responses
     "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
     "status": "error",
     "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-    "courseware_redirect_url": null,
-    "error_status_code": 400,
-    "error_message": "Something went wrong. Please try again.",
+    "redirect_url": null,
+    "errors": [
+      {
+        "code": 500,
+        "message": "Something went wrong. Please try again.",
+      }
+    ]
   }
