@@ -85,6 +85,8 @@ Sample API responses
       "access_method": "direct",
       "spent_limit": 10000,
       "per_learner_spend_limit": 200,
+      "remaining_balance": 9500,
+      "remaining_balance_for_learner": 200
     },
     "errors": []
   }
@@ -112,6 +114,8 @@ Sample API responses
       "access_method": "direct",
       "spent_limit": 10000,
       "per_learner_spend_limit": 200,
+      "remaining_balance": 9500,
+      "remaining_balance_for_learner": 200
     },
     "errors": []
   }
@@ -139,6 +143,8 @@ Sample API responses
       "access_method": "direct",
       "spent_limit": 10000,
       "per_learner_spend_limit": 200,
+      "remaining_balance": 9500,
+      "remaining_balance_for_learner": 200
     },
     "errors": []
   }
@@ -171,11 +177,13 @@ Sample API responses
       "access_method": "direct",
       "spent_limit": 10000,
       "per_learner_spend_limit": 200,
+      "remaining_balance": 9500,
+      "remaining_balance_for_learner": 200
     },
     "errors": []
   }
 
-GET Retrieve the fulfillment status for a policy redemption
+GETRetrieve the fulfillment status for a policy redemption
 --------------------------------------------------------
 
 **/api/v1/enterprise-customer/<enterprise_customer_uuid>/policy/<policy_uuid>/redemptions/<redemption_uuid>/**
