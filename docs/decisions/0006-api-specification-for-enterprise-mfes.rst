@@ -16,7 +16,7 @@ or service-to-service communication.
 API Endpoints
 =============
 
-Retrieve single, redeemable access policy for a course
+GET Retrieve single, redeemable access policy for a course
 ------------------------------------------------------
 
 **/api/v1/enterprise-customer/<enterprise_customer_uuid>/policy/can_redeem/**
@@ -28,7 +28,7 @@ clicks the "Enroll" button.
 
 At a high level, this API endpoint works by iterating over all subsidy access policies associated with
 the enterprise customer for the specified learner to understand which subsidy access policies are indeed
-redeemable. It does this by calling the `can_redeem` API endpoint in `enterprise-subsidy` for each active
+redeemable. It does this by calling the ``can_redeem`` API endpoint in ``enterprise-subsidy`` for each active
 subsidy access policy. In the event multiple subsidy access policies are found, this API endpoint chooses
 the preferred subsidy basked on our business rules.
 
@@ -39,10 +39,10 @@ list of redeemable policies, which would mean the client  (e.g., enterprise lear
 logic to make a choice of which redeemable policy to attempt a redemption. This new API endpoint would thus remove the
 need for such business logic in the client given the subsidy access policy choice is abstracted into the API layer instead.
 
-*Inputs:*
+*Inputs (query parameters):*
 
-* `lms_user_id`
-* `content_id` (i.e., course id)
+* ``lms_user_id``
+* ``content_id`` (i.e., course id)
 
 *Outputs:*
 
@@ -185,7 +185,7 @@ with a redemption (transaction) UUID that may be used to query against to unders
 design, may be asynchronous. As such, this API endpoint intends to be used to check the fulfillment status of a redemption to communicate to consumers that
 any side effects from the redemption have been successfully completed.
 
-*Inputs:*
+*Inputs (query parameters):*
 
 None, other than the arguments in the URL path for the endpoint.
 
