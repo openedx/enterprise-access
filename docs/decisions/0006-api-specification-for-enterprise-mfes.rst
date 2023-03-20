@@ -175,7 +175,7 @@ Sample API responses
     "errors": []
   }
 
-Retrieve the fulfillment status for a policy redemption
+GET Retrieve the fulfillment status for a policy redemption
 --------------------------------------------------------
 
 **/api/v1/enterprise-customer/<enterprise_customer_uuid>/policy/<policy_uuid>/redemptions/<redemption_uuid>/**
