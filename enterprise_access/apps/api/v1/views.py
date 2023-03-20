@@ -55,6 +55,7 @@ from enterprise_access.apps.events.utils import (
     send_access_policy_event_to_event_bus,
     send_subsidy_redemption_event_to_event_bus
 )
+from enterprise_access.apps.subsidy_access_policy.constants import POLICY_TYPES_WITH_CREDIT_LIMIT
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
@@ -854,13 +855,12 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
     lookup_url_kwarg = 'policy_uuid'
     permission_required = 'requests.has_learner_or_admin_access'
 
-    def get_permission_object(self):
-        """
-        Returns the enterprise uuid to verify that requesting user possess the enterprise learner or admin role.
-        """
+    @property
+    def enterprise_customer_uuid(self):
+        """Returns the enterprise customer uuid from query params or request data based on action type. """
         enterprise_uuid = ''
 
-        if self.action in ('list', 'redemption'):
+        if self.action in ('list', 'redemption', 'credits_available'):
             enterprise_uuid = self.request.query_params.get('enterprise_customer_uuid')
 
         if self.action == 'redeem':
@@ -871,6 +871,17 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
                     enterprise_uuid = policy.enterprise_customer_uuid
 
         return enterprise_uuid
+
+    def get_permission_object(self):
+        """
+        Returns the enterprise uuid to verify that requesting user possess the enterprise learner or admin role.
+        """
+        return self.enterprise_customer_uuid
+
+    def get_queryset(self):
+        queryset = SubsidyAccessPolicy.objects.order_by('-created')
+        enterprise_customer_uuid = self.enterprise_customer_uuid
+        return queryset.filter(enterprise_customer_uuid=enterprise_customer_uuid)
 
     def redeemable_policies(self, enterprise_customer_uuid, learner_id, content_key):
         """
@@ -883,6 +894,45 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
                 redeemable_policies.append(policy)
 
         return redeemable_policies
+
+    def policies_with_credit_available(self, enterprise_customer_uuid, learner_id):
+        """
+        Return all redeemable policies in terms of "credit available".
+        """
+        policies = []
+        all_policies = SubsidyAccessPolicy.objects.filter(
+            policy_type__in=POLICY_TYPES_WITH_CREDIT_LIMIT,
+            enterprise_customer_uuid=enterprise_customer_uuid
+        )
+        for policy in all_policies:
+            if policy.credit_available(learner_id):
+                policies.append(policy)
+
+        return policies
+
+    @action(detail=False, methods=['get'])
+    def credits_available(self, request):
+        """
+        Return a list of all redeemable policies for given `enterprise_customer_uuid`, `lms_user_id` that have
+        redeemable credit available.
+        """
+        serializer = serializers.SubsidyAccessPolicyCreditAvailableListSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        enterprise_customer_uuid = serializer.data['enterprise_customer_uuid']
+        learner_id = serializer.data['lms_user_id']
+
+        policies_with_credit_available = self.policies_with_credit_available(enterprise_customer_uuid, learner_id)
+        response_data = serializers.SubsidyAccessPolicyCreditAvailableSerializer(
+            policies_with_credit_available,
+            many=True,
+            context={'learner_id': learner_id}
+        ).data
+
+        return Response(
+            response_data,
+            status=status.HTTP_200_OK,
+        )
 
     def list(self, request):
         """

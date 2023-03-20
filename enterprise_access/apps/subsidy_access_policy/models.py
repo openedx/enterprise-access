@@ -260,13 +260,34 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
 
     def can_redeem(self, learner_id, content_key):
         learner_transaction_count = subsidy_client.transactions_for_learner(
-            subsidy_uuid = self.subsidy_uuid,
+            subsidy_uuid=self.subsidy_uuid,
             learner_id = learner_id,
         )
         if learner_transaction_count < self.per_learner_enrollment_limit:
             return super().can_redeem(learner_id, content_key)
 
         return False
+
+    def credit_available(self, learner_id=None):
+        if self.remaining_balance_per_user(learner_id) > 0:
+            return True
+        return False
+
+    def remaining_balance_per_user(self, learner_id=None):
+        """
+        Returns the remaining redeemable credit for the user.
+        """
+        learner_transaction_count = subsidy_client.transactions_for_learner(
+            subsidy_uuid=self.subsidy_uuid,
+            learner_id=learner_id,
+        )
+        return self.per_learner_enrollment_limit - learner_transaction_count
+
+    def remaining_balance(self):
+        """
+        Returns total remaining balance for the associated subsidy ledger.
+        """
+        return subsidy_client.get_current_balance(self.subsidy_uuid)
 
 
 class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
@@ -285,14 +306,35 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
 
     def can_redeem(self, learner_id, content_key):
         spent_amount = subsidy_client.amount_spent_for_learner(
-            subsidy_uuid = self.subsidy_uuid,
-            learner_id = learner_id,
-            )
+            subsidy_uuid=self.subsidy_uuid,
+            learner_id=learner_id,
+        )
         course_price = DiscoveryApiClient().get_course_price(content_key)
         if (spent_amount + course_price) < self.per_learner_spend_limit:
             return super().can_redeem(learner_id, content_key)
 
         return False
+
+    def credit_available(self, learner_id=None):
+        if self.remaining_balance_per_user(learner_id) > 0:
+            return True
+        return False
+
+    def remaining_balance_per_user(self, learner_id=None):
+        """
+        Returns the remaining redeemable credit for the user.
+        """
+        spent_amount = subsidy_client.amount_spent_for_learner(
+            subsidy_uuid=self.subsidy_uuid,
+            learner_id=learner_id,
+        )
+        return self.per_learner_spend_limit - spent_amount
+
+    def remaining_balance(self):
+        """
+        Returns total remaining balance for the associated subsidy ledger.
+        """
+        return subsidy_client.get_current_balance(self.subsidy_uuid)
 
 
 class CappedEnrollmentLearnerCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
@@ -311,12 +353,34 @@ class CappedEnrollmentLearnerCreditAccessPolicy(SubsidyAccessPolicy, CreditPolic
 
     def can_redeem(self, learner_id, content_key):
         group_amount_spent = subsidy_client.amount_spent_for_group_and_catalog(
-            subsidy_uuid = self.subsidy_uuid,
-            group_uuid = self.group_uuid,
-            catalog_uuid = self.catalog_uuid,
-            )
+            subsidy_uuid=self.subsidy_uuid,
+            group_uuid=self.group_uuid,
+            catalog_uuid=self.catalog_uuid,
+        )
         course_price = DiscoveryApiClient().get_course_price(content_key)
-        if  (group_amount_spent + course_price) < self.spend_limit:
+        if (group_amount_spent + course_price) < self.spend_limit:
             return super().can_redeem(learner_id, content_key)
 
         return False
+
+    def credit_available(self, learner_id=None):
+        if self.remaining_balance_per_user(learner_id) > 0:
+            return True
+        return False
+
+    def remaining_balance_per_user(self, learner_id=None):  # pylint: disable=unused-argument
+        """
+        Returns the remaining redeemable credit for the user.
+        """
+        group_amount_spent = subsidy_client.amount_spent_for_group_and_catalog(
+            subsidy_uuid=self.subsidy_uuid,
+            group_uuid=self.group_uuid,
+            catalog_uuid=self.catalog_uuid,
+        )
+        return self.spend_limit - group_amount_spent
+
+    def remaining_balance(self):
+        """
+        Returns total remaining balance for the associated subsidy ledger.
+        """
+        return subsidy_client.get_current_balance(self.subsidy_uuid)
