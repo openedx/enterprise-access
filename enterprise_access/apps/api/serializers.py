@@ -230,3 +230,26 @@ class SubsidyAccessPolicyRedeemableSerializer(serializers.ModelSerializer):
 
     def get_policy_redemption_url(self, obj):
         return reverse('api:v1:policy-redeem', kwargs={'policy_uuid': obj.uuid})
+
+
+class SubsidyAccessPolicyCreditAvailableSerializer(SubsidyAccessPolicyRedeemableSerializer):
+    """
+    Serializer to transform response for policy redeem GET endpoint.
+    """
+    remaining_balance_per_user = serializers.SerializerMethodField()
+    remaining_balance = serializers.SerializerMethodField()
+
+    def get_remaining_balance_per_user(self, obj):
+        learner_id = self.context.get('learner_id')
+        return obj.remaining_balance_per_user(learner_id=learner_id)
+
+    def get_remaining_balance(self, obj):
+        return obj.remaining_balance()
+
+
+class SubsidyAccessPolicyCreditAvailableListSerializer(serializers.Serializer):  # pylint: disable=abstract-method
+    """
+    Serializer to validate policy request GET query params.
+    """
+    enterprise_customer_uuid = serializers.UUIDField(required=True)
+    lms_user_id = serializers.CharField(required=True)

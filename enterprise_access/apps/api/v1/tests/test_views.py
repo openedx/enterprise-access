@@ -29,7 +29,9 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
 )
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
+    CappedEnrollmentLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
+    PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
     SubscriptionAccessPolicyFactory
 )
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
@@ -1558,7 +1560,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
             kwargs={'policy_uuid': self.redeemable_policy.uuid}
         )
         self.subsidy_access_policy_redemption_endpoint = reverse('api:v1:policy-redemption')
-
+        self.subsidy_access_policy_credits_available_endpoint = reverse('api:v1:policy-credits-available')
         self.setup_mocks()
 
     def setup_mocks(self):
@@ -1570,6 +1572,9 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         subsidy_client = subsidy_client_patcher.start()
         subsidy_client.can_redeem.return_value = True
         subsidy_client.transactions_for_learner.return_value = 2
+        subsidy_client.amount_spent_for_learner.return_value = 2
+        subsidy_client.amount_spent_for_group_and_catalog.return_value = 2
+        subsidy_client.get_current_balance.return_value = 10
         subsidy_client.redeem.return_value = {'id': 1111}
         subsidy_client.has_redeemed.return_value = {'id': 1111}
 
@@ -1669,6 +1674,30 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         response = self.client.get(self.subsidy_access_policy_redemption_endpoint, query_params)
         response_json = self.load_json(response.content)
         assert response_json == [{'id': 1111}]
+
+    def test_credits_available_endpoint(self):
+        """
+        Verify that SubsidyAccessPolicyViewset credits_available returns credit based policies with redeemable credit.
+        """
+        query_params = {
+            'enterprise_customer_uuid': self.enterprise_uuid,
+            'lms_user_id': '1234',
+        }
+        PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            per_learner_enrollment_limit=5
+        )
+        PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            per_learner_spend_limit=5
+        )
+        CappedEnrollmentLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            spend_limit=5
+        )
+        response = self.client.get(self.subsidy_access_policy_credits_available_endpoint, query_params)
+        response_json = self.load_json(response.content)
+        assert len(response_json) == 4
 
 
 @ddt.ddt
