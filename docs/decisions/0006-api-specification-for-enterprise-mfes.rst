@@ -26,6 +26,12 @@ the learner is already enrolled in the course (i.e., a prior redemption has been
 fulfilled) and/or which subsidy access policy should be used to redeem the course when a learner
 clicks the "Enroll" button.
 
+At a high level, this API endpoint works by iterating over all subsidy access policies associated with
+the enterprise customer for the specified learner to understand which subsidy access policies are indeed
+redeemable. It does this by calling the `can_redeem` API endpoint in `enterprise-subsidy` for each active
+subsidy access policy. In the event multiple subsidy access policies are found, this API endpoint chooses
+the preferred subsidy basked on our business rules.
+
 This API endpoint differs from the one spec'd in the 0003 Initial API Specification in that
 it makes a decision of which single subsidy access policy should be redeemed for a given course in the event
 a learner has multiple redeemable subsidy access policies. The API endpoint that's already spec'd returns a
