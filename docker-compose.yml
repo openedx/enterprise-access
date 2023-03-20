@@ -1,7 +1,7 @@
 version: "2.1"
 services:
   db:
-    image: mysql:8.0.28-oracle
+    image: edxops/mysql:5.7
     container_name: enterprise_access.db
     environment:
       MYSQL_ROOT_PASSWORD: ""
@@ -9,7 +9,7 @@ services:
     networks:
       - devstack_default
     volumes:
-      - enterprise_access_mysql8:/var/lib/mysql
+      - enterprise_access_mysql57:/var/lib/mysql
 
   memcache:
     image: memcached:1.4.24
@@ -23,8 +23,6 @@ services:
     volumes:
       - .:/edx/app/enterprise-access/
     command: bash -c 'while true; do python /edx/app/enterprise-access/manage.py runserver 0.0.0.0:18270; sleep 2; done'
-    environment:
-      DJANGO_SETTINGS_MODULE: enterprise_access.settings.devstack
     ports:
       - "18270:18270" # TODO: change this to your port
     depends_on:
@@ -77,4 +75,4 @@ networks:
     external: true
 
 volumes:
-  enterprise_access_mysql8:
+  enterprise_access_mysql57:
