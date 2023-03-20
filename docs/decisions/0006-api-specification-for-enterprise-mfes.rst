@@ -26,10 +26,12 @@ the learner is already enrolled in the course (i.e., a prior redemption has been
 fulfilled) and/or which subsidy access policy should be used to redeem the course when a learner
 clicks the "Enroll" button.
 
-This API endpoint differs from the current one spec'd in the 0003 Initial API Specification in that
-it makes a decision of which subsidy access policy should be redeemed for a given course in the event
-a learner has multiple redeemable subsidy access policies. As such, less business logic is needed on
-the client (e.g., the enterprise learner portal).
+This API endpoint differs from the one spec'd in the 0003 Initial API Specification in that
+it makes a decision of which single subsidy access policy should be redeemed for a given course in the event
+a learner has multiple redeemable subsidy access policies. The API endpoint that's already spec'd returns a
+list of redeemable policies, which would mean the client  (e.g., enterprise learner portal) still requires business
+logic to make a choice of which redeemable policy to attempt a redemption. This new API endpoint would thus remove the
+need for such business logic in the client given the subsidy access policy choice is abstracted into the API layer instead.
 
 *Inputs:*
 
