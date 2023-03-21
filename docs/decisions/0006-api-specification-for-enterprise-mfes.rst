@@ -21,6 +21,8 @@ GET Retrieve single, redeemable access policy for a course
 
 **/api/v1/enterprise-customer/<enterprise_customer_uuid>/policy/can_redeem/**
 
+/api/v1/enterprise-customer/2c87511c-34bd-41e8-9ada-def7c79bd321/policy/can_redeem/?lms_user_id=3&content_id=course-v1:ImperialX+dacc003+3T2019
+
 This API endpoint will be called by the enterprise learner portal to understand whether
 the learner is already enrolled in the course (i.e., a prior redemption has been successfully
 fulfilled) and/or which subsidy access policy should be used to redeem the course when a learner
@@ -45,148 +47,195 @@ which returns an individual transaction and its current state (i.e., ``created``
 *Inputs (query parameters):*
 
 * ``lms_user_id``
-* ``content_id`` (i.e., course id)
+* ``content_key`` (i.e., course key or course run key)
 
 *Outputs:*
 
+For each course run associated with the specified ``content_key``:
+
 * A single, redeemable subsidy access policy (if any).
 * Redemption status of the single, redeemable subsidy access policy (if any).
-* List of error(s) around why there is no redeemable subsidy access policy.
+* List of error(s) for why there is no redeemable subsidy access policy.
 
 Sample API responses
 ^^^^^^^^^^^^^^^^^^^^
+
+::
+
+  [
+    {
+      "course_run_key": "course-v1:ImperialX+dacc003+3T2019",
+      "redemption": {
+        "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
+        "status": "fulfilled",
+        "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
+        "courseware_url": "https://courses.edx.org/courses/course-v1:ImperialX+dacc003+3T2019/courseware/",
+        "errors": []
+      },
+      "subsidy_access_policy": {
+        "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
+        "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
+        "policy_type": "LearnerCreditAccessPolicy",
+        "description": "Learner credit access policy",
+        "active": true,
+        "catalog_uuid": "14f701ea-7e0b-4a4e-bbda-f295e40c7bf1",
+        "subsidy_uuid": "7801b0ef-b1c2-4f3a-97fa-121f0bce48be",
+        "access_method": "direct",
+        "spent_limit": 10000,
+        "per_learner_spend_limit": 200,
+        "remaining_balance": 9500,
+        "remaining_balance_for_learner": 200
+      },
+      "errors": []
+    }
+  ]
 
 *No redeemable subsidy access policies available to the learner:*
 
 ::
 
-  {
-    "redemption": null,
-    "subsidy_access_policy": null,
-    "errors": [
-      {
-        "code": 400,
-        "message": "Insufficient balance remaining",
-      }
-    ]
-  }
+  [
+    {
+      "course_run_key": "course-v1:ImperialX+dacc003+3T2019",
+      "redemption": null,
+      "subsidy_access_policy": null,
+      "errors": [
+        {
+          "code": 400,
+          "message": "Insufficient balance remaining",
+        }
+      ]
+    }
+  ]
 
 *Redeemable subsidy access policy that has not yet been redeemed and/or fulfilled:*
 
 ::
 
-  {
-    "redemption": null,
-    "subsidy_access_policy": {
-      "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-      "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
-      "policy_type": "LearnerCreditAccessPolicy",
-      "description": "Learner credit access policy",
-      "active": true,
-      "catalog_uuid": "14f701ea-7e0b-4a4e-bbda-f295e40c7bf1",
-      "subsidy_uuid": "7801b0ef-b1c2-4f3a-97fa-121f0bce48be",
-      "access_method": "direct",
-      "spent_limit": 10000,
-      "per_learner_spend_limit": 200,
-      "remaining_balance": 9500,
-      "remaining_balance_for_learner": 200
-    },
-    "errors": []
-  }
+  [
+    {
+      "course_run_key": "course-v1:ImperialX+dacc003+3T2019",
+      "redemption": null,
+      "subsidy_access_policy": {
+        "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
+        "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
+        "policy_type": "LearnerCreditAccessPolicy",
+        "description": "Learner credit access policy",
+        "active": true,
+        "catalog_uuid": "14f701ea-7e0b-4a4e-bbda-f295e40c7bf1",
+        "subsidy_uuid": "7801b0ef-b1c2-4f3a-97fa-121f0bce48be",
+        "access_method": "direct",
+        "spent_limit": 10000,
+        "per_learner_spend_limit": 200,
+        "remaining_balance": 9500,
+        "remaining_balance_for_learner": 200
+      },
+      "errors": []
+    }
+  ]
 
 *Redeemable subsidy access policy that has been redeemed but is pending fulfillment:*
 
 ::
 
-  {
-    "redemption": {
-      "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-      "status": "pending",
-      "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-      "redirect_url": null,
+  [
+    {
+      "course_run_key": "course-v1:ImperialX+dacc003+3T2019",
+      "redemption": {
+        "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
+        "status": "pending",
+        "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
+        "courseware_url": null,
+        "errors": []
+      },
+      "subsidy_access_policy": {
+        "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
+        "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
+        "policy_type": "LearnerCreditAccessPolicy",
+        "description": "Learner credit access policy",
+        "active": true,
+        "catalog_uuid": "14f701ea-7e0b-4a4e-bbda-f295e40c7bf1",
+        "subsidy_uuid": "7801b0ef-b1c2-4f3a-97fa-121f0bce48be",
+        "access_method": "direct",
+        "spent_limit": 10000,
+        "per_learner_spend_limit": 200,
+        "remaining_balance": 9500,
+        "remaining_balance_for_learner": 200
+      },
       "errors": []
-    },
-    "subsidy_access_policy": {
-      "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-      "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
-      "policy_type": "LearnerCreditAccessPolicy",
-      "description": "Learner credit access policy",
-      "active": true,
-      "catalog_uuid": "14f701ea-7e0b-4a4e-bbda-f295e40c7bf1",
-      "subsidy_uuid": "7801b0ef-b1c2-4f3a-97fa-121f0bce48be",
-      "access_method": "direct",
-      "spent_limit": 10000,
-      "per_learner_spend_limit": 200,
-      "remaining_balance": 9500,
-      "remaining_balance_for_learner": 200
-    },
-    "errors": []
-  }
+    }
+  ]
 
 *Redeemable subsidy access policy that has been successfully redeemed and fulfilled:*
 
 ::
 
-  {
-    "redemption": {
-      "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-      "status": "fulfilled",
-      "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-      "redirect_url": "https://learning.edx.org/course/course-v1:ImperialX+dacc003+3T2019/home",
+  [
+    {
+      "course_run_key": "course-v1:ImperialX+dacc003+3T2019",
+      "redemption": {
+        "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
+        "status": "fulfilled",
+        "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
+        "courseware_url": "https://courses.edx.org/courses/course-v1:ImperialX+dacc003+3T2019/courseware/",
+        "errors": []
+      },
+      "subsidy_access_policy": {
+        "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
+        "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
+        "policy_type": "LearnerCreditAccessPolicy",
+        "description": "Learner credit access policy",
+        "active": true,
+        "catalog_uuid": "14f701ea-7e0b-4a4e-bbda-f295e40c7bf1",
+        "subsidy_uuid": "7801b0ef-b1c2-4f3a-97fa-121f0bce48be",
+        "access_method": "direct",
+        "spent_limit": 10000,
+        "per_learner_spend_limit": 200,
+        "remaining_balance": 9500,
+        "remaining_balance_for_learner": 200
+      },
       "errors": []
-    },
-    "subsidy_access_policy": {
-      "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-      "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
-      "policy_type": "LearnerCreditAccessPolicy",
-      "description": "Learner credit access policy",
-      "active": true,
-      "catalog_uuid": "14f701ea-7e0b-4a4e-bbda-f295e40c7bf1",
-      "subsidy_uuid": "7801b0ef-b1c2-4f3a-97fa-121f0bce48be",
-      "access_method": "direct",
-      "spent_limit": 10000,
-      "per_learner_spend_limit": 200,
-      "remaining_balance": 9500,
-      "remaining_balance_for_learner": 200
-    },
-    "errors": []
-  }
+    }
+  ]
 
 *Redeemable subsidy access policy that has been redeemed, but failed during fulfillment:*
 
 ::
 
-  {
-    "redemption": {
-      "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-      "status": "error",
-      "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-      "redirect_url": null,
-      "errors": [
-        {
-          "code": 500,
-          "message": "Something went wrong. Please try again.",
-        }
-      ]
-    },
-    "subsidy_access_policy": {
-      "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-      "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
-      "policy_type": "LearnerCreditAccessPolicy",
-      "description": "Learner credit access policy",
-      "active": true,
-      "catalog_uuid": "14f701ea-7e0b-4a4e-bbda-f295e40c7bf1",
-      "subsidy_uuid": "7801b0ef-b1c2-4f3a-97fa-121f0bce48be",
-      "access_method": "direct",
-      "spent_limit": 10000,
-      "per_learner_spend_limit": 200,
-      "remaining_balance": 9500,
-      "remaining_balance_for_learner": 200
-    },
-    "errors": []
-  }
+  [
+    {
+      "course_run_key": "course-v1:ImperialX+dacc003+3T2019",
+      "redemption": {
+        "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
+        "status": "error",
+        "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
+        "courseware_url": null,
+        "errors": [
+          {
+            "code": 500,
+            "message": "Something went wrong. Please try again.",
+          }
+        ]
+      },
+      "subsidy_access_policy": {
+        "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
+        "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
+        "policy_type": "LearnerCreditAccessPolicy",
+        "description": "Learner credit access policy",
+        "active": true,
+        "catalog_uuid": "14f701ea-7e0b-4a4e-bbda-f295e40c7bf1",
+        "subsidy_uuid": "7801b0ef-b1c2-4f3a-97fa-121f0bce48be",
+        "access_method": "direct",
+        "spent_limit": 10000,
+        "per_learner_spend_limit": 200,
+        "remaining_balance": 9500,
+        "remaining_balance_for_learner": 200
+      },
+      "errors": []
+    }
+  ]
 
-GETRetrieve the fulfillment status for a policy redemption
+GET Retrieve the fulfillment status for a policy redemption
 --------------------------------------------------------
 
 **/api/v1/enterprise-customer/<enterprise_customer_uuid>/policy/<policy_uuid>/redemptions/<redemption_uuid>/**
@@ -221,7 +270,7 @@ Sample API responses
     "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
     "status": "fulfilled",
     "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-    "redirect_url": "https://learning.edx.org/course/course-v1:ImperialX+dacc003+3T2019/home",
+    "courseware_url": "https://courses.edx.org/courses/course-v1:ImperialX+dacc003+3T2019/courseware/",
     "errors": []
   }
 
@@ -233,7 +282,7 @@ Sample API responses
     "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
     "status": "pending",
     "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-    "redirect_url": null,
+    "courseware_url": null,
     "errors": []
   }
 
@@ -245,7 +294,7 @@ Sample API responses
     "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
     "status": "error",
     "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-    "redirect_url": null,
+    "courseware_url": null,
     "errors": [
       {
         "code": 500,
