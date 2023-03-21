@@ -139,7 +139,11 @@ Sample API responses
         "spent_limit": 10000,
         "per_learner_spend_limit": 200,
         "remaining_balance": 9500,
-        "remaining_balance_for_learner": 200
+        "remaining_balance_for_learner": 200,
+        "content_price": {
+          "list": 199,
+          "discounted": 0
+        }
       },
       "reasons": []
     }
@@ -171,7 +175,11 @@ Sample API responses
         "spent_limit": 10000,
         "per_learner_spend_limit": 200,
         "remaining_balance": 9500,
-        "remaining_balance_for_learner": 200
+        "remaining_balance_for_learner": 200,
+        "content_price": {
+          "list": 199,
+          "discounted": 0
+        }
       },
       "reasons": []
     }
@@ -208,7 +216,11 @@ Sample API responses
         "spent_limit": 10000,
         "per_learner_spend_limit": 200,
         "remaining_balance": 9500,
-        "remaining_balance_for_learner": 200
+        "remaining_balance_for_learner": 200,
+        "content_price": {
+          "list": 199,
+          "discounted": 0
+        }
       },
       "reasons": []
     }
