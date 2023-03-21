@@ -19,27 +19,25 @@ API Endpoints
 GET Retrieve single, redeemable access policy for a course
 ------------------------------------------------------
 
-**/api/v1/enterprise-customer/<enterprise_customer_uuid>/policy/can_redeem/**
-
-/api/v1/enterprise-customer/2c87511c-34bd-41e8-9ada-def7c79bd321/policy/can_redeem/?lms_user_id=3&content_id=course-v1:ImperialX+dacc003+3T2019
+**/api/v1/enterprise-customer/<enterprise_customer_uuid>/course/<course_key>/can_redeem/**
 
 This API endpoint will be called by the enterprise learner portal to understand whether
 the learner is already enrolled in the course (i.e., a prior redemption has been successfully
 fulfilled) and/or which subsidy access policy should be used to redeem the course when a learner
 clicks the "Enroll" button. 
 
-The course page in the enterprise learner portal displays a "Enroll" or "View course" for each course run for the course being viewed. Given
+The course page in the enterprise learner portal displays an "Enroll" or "View course" for each course run for the course being viewed. Given
 that we're now using the redemption fulfillment status as a proxy for whether the learner is already enrolled, we will need to know the fulfillment
 status for each course run. To avoid the frontend needing to make N API requests to ``can_redeem`` (i.e., one per course run), this API endpoint will
 return the fulfillment status and a redeemable policy for each course run.
 
-At a high level, this API endpoint works by iterating over all subsidy access policies associated with
+This API endpoint works by iterating over all subsidy access policies associated with
 the enterprise customer for the specified learner to understand which subsidy access policies are indeed
 redeemable. It does this by calling the ``can_redeem`` API endpoint in ``enterprise-subsidy`` for each active
 subsidy access policy. In the event multiple subsidy access policies are found, this API endpoint chooses
-the preferred subsidy basked on our business rules.
+the preferred subsidy based on defined business rules.
 
-This API endpoint differs from the one spec'd in the 0003 Initial API Specification in that
+This API endpoint differs from the one spec'd in the `0003 Initial API Specification`_ in that
 it makes a decision of which single subsidy access policy should be redeemed for a given course in the event
 a learner has multiple redeemable subsidy access policies. The API endpoint that's already spec'd returns a
 list of redeemable policies, which would mean the client  (e.g., enterprise learner portal) still requires business
@@ -52,7 +50,6 @@ which returns an individual transaction and its current state (i.e., ``created``
 *Inputs (query parameters):*
 
 * ``lms_user_id``
-* ``content_key`` (i.e., course key or course run key)
 
 *Outputs:*
 
@@ -307,3 +304,5 @@ Sample API responses
       }
     ]
   }
+
+.. _0003 Initial API Specification: 0003-initial-api-specification.rst
