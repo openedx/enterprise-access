@@ -65,36 +65,6 @@ For each specified ``content_key`` (i.e., course run key), returns the following
 Sample API responses
 ^^^^^^^^^^^^^^^^^^^^
 
-::
-
-  [
-    {
-      "course_run_key": "course-v1:ImperialX+dacc003+3T2019",
-      "redemption": {
-        "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-        "state": "committed",
-        "policy_redemption_status_url": "https://enterprise-subsidy.edx.org/api/v1/transactions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-        "courseware_url": "https://courses.edx.org/courses/course-v1:ImperialX+dacc003+3T2019/courseware/",
-        "errors": []
-      },
-      "subsidy_access_policy": {
-        "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-        "policy_redemption_url": "https://enterprise-access.edx.org/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
-        "policy_type": "LearnerCreditAccessPolicy",
-        "description": "Learner credit access policy",
-        "active": true,
-        "catalog_uuid": "14f701ea-7e0b-4a4e-bbda-f295e40c7bf1",
-        "subsidy_uuid": "7801b0ef-b1c2-4f3a-97fa-121f0bce48be",
-        "access_method": "direct",
-        "spent_limit": 10000,
-        "per_learner_spend_limit": 200,
-        "remaining_balance": 9500,
-        "remaining_balance_for_learner": 200
-      },
-      "reasons": []
-    }
-  ]
-
 *No redeemable subsidy access policies available to the learner:*
 
 ::
@@ -133,7 +103,11 @@ Sample API responses
         "spent_limit": 10000,
         "per_learner_spend_limit": 200,
         "remaining_balance": 9500,
-        "remaining_balance_for_learner": 200
+        "remaining_balance_for_learner": 200,
+        "content_price": {
+          "list": 199,
+          "discounted": 0
+        }
       },
       "reasons": []
     }
