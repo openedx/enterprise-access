@@ -138,3 +138,6 @@ dmypy.json
 
 # emacs
 *~
+
+# VSCode
+.vscode

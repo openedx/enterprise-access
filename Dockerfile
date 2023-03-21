@@ -44,9 +44,9 @@ RUN pip install --upgrade pip setuptools
 RUN rm -rf /var/lib/apt/lists/*
 
 WORKDIR /tmp
-RUN wget https://packages.confluent.io/clients/deb/pool/main/libr/librdkafka/librdkafka_1.8.2.orig.tar.gz
-RUN tar -xf librdkafka_1.8.2.orig.tar.gz
-WORKDIR /tmp/librdkafka-1.8.2
+RUN wget https://packages.confluent.io/clients/deb/pool/main/libr/librdkafka/librdkafka_2.0.2.orig.tar.gz
+RUN tar -xf librdkafka_2.0.2.orig.tar.gz
+WORKDIR /tmp/librdkafka-2.0.2
 RUN ./configure && make && make install && ldconfig
 
 RUN ln -s /usr/bin/python3 /usr/bin/python

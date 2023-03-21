@@ -10,3 +10,6 @@ coverage:
         target: 100%
 
 comment: false
+
+ignore:
+  - "docs/decisions"
