@@ -26,7 +26,12 @@ GET Retrieve single, redeemable access policy for a course
 This API endpoint will be called by the enterprise learner portal to understand whether
 the learner is already enrolled in the course (i.e., a prior redemption has been successfully
 fulfilled) and/or which subsidy access policy should be used to redeem the course when a learner
-clicks the "Enroll" button.
+clicks the "Enroll" button. 
+
+The course page in the enterprise learner portal displays a "Enroll" or "View course" for each course run for the course being viewed. Given
+that we're now using the redemption fulfillment status as a proxy for whether the learner is already enrolled, we will need to know the fulfillment
+status for each course run. To avoid the frontend needing to make N API requests to ``can_redeem`` (i.e., one per course run), this API endpoint will
+return the fulfillment status and a redeemable policy for each course run.
 
 At a high level, this API endpoint works by iterating over all subsidy access policies associated with
 the enterprise customer for the specified learner to understand which subsidy access policies are indeed
