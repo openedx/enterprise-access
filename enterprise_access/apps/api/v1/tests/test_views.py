@@ -1551,7 +1551,8 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         }])
 
         self.redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
-            enterprise_customer_uuid=self.enterprise_uuid
+            enterprise_customer_uuid=self.enterprise_uuid,
+            spend_limit=3
         )
         self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
 
@@ -1698,6 +1699,32 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         response = self.client.get(self.subsidy_access_policy_credits_available_endpoint, query_params)
         response_json = self.load_json(response.content)
         assert len(response_json) == 4
+
+    def test_credits_available_endpoint_with_non_redeemable_policies(self):
+        """
+        Verify that SubsidyAccessPolicyViewset credits_available does not return policies for which the per user credit
+        limits have already exceeded.
+        """
+        query_params = {
+            'enterprise_customer_uuid': self.enterprise_uuid,
+            'lms_user_id': '1234',
+        }
+        PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            per_learner_enrollment_limit=1
+        )
+        PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            per_learner_spend_limit=1
+        )
+        CappedEnrollmentLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            spend_limit=1
+        )
+        response = self.client.get(self.subsidy_access_policy_credits_available_endpoint, query_params)
+        response_json = self.load_json(response.content)
+        # only returns 1 policy created in the setup
+        assert len(response_json) == 1
 
 
 @ddt.ddt
