@@ -104,10 +104,7 @@ Sample API responses
         "per_learner_spend_limit": 200,
         "remaining_balance": 9500,
         "remaining_balance_for_learner": 200,
-        "content_price": {
-          "list": 199,
-          "discounted": 0
-        }
+        "list_price": 199,
       },
       "reasons": []
     }
@@ -140,10 +137,7 @@ Sample API responses
         "per_learner_spend_limit": 200,
         "remaining_balance": 9500,
         "remaining_balance_for_learner": 200,
-        "content_price": {
-          "list": 199,
-          "discounted": 0
-        }
+        "list_price": 199,
       },
       "reasons": []
     }
@@ -176,10 +170,7 @@ Sample API responses
         "per_learner_spend_limit": 200,
         "remaining_balance": 9500,
         "remaining_balance_for_learner": 200,
-        "content_price": {
-          "list": 199,
-          "discounted": 0
-        }
+        "list_price": 199,
       },
       "reasons": []
     }
@@ -217,10 +208,7 @@ Sample API responses
         "per_learner_spend_limit": 200,
         "remaining_balance": 9500,
         "remaining_balance_for_learner": 200,
-        "content_price": {
-          "list": 199,
-          "discounted": 0
-        }
+        "list_price": 199,
       },
       "reasons": []
     }
