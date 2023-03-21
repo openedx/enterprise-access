@@ -9,31 +9,35 @@ Accepted (March 2023)
 Context
 =======
 
-This document intends to outline which API endpoints exist or will exist in support of the
+This document intends to outline which API endpoint(s) exist or will exist in support of the
 Enterprise MFEs (e.g., frontend-app-learner-portal-enterprise) as well as other consumers,
 or service-to-service communication.
 
 API Endpoints
 =============
 
-GET Retrieve single, redeemable access policy for a course
-------------------------------------------------------
+GET Retrieve single, redeemable access policy for a set of content keys
+-----------------------------------------------------------------------
 
-**/api/v1/enterprise-customer/<enterprise_customer_uuid>/course/<course_key>/can_redeem/**
+**/api/v1/policy/enterprise-customer/<enterprise_customer_uuid>/can_redeem/?content_key=...&content_key=...**
 
 This API endpoint will be called by the enterprise learner portal to understand whether
-the learner is already enrolled in the course (i.e., a prior redemption has been successfully
-fulfilled) and/or which subsidy access policy should be used to redeem the course when a learner
+the learner is already enrolled in any of the available course runs (i.e., a prior redemption has been successfully
+fulfilled) and/or which subsidy access policy should be used to redeem each course run when a learner
 clicks the "Enroll" button. 
 
-The course page in the enterprise learner portal displays an "Enroll" or "View course" for each course run for the course being viewed. Given
-that we're now using the redemption fulfillment status as a proxy for whether the learner is already enrolled, we will need to know the fulfillment
-status for each course run. To avoid the frontend needing to make N API requests to ``can_redeem`` (i.e., one per course run), this API endpoint will
-return the fulfillment status and a redeemable policy for each course run.
+The redemption fulfillment status is retrieved from the ``/api/v1/transactions/<transaction_uuid>/`` API endpoint in ``enterprise-subsidy``,
+which returns an individual transaction and its current state (i.e., ``created``, ``pending``, ``committed``, ``failed``).
+
+The course page in the enterprise learner portal displays an "Enroll" or "View course" CTA for each course run of the
+course being viewed. Given that we're now using the redemption fulfillment status as a proxy for whether the learner
+is already enrolled, we will need to know the fulfillment status for each course run. To avoid the frontend needing to
+make N API requests to ``can_redeem`` (i.e., one per course run), this API endpoint will return the redemption's fulfillment
+status and a redeemable policy for each course run.
 
 This API endpoint works by iterating over all subsidy access policies associated with
 the enterprise customer for the specified learner to understand which subsidy access policies are indeed
-redeemable. It does this by calling the ``can_redeem`` API endpoint in ``enterprise-subsidy`` for each active
+redeemable for each course run. It does this by calling the ``can_redeem`` API endpoint in ``enterprise-subsidy`` for each active
 subsidy access policy. In the event multiple subsidy access policies are found, this API endpoint chooses
 the preferred subsidy based on defined business rules.
 
@@ -44,20 +48,19 @@ list of redeemable policies, which would mean the client  (e.g., enterprise lear
 logic to make a choice of which redeemable policy to attempt a redemption. This new API endpoint would thus remove the
 need for such business logic in the client given the subsidy access policy choice is abstracted into the API layer instead.
 
-The redemption fulfillment status is retrieved from the ``/api/v1/transactions/<transaction_uuid>/`` API endpoint in ``enterprise-subsidy``,
-which returns an individual transaction and its current state (i.e., ``created``, ``pending``, ``committed``).
-
 *Inputs (query parameters):*
 
 * ``lms_user_id``
+* ``content_key`` (i.e., one or more course run keys)
+* ``enterprise_customer_uuid`` might actually make more sense as a query parameter, too. TBD at implementation time.
 
 *Outputs:*
 
-For each course run associated with the specified ``content_key``:
+For each specified ``content_key`` (i.e., course run key), returns the following:
 
 * A single, redeemable subsidy access policy (if any).
-* Redemption status of the single, redeemable subsidy access policy (if any).
-* List of error(s) for why there is no redeemable subsidy access policy.
+* Redemption status of the single, redeemable subsidy access policy (if any). This is largely a serialized ``Transaction`` from ``enterprise-subsidy``, where the redemption UUID is a ``Transaction`` UUID.
+* List of reasons for why there is no redeemable subsidy access policy.
 
 Sample API responses
 ^^^^^^^^^^^^^^^^^^^^
@@ -69,14 +72,14 @@ Sample API responses
       "course_run_key": "course-v1:ImperialX+dacc003+3T2019",
       "redemption": {
         "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-        "status": "fulfilled",
-        "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
+        "state": "committed",
+        "policy_redemption_status_url": "https://enterprise-subsidy.edx.org/api/v1/transactions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
         "courseware_url": "https://courses.edx.org/courses/course-v1:ImperialX+dacc003+3T2019/courseware/",
         "errors": []
       },
       "subsidy_access_policy": {
         "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-        "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
+        "policy_redemption_url": "https://enterprise-access.edx.org/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
         "policy_type": "LearnerCreditAccessPolicy",
         "description": "Learner credit access policy",
         "active": true,
@@ -88,7 +91,7 @@ Sample API responses
         "remaining_balance": 9500,
         "remaining_balance_for_learner": 200
       },
-      "errors": []
+      "reasons": []
     }
   ]
 
@@ -101,10 +104,10 @@ Sample API responses
       "course_run_key": "course-v1:ImperialX+dacc003+3T2019",
       "redemption": null,
       "subsidy_access_policy": null,
-      "errors": [
+      "reasons": [
         {
-          "code": 400,
-          "message": "Insufficient balance remaining",
+          "reason": "Insufficient balance remaining",
+          "detail": "Not enough funds available for the course."
         }
       ]
     }
@@ -120,7 +123,7 @@ Sample API responses
       "redemption": null,
       "subsidy_access_policy": {
         "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-        "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
+        "policy_redemption_url": "https://enterprise-access.edx.org/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
         "policy_type": "LearnerCreditAccessPolicy",
         "description": "Learner credit access policy",
         "active": true,
@@ -132,7 +135,7 @@ Sample API responses
         "remaining_balance": 9500,
         "remaining_balance_for_learner": 200
       },
-      "errors": []
+      "reasons": []
     }
   ]
 
@@ -145,14 +148,14 @@ Sample API responses
       "course_run_key": "course-v1:ImperialX+dacc003+3T2019",
       "redemption": {
         "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-        "status": "pending",
-        "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
+        "state": "pending",
+        "policy_redemption_status_url": "https://enterprise-subsidy.edx.org/api/v1/transactions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
         "courseware_url": null,
         "errors": []
       },
       "subsidy_access_policy": {
         "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-        "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
+        "policy_redemption_url": "https://enterprise-access.edx.org/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
         "policy_type": "LearnerCreditAccessPolicy",
         "description": "Learner credit access policy",
         "active": true,
@@ -164,7 +167,7 @@ Sample API responses
         "remaining_balance": 9500,
         "remaining_balance_for_learner": 200
       },
-      "errors": []
+      "reasons": []
     }
   ]
 
@@ -177,14 +180,14 @@ Sample API responses
       "course_run_key": "course-v1:ImperialX+dacc003+3T2019",
       "redemption": {
         "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-        "status": "fulfilled",
-        "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
+        "state": "committed",
+        "policy_redemption_status_url": "https://enterprise-subsidy.edx.org/api/v1/transactions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
         "courseware_url": "https://courses.edx.org/courses/course-v1:ImperialX+dacc003+3T2019/courseware/",
         "errors": []
       },
       "subsidy_access_policy": {
         "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-        "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
+        "policy_redemption_url": "https://enterprise-access.edx.org/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
         "policy_type": "LearnerCreditAccessPolicy",
         "description": "Learner credit access policy",
         "active": true,
@@ -196,7 +199,7 @@ Sample API responses
         "remaining_balance": 9500,
         "remaining_balance_for_learner": 200
       },
-      "errors": []
+      "reasons": []
     }
   ]
 
@@ -209,8 +212,8 @@ Sample API responses
       "course_run_key": "course-v1:ImperialX+dacc003+3T2019",
       "redemption": {
         "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-        "status": "error",
-        "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
+        "state": "failed",
+        "policy_redemption_status_url": "https://enterprise-subsidy.edx.org/api/v1/transactions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
         "courseware_url": null,
         "errors": [
           {
@@ -221,7 +224,7 @@ Sample API responses
       },
       "subsidy_access_policy": {
         "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-        "policy_redemption_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
+        "policy_redemption_url": "https://enterprise-access.edx.org/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redeem/",
         "policy_type": "LearnerCreditAccessPolicy",
         "description": "Learner credit access policy",
         "active": true,
@@ -233,76 +236,8 @@ Sample API responses
         "remaining_balance": 9500,
         "remaining_balance_for_learner": 200
       },
-      "errors": []
+      "reasons": []
     }
   ]
-
-GET Retrieve the fulfillment status for a policy redemption
---------------------------------------------------------
-
-**/api/v1/enterprise-customer/<enterprise_customer_uuid>/policy/<policy_uuid>/redemptions/<redemption_uuid>/**
-
-When the policy-specific `redeem` endpoint is called (e.g., when learner clicks "Enroll" button on course page), it returns
-with a redemption (transaction) UUID that may be used to query against to understand the status of the redemption's fulfillment which, by
-design, may be asynchronous. As such, this API endpoint intends to be used to check the fulfillment status of a redemption to communicate to consumers that
-any side effects from the redemption have been successfully completed.
-
-*Inputs (query parameters):*
-
-None, other than the arguments in the URL path for the endpoint.
-
-*Outputs:*
-
-Metadata around the redemption fulfillment status, including:
-
-* Redemption/transaction UUID
-* Status (fulfilled, pending, error)
-* Path to the API endpoint to re-check the redemption's fulfillment status
-* Redirect URL (optional), e.g. on successful fulfillment, this might be URL to courseware.
-* List of errors, each with status code and error message (potentially to be displayed in the UI).
-
-Sample API responses
-^^^^^^^^^^^^^^^^^^^^
-
-*Redemption with successful fulfillment*
-
-::
-
-  {
-    "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-    "status": "fulfilled",
-    "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-    "courseware_url": "https://courses.edx.org/courses/course-v1:ImperialX+dacc003+3T2019/courseware/",
-    "errors": []
-  }
-
-*Redemption with pending fulfillment*
-
-::
-
-  {
-    "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-    "status": "pending",
-    "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-    "courseware_url": null,
-    "errors": []
-  }
-
-*Redemption with error(s) during fulfillment*
-
-::
-
-  {
-    "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-    "status": "error",
-    "policy_redemption_status_url": "/api/v1/policy/56744a36-93ac-4e6c-b998-a2a1899f2ae4/redemptions/26cdce7f-b13d-46fe-a395-06d8a50932e9/",
-    "courseware_url": null,
-    "errors": [
-      {
-        "code": 500,
-        "message": "Something went wrong. Please try again.",
-      }
-    ]
-  }
 
 .. _0003 Initial API Specification: 0003-initial-api-specification.rst
