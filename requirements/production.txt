@@ -8,7 +8,7 @@ amqp==5.1.1
     # via
     #   -r requirements/base.txt
     #   kombu
-analytics-python==1.4.0
+analytics-python==1.4.post1
     # via -r requirements/base.txt
 asgiref==3.6.0
     # via
@@ -126,7 +126,7 @@ django-crum==0.7.9
     #   edx-rbac
 django-extensions==3.2.1
     # via -r requirements/base.txt
-django-filter==22.1
+django-filter==23.1
     # via -r requirements/base.txt
 django-model-utils==4.3.1
     # via
@@ -157,7 +157,7 @@ drf-jwt==1.19.2
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
-drf-spectacular==0.26.0
+drf-spectacular==0.26.1
     # via -r requirements/base.txt
 drf-yasg==1.21.5
     # via
@@ -173,7 +173,7 @@ edx-celeryutils==1.2.2
     # via -r requirements/base.txt
 edx-django-release-util==1.2.0
     # via -r requirements/base.txt
-edx-django-utils==5.2.0
+edx-django-utils==5.3.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
@@ -182,6 +182,8 @@ edx-drf-extensions==8.4.1
     # via
     #   -r requirements/base.txt
     #   edx-rbac
+edx-enterprise-subsidy-client==0.2.2
+    # via -r requirements/base.txt
 edx-opaque-keys[django]==2.3.0
     # via
     #   -r requirements/base.txt
@@ -190,7 +192,9 @@ edx-opaque-keys[django]==2.3.0
 edx-rbac==1.7.0
     # via -r requirements/base.txt
 edx-rest-api-client==5.5.0
-    # via -r requirements/base.txt
+    # via
+    #   -r requirements/base.txt
+    #   edx-enterprise-subsidy-client
 fastavro==1.7.3
     # via
     #   -r requirements/base.txt
@@ -252,7 +256,7 @@ mysqlclient==2.1.1
     # via
     #   -r requirements/base.txt
     #   -r requirements/production.in
-newrelic==8.7.0
+newrelic==8.7.1
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -334,7 +338,7 @@ python3-openid==3.2.0
     # via
     #   -r requirements/base.txt
     #   social-auth-core
-pytz==2022.7.1
+pytz==2023.2
     # via
     #   -r requirements/base.txt
     #   celery
@@ -347,7 +351,7 @@ pyyaml==6.0
     #   -r requirements/production.in
     #   drf-spectacular
     #   edx-django-release-util
-redis==4.5.1
+redis==4.5.3
     # via -r requirements/base.txt
 requests==2.28.2
     # via
@@ -398,11 +402,11 @@ slumber==0.7.1
     # via
     #   -r requirements/base.txt
     #   edx-rest-api-client
-social-auth-app-django==5.0.0
+social-auth-app-django==5.1.0
     # via
     #   -r requirements/base.txt
     #   edx-auth-backends
-social-auth-core==4.3.0
+social-auth-core==4.4.0
     # via
     #   -r requirements/base.txt
     #   edx-auth-backends
@@ -442,7 +446,7 @@ zipp==3.15.0
     #   importlib-resources
 zope-event==4.6
     # via gevent
-zope-interface==5.5.2
+zope-interface==6.0
     # via gevent
 
 # The following packages are considered to be unsafe in a requirements file:

@@ -6,7 +6,7 @@
 #
 amqp==5.1.1
     # via kombu
-analytics-python==1.4.0
+analytics-python==1.4.post1
     # via -r requirements/base.in
 asgiref==3.6.0
     # via django
@@ -100,7 +100,7 @@ django-crum==0.7.9
     #   edx-rbac
 django-extensions==3.2.1
     # via -r requirements/base.in
-django-filter==22.1
+django-filter==23.1
     # via -r requirements/base.in
 django-model-utils==4.3.1
     # via
@@ -130,7 +130,7 @@ djangorestframework==3.14.0
     #   edx-drf-extensions
 drf-jwt==1.19.2
     # via edx-drf-extensions
-drf-spectacular==0.26.0
+drf-spectacular==0.26.1
     # via -r requirements/base.in
 drf-yasg==1.21.5
     # via edx-api-doc-tools
@@ -144,7 +144,7 @@ edx-celeryutils==1.2.2
     # via -r requirements/base.in
 edx-django-release-util==1.2.0
     # via -r requirements/base.in
-edx-django-utils==5.2.0
+edx-django-utils==5.3.0
     # via
     #   -r requirements/base.in
     #   edx-drf-extensions
@@ -153,6 +153,8 @@ edx-drf-extensions==8.4.1
     # via
     #   -r requirements/base.in
     #   edx-rbac
+edx-enterprise-subsidy-client==0.2.2
+    # via -r requirements/base.in
 edx-opaque-keys[django]==2.3.0
     # via
     #   edx-drf-extensions
@@ -160,7 +162,9 @@ edx-opaque-keys[django]==2.3.0
 edx-rbac==1.7.0
     # via -r requirements/base.in
 edx-rest-api-client==5.5.0
-    # via -r requirements/base.in
+    # via
+    #   -r requirements/base.in
+    #   edx-enterprise-subsidy-client
 fastavro==1.7.3
     # via
     #   -r requirements/base.in
@@ -193,7 +197,7 @@ monotonic==1.6
     # via analytics-python
 mysqlclient==2.1.1
     # via -r requirements/base.in
-newrelic==8.7.0
+newrelic==8.7.1
     # via edx-django-utils
 oauthlib==3.2.2
     # via
@@ -240,7 +244,7 @@ python-dateutil==2.8.2
     #   edx-drf-extensions
 python3-openid==3.2.0
     # via social-auth-core
-pytz==2022.7.1
+pytz==2023.2
     # via
     #   -r requirements/base.in
     #   celery
@@ -251,7 +255,7 @@ pyyaml==6.0
     # via
     #   drf-spectacular
     #   edx-django-release-util
-redis==4.5.1
+redis==4.5.3
     # via -r requirements/base.in
 requests==2.28.2
     # via
@@ -287,9 +291,9 @@ six==1.16.0
     #   python-dateutil
 slumber==0.7.1
     # via edx-rest-api-client
-social-auth-app-django==5.0.0
+social-auth-app-django==5.1.0
     # via edx-auth-backends
-social-auth-core==4.3.0
+social-auth-core==4.4.0
     # via
     #   edx-auth-backends
     #   social-auth-app-django

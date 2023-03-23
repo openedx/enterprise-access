@@ -22,7 +22,7 @@ services:
     container_name: enterprise_access.app
     volumes:
       - .:/edx/app/enterprise-access/
-      - ../src:/edx/src:cached
+      - ../src:/edx/src
     command: bash -c 'while true; do python /edx/app/enterprise-access/manage.py runserver 0.0.0.0:18270; sleep 2; done'
     ports:
       - "18270:18270" # TODO: change this to your port

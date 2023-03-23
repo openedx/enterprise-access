@@ -3,7 +3,7 @@ Tests for Enterprise Access API v1 views.
 """
 import random
 from unittest.mock import call, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import ddt
 import mock
@@ -22,17 +22,11 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
-from enterprise_access.apps.subsidy_access_policy.constants import (
-    PER_LEARNER_SPEND_CREDIT,
-    SUBSCRIPTION_ACCESS,
-    AccessMethods
-)
+from enterprise_access.apps.subsidy_access_policy.constants import PER_LEARNER_SPEND_CREDIT, AccessMethods
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
-    CappedEnrollmentLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
-    PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
-    SubscriptionAccessPolicyFactory
+    PerLearnerSpendCapLearnerCreditAccessPolicyFactory
 )
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
@@ -1567,7 +1561,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         """
         Setup mocks for different api clients.
         """
-        subsidy_client_path = 'enterprise_access.apps.subsidy_access_policy.models.subsidy_client'
+        subsidy_client_path = 'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client'
         subsidy_client_patcher = patch(subsidy_client_path)
         subsidy_client = subsidy_client_patcher.start()
         subsidy_client.can_redeem.return_value = True
@@ -1578,7 +1572,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         subsidy_client.redeem.return_value = {'id': 1111}
         subsidy_client.has_redeemed.return_value = {'id': 1111}
 
-        catalog_client_path = 'enterprise_access.apps.subsidy_access_policy.models.EnterpriseCatalogApiClient'
+        catalog_client_path = 'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_client'
         enterprise_catalog_client_patcher = patch(catalog_client_path)
         enterprise_catalog_client = enterprise_catalog_client_patcher.start()
         enterprise_catalog_client_instance = enterprise_catalog_client.return_value
@@ -1654,59 +1648,105 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         """
         Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint works as expected
         """
+        mock_transaction_record = {
+            'uuid': str(uuid4()),
+            'status': 'committed',
+            'other': True,
+        }
+        self.redeemable_policy.subsidy_client.create_subsidy_transaction.return_value = mock_transaction_record
         payload = {
             'learner_id': '1234',
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
         }
         response = self.client.post(self.subsidy_access_policy_redeem_endpoint, payload)
         response_json = self.load_json(response.content)
-        assert response_json == {'id': 1111}
+        assert response_json == mock_transaction_record
 
     def test_redemption_endpoint(self):
         """
         Verify that SubsidyAccessPolicyViewset redemption endpoint works as expected
         """
+        mock_transaction_record = {
+            'uuid': str(uuid4()),
+            'status': 'committed',
+            'other': True,
+        }
+        self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [
+                mock_transaction_record
+            ],
+            'aggregates': {
+                'total_quantity': 100,
+            },
+        }
         query_params = {
-            'enterprise_customer_uuid': self.enterprise_uuid,
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
             'learner_id': '1234',
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
         }
         response = self.client.get(self.subsidy_access_policy_redemption_endpoint, query_params)
         response_json = self.load_json(response.content)
-        assert response_json == [{'id': 1111}]
+        assert response_json == {
+            str(self.redeemable_policy.uuid): [mock_transaction_record],
+        }
 
     def test_credits_available_endpoint(self):
         """
         Verify that SubsidyAccessPolicyViewset credits_available returns credit based policies with redeemable credit.
         """
-        query_params = {
-            'enterprise_customer_uuid': self.enterprise_uuid,
-            'lms_user_id': '1234',
+        mock_transaction_record = {
+            'uuid': str(uuid4()),
+            'status': 'committed',
+            'other': True,
         }
-        PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+        self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [
+                mock_transaction_record
+            ],
+            'aggregates': {
+                'total_quantity': 0,
+            },
+        }
+        enroll_cap_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
             per_learner_enrollment_limit=5
         )
-        PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+        spend_cap_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
             per_learner_spend_limit=5
         )
-        CappedEnrollmentLearnerCreditAccessPolicyFactory(
-            enterprise_customer_uuid=self.enterprise_uuid,
-            spend_limit=5
-        )
+
+        query_params = {
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'lms_user_id': 1234,
+        }
         response = self.client.get(self.subsidy_access_policy_credits_available_endpoint, query_params)
-        response_json = self.load_json(response.content)
-        assert len(response_json) == 4
+
+        response_json = response.json()
+        # self.redeemable_policy, along with the 2 instances created from factories above,
+        # should give us a total of 3 policy records with credits available.
+        assert len(response_json) == 3
+        redeemable_policy_uuids = {self.redeemable_policy.uuid, enroll_cap_policy.uuid, spend_cap_policy.uuid}
+        actual_uuids = {UUID(policy['uuid']) for policy in response_json}
+        self.assertEqual(redeemable_policy_uuids, actual_uuids)
 
     def test_credits_available_endpoint_with_non_redeemable_policies(self):
         """
         Verify that SubsidyAccessPolicyViewset credits_available does not return policies for which the per user credit
         limits have already exceeded.
         """
-        query_params = {
-            'enterprise_customer_uuid': self.enterprise_uuid,
-            'lms_user_id': '1234',
+        mock_transaction_record = {
+            'uuid': str(uuid4()),
+            'status': 'committed',
+            'other': True,
+        }
+        self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [
+                mock_transaction_record
+            ],
+            'aggregates': {
+                'total_quantity': 100,
+            },
         }
         PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
@@ -1716,11 +1756,13 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
             enterprise_customer_uuid=self.enterprise_uuid,
             per_learner_spend_limit=1
         )
-        CappedEnrollmentLearnerCreditAccessPolicyFactory(
-            enterprise_customer_uuid=self.enterprise_uuid,
-            spend_limit=1
-        )
+
+        query_params = {
+            'enterprise_customer_uuid': self.enterprise_uuid,
+            'lms_user_id': '1234',
+        }
         response = self.client.get(self.subsidy_access_policy_credits_available_endpoint, query_params)
+
         response_json = self.load_json(response.content)
         # only returns 1 policy created in the setup
         assert len(response_json) == 1
@@ -1745,7 +1787,9 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
         self.policy_1 = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid_1
         )
-        self.policy_2 = SubscriptionAccessPolicyFactory(enterprise_customer_uuid=self.enterprise_customer_uuid_1)
+        self.policy_2 = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
         self.policy_with_different_enterprise_customer_uuid = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
 
     def test_list_policies_for_enterprise(self):
@@ -1759,8 +1803,10 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
         response = self.client.get(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, query_params, format='json')
         response_json = self.load_json(response.content)
         # Verify that api response only includes the policies linked to the enterprise admin belongs to.
-        assert response.data['results'] == SubsidyAccessPolicyCRUDSerializer([self.policy_2, self.policy_1],
-                                                                             many=True).data
+        assert response.data['results'] == SubsidyAccessPolicyCRUDSerializer(
+            [self.policy_2, self.policy_1],
+            many=True,
+        ).data
         # Verify that api response does not include policies that belong to another enterprise
         for policy in response_json['results']:
             assert policy['uuid'] != self.policy_with_different_enterprise_customer_uuid.uuid
@@ -1820,8 +1866,9 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
         }
         response = self.client.post(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, payload, format='json')
         assert response.status_code == status.HTTP_201_CREATED
-        assert SubsidyAccessPolicy.objects.filter(enterprise_customer_uuid=self.enterprise_customer_uuid_1).count() \
-            == 3
+        assert SubsidyAccessPolicy.objects.filter(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        ).count() == 3
 
     def test_create_with_invalid_policy_type(self):
         """
@@ -1841,30 +1888,6 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
         }
         response = self.client.post(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, payload, format='json')
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-
-    def test_validate_limits_for_non_credit_policy_type(self):
-        """
-        Verify that SubsidyAccessPolicyCRUDViewset validate method set all credit limits to 0
-        if request has any non-zero values for limits.
-        """
-        payload = {
-            'policy_type': SUBSCRIPTION_ACCESS,
-            'access_method': AccessMethods.DIRECT,
-            'description': 'edx-demo',
-            'active': 'true',
-            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
-            'catalog_uuid': str(uuid4()),
-            'subsidy_uuid': str(uuid4()),
-            'per_learner_enrollment_limit': 20,
-            'per_learner_spend_limit': 20,
-            'spend_limit': 20,
-        }
-        response = self.client.post(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, payload, format='json')
-        response_json = response.json()
-        assert response.status_code == status.HTTP_201_CREATED
-        assert response_json['per_learner_enrollment_limit'] == 0
-        assert response_json['per_learner_spend_limit'] == 0
-        assert response_json['spend_limit'] == 0
 
     def test_create_403_for_non_admin_users(self):
         """

@@ -22,6 +22,7 @@ edx-celeryutils
 edx-django-utils
 edx-django-release-util
 edx-drf-extensions
+edx-enterprise-subsidy-client
 edx-rbac
 edx-rest-api-client
 jsonfield2

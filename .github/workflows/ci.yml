@@ -21,10 +21,8 @@ jobs:
     - name: Install requirements
       run: make requirements
     - name: Upgrade packages
-      run: pip install -U pip wheel codecov
+      run: pip install -U pip wheel
     - name: Validate translations
       run: make validate_translations
     - name: Run tests and style checks
       run: make validate
-    - name: Codecov
-      run: codecov

@@ -10,7 +10,6 @@ from opaque_keys.edx.keys import CourseKey
 from rest_framework import serializers
 
 from enterprise_access.apps.subsidy_access_policy.constants import (
-    NON_CREDIT_LIMIT_POLICY_TYPES,
     POLICY_TYPE_CREDIT_LIMIT_FIELDS,
     POLICY_TYPE_FIELD_MAPPER,
     POLICY_TYPES_WITH_CREDIT_LIMIT,
@@ -204,10 +203,6 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
                 for field in POLICY_TYPE_CREDIT_LIMIT_FIELDS:
                     if field != POLICY_TYPE_FIELD_MAPPER.get(policy_type):
                         attrs.pop(field)
-            elif policy_type in NON_CREDIT_LIMIT_POLICY_TYPES:
-                # if here, we should discard all credit limits if they have a non-zero value
-                for field in POLICY_TYPE_CREDIT_LIMIT_FIELDS:
-                    attrs.pop(field)
         return attrs
 
 
