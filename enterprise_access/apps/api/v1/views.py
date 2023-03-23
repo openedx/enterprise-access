@@ -1,8 +1,9 @@
 """
 Views for Enterprise Access API v1.
 """
-
 import logging
+import os
+from collections import defaultdict
 from contextlib import suppress
 
 from celery import chain
@@ -10,7 +11,9 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
 from django.db.models import Count
+from django.http.request import QueryDict
 from django_filters.rest_framework import DjangoFilterBackend
+from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient
 from edx_rbac.decorators import permission_required
 from edx_rbac.mixins import PermissionRequiredMixin
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
@@ -856,7 +859,7 @@ class RedemptionLockedException(APIException):
     default_detail = 'Enrollment currently locked for this subsidy.'
 
 
-class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.GenericViewSet):
+class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequiredMixin, viewsets.GenericViewSet):
     """
     Viewset for Subsidy Access Policy APIs.
     """
@@ -880,6 +883,9 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
                 if policy:
                     enterprise_uuid = policy.enterprise_customer_uuid
 
+        if self.action == 'can_redeem':
+            enterprise_uuid = self.kwargs.get('enterprise_customer_uuid')
+
         return enterprise_uuid
 
     def get_permission_object(self):
@@ -893,17 +899,35 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
         enterprise_customer_uuid = self.enterprise_customer_uuid
         return queryset.filter(enterprise_customer_uuid=enterprise_customer_uuid)
 
-    def redeemable_policies(self, enterprise_customer_uuid, learner_id, content_key):
+    def evaluate_policies(self, enterprise_customer_uuid, learner_id, content_key):
         """
-        Return all redeemable policies.
+        Evaluate all policies for the given enterprise customer to check if it can be redeemed against the given learner
+        and content.
+
+        Note: Calling this will cause multiple backend API calls to the enterprise-subsidy can_redeem endpoint, one for
+        each access policy evaluated.
+
+        Returns:
+            tuple of (list of SubsidyAccessPolicy, dict mapping str -> list of SubsidyAccessPolicy): The first tuple
+            element is a list of redeemable policies, and the second tuple element is a mapping of reason strings to
+            non-redeemable policies.  The reason strings are non-specific, short explanations for why each bucket of
+            policies has been deemed non-redeemable.
         """
         redeemable_policies = []
-        all_policies = SubsidyAccessPolicy.objects.filter(enterprise_customer_uuid=enterprise_customer_uuid)
-        for policy in all_policies:
-            if policy.can_redeem(learner_id, content_key):
+        non_redeemable_policies = defaultdict(list)
+        all_policies_for_enterprise = SubsidyAccessPolicy.objects.filter(
+            enterprise_customer_uuid=enterprise_customer_uuid
+        )
+        for policy in all_policies_for_enterprise:
+            redeemable, reason = policy.can_redeem(learner_id, content_key)
+            if redeemable:
                 redeemable_policies.append(policy)
+            else:
+                # Aggregate the reasons for policies not being redeemable.  This really only works if the reason string
+                # is short and generic because the bucketing logic simply treats entire string as the bucket key.
+                non_redeemable_policies[reason].append(policy)
 
-        return redeemable_policies
+        return (redeemable_policies, non_redeemable_policies)
 
     def policies_with_credit_available(self, enterprise_customer_uuid, learner_id):
         """
@@ -955,7 +979,7 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
         learner_id = serializer.data['learner_id']
         content_key = serializer.data['content_key']
 
-        redeemable_policies = self.redeemable_policies(enterprise_customer_uuid, learner_id, content_key)
+        redeemable_policies, _ = self.evaluate_policies(enterprise_customer_uuid, learner_id, content_key)
         response_data = serializers.SubsidyAccessPolicyRedeemableSerializer(redeemable_policies, many=True).data
 
         return Response(
@@ -967,6 +991,8 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
     def redeem(self, request, *args, **kwargs):
         """
         Redeem a policy for given `learner_id` and `content_key`
+
+        URL Location: POST /api/v1/policy/<policy_uuid>/redeem/?learner_id=<>&content_key=<>
         """
         policy = get_object_or_404(SubsidyAccessPolicy, pk=kwargs.get('policy_uuid'))
 
@@ -997,12 +1023,64 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
             if lock_acquired:
                 policy.release_lock(learner_id, content_key)
 
+    def get_redemptions_by_policy_uuid(self, enterprise_customer_uuid, learner_id, content_key):
+        """
+        Get existing redemptions for the given enterprise, learner, and content, bucketed by policy.
+
+        Note: Calling this will cause multiple backend API calls to the enterprise-subsidy can_redeem endpoint, one for
+        each access policy evaluated.
+
+        Returns:
+            dict of list of policy data: mapping of policy UUID to a list of deserialized ledger transactions. e.g.:
+                {
+                    "316b0f76-a69c-464b-93d7-7c0142f003aa": [
+                        {
+                            "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
+                            "state": "committed",
+                            "idempotency_key": "the-idempotency-key",
+                            "learner_id": 54321,
+                            "content_key": "course-v1:demox+1234+2T2023",
+                            "quantity": -19900,
+                            "unit": "USD_CENTS",
+                            "reference_id": "6ff2c1c9-d5fc-48a8-81da-e6a675263f67",
+                            "reference_type": "enterprise_fufillment_source_uuid",
+                            "subsidy_access_policy_uuid": "ac4cca18-4857-402d-963a-790c2f6fcc53",
+                            "metadata": {...},
+                            "created": <created-datetime>,
+                            "modified": <modified-datetime>,
+                            "reversals": [],
+                            "policy_redemption_status_url": <API URL to check redemption status>,
+                            "courseware_url": "https://courses.edx.org/courses/course-v1:demox+1234+2T2023/courseware/",
+                        },
+                    ]
+                }
+        """
+        redemptions_by_policy_uuid = {}
+        policies = SubsidyAccessPolicy.objects.filter(enterprise_customer_uuid=enterprise_customer_uuid)
+
+        for policy in policies:
+            if redemptions := policy.redemptions(learner_id, content_key):
+                for redemption in redemptions:
+                    redemption["policy_redemption_status_url"] = os.path.join(
+                        EnterpriseSubsidyAPIClient.TRANSACTIONS_ENDPOINT,
+                        f"{redemption['uuid']}/",
+                    )
+                    # TODO: this is currently hard-coded to only support OCM courses.
+                    redemption["courseware_url"] = os.path.join(
+                        settings.LMS_URL,
+                        f"courses/{redemption['content_key']}/courseware/",
+                    )
+                redemptions_by_policy_uuid[str(policy.uuid)] = redemptions
+
+        return redemptions_by_policy_uuid
+
     @action(detail=False, methods=['get'])
     def redemption(self, request, *args, **kwargs):
         """
         Return redemption records for given `enterprise_customer_uuid`, `learner_id` and `content_key`
+
+        URL Location: GET /api/v1/policy/redemption/?enterprise_customer_uuid=<>&learner_id=<>&content_key=<>
         """
-        # import pdb; pdb.set_trace()
         serializer = serializers.SubsidyAccessPolicyRedeemListSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
@@ -1010,13 +1088,126 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
         learner_id = serializer.data['learner_id']
         content_key = serializer.data['content_key']
 
-        redemptions_by_policy_uuid = {}
-        policies = SubsidyAccessPolicy.objects.filter(enterprise_customer_uuid=enterprise_customer_uuid)
-        for policy in policies:
-            if redemptions := policy.redemptions(learner_id, content_key):
-                redemptions_by_policy_uuid[str(policy.uuid)] = redemptions
-
         return Response(
-            redemptions_by_policy_uuid,
+            self.get_redemptions_by_policy_uuid(enterprise_customer_uuid, learner_id, content_key),
             status=status.HTTP_200_OK,
         )
+
+    @action(
+        detail=False,
+        methods=['get'],
+        url_name='can-redeem',
+        # TODO: more precise UUID pattern?
+        url_path='enterprise-customer/(?P<enterprise_customer_uuid>[^/.]+)/can-redeem',
+    )
+    def can_redeem(self, request, enterprise_customer_uuid=None):
+        """
+        Retrieve single, redeemable access policy for a set of content keys.
+
+        URL Location: GET /api/v1/policy/enterprise-customer/<enterprise_customer_uuid>/can-redeem/
+                          ?content_key=<>&content_key=<>&...&content_key=<>
+
+        Request Args:
+            enterprise_customer_uuid (URL, required): The enterprise customer to answer this question about.
+            content_key (query parameter, multiple, required): Possibly multiple content_keys to run this query against.
+
+        Returns:
+            rest_framework.response.Response:
+                400: If there are missing or otherwise invalid input parameters.  Response body is JSON with a single
+                     `Error` key.
+                403: If the requester has insufficient permissions, Response body is JSON with a single `Error` key.
+                201: If a redeemable access policy was found, an existing redemption was found, or neither.  Response
+                     body is a JSON list of dict containing redemption evaluations for each given content_key.  See
+                     below for a sample response to 3 passed content_keys: one which has existing redemptions, one
+                     without, and a third that is not redeemable.:
+                     [
+                         {
+                             "content_key": "course-v1:demox+1234+2T2023_1",
+                             "redemptions": [
+                                 {
+                                     "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
+                                     "state": "committed",
+                                     "policy_redemption_status_url": <API URL to check the redemtion status>,
+                                     "courseware_url": <URL to the courseware page>,
+                                     <remainder of serialized Transaction>
+                                 },
+                             ],
+                             "subsidy_access_policy": {
+                                 "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
+                                 "policy_redemption_url": <API URL to redeem the policy>,
+                                 <remainder of serialized SubsidyAccessPolicy>
+                             },
+                             "reasons": []
+                         },
+                         {
+                             "content_key": "course-v1:demox+1234+2T2023_2",
+                             "redemptions": [],
+                             "subsidy_access_policy": {
+                                 "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
+                                 "policy_redemption_url": <API URL to redeem the policy>,
+                                 <remainder of serialized SubsidyAccessPolicy>
+                             },
+                             "reasons": []
+                         },
+                         {
+                             "content_key": "course-v1:demox+1234+2T2023_3",
+                             "redemptions": [],
+                             "subsidy_access_policy": null,
+                             "reasons": [
+                                 {
+                                     "reason": "Not enough funds available for the course.",
+                                     "policy_uuids": ["56744a36-93ac-4e6c-b998-a2a1899f2ae4"],
+                                 }
+                             ]
+                         }
+                         ...
+                     ]
+        """
+        all_request_params = QueryDict(mutable=True)
+        all_request_params.update(request.query_params)
+        all_request_params.update({"enterprise_customer_uuid": enterprise_customer_uuid})
+        serializer = serializers.SubsidyAccessPolicyCanRedeemRequestSerializer(data=all_request_params)
+        serializer.is_valid(raise_exception=True)
+
+        enterprise_customer_uuid = serializer.data['enterprise_customer_uuid']
+        content_keys = serializer.data['content_key']
+        learner_id = self.lms_user_id
+
+        response = []
+        for content_key in content_keys:
+            serialized_policy = None
+            reasons = []
+
+            redemptions_by_policy_uuid = self.get_redemptions_by_policy_uuid(
+                enterprise_customer_uuid,
+                learner_id,
+                content_key
+            )
+            # Flatten dict of lists because the response doesn't need to be bucketed by policy_uuid.
+            redemptions = [
+                redemption
+                for redemptions in redemptions_by_policy_uuid.values()
+                for redemption in redemptions
+            ]
+            redeemable_policies, non_redeemable_policies = self.evaluate_policies(
+                enterprise_customer_uuid, learner_id, content_key
+            )
+            if not redemptions and not redeemable_policies:
+                for reason, policies in non_redeemable_policies.items():
+                    reasons.append({
+                        "reason": reason,
+                        "policy_uuids": [policy.uuid for policy in policies],
+                    })
+            if redeemable_policies:
+                resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
+                serialized_policy = serializers.SubsidyAccessPolicyRedeemableSerializer(resolved_policy).data
+
+            can_redeem_for_content_response = {
+                "content_key": content_key,
+                "redemptions": redemptions,
+                "subsidy_access_policy": serialized_policy,
+                "reasons": reasons,
+            }
+            response.append(can_redeem_for_content_response)
+
+        return Response(response, status=status.HTTP_200_OK)
