@@ -4,19 +4,15 @@ import sys
 from uuid import uuid4
 
 from django.db import models
+from django.utils.functional import cached_property
 from django_extensions.db.models import TimeStampedModel
+from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient
 from simple_history.models import HistoricalRecords
 
 from enterprise_access.apps.api.utils import acquire_subsidy_policy_lock, release_subsidy_policy_lock
-from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClient
 from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
-from enterprise_access.apps.subsidy_access_policy.constants import (
-    CREDIT_POLICY_TYPE_PRIORITY,
-    SUBSCRIPTION_POLICY_TYPE_PRIORITY,
-    AccessMethods
-)
-from enterprise_access.apps.subsidy_access_policy.mocks import group_client, subsidy_client
+from enterprise_access.apps.subsidy_access_policy.constants import CREDIT_POLICY_TYPE_PRIORITY, AccessMethods
 
 SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS = 300
 
@@ -87,13 +83,34 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
     history = HistoricalRecords()
 
+    @cached_property
+    def subsidy_client(self):
+        """
+        A request-cached EnterpriseSubsidyAPIClient instance.
+        """
+        return EnterpriseSubsidyAPIClient()
+
+    @cached_property
+    def catalog_client(self):
+        """
+        A request-cached EnterpriseCatalogApiClient instance.
+        """
+        return EnterpriseCatalogApiClient()
+
+    @cached_property
+    def lms_api_client(self):
+        """
+        A request-cached LmsApiClient instance.
+        """
+        return LmsApiClient()
+
     def save(self, *args, **kwargs):
         """
         Override to persist policy type.
         """
-        # TODO: find a better way to do this. Raising an exception will cause 500
         if type(self).__name__ == SubsidyAccessPolicy.__name__:
-            # it doesn't make sense to create an object of SubsidyAccessPolicy because it is not a concrete policy
+            # it doesn't make sense to create an object of SubsidyAccessPolicy
+            # because it is not a concrete policy
             raise TypeError("Can not create object of class SubsidyAccessPolicy")
 
         self.policy_type = type(self).__name__
@@ -118,18 +135,62 @@ class SubsidyAccessPolicy(TimeStampedModel):
         finally:
             return super().__new__(proxy_class)  # pylint: disable=lost-exception
 
+    def subsidy_record(self):
+        return self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
+
+    def subsidy_balance(self):
+        """
+        Returns total remaining balance for the associated subsidy ledger.
+        """
+        return int(self.subsidy_record().get('current_balance'))
+
+    def remaining_balance(self):
+        """
+        Synonym for subsidy_balance().
+        """
+        return self.subsidy_balance()
+
+    def transactions_for_learner(self, lms_user_id):
+        """
+        TODO: figure out cache?
+        """
+        response_payload = self.subsidy_client.list_subsidy_transactions(
+            subsidy_uuid=self.subsidy_uuid,
+            lms_user_id=lms_user_id,
+            subsidy_access_policy_uuid=self.uuid,
+        )
+        return {
+            'transactions': response_payload['results'],
+            'aggregates': response_payload['aggregates'],
+        }
+
+    def transactions_for_learner_and_content(self, lms_user_id, content_key):
+        """
+        Return a dictionary that contains a list of transactions
+        and aggregates describing those transactions
+        for the given ``lms_user_id`` and ``content_key``.
+        """
+        response_payload = self.subsidy_client.list_subsidy_transactions(
+            subsidy_uuid=self.subsidy_uuid,
+            lms_user_id=lms_user_id,
+            content_key=content_key,
+            subsidy_access_policy_uuid=self.uuid,
+        )
+        return {
+            'transactions': response_payload['results'],
+            'aggregates': response_payload['aggregates'],
+        }
+
     def can_redeem(self, learner_id, content_key):
         """
         Check that a given learner can redeem the given content.
         """
-        enterprise_catalog_api_client = EnterpriseCatalogApiClient()
-        lms_api_client = LmsApiClient()
-
-        if not enterprise_catalog_api_client.contains_content_items(self.catalog_uuid, [content_key]):
+        if not self.catalog_client.contains_content_items(self.catalog_uuid, [content_key]):
             return False
-        if not lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, learner_id):
+        # TODO: can we rely on JWT roles to check this?
+        if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, learner_id):
             return False
-        if not subsidy_client.can_redeem(self.subsidy_uuid, learner_id, content_key):
+        if not self.subsidy_client.can_redeem(self.subsidy_uuid, learner_id, content_key):
             return False
 
         return True
@@ -141,25 +202,39 @@ class SubsidyAccessPolicy(TimeStampedModel):
             A ledger transaction id, or None if the subsidy was not redeemed.
         """
         if self.access_method == AccessMethods.DIRECT:
-            return subsidy_client.redeem(self.subsidy_uuid, learner_id, content_key)
-        if self.access_method == AccessMethods.REQUEST:
-            return subsidy_client.request_redemption(self.subsidy_uuid, learner_id, content_key)
-        return None
+            return self.subsidy_client.create_subsidy_transaction(
+                subsidy_uuid=self.subsidy_uuid,
+                lms_user_id=learner_id,
+                content_key=content_key,
+                subsidy_access_policy_uuid=self.uuid,
+            )
+        else:
+            raise ValueError(f"unknown access method {self.access_method}")
 
     def has_redeemed(self, learner_id, content_key):
         """
-        Check if the subsidy has been redeemed.
+        Check if any existing transactions are present in the subsidy
+        for the given learner_id and content_key.
         """
         if self.access_method == AccessMethods.DIRECT:
-            return subsidy_client.has_redeemed(self.subsidy_uuid, learner_id, content_key)
-        elif self.access_method == AccessMethods.REQUEST:
-            return subsidy_client.has_requested(self.subsidy_uuid, learner_id, content_key)
+            return bool(self.transactions_for_learner_and_content(learner_id, content_key)['transactions'])
+        else:
+            raise ValueError(f"unknown access method {self.access_method}")
+
+    def redemptions(self, learner_id, content_key):
+        """
+        Returns any existing transactions the policy's subsidy
+        that are associated with the given learner_id and content_key.
+        """
+        if self.access_method == AccessMethods.DIRECT:
+            return self.transactions_for_learner_and_content(learner_id, content_key)['transactions']
         else:
             raise ValueError(f"unknown access method {self.access_method}")
 
     def acquire_lock(self, learner_id, content_key):  # pylint: disable=unused-argument
         """
         Acquire a lock for transaction isolation.
+        TODO: use this method.
         """
         return acquire_subsidy_policy_lock(
             self.uuid,
@@ -169,6 +244,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
     def release_lock(self, learner_id, content_key):  # pylint: disable=unused-argument
         """
         Release a previously acquired lock for transaction isolation.
+        TODO: use this method.
         """
         return release_subsidy_policy_lock(
             self.uuid,
@@ -187,52 +263,22 @@ class SubsidyAccessPolicy(TimeStampedModel):
             result is non-deterministic.
         - if multiple policies with identical balances tie for first place, the
             result is non-deterministic.
-
-        Spec:
-        https://2u-internal.atlassian.net/wiki/spaces/SOL/pages/229212214/Commission+Subsidy+Access+Policy+API#Policy-Resolver
         """
 
-        # for each policy we need current balance
+        # TODO: for each policy we need current balance
         # policies don't have direct access to subsidy balance, must call subsidy api to get current balance but
         # instead of making a call for each policy we can implement a specific endpoint in enterprise-subsidy
         # to get current balance for multiple subsidies.
-        subsidy_uuids = [redeemable_policy.subsidy_uuid for redeemable_policy in redeemable_policies]
-        subsidies_balance = subsidy_client.get_current_balance(subsidy_uuids)
+        # For now, we inefficiently make one call per subsidy record.
+        subsidies_balance = {
+            policy.uuid: policy.current_balance()
+            for policy in redeemable_policies
+        }
         sorted_policies = sorted(
             redeemable_policies,
             key=lambda p: (p.priority, subsidies_balance[p.subsidy_uuid]),
         )
         return sorted_policies[0]
-
-
-class SubscriptionAccessPolicy(SubsidyAccessPolicy):
-    """
-    A subsidy access policy for subscriptions.
-
-    .. no_pii: This model has no PII
-    """
-    objects = PolicyManager()
-
-    class Meta:
-        """
-        Metaclass for SubscriptionAccessPolicy.
-        """
-        proxy = True
-
-    def can_redeem(self, learner_id, content_key):
-        if subsidy_client.get_license_for_learner(self.subsidy_uuid, learner_id):
-            return super().can_redeem(learner_id, content_key)
-
-        group_uuids = list(group_client.get_groups_for_learner(learner_id))
-        if self.group_uuid in group_uuids:
-            if subsidy_client.get_license_for_group(self.subsidy_uuid, self.group_uuid):
-                return super().can_redeem(learner_id, content_key)
-
-        return False
-
-    @property
-    def priority(self):
-        return SUBSCRIPTION_POLICY_TYPE_PRIORITY
 
 
 class CreditPolicyMixin:
@@ -261,11 +307,11 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
         proxy = True
 
     def can_redeem(self, learner_id, content_key):
-        learner_transaction_count = subsidy_client.transactions_for_learner(
-            subsidy_uuid=self.subsidy_uuid,
-            learner_id=learner_id,
-        )
-        if learner_transaction_count < self.per_learner_enrollment_limit:
+        """
+        Checks if the given learner_id has a number of existing subsidy transactions
+        LTE to the learner enrollment cap declared by this policy.
+        """
+        if len(self.transactions_for_learner(learner_id)['transactions']) < self.per_learner_enrollment_limit:
             return super().can_redeem(learner_id, content_key)
 
         return False
@@ -279,17 +325,8 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
         """
         Returns the remaining redeemable credit for the user.
         """
-        learner_transaction_count = subsidy_client.transactions_for_learner(
-            subsidy_uuid=self.subsidy_uuid,
-            learner_id=learner_id,
-        )
-        return self.per_learner_enrollment_limit - learner_transaction_count
-
-    def remaining_balance(self):
-        """
-        Returns total remaining balance for the associated subsidy ledger.
-        """
-        return subsidy_client.get_current_balance(self.subsidy_uuid)
+        existing_transaction_count = len(self.transactions_for_learner(learner_id)['transactions'])
+        return self.per_learner_enrollment_limit - existing_transaction_count
 
 
 class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
@@ -308,83 +345,25 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
         proxy = True
 
     def can_redeem(self, learner_id, content_key):
-        spent_amount = subsidy_client.amount_spent_for_learner(
-            subsidy_uuid=self.subsidy_uuid,
-            learner_id=learner_id,
-        )
-        course_price = DiscoveryApiClient().get_course_price(content_key)
+        """
+        TODO: Well, can you?
+        """
+        spent_amount = self.transactions_for_learner(learner_id)['aggregates'].get('total_quantity') or 0
+        course_price = self.subsidy_client.get_subsidy_content_data(
+            self.enterprise_customer_uuid,
+            content_key
+        )['content_price']
         if (spent_amount + course_price) < self.per_learner_spend_limit:
             return super().can_redeem(learner_id, content_key)
 
         return False
 
     def credit_available(self, learner_id=None):
-        if self.remaining_balance_per_user(learner_id) > 0:
-            return True
-        return False
+        return self.remaining_balance_per_user(learner_id) > 0
 
     def remaining_balance_per_user(self, learner_id=None):
         """
         Returns the remaining redeemable credit for the user.
         """
-        spent_amount = subsidy_client.amount_spent_for_learner(
-            subsidy_uuid=self.subsidy_uuid,
-            learner_id=learner_id,
-        )
+        spent_amount = self.transactions_for_learner(learner_id)['aggregates'].get('total_quantity') or 0
         return self.per_learner_spend_limit - spent_amount
-
-    def remaining_balance(self):
-        """
-        Returns total remaining balance for the associated subsidy ledger.
-        """
-        return subsidy_client.get_current_balance(self.subsidy_uuid)
-
-
-class CappedEnrollmentLearnerCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
-    """
-    Policy that limits the maximum amount that can be spent aggregated across all users covered by this policy.
-
-    .. no_pii: This model has no PII
-    """
-
-    objects = PolicyManager()
-
-    class Meta:
-        """
-        Metaclass for CappedEnrollmentLearnerCreditAccessPolicy.
-        """
-        proxy = True
-
-    def can_redeem(self, learner_id, content_key):
-        group_amount_spent = subsidy_client.amount_spent_for_group_and_catalog(
-            subsidy_uuid=self.subsidy_uuid,
-            group_uuid=self.group_uuid,
-            catalog_uuid=self.catalog_uuid,
-        )
-        course_price = DiscoveryApiClient().get_course_price(content_key)
-        if (group_amount_spent + course_price) < self.spend_limit:
-            return super().can_redeem(learner_id, content_key)
-
-        return False
-
-    def credit_available(self, learner_id=None):
-        if self.remaining_balance_per_user(learner_id) > 0:
-            return True
-        return False
-
-    def remaining_balance_per_user(self, learner_id=None):  # pylint: disable=unused-argument
-        """
-        Returns the remaining redeemable credit for the user.
-        """
-        group_amount_spent = subsidy_client.amount_spent_for_group_and_catalog(
-            subsidy_uuid=self.subsidy_uuid,
-            group_uuid=self.group_uuid,
-            catalog_uuid=self.catalog_uuid,
-        )
-        return self.spend_limit - group_amount_spent
-
-    def remaining_balance(self):
-        """
-        Returns total remaining balance for the associated subsidy ledger.
-        """
-        return subsidy_client.get_current_balance(self.subsidy_uuid)

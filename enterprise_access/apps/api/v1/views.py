@@ -20,7 +20,7 @@ from rest_framework import filters, permissions
 from rest_framework import serializers as rest_serializers
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ParseError
+from rest_framework.exceptions import APIException, ParseError
 from rest_framework.generics import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -846,6 +846,16 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         return queryset.filter(enterprise_customer_uuid=enterprise_customer_uuid)
 
 
+class RedemptionRequestException(APIException):
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    default_detail = 'Could not redeem'
+
+
+class RedemptionLockedException(APIException):
+    status_code = status.HTTP_423_LOCKED
+    default_detail = 'Enrollment currently locked for this subsidy.'
+
+
 class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.GenericViewSet):
     """
     Viewset for Subsidy Access Policy APIs.
@@ -966,23 +976,23 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
         learner_id = serializer.data['learner_id']
         content_key = serializer.data['content_key']
         lock_acquired = False
+        # import pdb; pdb.set_trace()
         try:
             lock_acquired = policy.acquire_lock(learner_id, content_key)
             if not lock_acquired:
-                return Response(
-                    data='Enrollment currently locked for this subsidy.',
-                    status=status.HTTP_423_LOCKED,
-                )
+                raise RedemptionLockedException()
             if policy.can_redeem(learner_id, content_key):
-                response = policy.redeem(learner_id, content_key)
+                redemption_result = policy.redeem(learner_id, content_key)
                 send_subsidy_redemption_event_to_event_bus(
                     SUBSIDY_REDEEMED.event_type,
                     serializer.data
                 )
-            return Response(
-                response,
-                status=status.HTTP_200_OK,
-            )
+                return Response(
+                    redemption_result,
+                    status=status.HTTP_200_OK,
+                )
+            else:
+                raise RedemptionRequestException()
         finally:
             if lock_acquired:
                 policy.release_lock(learner_id, content_key)
@@ -992,6 +1002,7 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
         """
         Return redemption records for given `enterprise_customer_uuid`, `learner_id` and `content_key`
         """
+        # import pdb; pdb.set_trace()
         serializer = serializers.SubsidyAccessPolicyRedeemListSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
@@ -999,13 +1010,13 @@ class SubsidyAccessPolicyRedeemViewset(PermissionRequiredMixin, viewsets.Generic
         learner_id = serializer.data['learner_id']
         content_key = serializer.data['content_key']
 
-        redemptions = []
+        redemptions_by_policy_uuid = {}
         policies = SubsidyAccessPolicy.objects.filter(enterprise_customer_uuid=enterprise_customer_uuid)
         for policy in policies:
-            redemption = policy.has_redeemed(learner_id, content_key)
-            redemptions.append(redemption)
+            if redemptions := policy.redemptions(learner_id, content_key):
+                redemptions_by_policy_uuid[str(policy.uuid)] = redemptions
 
         return Response(
-            redemptions,
+            redemptions_by_policy_uuid,
             status=status.HTTP_200_OK,
         )

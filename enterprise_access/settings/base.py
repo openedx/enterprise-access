@@ -248,6 +248,7 @@ AUTO_AUTH_USERNAME_PREFIX = 'auto_auth_'
 SOCIAL_AUTH_STRATEGY = 'auth_backends.strategies.EdxDjangoStrategy'
 
 # Set these to the correct values for your OAuth2 provider (e.g., LMS)
+OAUTH2_PROVIDER_URL = 'http://edx.devstack.lms:18000/oauth2'
 SOCIAL_AUTH_EDX_OAUTH2_KEY = 'replace-me'
 SOCIAL_AUTH_EDX_OAUTH2_SECRET = 'replace-me'
 SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT = 'replace-me'

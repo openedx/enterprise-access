@@ -98,6 +98,9 @@ migrate: ## apply database migrations
 html_coverage: ## generate and view HTML coverage report
 	coverage html && open htmlcov/index.html
 
+subsidy_client_local:  # re-install edx-enterprise-subsidy-client from local code
+	pip uninstall -y edx-enterprise-subsidy-client && pip install -e /edx/src/edx-enterprise-subsidy-client/ && pip freeze | grep subsidy-client
+
 upgrade: export CUSTOM_COMPILE_COMMAND=make upgrade
 upgrade: piptools ## update the requirements/*.txt files with the latest packages satisfying requirements/*.in
 	# Make sure to compile files after any other files they include!
@@ -207,6 +210,9 @@ db-shell: # Run the app shell as root, enter the app's database
 
 %-restart: # Restart the specified service container
 	docker-compose restart $*
+
+app-restart-devserver:  # restart just the app Django dev server
+	docker-compose exec app bash -c 'kill $$(ps aux | egrep "manage.py ?\w* runserver" | egrep -v "while|grep" | awk "{print \$$2}")'
 
 %-attach:
 	docker attach enterprise_access.$*
