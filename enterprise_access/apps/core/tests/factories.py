@@ -11,6 +11,7 @@ USER_PASSWORD = 'password'
 
 FAKER = Faker()
 
+
 class UserFactory(factory.django.DjangoModelFactory):
     """
     Test factory for the `User` model.

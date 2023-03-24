@@ -17,6 +17,7 @@ class group_client():
         """Group service api"""
         return mock.MagicMock(learner_id)
 
+
 class catalog_client():
     """
     API client for the enterprise-catalog service.
@@ -30,6 +31,7 @@ class catalog_client():
     def get_course_price(cls, content_key):
         """Catalog service api"""
         return mock.MagicMock(content_key)
+
 
 class subsidy_client():
     """

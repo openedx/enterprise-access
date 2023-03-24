@@ -46,7 +46,10 @@ def has_explicit_access_to_requests_admin(user, enterprise_customer_uuid):
     )
 
 
-has_admin_access = has_implicit_access_to_requests_admin | has_explicit_access_to_requests_admin  # pylint: disable=unsupported-binary-operation
+# pylint: disable=unsupported-binary-operation
+has_admin_access = (
+    has_implicit_access_to_requests_admin | has_explicit_access_to_requests_admin
+)
 
 rules.add_perm(
     constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
@@ -92,7 +95,10 @@ def has_explicit_access_to_requests_learner(user, enterprise_customer_uuid):
     )
 
 
-has_learner_access = has_implicit_access_to_requests_learner | has_explicit_access_to_requests_learner  # pylint: disable=unsupported-binary-operation
+# pylint: disable=unsupported-binary-operation
+has_learner_access = (
+    has_implicit_access_to_requests_learner | has_explicit_access_to_requests_learner
+)
 
 # Grants access permission if the user is a learner or admin
 rules.add_perm(

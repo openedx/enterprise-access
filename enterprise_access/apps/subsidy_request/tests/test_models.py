@@ -14,6 +14,7 @@ from test_utils import TestCaseWithMockedDiscoveryApiClient
 
 now = datetime.utcnow()
 
+
 @ddt.ddt
 @mark.django_db
 class LicenseRequestTests(TestCaseWithMockedDiscoveryApiClient):
@@ -40,7 +41,6 @@ class LicenseRequestTests(TestCaseWithMockedDiscoveryApiClient):
         expected_error = 'Both reviewer and reviewed_at are required for a review.'
         print(error.exception.messages)
         assert error.exception.messages[0] == expected_error
-
 
     @ddt.data(
         (mock_subscription_plan_uuid, None),

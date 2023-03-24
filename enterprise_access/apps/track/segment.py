@@ -10,6 +10,7 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
+
 def track_event(lms_user_id, event_name, properties):
     """
     Send a tracking event to segment

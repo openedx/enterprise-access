@@ -30,18 +30,22 @@ RUN apt-get update && apt-get -qy install --no-install-recommends \
  locales \
  python3.8 \
  python3-pip \
+ python3.8-venv \
+ python3.8-dev \
  libmysqlclient-dev \
  libssl-dev \
- python3-dev \
- gcc \
  build-essential \
  git \ 
  wget
 
-
 RUN pip install --upgrade pip setuptools
 # delete apt package lists because we do not need them inflating our image
 RUN rm -rf /var/lib/apt/lists/*
+
+# Create a virtualenv for sanity
+ENV VIRTUAL_ENV=/edx/venvs/enterprise-access
+RUN python3.8 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 WORKDIR /tmp
 RUN wget https://packages.confluent.io/clients/deb/pool/main/libr/librdkafka/librdkafka_2.0.2.orig.tar.gz
@@ -66,8 +70,10 @@ WORKDIR /edx/app/enterprise-access
 # Copy the requirements explicitly even though we copy everything below
 # this prevents the image cache from busting unless the dependencies have changed.
 COPY requirements/production.txt /edx/app/enterprise-access/requirements/production.txt
+COPY requirements/pip.txt /edx/app/enterprise-access/requirements/pip.txt
 
 # Dependencies are installed as root so they cannot be modified by the application user.
+RUN pip install -r requirements/pip.txt
 RUN pip install -r requirements/production.txt
 
 RUN mkdir -p /edx/var/log

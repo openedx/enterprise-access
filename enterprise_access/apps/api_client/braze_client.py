@@ -10,10 +10,12 @@ logger = logging.getLogger(__name__)
 
 ENTERPRISE_BRAZE_ALIAS_LABEL = 'Enterprise'  # Do Not change this, this is consistent with other uses across edX repos.
 
+
 class BrazeApiClient(BrazeClient):
     """
     API client for calls to Braze.
     """
+
     def __init__(self):
 
         required_settings = ['BRAZE_API_KEY', 'BRAZE_API_URL', 'BRAZE_APP_ID']
@@ -58,7 +60,7 @@ class BrazeApiClient(BrazeClient):
         # we don't accidently create a duplicate Braze profile.
         self.identify_users([{
             'external_id': lms_user_id,
-            'user_alias' : user_alias
+            'user_alias': user_alias
         }])
 
         attributes = {
@@ -70,7 +72,7 @@ class BrazeApiClient(BrazeClient):
         return {
             'external_user_id': lms_user_id,
             'attributes': attributes,
-             # If a profile does not already exist, Braze will create a new profile before sending a message.
+            # If a profile does not already exist, Braze will create a new profile before sending a message.
             'send_to_existing_only': False,
             'trigger_properties': trigger_properties or {},
         }

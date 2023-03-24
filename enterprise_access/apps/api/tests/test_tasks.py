@@ -188,6 +188,7 @@ class TestTasks(APITestWithMocks):
             is_relinkable=False
         )
 
+
 class TestLicenseAssignmentTasks(APITestWithMocks):
     """
     Test license assignment tasks.
@@ -216,7 +217,7 @@ class TestLicenseAssignmentTasks(APITestWithMocks):
         Verify assign_licenses_task calls License Manager to assign new licenses.
         """
 
-        mock_license_assignments = [{ 'user_email': self.user.email, 'license': self.mock_license_uuid }]
+        mock_license_assignments = [{'user_email': self.user.email, 'license': self.mock_license_uuid}]
         mock_license_manager_client().assign_licenses.return_value = {
             'num_successful_assignments': 1,
             'num_already_associated': 0,
@@ -241,7 +242,7 @@ class TestLicenseAssignmentTasks(APITestWithMocks):
         )
 
     def test_update_license_requests_after_assignments_task(self):
-        mock_license_assignments = [{ 'user_email': self.user.email, 'license': self.mock_license_uuid }]
+        mock_license_assignments = [{'user_email': self.user.email, 'license': self.mock_license_uuid}]
         license_assignment_results = {
             'license_request_uuids': [self.pending_license_request.uuid],
             'assigned_licenses': {
@@ -264,6 +265,7 @@ class TestLicenseAssignmentTasks(APITestWithMocks):
             event=SegmentEvents.LICENSE_REQUEST_APPROVED,
             properties=LicenseRequestSerializer(self.pending_license_request).data
         )
+
 
 class TestCouponCodeAssignmentTasks(APITestWithMocks):
     """
@@ -292,7 +294,7 @@ class TestCouponCodeAssignmentTasks(APITestWithMocks):
         """
         Verify assign_coupon_codes_task calls Ecommerece to assign new coupon codes.
         """
-        mock_coupon_code_assignments = [{ 'user_email': self.user.email, 'code': self.mock_coupon_code }]
+        mock_coupon_code_assignments = [{'user_email': self.user.email, 'code': self.mock_coupon_code}]
         mock_ecommerce_client().assign_coupon_codes.return_value = {
             'offer_assignments': mock_coupon_code_assignments
         }
@@ -316,7 +318,7 @@ class TestCouponCodeAssignmentTasks(APITestWithMocks):
         )
 
     def test_update_coupon_code_requests_after_assignments_task(self):
-        mock_coupon_code_assignments = [{ 'user_email': self.user.email, 'code': self.mock_coupon_code }]
+        mock_coupon_code_assignments = [{'user_email': self.user.email, 'code': self.mock_coupon_code}]
         coupon_code_assignment_results = {
             'coupon_code_request_uuids': [self.pending_coupon_code_request.uuid],
             'assigned_codes': {

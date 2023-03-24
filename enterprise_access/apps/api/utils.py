@@ -23,6 +23,7 @@ def get_enterprise_uuid_from_query_params(request):
     except ValueError as ex:
         raise ParseError('{} is not a valid uuid.'.format(enterprise_customer_uuid)) from ex
 
+
 def get_enterprise_uuid_from_request_data(request):
     """
     Extracts enterprise_customer_uuid from the request payload.
@@ -48,6 +49,7 @@ def validate_uuid(uuid):
     except ValueError as ex:
         raise ParseError('{} is not a valid uuid.'.format(uuid)) from ex
 
+
 def acquire_subsidy_policy_lock(subsidy_policy_uuid, django_cache_timeout=DEFAULT_TIMEOUT, **cache_key_kwargs):
     """
     Acquires a lock for the provided subsidy policy.  Returns True if the lock was
@@ -59,6 +61,7 @@ def acquire_subsidy_policy_lock(subsidy_policy_uuid, django_cache_timeout=DEFAUL
         return False
     TieredCache.set_all_tiers(cache_key, 'ACQUIRED', django_cache_timeout)
     return True
+
 
 def release_subsidy_policy_lock(subsidy_policy_uuid, **cache_key_kwargs):
     """

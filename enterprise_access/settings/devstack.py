@@ -21,14 +21,17 @@ SOCIAL_AUTH_EDX_OAUTH2_KEY = os.environ.get('SOCIAL_AUTH_EDX_OAUTH2_KEY', 'enter
 SOCIAL_AUTH_EDX_OAUTH2_SECRET = os.environ.get('SOCIAL_AUTH_EDX_OAUTH2_SECRET', 'enterprise_access-sso-secret')
 SOCIAL_AUTH_EDX_OAUTH2_ISSUER = os.environ.get('SOCIAL_AUTH_EDX_OAUTH2_ISSUER', 'http://edx.devstack.lms:18000')
 SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT = os.environ.get('SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT', 'http://edx.devstack.lms:18000')
-SOCIAL_AUTH_EDX_OAUTH2_LOGOUT_URL = os.environ.get('SOCIAL_AUTH_EDX_OAUTH2_LOGOUT_URL', 'http://edx.devstack.lms:18000/logout')
+SOCIAL_AUTH_EDX_OAUTH2_LOGOUT_URL = os.environ.get(
+    'SOCIAL_AUTH_EDX_OAUTH2_LOGOUT_URL', 'http://edx.devstack.lms:18000/logout')
 SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT = os.environ.get(
     'SOCIAL_AUTH_EDX_OAUTH2_PUBLIC_URL_ROOT', 'http://edx.devstack.lms:18000',
 )
 
 # OAuth2 variables specific to backend service API calls.
-BACKEND_SERVICE_EDX_OAUTH2_KEY = os.environ.get('BACKEND_SERVICE_EDX_OAUTH2_KEY', 'enterprise_access-backend-service-key')
-BACKEND_SERVICE_EDX_OAUTH2_SECRET = os.environ.get('BACKEND_SERVICE_EDX_OAUTH2_SECRET', 'enterprise_access-backend-service-secret')
+BACKEND_SERVICE_EDX_OAUTH2_KEY = os.environ.get(
+    'BACKEND_SERVICE_EDX_OAUTH2_KEY', 'enterprise_access-backend-service-key')
+BACKEND_SERVICE_EDX_OAUTH2_SECRET = os.environ.get(
+    'BACKEND_SERVICE_EDX_OAUTH2_SECRET', 'enterprise_access-backend-service-secret')
 
 JWT_AUTH.update({
     'JWT_SECRET_KEY': 'lms-secret',

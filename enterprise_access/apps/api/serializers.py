@@ -73,6 +73,7 @@ class SubsidyRequestSerializer(serializers.ModelSerializer):
         }
         abstract = True
 
+
 class LicenseRequestSerializer(SubsidyRequestSerializer):
     """
     Serializer for the `LicenseRequest` model.

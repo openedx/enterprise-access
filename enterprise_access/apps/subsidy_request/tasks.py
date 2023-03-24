@@ -26,6 +26,7 @@ def _get_course_partners(course_data):
     owners = course_data.get('owners') or []
     return [{'uuid': owner.get('uuid'), 'name': owner.get('name')} for owner in owners]
 
+
 @shared_task(base=LoggedTaskWithRetry)
 def update_course_info_for_subsidy_request_task(subsidy_type, subsidy_request_uuid):
     """
@@ -95,7 +96,7 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
         logger.info(
             'No new subsidy requests. Not sending new requests '
             f'email to admins for enterprise {enterprise_customer_uuid}.'
-            )
+        )
         return
 
     lms_client = LmsApiClient()
@@ -125,8 +126,8 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
     braze_client = BrazeApiClient()
     recipients = [
         braze_client.create_recipient(
-         user_email=admin_user['email'],
-         lms_user_id=admin_user['lms_user_id']
+            user_email=admin_user['email'],
+            lms_user_id=admin_user['lms_user_id']
         )
         for admin_user in admin_users
     ]

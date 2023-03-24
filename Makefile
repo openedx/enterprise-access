@@ -74,7 +74,7 @@ isort: ## run isort to sort imports in all Python files
 	isort --recursive --atomic enterprise_access/
 
 style: ## run Python style checker
-	pylint --rcfile=pylintrc enterprise_access *.py
+	pycodestyle enterprise_access manage.py
 
 lint: ## run Python code linting
 	pylint --rcfile=pylintrc enterprise_access *.py
@@ -178,6 +178,10 @@ dev.up: # Starts all containers
 	docker-compose up -d
 
 dev.up.build: docker_build
+	docker-compose up -d
+
+dev.up.build-no-cache:
+	docker-compose build --no-cache
 	docker-compose up -d
 
 dev.down: # Kills containers and all of their data that isn't in volumes

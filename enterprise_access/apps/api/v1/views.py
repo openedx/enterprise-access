@@ -169,9 +169,9 @@ class SubsidyRequestViewSet(UserDetailsFromJwtMixin, viewsets.ModelViewSet):
             pretty_uuids = ','.join(uuids)
             pretty_verbs = '/'.join(incorrect_states)
             error_msg = (
-                    f'{self.subsidy_type} Request(s) with UUID(s) {pretty_uuids} are already {pretty_verbs}. '
-                    f'Requests could not be {current_action}.'
-                )
+                f'{self.subsidy_type} Request(s) with UUID(s) {pretty_uuids} are already {pretty_verbs}. '
+                f'Requests could not be {current_action}.'
+            )
             raise SubsidyRequestError(error_msg, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     @permission_required(
@@ -551,7 +551,7 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
                 coupon_code_request.approve(self.user)
 
         coupon_code_requests_to_approve_uuids = [
-            str(coupon_code_request.uuid) for coupon_code_request in  coupon_code_requests_to_approve
+            str(coupon_code_request.uuid) for coupon_code_request in coupon_code_requests_to_approve
         ]
         coupon_code_assignment_tasks = chain(
             assign_coupon_codes_task.s(
