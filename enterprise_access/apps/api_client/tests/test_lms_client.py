@@ -16,6 +16,7 @@ class TestLmsApiClient(TestCase):
     """
     Test LMS Api client.
     """
+
     def setUp(self):
         super().setUp()
         self.enterprise_learner_list_view_response = {
@@ -123,7 +124,6 @@ class TestLmsApiClient(TestCase):
             expected_url,
             timeout=settings.LMS_CLIENT_TIMEOUT,
         )
-
 
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
     def test_unlink_users_from_enterprise(self, mock_oauth_client):

@@ -7,6 +7,7 @@ from enterprise_access.apps.track.segment import track_event
 mock_lms_user_id = 'lms_user_id'
 mock_event_name = 'mock.event.name'
 
+
 @override_settings(SEGMENT_KEY=None)
 @mock.patch('enterprise_access.apps.track.segment.logger', return_value=mock.MagicMock())
 def test_track_event_no_segment_key(mock_logger):
@@ -14,6 +15,7 @@ def test_track_event_no_segment_key(mock_logger):
     mock_logger.warning.assert_called_with(
         "Event %s for user_id %s not tracked because SEGMENT_KEY not set", mock_event_name, mock_lms_user_id
     )
+
 
 @override_settings(SEGMENT_KEY='123')
 @mock.patch('enterprise_access.apps.track.segment.logger', return_value=mock.MagicMock())

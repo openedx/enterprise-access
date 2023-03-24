@@ -10,6 +10,7 @@ from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
 
 logger = logging.getLogger(__name__)
 
+
 class LicenseManagerApiClient(BaseOAuthClient):
     """
     API client for calls to the license-manager service.

@@ -145,11 +145,11 @@ REST_FRAMEWORK = {
 
 # DRF Spectacular settings
 SPECTACULAR_SETTINGS = {
-     'TITLE': 'Enterprise Access API',
-     'DESCRIPTION': 'API for controlling request-based access to enterprise subsidized enrollments.',
-     'VERSION': '1.0.0',
-     'SERVE_INCLUDE_SCHEMA': False,
- }
+    'TITLE': 'Enterprise Access API',
+    'DESCRIPTION': 'API for controlling request-based access to enterprise subsidized enrollments.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
 
 # Internationalization
 # https://docs.djangoproject.com/en/dev/topics/i18n/

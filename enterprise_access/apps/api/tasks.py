@@ -71,11 +71,11 @@ def decline_enterprise_subsidy_requests_task(subsidy_request_uuids, subsidy_type
 
 @shared_task(base=LoggedTaskWithRetry)
 def send_notification_email_for_request(
-        subsidy_request_uuid,
-        braze_campaign_id,
-        subsidy_type,
-        braze_trigger_properties=None,
-    ):
+    subsidy_request_uuid,
+    braze_campaign_id,
+    subsidy_type,
+    braze_trigger_properties=None,
+):
     """
     Send email via braze for the subsidy_request
 
@@ -125,6 +125,7 @@ def send_notification_email_for_request(
         recipients=[recipient],
         trigger_properties=braze_trigger_properties,
     )
+
 
 @shared_task(base=LoggedTaskWithRetry)
 def assign_licenses_task(license_request_uuids, subscription_uuid):
@@ -216,6 +217,7 @@ def update_license_requests_after_assignments_task(license_assignment_results):
 
     LicenseRequest.bulk_update(license_requests, ['state', 'subscription_plan_uuid', 'license_uuid'])
 
+
 @shared_task(base=LoggedTaskWithRetry)
 def assign_coupon_codes_task(coupon_code_request_uuids, coupon_id):
     """
@@ -247,7 +249,7 @@ def assign_coupon_codes_task(coupon_code_request_uuids, coupon_id):
 
     ecommerce_api_client = EcommerceApiClient()
     response = ecommerce_api_client.assign_coupon_codes(user_emails, coupon_id)
-    assigned_codes = { assignment['user_email']: assignment['code'] for assignment in response['offer_assignments'] }
+    assigned_codes = {assignment['user_email']: assignment['code'] for assignment in response['offer_assignments']}
 
     return {
         'coupon_code_request_uuids': coupon_code_request_uuids,
@@ -303,6 +305,7 @@ def update_coupon_code_requests_after_assignments_task(coupon_code_assignment_re
             )
 
     CouponCodeRequest.bulk_update(coupon_code_requests, ['state', 'coupon_id', 'coupon_code'])
+
 
 @shared_task(base=LoggedTaskWithRetry)
 def unlink_users_from_enterprise_task(enterprise_customer_uuid, lms_user_ids):

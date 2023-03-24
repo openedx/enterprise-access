@@ -129,7 +129,7 @@ class SubsidyAccessPolicyTests(TestCase):
         mock_catalog_client,
         mock_subsidy_client,
         mock_group_client,
-        ):
+    ):
         """
         Test the can_redeem method of SubscriptionAccessPolicy model
         """
@@ -145,7 +145,7 @@ class SubsidyAccessPolicyTests(TestCase):
         self.assertEqual(
             subscription_access_policy.can_redeem(self.user, self.course_id),
             can_redeem_via_learner_license
-            )
+        )
         # test for redemption via group license
         mock_subsidy_client.get_license_for_learner.return_value = False
         subscription_access_policy.group_uuid = 'test-uuid'
@@ -154,7 +154,7 @@ class SubsidyAccessPolicyTests(TestCase):
         self.assertEqual(
             subscription_access_policy.can_redeem(self.user, self.course_id),
             can_redeem_via_group_license
-            )
+        )
 
     def test_subscription_access_policy_redeem_with_invalid_access_method(self, *args):
         """
@@ -175,12 +175,12 @@ class SubsidyAccessPolicyTests(TestCase):
         is_redeemable,
         ledger_transaction_id,
         redeem_return_value,
-        mock_discovery_client, # lint-amnesty, pylint: disable=unused-argument
+        mock_discovery_client,  # lint-amnesty, pylint: disable=unused-argument
         mock_lms_client,
         mock_catalog_client,
         mock_subsidy_client,
         *args
-        ):
+    ):
         """
         Test the redeem method of SubscriptionAccessPolicy model
         """
@@ -204,12 +204,12 @@ class SubsidyAccessPolicyTests(TestCase):
         is_redeemable,
         ledger_transaction_id,
         request_redemption_return_value,
-        mock_discovery_client, # lint-amnesty, pylint: disable=unused-argument
+        mock_discovery_client,  # lint-amnesty, pylint: disable=unused-argument
         mock_lms_client,
         mock_catalog_client,
         mock_subsidy_client,
         *args
-        ):
+    ):
         """
         Test the redeem method of SubscriptionAccessPolicy model
         """
@@ -222,17 +222,16 @@ class SubsidyAccessPolicyTests(TestCase):
         self.assertEqual(
             subscription_access_policy.redeem(self.user, self.course_id),
             request_redemption_return_value
-            )
-
+        )
 
     def test_subscription_access_policy_has_redeemed(
         self,
-        mock_discovery_client, # lint-amnesty, pylint: disable=unused-argument
-        mock_lms_client, # lint-amnesty, pylint: disable=unused-argument
-        mock_catalog_client, # lint-amnesty, pylint: disable=unused-argument
+        mock_discovery_client,  # lint-amnesty, pylint: disable=unused-argument
+        mock_lms_client,  # lint-amnesty, pylint: disable=unused-argument
+        mock_catalog_client,  # lint-amnesty, pylint: disable=unused-argument
         mock_subsidy_client,
         *args
-        ):
+    ):
         """
         Test the has_redeemed method of SubscriptionAccessPolicy model
         """
@@ -246,12 +245,12 @@ class SubsidyAccessPolicyTests(TestCase):
 
     def test_subscription_request_access_policy_has_redeemed(
         self,
-        mock_discovery_client, # lint-amnesty, pylint: disable=unused-argument
-        mock_lms_client, # lint-amnesty, pylint: disable=unused-argument
-        mock_catalog_client, # lint-amnesty, pylint: disable=unused-argument
+        mock_discovery_client,  # lint-amnesty, pylint: disable=unused-argument
+        mock_lms_client,  # lint-amnesty, pylint: disable=unused-argument
+        mock_catalog_client,  # lint-amnesty, pylint: disable=unused-argument
         mock_subsidy_client,
         *args
-        ):
+    ):
         """
         Test the has_redeemed method of LicenseRequestAccessPolicy model
         """
@@ -276,12 +275,12 @@ class SubsidyAccessPolicyTests(TestCase):
         is_redeemable,
         transactions_for_learner,
         can_redeem,
-        mock_discovery_client, # lint-amnesty, pylint: disable=unused-argument
+        mock_discovery_client,  # lint-amnesty, pylint: disable=unused-argument
         mock_lms_client,
         mock_catalog_client,
         mock_subsidy_client,
         *args
-        ):
+    ):
         """
         Test the can_redeem method of PerLearnerEnrollmentCapLearnerCreditAccessPolicy model
         """
@@ -290,12 +289,13 @@ class SubsidyAccessPolicyTests(TestCase):
         mock_lms_client_instance.enterprise_contains_learner.return_value = enterprise_contains_learner
         mock_subsidy_client.can_redeem.return_value = is_redeemable
         mock_subsidy_client.transactions_for_learner.return_value = transactions_for_learner
-        per_learner_enrollment_cap_learner_credit_access_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory() # lint-amnesty, pylint: disable=line-too-long
-        per_learner_enrollment_cap_learner_credit_access_policy.per_learner_enrollment_limit = 5
+
+        per_learner_enrollment_cap_learner_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
+        per_learner_enrollment_cap_learner_policy.per_learner_enrollment_limit = 5
         self.assertEqual(
-            per_learner_enrollment_cap_learner_credit_access_policy.can_redeem(self.user, self.course_id),
+            per_learner_enrollment_cap_learner_policy.can_redeem(self.user, self.course_id),
             can_redeem
-            )
+        )
 
     @ddt.data(
         (True, True, True, 491, False),
@@ -315,7 +315,7 @@ class SubsidyAccessPolicyTests(TestCase):
         mock_catalog_client,
         mock_subsidy_client,
         *args
-        ):
+    ):
         """
         Test the can_redeem method of PerLearnerSpendCapLearnerCreditAccessPolicy model
         """
@@ -331,7 +331,7 @@ class SubsidyAccessPolicyTests(TestCase):
         self.assertEqual(
             per_learner_spend_cap_learner_credit_access_policy.can_redeem(self.user, self.course_id),
             can_redeem
-            )
+        )
 
     @ddt.data(
         (True, True, True, 4991, False),
@@ -351,7 +351,7 @@ class SubsidyAccessPolicyTests(TestCase):
         mock_catalog_client,
         mock_subsidy_client,
         *args
-        ):
+    ):
         """
         Test the can_redeem method of CappedEnrollmentLearnerCreditAccessPolicyFactory model
         """
@@ -367,4 +367,4 @@ class SubsidyAccessPolicyTests(TestCase):
         self.assertEqual(
             capped_enrollment_learner_credit_access_policy.can_redeem(self.user, self.course_id),
             can_redeem
-            )
+        )

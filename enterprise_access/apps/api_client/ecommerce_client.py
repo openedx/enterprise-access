@@ -10,6 +10,7 @@ from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
 
 logger = logging.getLogger(__name__)
 
+
 class EcommerceApiClient(BaseOAuthClient):
     """
     API client for calls to the ecommerce service.
@@ -66,7 +67,7 @@ class EcommerceApiClient(BaseOAuthClient):
         try:
             endpoint = f'{self.enterprise_coupons_endpoint}{coupon_id}/assign/'
             payload = {
-                'users': [{ 'email': email } for email in user_emails],
+                'users': [{'email': email} for email in user_emails],
                 # Skip code assignment email since we have a request approved email
                 'notify_learners': False
             }

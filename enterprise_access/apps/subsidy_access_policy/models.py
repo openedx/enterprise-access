@@ -162,18 +162,18 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Acquire a lock for transaction isolation.
         """
         return acquire_subsidy_policy_lock(
-                self.uuid,
-                django_cache_timeout=SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS,
-            )
+            self.uuid,
+            django_cache_timeout=SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS,
+        )
 
     def release_lock(self, learner_id, content_key):  # pylint: disable=unused-argument
         """
         Release a previously acquired lock for transaction isolation.
         """
         return release_subsidy_policy_lock(
-                self.uuid,
-                django_cache_timeout=SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS,
-            )
+            self.uuid,
+            django_cache_timeout=SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS,
+        )
 
     @staticmethod
     def resolve_policy(redeemable_policies):
@@ -212,6 +212,7 @@ class SubscriptionAccessPolicy(SubsidyAccessPolicy):
     .. no_pii: This model has no PII
     """
     objects = PolicyManager()
+
     class Meta:
         """
         Metaclass for SubscriptionAccessPolicy.
@@ -252,6 +253,7 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
     """
 
     objects = PolicyManager()
+
     class Meta:
         """
         Metaclass for PerLearnerEnrollmentCreditAccessPolicy.
@@ -261,7 +263,7 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
     def can_redeem(self, learner_id, content_key):
         learner_transaction_count = subsidy_client.transactions_for_learner(
             subsidy_uuid=self.subsidy_uuid,
-            learner_id = learner_id,
+            learner_id=learner_id,
         )
         if learner_transaction_count < self.per_learner_enrollment_limit:
             return super().can_redeem(learner_id, content_key)
@@ -298,6 +300,7 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
     """
 
     objects = PolicyManager()
+
     class Meta:
         """
         Metaclass for PerLearnerSpendCreditAccessPolicy.
@@ -345,6 +348,7 @@ class CappedEnrollmentLearnerCreditAccessPolicy(SubsidyAccessPolicy, CreditPolic
     """
 
     objects = PolicyManager()
+
     class Meta:
         """
         Metaclass for CappedEnrollmentLearnerCreditAccessPolicy.

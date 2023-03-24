@@ -33,6 +33,7 @@ class Command(BaseCommand):
         'Spin off celery tasks to send enterprise admins an email that lists requests '
         'that were created since this was last run.'
     )
+
     def add_arguments(self, parser):
         parser.add_argument(
             '--batch-size',

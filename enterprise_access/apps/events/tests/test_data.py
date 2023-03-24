@@ -64,7 +64,7 @@ class DataTests(TestCase):
         subsidy_redemption_event = SubsidyRedemptionEvent.from_dict(subsidy_redemption_event_data, mock.MagicMock())
 
         assert SubsidyRedemptionEvent.to_dict(subsidy_redemption_event, mock.MagicMock()) == \
-               subsidy_redemption_event_data
+            subsidy_redemption_event_data
 
     @mock.patch('enterprise_access.apps.events.data.AvroSerializer', return_value=mock.MagicMock())
     def test_subsidy_event_serializer(self, mock_avro_serializer):

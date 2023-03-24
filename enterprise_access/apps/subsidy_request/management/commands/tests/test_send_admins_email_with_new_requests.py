@@ -36,9 +36,9 @@ class TestManagementCommands(APITestWithMocks):
         ]
 
     @mock.patch('enterprise_access.apps.subsidy_request.management.commands'
-        '.send_admins_email_with_new_requests'
-        '.sleep'
-    )
+                '.send_admins_email_with_new_requests'
+                '.sleep'
+                )
     @mock.patch(
         'enterprise_access.apps.subsidy_request.management.commands'
         '.send_admins_email_with_new_requests.send_admins_email_with_new_requests_task'

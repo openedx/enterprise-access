@@ -58,6 +58,7 @@ CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT = reverse('api:v1:customer-configurations-
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:policy-list')
 SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT = reverse('api:v1:admin-policy-list')
 
+
 @ddt.ddt
 @mark.django_db
 class TestSubsidyRequestViewSet(APITestWithMocks):
@@ -76,6 +77,7 @@ class TestSubsidyRequestViewSet(APITestWithMocks):
 
         self.enterprise_customer_uuid_1 = uuid4()
         self.enterprise_customer_uuid_2 = uuid4()
+
 
 @ddt.ddt
 class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
@@ -161,7 +163,7 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
         (f',{SubsidyRequestStates.DECLINED},', [SubsidyRequestStates.DECLINED]),
         (f'{SubsidyRequestStates.REQUESTED},{SubsidyRequestStates.ERROR}',
             [SubsidyRequestStates.REQUESTED, SubsidyRequestStates.ERROR]
-        ),
+         ),
     )
     @ddt.unpack
     def test_filter_by_states(self, states, expected_states):
@@ -197,7 +199,6 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
             ).order_by('uuid')
         ]
         assert license_request_uuids == expected_license_request_uuids
-
 
     def test_create_no_customer_configuration(self):
         """
@@ -541,7 +542,6 @@ class TestLicenseRequestViewSet(TestSubsidyRequestViewSet):
                 SubsidyTypeChoices.LICENSE
             )
         ], True)
-
 
     def test_decline_no_subsidy_request_uuids(self):
         """ 400 thrown if no subsidy requests provided """
@@ -983,7 +983,6 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
             state=SubsidyRequestStates.PENDING
         ).count() == 0
 
-
     @mock.patch('enterprise_access.apps.api.v1.views.EcommerceApiClient.get_coupon_overview')
     def test_approve_subsidy_request_already_declined(self, mock_get_coupon):
         """ 422 thrown if any subsidy request in payload already declined """
@@ -1186,6 +1185,7 @@ class TestCouponCodeRequestViewSet(TestSubsidyRequestViewSet):
             [self.coupon_code_request_1.user.lms_user_id],
         )
 
+
 @ddt.ddt
 class TestSubsidyRequestCustomerConfigurationViewSet(APITestWithMocks):
     """
@@ -1287,7 +1287,6 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITestWithMocks):
         ])
 
         assert configuration_enterprise_customer_uuids == expected_configuration_enterprise_customer_uuids
-
 
     @ddt.data(
         [{
@@ -1732,6 +1731,7 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
     """
     Tests for SubsidyAccessPolicyCRUDViewset.
     """
+
     def setUp(self):
         super().setUp()
 
@@ -1821,7 +1821,7 @@ class TestSubsidyAccessPolicyCRUDViewset(TestSubsidyRequestViewSet):
         response = self.client.post(SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT, payload, format='json')
         assert response.status_code == status.HTTP_201_CREATED
         assert SubsidyAccessPolicy.objects.filter(enterprise_customer_uuid=self.enterprise_customer_uuid_1).count() \
-               == 3
+            == 3
 
     def test_create_with_invalid_policy_type(self):
         """

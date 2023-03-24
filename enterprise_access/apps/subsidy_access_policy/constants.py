@@ -1,5 +1,6 @@
 """ Constants for the subsidy_access_policy app. """
 
+
 class AccessMethods:
     """
     Possible states of a subsidy request.
@@ -16,6 +17,7 @@ class AccessMethods:
     )
 
 # Segment events
+
 
 class SegmentEvents:
     """

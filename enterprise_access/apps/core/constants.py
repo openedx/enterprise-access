@@ -13,6 +13,7 @@ REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION = 'requests.has_learner_or_admin_access
 
 ALL_ACCESS_CONTEXT = '*'
 
+
 class Status:
     """Health statuses."""
     OK = "OK"

@@ -18,6 +18,7 @@ from enterprise_access.apps.subsidy_request.models import (
 
 FAKER = Faker()
 
+
 class SubsidyRequestFactory(factory.django.DjangoModelFactory):
     """
     Base Test factory for the `LicenseRequest` and `CouponCodeRequest` model.
@@ -57,7 +58,6 @@ class CouponCodeRequestFactory(SubsidyRequestFactory):
 
     class Meta:
         model = CouponCodeRequest
-
 
 
 class SubsidyRequestCustomerConfigurationFactory(factory.django.DjangoModelFactory):

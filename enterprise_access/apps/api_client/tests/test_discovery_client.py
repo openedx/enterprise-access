@@ -73,7 +73,7 @@ class TestDiscoveryApiClient(TestCase):
             'full_description': '',
             'level_type': None,
             'more_stuff_not_listed_here?': True,
-            "entitlements": [{'mode': 'verified', 'price': '199.00', 'currency': 'USD', 'sku': '3964E13',}]
+            "entitlements": [{'mode': 'verified', 'price': '199.00', 'currency': 'USD', 'sku': '3964E13', }]
         }
         mock_oauth_client.return_value.get.return_value = Response()
 

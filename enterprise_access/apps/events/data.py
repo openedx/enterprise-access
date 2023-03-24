@@ -27,21 +27,22 @@ class CouponCodeRequestData:
     decline_reason = attr.ib(type=str, default=None)
     coupon_code = attr.ib(type=str, default=None)
 
+
 class CouponCodeRequestEvent:
     """
     Coupon code request events to be put on event bus.
     """
 
     def __init__(self, *args, **kwargs):
-        self.uuid=kwargs['uuid']
-        self.lms_user_id=kwargs['lms_user_id']
-        self.course_id=kwargs['course_id']
-        self.enterprise_customer_uuid=kwargs['enterprise_customer_uuid']
-        self.state=kwargs['state']
-        self.reviewed_at=kwargs['reviewed_at']
-        self.reviewer_lms_user_id=kwargs['reviewer_lms_user_id']
-        self.coupon_id=kwargs['coupon_id']
-        self.coupon_code=kwargs['coupon_code']
+        self.uuid = kwargs['uuid']
+        self.lms_user_id = kwargs['lms_user_id']
+        self.course_id = kwargs['course_id']
+        self.enterprise_customer_uuid = kwargs['enterprise_customer_uuid']
+        self.state = kwargs['state']
+        self.reviewed_at = kwargs['reviewed_at']
+        self.reviewer_lms_user_id = kwargs['reviewer_lms_user_id']
+        self.coupon_id = kwargs['coupon_id']
+        self.coupon_code = kwargs['coupon_code']
 
     AVRO_SCHEMA = """
         {
@@ -79,6 +80,7 @@ class CouponCodeRequestEvent:
             "coupon_id": obj.coupon_id,
             "coupon_code": obj.coupon_code
         }
+
 
 class CouponCodeRequestEventSerializer:
     """

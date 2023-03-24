@@ -1,5 +1,6 @@
 """ Constants for the subsidy_request app. """
 
+
 class SubsidyRequestStates:
     """ Possible states of a subsidy request. """
 
@@ -28,6 +29,7 @@ class SubsidyTypeChoices:
         (COUPON, 'Coupon Subsidy'),
     )
 
+
 SUBSIDY_TYPE_CHANGE_DECLINATION = (
     'Declined because subsidy type on SubsidyRequestCustomerConfiguration '
     'has changed.'
@@ -36,6 +38,7 @@ SUBSIDY_TYPE_CHANGE_DECLINATION = (
 SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE = 100
 
 # Segment events
+
 
 class SegmentEvents:
     """
@@ -49,7 +52,7 @@ class SegmentEvents:
     COUPON_CODE_REQUEST_APPROVED = 'edx.server.enterprise-access.coupon-code-request-lifecycle.approved'
     COUPON_CODE_REQUEST_DECLINED = 'edx.server.enterprise-access.coupon-code-request-lifecycle.declined'
     SUBSIDY_REQUEST_CONFIGURATION_CREATED = ('edx.server.enterprise-access.'
-                                            'subsidy-request-configuration-lifecycle.created')
+                                             'subsidy-request-configuration-lifecycle.created')
     SUBSIDY_REQUEST_CONFIGURATION_UPDATED = ('edx.server.enterprise-access.'
                                              'subsidy-request-configuration-lifecycle.updated')
 

@@ -68,7 +68,7 @@ def create_topics(topic_names):
     Create topics in the event bus
     :param topic_names: topics to create
     """
-    KAFKA_ACCESS_CONF_BASE = { 'bootstrap.servers': settings.KAFKA_BOOTSTRAP_SERVER }
+    KAFKA_ACCESS_CONF_BASE = {'bootstrap.servers': settings.KAFKA_BOOTSTRAP_SERVER}
 
     if settings.KAFKA_API_KEY and settings.KAFKA_API_SECRET:
         KAFKA_ACCESS_CONF_BASE.update({
