@@ -212,7 +212,7 @@ edx-drf-extensions==8.4.1
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.2.2
+edx-enterprise-subsidy-client==0.2.3
     # via -r requirements/base.txt
 edx-lint==5.3.4
     # via -r requirements/test.in

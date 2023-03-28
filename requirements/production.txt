@@ -182,7 +182,7 @@ edx-drf-extensions==8.4.1
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.2.2
+edx-enterprise-subsidy-client==0.2.3
     # via -r requirements/base.txt
 edx-opaque-keys[django]==2.3.0
     # via

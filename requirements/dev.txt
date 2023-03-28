@@ -238,7 +238,7 @@ edx-drf-extensions==8.4.1
     # via
     #   -r requirements/validation.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.2.2
+edx-enterprise-subsidy-client==0.2.3
     # via -r requirements/validation.txt
 edx-i18n-tools==0.9.2
     # via -r requirements/dev.in
