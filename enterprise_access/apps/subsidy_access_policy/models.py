@@ -259,10 +259,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Release a previously acquired lock for transaction isolation.
         TODO: use this method.
         """
-        return release_subsidy_policy_lock(
-            self.uuid,
-            django_cache_timeout=SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS,
-        )
+        return release_subsidy_policy_lock(self.uuid)
 
     @classmethod
     def resolve_policy(cls, redeemable_policies):
