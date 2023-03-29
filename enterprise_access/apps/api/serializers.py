@@ -249,3 +249,23 @@ class SubsidyAccessPolicyCreditAvailableListSerializer(serializers.Serializer): 
     """
     enterprise_customer_uuid = serializers.UUIDField(required=True)
     lms_user_id = serializers.CharField(required=True)
+
+
+class SubsidyAccessPolicyCanRedeemRequestSerializer(serializers.Serializer):  # pylint: disable=abstract-method
+    """
+    Serializer to validate SubsidyAccessPolicyRedeemViewset.can_redeem GET request parameters.
+    """
+    enterprise_customer_uuid = serializers.UUIDField(required=True)
+    content_key = serializers.ListField(child=serializers.CharField(required=True), allow_empty=False)
+
+    def validate_content_key(self, value):
+        """
+        Validate `content_key`.
+        """
+        for content_key in value:
+            try:
+                CourseKey.from_string(content_key)
+            except InvalidKeyError as exc:
+                raise serializers.ValidationError(f"Invalid course key: {content_key}") from exc
+
+        return value

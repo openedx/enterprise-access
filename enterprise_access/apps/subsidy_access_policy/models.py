@@ -1,5 +1,6 @@
 """ Models for subsidy_access_policy """
 
+import functools
 import sys
 from uuid import uuid4
 
@@ -15,6 +16,13 @@ from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.subsidy_access_policy.constants import CREDIT_POLICY_TYPE_PRIORITY, AccessMethods
 
 SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS = 300
+
+REASON_CONTENT_NOT_IN_CATALOG = "Requested content_key not contained in policy's catalog."
+REASON_LEARNER_NOT_IN_ENTERPRISE = "Learner not part of enterprise associated with the access policy."
+REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY = "Not enough remaining value in subsidy to redeem requested content."
+REASON_LEARNER_MAX_SPEND_REACHED = "The learner's maximum spend in this subsidy access policy has been reached."
+REASON_LEARNER_MAX_ENROLLMENTS_REACHED = \
+    "The learner's maximum number of enrollments given by this subsidy access policy has been reached."
 
 
 class PolicyManager(models.Manager):
@@ -83,12 +91,17 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
     history = HistoricalRecords()
 
-    @cached_property
-    def subsidy_client(self):
+    @classmethod
+    @functools.lru_cache(maxsize=None)
+    def get_subsidy_client(cls):
         """
         A request-cached EnterpriseSubsidyAPIClient instance.
         """
         return EnterpriseSubsidyAPIClient()
+
+    @property
+    def subsidy_client(self):
+        return self.get_subsidy_client()
 
     @cached_property
     def catalog_client(self):
@@ -186,14 +199,14 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Check that a given learner can redeem the given content.
         """
         if not self.catalog_client.contains_content_items(self.catalog_uuid, [content_key]):
-            return False
+            return (False, REASON_CONTENT_NOT_IN_CATALOG)
         # TODO: can we rely on JWT roles to check this?
         if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, learner_id):
-            return False
+            return (False, REASON_LEARNER_NOT_IN_ENTERPRISE)
         if not self.subsidy_client.can_redeem(self.subsidy_uuid, learner_id, content_key):
-            return False
+            return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
 
-        return True
+        return (True, None)
 
     def redeem(self, learner_id, content_key):
         """
@@ -251,32 +264,37 @@ class SubsidyAccessPolicy(TimeStampedModel):
             django_cache_timeout=SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS,
         )
 
-    @staticmethod
-    def resolve_policy(redeemable_policies):
+    @classmethod
+    def resolve_policy(cls, redeemable_policies):
         """
         Select one out of multiple policies which have already been deemed redeemable.
 
-        Prefer learner credit policies, and prefer smaller balances.
+        Prioritize learner credit policies, and then prioritize policies with subsidies that have smaller balances.  The
+        type priority is codified in ``*_POLICY_TYPE_PRIORITY`` variables in constants.py.
 
         Deficiencies:
-        - if multiple policies with matching subsidies tie for first place, the
-            result is non-deterministic.
-        - if multiple policies with identical balances tie for first place, the
-            result is non-deterministic.
-        """
+        * If multiple policies with equal policy types and equal subsidy balances tie for first place, the result is
+          non-deterministic.
 
-        # TODO: for each policy we need current balance
-        # policies don't have direct access to subsidy balance, must call subsidy api to get current balance but
-        # instead of making a call for each policy we can implement a specific endpoint in enterprise-subsidy
-        # to get current balance for multiple subsidies.
+        Original spec:
+        https://2u-internal.atlassian.net/wiki/spaces/SOL/pages/229212214/Commission+Subsidy+Access+Policy+API#Policy-Resolver
+
+        Args:
+            redeemable_policies (list of SubsidyAccessPolicy): A list of subsidy access policies to select one from.
+
+        Returns:
+           SubsidyAccessPolicy: one policy selected from the input list.
+        """
+        subsidy_client = cls.get_subsidy_client()
         # For now, we inefficiently make one call per subsidy record.
-        subsidies_balance = {
-            policy.uuid: policy.current_balance()
-            for policy in redeemable_policies
+        subsidy_uuids = set(redeemable_policy.subsidy_uuid for redeemable_policy in redeemable_policies)
+        subsidy_balances = {
+            subsidy_uuid: subsidy_client.retrieve_subsidy(subsidy_uuid)["current_balance"]
+            for subsidy_uuid in subsidy_uuids
         }
         sorted_policies = sorted(
             redeemable_policies,
-            key=lambda p: (p.priority, subsidies_balance[p.subsidy_uuid]),
+            key=lambda p: (p.priority, subsidy_balances[p.subsidy_uuid]),
         )
         return sorted_policies[0]
 
@@ -314,7 +332,7 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
         if len(self.transactions_for_learner(learner_id)['transactions']) < self.per_learner_enrollment_limit:
             return super().can_redeem(learner_id, content_key)
 
-        return False
+        return (False, REASON_LEARNER_MAX_ENROLLMENTS_REACHED)
 
     def credit_available(self, learner_id=None):
         if self.remaining_balance_per_user(learner_id) > 0:
@@ -356,7 +374,7 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
         if (spent_amount + course_price) < self.per_learner_spend_limit:
             return super().can_redeem(learner_id, content_key)
 
-        return False
+        return (False, REASON_LEARNER_MAX_SPEND_REACHED)
 
     def credit_available(self, learner_id=None):
         return self.remaining_balance_per_user(learner_id) > 0
