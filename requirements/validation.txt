@@ -182,6 +182,7 @@ django==3.2.18
     #   jsonfield
     #   jsonfield2
     #   openedx-events
+    #   social-auth-app-django
 django-celery-results==2.5.0
     # via
     #   -r requirements/quality.txt
@@ -459,7 +460,7 @@ mysqlclient==2.1.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-newrelic==8.7.1
+newrelic==8.8.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -635,7 +636,7 @@ python3-openid==3.2.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   social-auth-core
-pytz==2023.2
+pytz==2023.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -654,7 +655,7 @@ readme-renderer==37.3
     # via
     #   -r requirements/quality.txt
     #   twine
-redis==4.5.3
+redis==4.5.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -742,12 +743,12 @@ snowballstemmer==2.2.0
     # via
     #   -r requirements/quality.txt
     #   pydocstyle
-social-auth-app-django==5.1.0
+social-auth-app-django==5.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-auth-backends
-social-auth-core==4.4.0
+social-auth-core==4.4.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
