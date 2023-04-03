@@ -163,6 +163,7 @@ django==3.2.18
     #   jsonfield
     #   jsonfield2
     #   openedx-events
+    #   social-auth-app-django
 django-celery-results==2.5.0
     # via -r requirements/validation.txt
 django-cors-headers==3.14.0
@@ -374,7 +375,7 @@ more-itertools==9.1.0
     #   jaraco-classes
 mysqlclient==2.1.1
     # via -r requirements/validation.txt
-newrelic==8.7.1
+newrelic==8.8.0
     # via
     #   -r requirements/validation.txt
     #   edx-django-utils
@@ -531,7 +532,7 @@ python3-openid==3.2.0
     # via
     #   -r requirements/validation.txt
     #   social-auth-core
-pytz==2023.2
+pytz==2023.3
     # via
     #   -r requirements/validation.txt
     #   celery
@@ -549,7 +550,7 @@ readme-renderer==37.3
     # via
     #   -r requirements/validation.txt
     #   twine
-redis==4.5.3
+redis==4.5.4
     # via -r requirements/validation.txt
 requests==2.28.2
     # via
@@ -625,11 +626,11 @@ snowballstemmer==2.2.0
     # via
     #   -r requirements/validation.txt
     #   pydocstyle
-social-auth-app-django==5.1.0
+social-auth-app-django==5.2.0
     # via
     #   -r requirements/validation.txt
     #   edx-auth-backends
-social-auth-core==4.4.0
+social-auth-core==4.4.1
     # via
     #   -r requirements/validation.txt
     #   edx-auth-backends
