@@ -40,7 +40,7 @@ celery==5.2.7
     #   -r requirements/base.txt
     #   django-celery-results
     #   edx-celeryutils
-certifi==2022.12.7
+certifi==2023.5.7
     # via
     #   -r requirements/base.txt
     #   requests
@@ -82,7 +82,7 @@ code-annotations==1.3.0
     # via
     #   -r requirements/test.in
     #   edx-lint
-confluent-kafka==2.1.0
+confluent-kafka==2.1.1
     # via -r requirements/base.txt
 coreapi==2.3.3
     # via
@@ -95,14 +95,12 @@ coreschema==0.0.4
     #   -r requirements/base.txt
     #   coreapi
     #   drf-yasg
-coverage[toml]==6.5.0
+coverage[toml]==7.2.5
     # via
-    #   -c requirements/constraints.txt
     #   -r requirements/test.in
     #   pytest-cov
-cryptography==38.0.4
+cryptography==40.0.2
     # via
-    #   -c requirements/constraints.txt
     #   -r requirements/base.txt
     #   pyjwt
     #   social-auth-core
@@ -231,9 +229,9 @@ exceptiongroup==1.1.1
     # via pytest
 factory-boy==3.2.1
     # via -r requirements/test.in
-faker==18.6.0
+faker==18.6.2
     # via factory-boy
-fastavro==1.7.3
+fastavro==1.7.4
     # via
     #   -r requirements/base.txt
     #   openedx-events
@@ -293,10 +291,8 @@ markupsafe==2.1.2
     #   jinja2
 mccabe==0.7.0
     # via pylint
-mock==4.0.3
-    # via
-    #   -c requirements/constraints.txt
-    #   -r requirements/test.in
+mock==5.0.2
+    # via -r requirements/test.in
 monotonic==1.6
     # via
     #   -r requirements/base.txt
@@ -316,7 +312,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
-openedx-events==7.0.0
+openedx-events==7.1.0
     # via -r requirements/base.txt
 packaging==23.1
     # via
@@ -374,7 +370,7 @@ pyjwt[crypto]==2.6.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==2.17.3
+pylint==2.17.4
     # via
     #   edx-lint
     #   pylint-celery
@@ -433,9 +429,9 @@ pyyaml==6.0
     #   code-annotations
     #   drf-spectacular
     #   edx-django-release-util
-redis==4.5.4
+redis==4.5.5
     # via -r requirements/base.txt
-requests==2.29.0
+requests==2.30.0
     # via
     #   -r requirements/base.txt
     #   analytics-python
@@ -450,7 +446,7 @@ requests-oauthlib==1.3.1
     # via
     #   -r requirements/base.txt
     #   social-auth-core
-ruamel-yaml==0.17.21
+ruamel-yaml==0.17.24
     # via
     #   -r requirements/base.txt
     #   drf-yasg
@@ -529,7 +525,7 @@ uritemplate==4.1.1
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==1.26.15
+urllib3==2.0.2
     # via
     #   -r requirements/base.txt
     #   requests
