@@ -10,11 +10,3 @@
 
 # Common constraints for edx repos
 -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
-
-
-cryptography==38.0.4 # greater version has issue.
-
-mock<5.0.0 # greater version breaking tests. Need investigation.
-6.5.0
-
-coverage<7.0.0 # grater version dropped the coverage.

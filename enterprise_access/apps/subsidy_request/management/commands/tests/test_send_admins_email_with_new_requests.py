@@ -50,7 +50,7 @@ class TestManagementCommands(APITestWithMocks):
         """
         command_name = 'send_admins_email_with_new_requests'
 
-        uuids = [str(uuid4()) for _ in range(5)]
+        uuids = [uuid4() for _ in range(5)]
         for uuid in uuids:
             factories.SubsidyRequestCustomerConfigurationFactory(
                 enterprise_customer_uuid=uuid,
@@ -63,8 +63,9 @@ class TestManagementCommands(APITestWithMocks):
             )
         call_command(command_name, '--batch-size=3')
 
-        assert mock_task.call_count == 5
-        assert mock_task.called_once_with(uuids[-1])
+        expected_calls = [mock.call(customer_uuid) for customer_uuid in uuids]
+        actual_calls = mock_task.call_args_list
+        self.assertEqual(sorted(expected_calls), sorted(actual_calls))
         assert mock_sleep.call_count == 1
 
     @mock.patch('enterprise_access.apps.subsidy_request.tasks.LmsApiClient.get_enterprise_customer_data')
