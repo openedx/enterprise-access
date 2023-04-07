@@ -1,10 +1,10 @@
-5. Access Policy Redemption Locks
-#################################
+0005 Access Policy Redemption Locks
+###################################
 
 Status
 ******
 
-**Proposed**
+**Accepted**
 
 March 2023
 
