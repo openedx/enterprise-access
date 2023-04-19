@@ -1,21 +1,24 @@
-""" Models for subsidy_access_policy """
-
+"""
+Models for subsidy_access_policy
+"""
 import functools
 import sys
+from contextlib import contextmanager
 from uuid import uuid4
 
+from django.core.cache import cache as django_cache
 from django.db import models
 from django.utils.functional import cached_property
 from django_extensions.db.models import TimeStampedModel
+from edx_django_utils.cache.utils import get_cache_key
 from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient
 from simple_history.models import HistoricalRecords
 
-from enterprise_access.apps.api.utils import acquire_subsidy_policy_lock, release_subsidy_policy_lock
 from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.subsidy_access_policy.constants import CREDIT_POLICY_TYPE_PRIORITY, AccessMethods
 
-SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS = 300
+POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
 
 REASON_CONTENT_NOT_IN_CATALOG = "Requested content_key not contained in policy's catalog."
 REASON_LEARNER_NOT_IN_ENTERPRISE = "Learner not part of enterprise associated with the access policy."
@@ -23,6 +26,12 @@ REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY = "Not enough remaining value in subsidy to r
 REASON_LEARNER_MAX_SPEND_REACHED = "The learner's maximum spend in this subsidy access policy has been reached."
 REASON_LEARNER_MAX_ENROLLMENTS_REACHED = \
     "The learner's maximum number of enrollments given by this subsidy access policy has been reached."
+
+
+class SubsidyAccessPolicyLockAttemptFailed(Exception):
+    """
+    Raise when attempt to lock SubsidyAccessPolicy failed due to an already existing lock acquired on the same resource.
+    """
 
 
 class PolicyManager(models.Manager):
@@ -212,7 +221,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Redeem a subsidy for the given learner and content.
         Returns:
-            A ledger transaction id, or None if the subsidy was not redeemed.
+            A ledger transaction, or None if the subsidy was not redeemed.
         """
         if self.access_method == AccessMethods.DIRECT:
             return self.subsidy_client.create_subsidy_transaction(
@@ -244,22 +253,62 @@ class SubsidyAccessPolicy(TimeStampedModel):
         else:
             raise ValueError(f"unknown access method {self.access_method}")
 
-    def acquire_lock(self, learner_id, content_key):  # pylint: disable=unused-argument
+    def lock_resource_key(self, lms_user_id=None, content_key=None) -> str:
         """
-        Acquire a lock for transaction isolation.
-        TODO: use this method.
-        """
-        return acquire_subsidy_policy_lock(
-            self.uuid,
-            django_cache_timeout=SUBSIDY_POLICY_LOCK_TIMEOUT_SECONDS,
-        )
+        Get a string that can be used as a cache key representing the resource being locked.
 
-    def release_lock(self, learner_id, content_key):  # pylint: disable=unused-argument
+        Returns:
+            str: deterministic hash digest based on policy ID and other optional keys.
         """
-        Release a previously acquired lock for transaction isolation.
-        TODO: use this method.
+        cache_key_inputs = {
+            "resource": POLICY_LOCK_RESOURCE_NAME,
+            "uuid": self.uuid,
+        }
+        cache_key_inputs.update({"lms_user_id": lms_user_id} if lms_user_id else {})
+        cache_key_inputs.update({"content_key": content_key} if content_key else {})
+        return get_cache_key(**cache_key_inputs)
+
+    def acquire_lock(self, lms_user_id=None, content_key=None) -> str:
         """
-        return release_subsidy_policy_lock(self.uuid)
+        Acquire an exclusive lock on this SubsidyAccessPolicy instance.
+
+        Memcached devs recommend using add() for locking instead of get()+set(), which rules out TieredCache which only
+        exposes get()+set() from django cache.  See: https://github.com/memcached/memcached/issues/163
+
+        Returns:
+            str: lock ID if a lock was successfully acquired, None otherwise.
+        """
+        lock_id = str(uuid4())
+        if django_cache.add(self.lock_resource_key(lms_user_id, content_key), lock_id):
+            return lock_id
+        else:
+            return None
+
+    def release_lock(self, lms_user_id=None, content_key=None) -> None:
+        """
+        Release an exclusive lock on this SubsidyAccessPolicy instance.
+        """
+        django_cache.delete(self.lock_resource_key(lms_user_id, content_key))
+
+    @contextmanager
+    def lock(self, lms_user_id=None, content_key=None):
+        """
+        Context manager for locking this SubsidyAccessPolicy instance.
+
+        Raises:
+            SubsidyAccessPolicyLockAttemptFailed:
+                Raises this if there's another distributed process locking this SubsidyAccessPolicy.
+        """
+        lock_id = self.acquire_lock(lms_user_id, content_key)
+        if not lock_id:
+            raise SubsidyAccessPolicyLockAttemptFailed(
+                f"Failed to acquire lock on SubsidyAccessPolicy {self} with lms_user_id={lms_user_id}, "
+                f"content_key={content_key}."
+            )
+        try:
+            yield lock_id
+        finally:
+            self.release_lock(lms_user_id, content_key)
 
     @classmethod
     def resolve_policy(cls, redeemable_policies):

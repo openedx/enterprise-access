@@ -1,16 +1,21 @@
-""" Tests for subsidy_access_policy models. """
+"""
+Tests for subsidy_access_policy models.
+"""
 from unittest.mock import patch
 from uuid import uuid4
 
 import ddt
 import factory
+import pytest
+from django.core.cache import cache as django_cache
 from django.test import TestCase
 
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_access_policy.models import (
     PerLearnerEnrollmentCreditAccessPolicy,
     PerLearnerSpendCreditAccessPolicy,
-    SubsidyAccessPolicy
+    SubsidyAccessPolicy,
+    SubsidyAccessPolicyLockAttemptFailed
 )
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
@@ -53,6 +58,7 @@ class SubsidyAccessPolicyTests(TestCase):
         self.subsidy_client_patcher.stop()
         self.catalog_client_patcher.stop()
         self.lms_api_client_patcher.stop()
+        django_cache.clear()  # clear any leftover policy locks.
 
     @classmethod
     def setUpClass(cls):
@@ -277,3 +283,60 @@ class SubsidyAccessPolicyTests(TestCase):
             self.per_learner_spend_policy.can_redeem(self.user, self.course_id),
             expected_policy_can_redeem
         )
+
+    def test_acquire_lock_release_lock_no_kwargs(self):
+        """
+        Create one hypothetical sequence consisting of three actors and two policies.  Each policy should only allow one
+        lock to be grabbed at a time.
+        """
+        # Simple case, acquire lock on first policy.
+        lock_1 = self.per_learner_enroll_policy.acquire_lock()
+        assert lock_1  # Non-null means the lock was successfully acquired.
+        # A second actor attempts to acquire lock on first policy, but it's already locked.
+        lock_2 = self.per_learner_enroll_policy.acquire_lock()
+        assert lock_2 is None
+        # A third actor attempts to acquire lock on second policy, should work even though first policy is locked.
+        lock_3 = self.per_learner_spend_policy.acquire_lock()
+        assert lock_3
+        assert lock_3 != lock_1
+        # After releasing the first lock, the second actor should have success.
+        self.per_learner_enroll_policy.release_lock()
+        lock_2 = self.per_learner_enroll_policy.acquire_lock()
+        assert lock_2
+        # Finally, the third actor releases the lock on the second policy.
+        self.per_learner_spend_policy.release_lock()
+
+    def test_acquire_lock_release_lock_with_kwargs(self):
+        """
+        Create one hypothetical sequence consisting two actors trying to lock the same policy, but the locks are
+        acquired with kwargs that prevent lock contention.  This simulates a per-learner cap (either spend or enroll
+        cap) rather than a per-policy cap.
+        """
+        user_1_lock_1 = self.per_learner_enroll_policy.acquire_lock(lms_user_id=1)
+        assert user_1_lock_1  # Non-null means the lock was successfully acquired.
+        user_2_lock = self.per_learner_enroll_policy.acquire_lock(lms_user_id=2)
+        assert user_2_lock
+        user_1_lock_2 = self.per_learner_enroll_policy.acquire_lock(lms_user_id=1)
+        assert user_1_lock_2 is None
+        self.per_learner_enroll_policy.release_lock(lms_user_id=1)
+        user_1_lock_2 = self.per_learner_enroll_policy.acquire_lock(lms_user_id=1)
+        assert user_1_lock_2
+        self.per_learner_enroll_policy.release_lock(lms_user_id=2)
+        self.per_learner_enroll_policy.release_lock(lms_user_id=1)
+
+    def test_lock_contextmanager_happy(self):
+        """
+        Ensure the lock contextmanager does not raise an exception if the policy is not locked.
+        """
+        with self.per_learner_enroll_policy.lock():
+            pass
+
+    def test_lock_contextmanager_already_locked(self):
+        """
+        Ensure the lock contextmanager raises SubsidyAccessPolicyLockAttemptFailed if the policy is locked.
+        """
+        self.per_learner_enroll_policy.acquire_lock()
+        with pytest.raises(SubsidyAccessPolicyLockAttemptFailed, match=r"Failed to acquire lock.*"):
+            with self.per_learner_enroll_policy.lock():
+                pass
+        self.per_learner_enroll_policy.release_lock()

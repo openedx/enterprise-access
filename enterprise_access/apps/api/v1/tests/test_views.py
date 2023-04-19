@@ -9,6 +9,7 @@ import ddt
 import mock
 from django.conf import settings
 from pytest import mark
+from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
 
@@ -1570,8 +1571,11 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         get_subsidy_client.return_value.amount_spent_for_learner.return_value = 2
         get_subsidy_client.return_value.amount_spent_for_group_and_catalog.return_value = 2
         get_subsidy_client.return_value.get_current_balance.return_value = 10
-        get_subsidy_client.return_value.redeem.return_value = {'id': 1111}
-        get_subsidy_client.return_value.has_redeemed.return_value = {'id': 1111}
+        get_subsidy_client.return_value.list_subsidy_transactions.return_value = {"results": [], "aggregates": []}
+        get_subsidy_client.return_value.retrieve_subsidy_transaction.side_effect = \
+            NotImplementedError("unit test must override retrieve_subsidy_transaction to use.")
+        get_subsidy_client.return_value.create_subsidy_transaction.side_effect = \
+            NotImplementedError("unit test must override create_subsidy_transaction to use.")
 
         catalog_client_path = 'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_client'
         enterprise_catalog_client_patcher = patch(catalog_client_path)
@@ -1654,7 +1658,11 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
             'status': 'committed',
             'other': True,
         }
-        self.redeemable_policy.subsidy_client.create_subsidy_transaction.return_value = mock_transaction_record
+        # HTTPError would be caused by a 404, indicating that a transaction does not already exist for this policy.
+        self.redeemable_policy.get_subsidy_client.return_value.retrieve_subsidy_transaction.side_effect = HTTPError()
+        self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.side_effect = None
+        self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.return_value = \
+            mock_transaction_record
         payload = {
             'learner_id': '1234',
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
