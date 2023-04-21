@@ -18,7 +18,7 @@ async-timeout==4.0.2
     # via
     #   -r requirements/base.txt
     #   redis
-attrs==22.2.0
+attrs==23.1.0
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -158,7 +158,7 @@ drf-jwt==1.19.2
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
-drf-spectacular==0.26.1
+drf-spectacular==0.26.2
     # via -r requirements/base.txt
 drf-yasg==1.21.5
     # via
@@ -179,7 +179,7 @@ edx-django-utils==5.4.0
     #   -r requirements/base.txt
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.6.0
+edx-drf-extensions==8.7.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
@@ -292,7 +292,7 @@ prompt-toolkit==3.0.38
     # via
     #   -r requirements/base.txt
     #   click-repl
-psutil==5.9.4
+psutil==5.9.5
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -407,12 +407,12 @@ social-auth-app-django==5.2.0
     # via
     #   -r requirements/base.txt
     #   edx-auth-backends
-social-auth-core==4.4.1
+social-auth-core==4.4.2
     # via
     #   -r requirements/base.txt
     #   edx-auth-backends
     #   social-auth-app-django
-sqlparse==0.4.3
+sqlparse==0.4.4
     # via
     #   -r requirements/base.txt
     #   django
