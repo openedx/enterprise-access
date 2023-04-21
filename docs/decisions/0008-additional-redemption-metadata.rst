@@ -21,7 +21,7 @@ POST access policy redeem transaction
 ======================================
 **/api/v1/policy/<policy_uuid>/redeem/**
 
-This is the existing API endpoint to eedeem subsidy value by making a request to enterprise-subsidy service.
+This is the existing API endpoint to redeem subsidy value by making a request to enterprise-subsidy service.
 
 Inputs
 ------
