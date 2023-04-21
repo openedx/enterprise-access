@@ -11,6 +11,12 @@ Context
 
 This document intends to outline modifications to existing API endpoint(s) such that MFEs can pass additional metadata into the redemption flow. This extention was devised to support required GEAG meatadata such as DOB and terms acceptance dates.
 
+Decision
+=======
+
+The GEAG system requires additional metadata about a learner in order to process an allocation. This additional metadata (name, dob, etc) are collected during the enrollment flow on the edX side before enrollment. This additional metadata is not persisted anywhere on the edX side. Because of the lack of persistence and the placement of this information collection on the edX side of the process we decided to create a faicility for the frontend to pass along additional metadata into the redemption flow.
+
+
 POST access policy redeem transaction
 ======================================
 **/api/v1/policy/<policy_uuid>/redeem/**
@@ -34,12 +40,15 @@ Inputs
       "metadata": {
         "geag_first_name": "Mona",
         "geag_last_name": "Lisa",
-        "geag_dob": "1503-01-01"
+        "geag_date_of_birth": "1503-01-01",
+        "geag_terms_accepted_at": "2021-05-21T17:32:28Z"
     }
   ]
 
+Consequences
+************
 
-
+The subsidy service will need to accept metadata in a similar way so that the policy service can pass the metadata along.
 
 
 .. _0003 Initial API Specification: 0003-initial-api-specification.rst

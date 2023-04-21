@@ -217,7 +217,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         return (True, None)
 
-    def redeem(self, learner_id, content_key):
+    def redeem(self, learner_id, content_key, metadata={}):
         """
         Redeem a subsidy for the given learner and content.
         Returns:
