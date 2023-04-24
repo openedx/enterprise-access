@@ -141,7 +141,7 @@ class SubsidyAccessPolicyRedeemSerializer(serializers.Serializer):  # pylint: di
     """
     learner_id = serializers.IntegerField(required=True)
     content_key = serializers.CharField(required=True)
-    metadata = serializers.JSONField(required=False)
+    metadata = serializers.JSONField(required=False, allow_null=True)
 
     def validate_content_key(self, value):
         """
