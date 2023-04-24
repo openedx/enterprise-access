@@ -14,7 +14,7 @@ asgiref==3.6.0
     # via
     #   -r requirements/validation.txt
     #   django
-astroid==2.15.2
+astroid==2.15.4
     # via
     #   -r requirements/validation.txt
     #   pylint
@@ -23,7 +23,7 @@ async-timeout==4.0.2
     # via
     #   -r requirements/validation.txt
     #   redis
-attrs==22.2.0
+attrs==23.1.0
     # via
     #   -r requirements/validation.txt
     #   jsonschema
@@ -213,7 +213,7 @@ drf-jwt==1.19.2
     # via
     #   -r requirements/validation.txt
     #   edx-drf-extensions
-drf-spectacular==0.26.1
+drf-spectacular==0.26.2
     # via -r requirements/validation.txt
 drf-yasg==1.21.5
     # via
@@ -234,7 +234,7 @@ edx-django-utils==5.4.0
     #   -r requirements/validation.txt
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.6.0
+edx-drf-extensions==8.7.0
     # via
     #   -r requirements/validation.txt
     #   edx-rbac
@@ -261,7 +261,7 @@ exceptiongroup==1.1.1
     #   pytest
 factory-boy==3.2.1
     # via -r requirements/validation.txt
-faker==18.4.0
+faker==18.5.1
     # via
     #   -r requirements/validation.txt
     #   factory-boy
@@ -269,7 +269,7 @@ fastavro==1.7.3
     # via
     #   -r requirements/validation.txt
     #   openedx-events
-filelock==3.11.0
+filelock==3.12.0
     # via
     #   -r requirements/validation.txt
     #   tox
@@ -282,7 +282,7 @@ idna==3.4
     # via
     #   -r requirements/validation.txt
     #   requests
-importlib-metadata==6.3.0
+importlib-metadata==6.6.0
     # via
     #   -r requirements/validation.txt
     #   keyring
@@ -434,7 +434,7 @@ prompt-toolkit==3.0.38
     # via
     #   -r requirements/validation.txt
     #   click-repl
-psutil==5.9.4
+psutil==5.9.5
     # via
     #   -r requirements/validation.txt
     #   edx-django-utils
@@ -454,7 +454,7 @@ pycryptodomex==3.17
     #   pyjwkest
 pydocstyle==6.3.0
     # via -r requirements/validation.txt
-pygments==2.15.0
+pygments==2.15.1
     # via
     #   -r requirements/validation.txt
     #   diff-cover
@@ -629,12 +629,12 @@ social-auth-app-django==5.2.0
     # via
     #   -r requirements/validation.txt
     #   edx-auth-backends
-social-auth-core==4.4.1
+social-auth-core==4.4.2
     # via
     #   -r requirements/validation.txt
     #   edx-auth-backends
     #   social-auth-app-django
-sqlparse==0.4.3
+sqlparse==0.4.4
     # via
     #   -r requirements/validation.txt
     #   django
@@ -690,7 +690,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.21.0
+virtualenv==20.22.0
     # via
     #   -r requirements/validation.txt
     #   tox
