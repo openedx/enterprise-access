@@ -1040,7 +1040,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
         learner_id = serializer.data['learner_id']
         content_key = serializer.data['content_key']
-        metadata = serializer.data.get('metadata', {})
+        metadata = serializer.data.get('metadata')
         try:
             # For now, we should lock the whole policy (i.e. pass nothing to policy.lock()).  In some cases this is more
             # aggressive than necessary, but we can optimize for performance at a later phase of this project.  At that
