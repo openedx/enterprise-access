@@ -9,12 +9,12 @@ Proposed
 Context
 =======
 
-This document intends to outline modifications to existing API endpoint(s) such that MFEs can pass additional metadata into the redemption flow. This extension was devised to support required GetSmarter Enteprise Api Gateway (GEAG) meatadata such as DOB and terms acceptance dates.
+This document intends to outline modifications to existing API endpoint(s) such that MFEs can pass additional metadata into the redemption flow. This extension was devised to support required GetSmarter Enterprise Api Gateway (GEAG) meatadata such as DOB and terms acceptance dates.
 
 Decision
 =======
 
-The GetSmarter Enteprise Api Gateway (GEAG) system requires additional metadata about a learner in order to process an allocation. The additional metadata (name, dob, etc) is collected during the enrollment flow on the edX side before enrollment. This additional metadata is not persisted anywhere on the edX side - such as the user profile. Given these factors we have decided to create a facility for the frontend to pass along additional metadata into the redemption flow. It will pass this information onto the subsidy redemption call, returning any response. Subsidy service will be responsible for any validation or data persistence as it relates to this metadata.
+The GetSmarter Enterprise Api Gateway (GEAG) system requires additional metadata about a learner in order to process an allocation. The additional metadata (name, dob, etc) is collected during the enrollment flow on the edX side before enrollment. This additional metadata is not persisted anywhere on the edX side - such as the user profile. Given these factors we have decided to create a facility for the frontend to pass along additional metadata into the redemption flow. It will pass this information onto the subsidy redemption call, returning any response. Subsidy service will be responsible for any validation or data persistence as it relates to this metadata.
 
 
 POST access policy redeem transaction

@@ -229,6 +229,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 lms_user_id=learner_id,
                 content_key=content_key,
                 subsidy_access_policy_uuid=self.uuid,
+                metadata=metadata,
             )
         else:
             raise ValueError(f"unknown access method {self.access_method}")
