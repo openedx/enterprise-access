@@ -136,25 +136,9 @@ class SubsidyRequestCustomerConfigurationSerializer(serializers.ModelSerializer)
         return super().update(instance, validated_data)
 
 
-class SubsidyAccessPolicyRedeemSerializer(serializers.Serializer):  # pylint: disable=abstract-method
-    """
-    Serializer to validate policy redeem request POST data.
-    """
-    learner_id = serializers.IntegerField(required=True)
-    content_key = serializers.CharField(required=True)
-    metadata = serializers.JSONField(required=False, allow_null=True)
-
-    def validate_content_key(self, value):
-        """
-        Validate `content_key`.
-        """
-        try:
-            CourseKey.from_string(value)
-        except InvalidKeyError as exc:
-            raise serializers.ValidationError(f"Invalid course key: {value}") from exc
-
-        return value
-
+#####################################
+# Subsidy Access Policy Serializers #
+#####################################
 
 class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
     """
@@ -208,16 +192,91 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class SubsidyAccessPolicyRedeemListSerializer(SubsidyAccessPolicyRedeemSerializer):  # pylint: disable=abstract-method
+class ValidateContentKeyMixin:
     """
-    Serializer to validate policy request GET query params.
+    Mixin to provide validation function for the `content_key` serializer field.
+
+    Requires the inheriting serializer to declare a `content_key` field.  Supports one or many content keys (CharField
+    or ListField-of-CharField).
     """
+    def validate_content_key(self, value):
+        """
+        Validate `content_key` field.
+        """
+        content_keys = [value] if isinstance(value, str) else value
+        for content_key in content_keys:
+            try:
+                CourseKey.from_string(content_key)
+            except InvalidKeyError as exc:
+                raise serializers.ValidationError(f"Invalid content_key: {content_key}") from exc
+        return value
+
+
+# pylint: disable=abstract-method
+class SubsidyAccessPolicyRedeemRequestSerializer(ValidateContentKeyMixin, serializers.Serializer):
+    """
+    Request Serializer to validate policy redeem endpoint POST data.
+
+    For view: SubsidyAccessPolicyRedeemViewset.redeem
+    """
+    lms_user_id = serializers.IntegerField(required=True)
+    content_key = serializers.CharField(required=True)
+    metadata = serializers.JSONField(required=False, allow_null=True)
+
+
+# pylint: disable=abstract-method
+class SubsidyAccessPolicyListRequestSerializer(ValidateContentKeyMixin, serializers.Serializer):
+    """
+    Request Serializer to validate policy list endpoint query params.
+
+    For view: SubsidyAccessPolicyRedeemViewset.list
+    """
+    lms_user_id = serializers.IntegerField(required=True)
+    content_key = serializers.CharField(required=True)
     enterprise_customer_uuid = serializers.UUIDField(required=True)
 
 
-class SubsidyAccessPolicyRedeemableSerializer(serializers.ModelSerializer):
+# pylint: disable=abstract-method
+class SubsidyAccessPolicyRedemptionRequestSerializer(ValidateContentKeyMixin, serializers.Serializer):
     """
-    Serializer to transform response for policy redeem GET endpoint.
+    Request Serializer to validate policy redemption endpoint query params.
+
+    For view: SubsidyAccessPolicyRedeemViewset.redemption
+    """
+    lms_user_id = serializers.IntegerField(required=True)
+    content_key = serializers.CharField(required=True)
+    enterprise_customer_uuid = serializers.UUIDField(required=True)
+
+
+# pylint: disable=abstract-method
+class SubsidyAccessPolicyCreditsAvailableRequestSerializer(serializers.Serializer):
+    """
+    Request serializer to validate policy credits_available endpoint query params.
+
+    For view: SubsidyAccessPolicyRedeemViewset.credits_available
+    """
+    enterprise_customer_uuid = serializers.UUIDField(required=True)
+    lms_user_id = serializers.IntegerField(required=True)
+
+
+# pylint: disable=abstract-method
+class SubsidyAccessPolicyCanRedeemRequestSerializer(ValidateContentKeyMixin, serializers.Serializer):
+    """
+    Request serializer to validate can_redeem endpoint query params.
+
+    For view: SubsidyAccessPolicyRedeemViewset.can_redeem
+    """
+    enterprise_customer_uuid = serializers.UUIDField(required=True)
+    content_key = serializers.ListField(child=serializers.CharField(required=True), allow_empty=False)
+
+
+class SubsidyAccessPolicyRedeemableResponseSerializer(serializers.ModelSerializer):
+    """
+    Response serializer to represent redeemable policies.
+
+    For views:
+    * SubsidyAccessPolicyRedeemViewset.list
+    * SubsidyAccessPolicyRedeemViewset.can_redeem
     """
 
     policy_redemption_url = serializers.SerializerMethodField()
@@ -227,48 +286,31 @@ class SubsidyAccessPolicyRedeemableSerializer(serializers.ModelSerializer):
         exclude = ('created', 'modified')
 
     def get_policy_redemption_url(self, obj):
+        """
+        Generate a fully qualified URI that can be POSTed to redeem a policy.
+
+        Deficiencies:
+        * In a prod-like environment, this may return an "http" URL because the protocol is inferred from django
+          settings, however we tend to deploy TLS above the application layer.  We can't just force it to "https" using
+          string manipulation because then it would break dev environments which don't use https.  As-is, it should
+          still work in prod because the other non-app infrastructure should automatically 3xx redirect to "https".
+        """
         location = reverse('api:v1:policy-redeem', kwargs={'policy_uuid': obj.uuid})
         return get_current_request().build_absolute_uri(location)
 
 
-class SubsidyAccessPolicyCreditAvailableSerializer(SubsidyAccessPolicyRedeemableSerializer):
+class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyRedeemableResponseSerializer):
     """
-    Serializer to transform response for policy redeem GET endpoint.
+    Response serializer to represent redeemable policies with additional information about remaining balance.
+
+    For view: SubsidyAccessPolicyRedeemViewset.credits_available
     """
     remaining_balance_per_user = serializers.SerializerMethodField()
     remaining_balance = serializers.SerializerMethodField()
 
     def get_remaining_balance_per_user(self, obj):
-        learner_id = self.context.get('learner_id')
-        return obj.remaining_balance_per_user(learner_id=learner_id)
+        lms_user_id = self.context.get('lms_user_id')
+        return obj.remaining_balance_per_user(lms_user_id=lms_user_id)
 
     def get_remaining_balance(self, obj):
         return obj.remaining_balance()
-
-
-class SubsidyAccessPolicyCreditAvailableListSerializer(serializers.Serializer):  # pylint: disable=abstract-method
-    """
-    Serializer to validate policy request GET query params.
-    """
-    enterprise_customer_uuid = serializers.UUIDField(required=True)
-    lms_user_id = serializers.CharField(required=True)
-
-
-class SubsidyAccessPolicyCanRedeemRequestSerializer(serializers.Serializer):  # pylint: disable=abstract-method
-    """
-    Serializer to validate SubsidyAccessPolicyRedeemViewset.can_redeem GET request parameters.
-    """
-    enterprise_customer_uuid = serializers.UUIDField(required=True)
-    content_key = serializers.ListField(child=serializers.CharField(required=True), allow_empty=False)
-
-    def validate_content_key(self, value):
-        """
-        Validate `content_key`.
-        """
-        for content_key in value:
-            try:
-                CourseKey.from_string(content_key)
-            except InvalidKeyError as exc:
-                raise serializers.ValidationError(f"Invalid course key: {content_key}") from exc
-
-        return value

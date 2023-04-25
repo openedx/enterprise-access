@@ -80,8 +80,10 @@ lint: ## run Python code linting
 	pylint --rcfile=pylintrc enterprise_access *.py
 
 quality: style isort_check lint ## check code style and import sorting, then lint
+	@echo "\e[32mQuality tests passed!\e[0m"
 
 quality_fix: style isort lint ## Check code style, FIX any imports, then lint
+	@echo "\e[32mQuality tests passed!\e[0m"
 
 pii_check: ## check for PII annotations on all Django models
 	DJANGO_SETTINGS_MODULE=enterprise_access.settings.test \
