@@ -3,6 +3,7 @@ Serializers for Enterprise Access API v1.
 """
 import logging
 
+from crum import get_current_request
 from django.apps import apps
 from django.urls import reverse
 from opaque_keys import InvalidKeyError
@@ -225,7 +226,8 @@ class SubsidyAccessPolicyRedeemableSerializer(serializers.ModelSerializer):
         exclude = ('created', 'modified')
 
     def get_policy_redemption_url(self, obj):
-        return reverse('api:v1:policy-redeem', kwargs={'policy_uuid': obj.uuid})
+        location = reverse('api:v1:policy-redeem', kwargs={'policy_uuid': obj.uuid})
+        return get_current_request().build_absolute_uri(location)
 
 
 class SubsidyAccessPolicyCreditAvailableSerializer(SubsidyAccessPolicyRedeemableSerializer):

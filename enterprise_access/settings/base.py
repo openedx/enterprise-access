@@ -93,6 +93,8 @@ MIDDLEWARE = (
     # Ensures proper DRF permissions in support of JWTs
     'edx_rest_framework_extensions.auth.jwt.middleware.EnsureJWTAuthSettingsMiddleware',
     'simple_history.middleware.HistoryRequestMiddleware',
+    # Used to get request inside serializers.
+    'crum.CurrentRequestUserMiddleware',
 )
 
 # Enable CORS

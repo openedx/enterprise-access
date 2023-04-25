@@ -2,6 +2,7 @@
 Tests for Enterprise Access API v1 views.
 """
 import random
+import re
 from unittest.mock import call, patch
 from uuid import UUID, uuid4
 
@@ -9,10 +10,10 @@ import ddt
 import mock
 from django.conf import settings
 from pytest import mark
+from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
 
-from enterprise_access.apps.api.serializers import SubsidyAccessPolicyRedeemableSerializer
 from enterprise_access.apps.core.constants import (
     ALL_ACCESS_CONTEXT,
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -1570,8 +1571,11 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         get_subsidy_client.return_value.amount_spent_for_learner.return_value = 2
         get_subsidy_client.return_value.amount_spent_for_group_and_catalog.return_value = 2
         get_subsidy_client.return_value.get_current_balance.return_value = 10
-        get_subsidy_client.return_value.redeem.return_value = {'id': 1111}
-        get_subsidy_client.return_value.has_redeemed.return_value = {'id': 1111}
+        get_subsidy_client.return_value.list_subsidy_transactions.return_value = {"results": [], "aggregates": []}
+        get_subsidy_client.return_value.retrieve_subsidy_transaction.side_effect = \
+            NotImplementedError("unit test must override retrieve_subsidy_transaction to use.")
+        get_subsidy_client.return_value.create_subsidy_transaction.side_effect = \
+            NotImplementedError("unit test must override create_subsidy_transaction to use.")
 
         catalog_client_path = 'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_client'
         enterprise_catalog_client_patcher = patch(catalog_client_path)
@@ -1588,9 +1592,9 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         self.addCleanup(get_subsidy_client_patcher.stop)
         self.addCleanup(enterprise_catalog_client_patcher.stop)
 
-    def test_list_all_redeemable_only_policies(self):
+    def test_list(self):
         """
-        Verify that SubsidyAccessPolicyRedeemViewset list endpoint return all redeemable policies
+        list endpoint should return only the redeemable policy, and also check the serialized output fields.
         """
         query_params = {
             'enterprise_customer_uuid': self.enterprise_uuid,
@@ -1600,14 +1604,26 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         response = self.client.get(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, query_params)
         response_json = self.load_json(response.content)
 
-        # Verify that api response only includes the redeemable policies
-        assert response_json == [
-            dict(SubsidyAccessPolicyRedeemableSerializer([self.redeemable_policy], many=True).data[0])
-        ]
+        # Response should only include the one redeemable policy.
+        assert len(response_json) == 1
+        assert response_json[0]["uuid"] == str(self.redeemable_policy.uuid)
 
-        # Verify that api response dosn't include non-redeemable policies
-        for policy in response_json:
-            assert policy['uuid'] != self.non_redeemable_policy.uuid
+        # Check remainder of serialized fields.
+        assert response_json[0]["policy_type"] == 'PerLearnerEnrollmentCreditAccessPolicy'
+        assert response_json[0]["access_method"] == self.redeemable_policy.access_method
+        assert response_json[0]["active"] == self.redeemable_policy.active
+        assert response_json[0]["catalog_uuid"] == str(self.redeemable_policy.catalog_uuid)
+        assert response_json[0]["description"] == self.redeemable_policy.description
+        assert response_json[0]["enterprise_customer_uuid"] == str(self.enterprise_uuid)
+        assert response_json[0]["group_uuid"] == str(self.redeemable_policy.group_uuid)
+        assert response_json[0]["per_learner_enrollment_limit"] == self.redeemable_policy.per_learner_enrollment_limit
+        assert response_json[0]["per_learner_spend_limit"] == self.redeemable_policy.per_learner_spend_limit
+        assert response_json[0]["spend_limit"] == self.redeemable_policy.spend_limit
+        assert response_json[0]["subsidy_uuid"] == str(self.redeemable_policy.subsidy_uuid)
+        assert re.fullmatch(
+            f"http.*/api/v1/policy/{self.redeemable_policy.uuid}/redeem/",
+            response_json[0]["policy_redemption_url"],
+        )
 
     @ddt.data(
         (
@@ -1654,7 +1670,11 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
             'status': 'committed',
             'other': True,
         }
-        self.redeemable_policy.subsidy_client.create_subsidy_transaction.return_value = mock_transaction_record
+        # HTTPError would be caused by a 404, indicating that a transaction does not already exist for this policy.
+        self.redeemable_policy.get_subsidy_client.return_value.retrieve_subsidy_transaction.side_effect = HTTPError()
+        self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.side_effect = None
+        self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.return_value = \
+            mock_transaction_record
         payload = {
             'learner_id': '1234',
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',

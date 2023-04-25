@@ -59,7 +59,10 @@ from enterprise_access.apps.events.utils import (
     send_subsidy_redemption_event_to_event_bus
 )
 from enterprise_access.apps.subsidy_access_policy.constants import POLICY_TYPES_WITH_CREDIT_LIMIT
-from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+from enterprise_access.apps.subsidy_access_policy.models import (
+    SubsidyAccessPolicy,
+    SubsidyAccessPolicyLockAttemptFailed
+)
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
@@ -854,9 +857,21 @@ class RedemptionRequestException(APIException):
     default_detail = 'Could not redeem'
 
 
-class RedemptionLockedException(APIException):
-    status_code = status.HTTP_423_LOCKED
-    default_detail = 'Enrollment currently locked for this subsidy.'
+class SubsidyAccessPolicyLockedException(APIException):
+    """
+    Throw this exception when an attempt to acquire a policy lock failed because it was already locked by another agent.
+
+    Note: status.HTTP_423_LOCKED is NOT acceptable as a status code for delivery to web browsers.  According to Mozilla:
+
+      > The ability to lock a resource is specific to some WebDAV servers. Browsers accessing web pages will never
+      > encounter this status code; in the erroneous cases it happens, they will handle it as a generic 400 status code.
+
+    See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/423
+
+    HTTP 429 Too Many Requests is the next best thing, and implies retryability.
+    """
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    default_detail = 'Enrollment currently locked for this subsidy access policy.'
 
 
 class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequiredMixin, viewsets.GenericViewSet):
@@ -993,6 +1008,30 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         Redeem a policy for given `learner_id` and `content_key`
 
         URL Location: POST /api/v1/policy/<policy_uuid>/redeem/?learner_id=<>&content_key=<>
+
+        status codes:
+            400: There are missing or otherwise invalid input parameters.
+            403: The requester has insufficient redeem permissions.
+            422: The subisdy access policy is not redeemable in a way that IS NOT retryable.
+            429: The subisdy access policy is not redeemable in a way that IS retryable (e.g. policy currently locked).
+            200: The policy was successfully redeemed.  Response body is JSON with a serialized Transaction
+                 containing the following keys (sample values):
+                 {
+                     "uuid": "the-transaction-uuid",
+                     "state": "COMMITTED",
+                     "idempotency_key": "the-idempotency-key",
+                     "lms_user_id": 54321,
+                     "content_key": "demox_1234+2T2023",
+                     "quantity": 19900,
+                     "unit": "USD_CENTS",
+                     "reference_id": 1234,
+                     "reference_type": "enterprise_fufillment_source_uuid",
+                     "subsidy_access_policy_uuid": "a-policy-uuid",
+                     "metadata": {...},
+                     "created": "created-datetime",
+                     "modified": "modified-datetime",
+                     "reversals": []
+                 }
         """
         policy = get_object_or_404(SubsidyAccessPolicy, pk=kwargs.get('policy_uuid'))
 
@@ -1001,27 +1040,24 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
         learner_id = serializer.data['learner_id']
         content_key = serializer.data['content_key']
-        lock_acquired = False
-        # import pdb; pdb.set_trace()
         try:
-            lock_acquired = policy.acquire_lock(learner_id, content_key)
-            if not lock_acquired:
-                raise RedemptionLockedException()
-            if policy.can_redeem(learner_id, content_key):
-                redemption_result = policy.redeem(learner_id, content_key)
-                send_subsidy_redemption_event_to_event_bus(
-                    SUBSIDY_REDEEMED.event_type,
-                    serializer.data
-                )
-                return Response(
-                    redemption_result,
-                    status=status.HTTP_200_OK,
-                )
-            else:
-                raise RedemptionRequestException()
-        finally:
-            if lock_acquired:
-                policy.release_lock(learner_id, content_key)
+            # For now, we should lock the whole policy (i.e. pass nothing to policy.lock()).  In some cases this is more
+            # aggressive than necessary, but we can optimize for performance at a later phase of this project.  At that
+            # point, we should also consider migrating this logic into the policy model so that different policy types
+            # that have different locking needs can supply different lock kwargs.
+            with policy.lock():
+                if policy.can_redeem(learner_id, content_key):
+                    redemption_result = policy.redeem(learner_id, content_key)
+                    send_subsidy_redemption_event_to_event_bus(
+                        SUBSIDY_REDEEMED.event_type,
+                        serializer.data
+                    )
+                    return Response(redemption_result, status=status.HTTP_200_OK)
+                else:
+                    raise RedemptionRequestException()
+        except SubsidyAccessPolicyLockAttemptFailed as exc:
+            logger.exception(exc)
+            raise SubsidyAccessPolicyLockedException() from exc
 
     def get_redemptions_by_policy_uuid(self, enterprise_customer_uuid, learner_id, content_key):
         """
