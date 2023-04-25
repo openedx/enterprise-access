@@ -375,7 +375,6 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
         Checks if the given learner_id has a number of existing subsidy transactions
         LTE to the learner enrollment cap declared by this policy.
         """
-        print('can_redeem!!!', self.per_learner_enrollment_limit)
         if self.per_learner_enrollment_limit is None:
             return super().can_redeem(learner_id, content_key)
 

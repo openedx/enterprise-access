@@ -39,7 +39,6 @@ class LicenseRequestTests(TestCaseWithMockedDiscoveryApiClient):
             license_request.save()
 
         expected_error = 'Both reviewer and reviewed_at are required for a review.'
-        print(error.exception.messages)
         assert error.exception.messages[0] == expected_error
 
     @ddt.data(
