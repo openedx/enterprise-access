@@ -85,17 +85,17 @@ class SubsidyAccessPolicy(TimeStampedModel):
     per_learner_enrollment_limit = models.IntegerField(
         null=True,
         blank=True,
-        default=0,
+        default=None,
     )
     per_learner_spend_limit = models.IntegerField(
         null=True,
         blank=True,
-        default=0,
+        default=None,
     )
     spend_limit = models.IntegerField(
         null=True,
         blank=True,
-        default=0,
+        default=None,
     )
 
     history = HistoricalRecords()
@@ -375,7 +375,11 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
         Checks if the given learner_id has a number of existing subsidy transactions
         LTE to the learner enrollment cap declared by this policy.
         """
-        if len(self.transactions_for_learner(learner_id)['transactions']) < self.per_learner_enrollment_limit:
+        if self.per_learner_enrollment_limit is None:
+            return super().can_redeem(learner_id, content_key)
+
+        learner_transactions_count = len(self.transactions_for_learner(learner_id)['transactions'])
+        if learner_transactions_count < self.per_learner_enrollment_limit:
             return super().can_redeem(learner_id, content_key)
 
         return (False, REASON_LEARNER_MAX_ENROLLMENTS_REACHED)
@@ -410,13 +414,18 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
 
     def can_redeem(self, learner_id, content_key):
         """
-        TODO: Well, can you?
+        Determines whether learner can redeem a subsidy access policy given the
+        limits specified on the policy.
         """
         spent_amount = self.transactions_for_learner(learner_id)['aggregates'].get('total_quantity') or 0
         course_price = self.subsidy_client.get_subsidy_content_data(
             self.enterprise_customer_uuid,
             content_key
         )['content_price']
+
+        if self.per_learner_enrollment_limit is None:
+            return super().can_redeem(learner_id, content_key)
+
         if (spent_amount + course_price) < self.per_learner_spend_limit:
             return super().can_redeem(learner_id, content_key)
 

@@ -1238,10 +1238,13 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
                 serialized_policy = serializers.SubsidyAccessPolicyRedeemableSerializer(resolved_policy).data
 
+            has_successful_redemption = any(redemption['state'] == 'committed' for redemption in redemptions)
             can_redeem_for_content_response = {
                 "content_key": content_key,
                 "redemptions": redemptions,
-                "subsidy_access_policy": serialized_policy,
+                "has_redeemed": has_successful_redemption,
+                "redeemable_subsidy_access_policy": serialized_policy,
+                "can_redeem": bool(serialized_policy),
                 "reasons": reasons,
             }
             response.append(can_redeem_for_content_response)
