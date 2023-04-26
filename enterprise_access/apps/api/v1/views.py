@@ -60,7 +60,7 @@ from enterprise_access.apps.events.utils import (
 )
 from enterprise_access.apps.subsidy_access_policy.constants import (
     POLICY_TYPES_WITH_CREDIT_LIMIT,
-    TransactionStateChoices,
+    TransactionStateChoices
 )
 from enterprise_access.apps.subsidy_access_policy.models import (
     SubsidyAccessPolicy,
