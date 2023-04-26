@@ -58,7 +58,10 @@ from enterprise_access.apps.events.utils import (
     send_access_policy_event_to_event_bus,
     send_subsidy_redemption_event_to_event_bus
 )
-from enterprise_access.apps.subsidy_access_policy.constants import POLICY_TYPES_WITH_CREDIT_LIMIT, TransactionStateChoices
+from enterprise_access.apps.subsidy_access_policy.constants import (
+    POLICY_TYPES_WITH_CREDIT_LIMIT,
+    TransactionStateChoices,
+)
 from enterprise_access.apps.subsidy_access_policy.models import (
     SubsidyAccessPolicy,
     SubsidyAccessPolicyLockAttemptFailed
@@ -1238,10 +1241,11 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
                 serialized_policy = serializers.SubsidyAccessPolicyRedeemableSerializer(resolved_policy).data
 
+            has_success_redemption = any(redemption['state'] == TransactionStateChoices.COMMITTED for redemption in redemptions)
             can_redeem_for_content_response = {
                 "content_key": content_key,
                 "redemptions": redemptions,
-                "has_successful_redemption": any(redemption['state'] == TransactionStateChoices.COMMITTED for redemption in redemptions),
+                "has_successful_redemption": has_success_redemption,
                 "redeemable_subsidy_access_policy": serialized_policy,
                 "can_redeem": bool(serialized_policy),
                 "reasons": reasons,

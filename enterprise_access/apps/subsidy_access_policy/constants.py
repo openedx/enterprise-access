@@ -56,6 +56,7 @@ POLICY_TYPE_CREDIT_LIMIT_FIELDS = [
 
 POLICY_TYPE_FIELD_MAPPER = dict(zip(POLICY_TYPES_WITH_CREDIT_LIMIT, POLICY_TYPE_CREDIT_LIMIT_FIELDS))
 
+
 class TransactionStateChoices:
     """
     Lifecycle states for a ledger transaction (i.e., redemption).
