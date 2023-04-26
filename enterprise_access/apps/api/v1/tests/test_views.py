@@ -20,6 +20,7 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
+from enterprise_access.apps.subsidy_access_policy.constants import TransactionStateChoices
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
@@ -1667,7 +1668,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         """
         mock_transaction_record = {
             'uuid': str(uuid4()),
-            'status': 'committed',
+            'state': TransactionStateChoices.COMMITTED,
             'other': True,
         }
         # HTTPError would be caused by a 404, indicating that a transaction does not already exist for this policy.
@@ -1689,7 +1690,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         """
         mock_transaction_record = {
             'uuid': str(uuid4()),
-            'status': 'committed',
+            'state': TransactionStateChoices.COMMITTED,
             'other': True,
             'content_key': 'course-v1:edX+test+courserun',
         }
@@ -1718,7 +1719,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         """
         mock_transaction_record = {
             'uuid': str(uuid4()),
-            'status': 'committed',
+            'state': TransactionStateChoices.COMMITTED,
             'other': True,
         }
         self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
@@ -1759,7 +1760,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         """
         mock_transaction_record = {
             'uuid': str(uuid4()),
-            'status': 'committed',
+            'state': TransactionStateChoices.COMMITTED,
             'other': True,
         }
         self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
@@ -1878,7 +1879,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
             "results": [{
                 "uuid": test_transaction_uuid,
-                "state": "committed",
+                "state": TransactionStateChoices.COMMITTED,
                 "idempotency_key": "the-idempotency-key",
                 "learner_id": self.user.lms_user_id,
                 "content_key": "course-v1:demox+1234+2T2023",
