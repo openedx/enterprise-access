@@ -1,0 +1,847 @@
+{
+	"info": {
+		"_postman_id": "a5c877bc-6086-41d6-8acc-0d8ad061932b",
+		"name": "LC2 Generate Test Data",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "24342930"
+	},
+	"item": [
+		{
+			"name": "Create Subsidy Access Policy for Subsidy A",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const jsonResponse = pm.response.json();",
+							"pm.collectionVariables.set(\"subsidy_access_policy_A_uuid\", jsonResponse.uuid);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"policy_type\": \"PerLearnerEnrollmentCreditAccessPolicy\",\n    \"description\": \"policy for LC2 Test Subsidy A {{subsidy_A_uuid}}\",\n    \"active\": true,\n    \"enterprise_customer_uuid\": \"{{enterprise_customer_uuid}}\",\n    \"catalog_uuid\": \"{{enterprise_customer_catalog_uuid}}\",\n    \"subsidy_uuid\": \"{{subsidy_A_uuid}}\",\n    \"access_method\": \"direct\",\n    \"per_learner_enrollment_limit\": 100,\n    \"per_learner_spend_limit\": 0,\n    \"spend_limit\": 0\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://enterprise-access.edx.org/api/v1/admin/policy/",
+					"protocol": "https",
+					"host": [
+						"enterprise-access",
+						"edx",
+						"org"
+					],
+					"path": [
+						"api",
+						"v1",
+						"admin",
+						"policy",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Subsidy Access Policy for Subsidy B",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const jsonResponse = pm.response.json();",
+							"pm.collectionVariables.set(\"subsidy_access_policy_B_uuid\", jsonResponse.uuid);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"policy_type\": \"PerLearnerEnrollmentCreditAccessPolicy\",\n    \"description\": \"policy for LC2 Test Subsidy B {{subsidy_B_uuid}}\",\n    \"active\": true,\n    \"enterprise_customer_uuid\": \"{{enterprise_customer_uuid}}\",\n    \"catalog_uuid\": \"{{enterprise_customer_catalog_uuid}}\",\n    \"subsidy_uuid\": \"{{subsidy_B_uuid}}\",\n    \"access_method\": \"direct\",\n    \"per_learner_enrollment_limit\": 100,\n    \"per_learner_spend_limit\": 0,\n    \"spend_limit\": 0\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://enterprise-access.edx.org/api/v1/admin/policy/",
+					"protocol": "https",
+					"host": [
+						"enterprise-access",
+						"edx",
+						"org"
+					],
+					"path": [
+						"api",
+						"v1",
+						"admin",
+						"policy",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Subsidy Access Policy for Subsidy C",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const jsonResponse = pm.response.json();",
+							"pm.collectionVariables.set(\"subsidy_access_policy_C_uuid\", jsonResponse.uuid);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"policy_type\": \"PerLearnerEnrollmentCreditAccessPolicy\",\n    \"description\": \"policy for LC2 Test Subsidy C {{subsidy_C_uuid}}\",\n    \"active\": true,\n    \"enterprise_customer_uuid\": \"{{enterprise_customer_uuid}}\",\n    \"catalog_uuid\": \"{{enterprise_customer_catalog_uuid}}\",\n    \"subsidy_uuid\": \"{{subsidy_C_uuid}}\",\n    \"access_method\": \"direct\",\n    \"per_learner_enrollment_limit\": 100,\n    \"per_learner_spend_limit\": 0,\n    \"spend_limit\": 0\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://enterprise-access.edx.org/api/v1/admin/policy/",
+					"protocol": "https",
+					"host": [
+						"enterprise-access",
+						"edx",
+						"org"
+					],
+					"path": [
+						"api",
+						"v1",
+						"admin",
+						"policy",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Subsidy Access Policy for Subsidy D",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const jsonResponse = pm.response.json();",
+							"pm.collectionVariables.set(\"subsidy_access_policy_D_uuid\", jsonResponse.uuid);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"policy_type\": \"PerLearnerEnrollmentCreditAccessPolicy\",\n    \"description\": \"policy for LC2 Test Subsidy D {{subsidy_D_uuid}}\",\n    \"active\": true,\n    \"enterprise_customer_uuid\": \"{{enterprise_customer_uuid}}\",\n    \"catalog_uuid\": \"{{enterprise_customer_catalog_uuid}}\",\n    \"subsidy_uuid\": \"{{subsidy_D_uuid}}\",\n    \"access_method\": \"direct\",\n    \"per_learner_enrollment_limit\": 100,\n    \"per_learner_spend_limit\": 0,\n    \"spend_limit\": 0\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://enterprise-access.edx.org/api/v1/admin/policy/",
+					"protocol": "https",
+					"host": [
+						"enterprise-access",
+						"edx",
+						"org"
+					],
+					"path": [
+						"api",
+						"v1",
+						"admin",
+						"policy",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Transaction A.1, OCM, Not Reversed",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"subsidy_uuid\": \"{{subsidy_A_uuid}}\",\n    \"learner_id\": {{lms_user_id}},\n    \"content_key\": \"course-v1:DelftX+PDCE01x+2T2023\",\n    \"subsidy_access_policy_uuid\": \"{{subsidy_access_policy_A_uuid}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://enterprise-subsidy.edx.org/api/v1/transactions/",
+					"protocol": "https",
+					"host": [
+						"enterprise-subsidy",
+						"edx",
+						"org"
+					],
+					"path": [
+						"api",
+						"v1",
+						"transactions",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Transaction A.2, OCM, Reversed",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const jsonResponse = pm.response.json();",
+							"pm.collectionVariables.set(\"transaction_A.2_uuid\", jsonResponse.uuid);",
+							"pm.collectionVariables.set(\"transaction_A.2_fulfillment_identifier\", jsonResponse.fulfillment_identifier);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"subsidy_uuid\": \"{{subsidy_A_uuid}}\",\n    \"learner_id\": {{lms_user_id}},\n    \"content_key\": \"course-v1:DelftX+EX102SPx+2T2023\",\n    \"subsidy_access_policy_uuid\": \"{{subsidy_access_policy_A_uuid}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://enterprise-subsidy.edx.org/api/v1/transactions/",
+					"protocol": "https",
+					"host": [
+						"enterprise-subsidy",
+						"edx",
+						"org"
+					],
+					"path": [
+						"api",
+						"v1",
+						"transactions",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Reverse Enrollment for Transaction A.2",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://courses.edx.org/enterprise/api/v1/enterprise-subsidy-fulfillment/{{transaction_A.2_fulfillment_identifier}}/cancel-fulfillment",
+					"protocol": "https",
+					"host": [
+						"courses",
+						"edx",
+						"org"
+					],
+					"path": [
+						"enterprise",
+						"api",
+						"v1",
+						"enterprise-subsidy-fulfillment",
+						"{{transaction_A.2_fulfillment_identifier}}",
+						"cancel-fulfillment"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Transaction B.1, OCM, Not Reversed",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"subsidy_uuid\": \"{{subsidy_B_uuid}}\",\n    \"learner_id\": {{lms_user_id}},\n    \"content_key\": \"course-v1:URosarioX+URX14+1T2023\",\n    \"subsidy_access_policy_uuid\": \"{{subsidy_access_policy_B_uuid}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://enterprise-subsidy.edx.org/api/v1/transactions/",
+					"protocol": "https",
+					"host": [
+						"enterprise-subsidy",
+						"edx",
+						"org"
+					],
+					"path": [
+						"api",
+						"v1",
+						"transactions",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Transaction B.2, OCM, Reversed",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const jsonResponse = pm.response.json();",
+							"pm.collectionVariables.set(\"transaction_B.2_uuid\", jsonResponse.uuid);",
+							"pm.collectionVariables.set(\"transaction_B.2_fulfillment_identifier\", jsonResponse.fulfillment_identifier);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"subsidy_uuid\": \"{{subsidy_B_uuid}}\",\n    \"learner_id\": {{lms_user_id}},\n    \"content_key\": \"course-v1:CatalystX+ILDIV1x+1T2023\",\n    \"subsidy_access_policy_uuid\": \"{{subsidy_access_policy_B_uuid}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://enterprise-subsidy.edx.org/api/v1/transactions/",
+					"protocol": "https",
+					"host": [
+						"enterprise-subsidy",
+						"edx",
+						"org"
+					],
+					"path": [
+						"api",
+						"v1",
+						"transactions",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Reverse Enrollment for Transaction B.2",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://courses.edx.org/enterprise/api/v1/enterprise-subsidy-fulfillment/{{transaction_B.2_fulfillment_identifier}}/cancel-fulfillment",
+					"protocol": "https",
+					"host": [
+						"courses",
+						"edx",
+						"org"
+					],
+					"path": [
+						"enterprise",
+						"api",
+						"v1",
+						"enterprise-subsidy-fulfillment",
+						"{{transaction_B.2_fulfillment_identifier}}",
+						"cancel-fulfillment"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Transaction C.1, OCM, Not Reversed",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"subsidy_uuid\": \"{{subsidy_C_uuid}}\",\n    \"learner_id\": {{lms_user_id}},\n    \"content_key\": \"course-v1:GoogleCloud+DELP9x+2T2023\",\n    \"subsidy_access_policy_uuid\": \"{{subsidy_access_policy_C_uuid}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://enterprise-subsidy.edx.org/api/v1/transactions/",
+					"protocol": "https",
+					"host": [
+						"enterprise-subsidy",
+						"edx",
+						"org"
+					],
+					"path": [
+						"api",
+						"v1",
+						"transactions",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Transaction C.2, OCM, Reversed",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const jsonResponse = pm.response.json();",
+							"pm.collectionVariables.set(\"transaction_C.2_uuid\", jsonResponse.uuid);",
+							"pm.collectionVariables.set(\"transaction_C.2_fulfillment_identifier\", jsonResponse.fulfillment_identifier);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"subsidy_uuid\": \"{{subsidy_C_uuid}}\",\n    \"learner_id\": {{lms_user_id}},\n    \"content_key\": \"course-v1:LinuxFoundationX+LFD133x+2T2023\",\n    \"subsidy_access_policy_uuid\": \"{{subsidy_access_policy_C_uuid}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://enterprise-subsidy.edx.org/api/v1/transactions/",
+					"protocol": "https",
+					"host": [
+						"enterprise-subsidy",
+						"edx",
+						"org"
+					],
+					"path": [
+						"api",
+						"v1",
+						"transactions",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Reverse Enrollment for Transaction C.2",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://courses.edx.org/enterprise/api/v1/enterprise-subsidy-fulfillment/{{transaction_C.2_fulfillment_identifier}}/cancel-fulfillment",
+					"protocol": "https",
+					"host": [
+						"courses",
+						"edx",
+						"org"
+					],
+					"path": [
+						"enterprise",
+						"api",
+						"v1",
+						"enterprise-subsidy-fulfillment",
+						"{{transaction_C.2_fulfillment_identifier}}",
+						"cancel-fulfillment"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Transaction D.1, OCM, Not Reversed",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"subsidy_uuid\": \"{{subsidy_D_uuid}}\",\n    \"learner_id\": {{lms_user_id}},\n    \"content_key\": \"course-v1:CatalystX+IL4x+1T2023\",\n    \"subsidy_access_policy_uuid\": \"{{subsidy_access_policy_D_uuid}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://enterprise-subsidy.edx.org/api/v1/transactions/",
+					"protocol": "https",
+					"host": [
+						"enterprise-subsidy",
+						"edx",
+						"org"
+					],
+					"path": [
+						"api",
+						"v1",
+						"transactions",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Transaction D.2, OCM, Reversed",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"const jsonResponse = pm.response.json();",
+							"pm.collectionVariables.set(\"transaction_D.2_uuid\", jsonResponse.uuid);",
+							"pm.collectionVariables.set(\"transaction_D.2_fulfillment_identifier\", jsonResponse.fulfillment_identifier);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"subsidy_uuid\": \"{{subsidy_D_uuid}}\",\n    \"learner_id\": {{lms_user_id}},\n    \"content_key\": \"course-v1:IsraelX+EPS1x+1T2023a\",\n    \"subsidy_access_policy_uuid\": \"{{subsidy_access_policy_D_uuid}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://enterprise-subsidy.edx.org/api/v1/transactions/",
+					"protocol": "https",
+					"host": [
+						"enterprise-subsidy",
+						"edx",
+						"org"
+					],
+					"path": [
+						"api",
+						"v1",
+						"transactions",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Reverse Enrollment for Transaction D.2",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "JWT {{JWT payload}}.{{JWT signature}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://courses.edx.org/enterprise/api/v1/enterprise-subsidy-fulfillment/{{transaction_D.2_fulfillment_identifier}}/cancel-fulfillment",
+					"protocol": "https",
+					"host": [
+						"courses",
+						"edx",
+						"org"
+					],
+					"path": [
+						"enterprise",
+						"api",
+						"v1",
+						"enterprise-subsidy-fulfillment",
+						"{{transaction_D.2_fulfillment_identifier}}",
+						"cancel-fulfillment"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "JWT payload",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "JWT signature",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "lms_user_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "subsidy_A_uuid",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "subsidy_B_uuid",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "subsidy_C_uuid",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "subsidy_D_uuid",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "enterprise_customer_uuid",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "enterprise_customer_catalog_uuid",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "subsidy_access_policy_C_uuid",
+			"value": ""
+		},
+		{
+			"key": "subsidy_access_policy_A_uuid",
+			"value": ""
+		},
+		{
+			"key": "subsidy_access_policy_B_uuid",
+			"value": ""
+		},
+		{
+			"key": "transaction_A.2_uuid",
+			"value": ""
+		},
+		{
+			"key": "transaction_A.2_fulfillment_identifier",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "transaction_B.2_fulfillment_identifier",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "subsidy_access_policy_D_uuid",
+			"value": ""
+		},
+		{
+			"key": "transaction_B.2_uuid",
+			"value": ""
+		},
+		{
+			"key": "transaction_C.2_uuid",
+			"value": ""
+		},
+		{
+			"key": "transaction_C.2_fulfillment_identifier",
+			"value": ""
+		},
+		{
+			"key": "transaction_D.2_uuid",
+			"value": ""
+		},
+		{
+			"key": "transaction_D.2_fulfillment_identifier",
+			"value": ""
+		}
+	]
+}
