@@ -85,17 +85,17 @@ class SubsidyAccessPolicy(TimeStampedModel):
     per_learner_enrollment_limit = models.IntegerField(
         null=True,
         blank=True,
-        default=0,
+        default=None,
     )
     per_learner_spend_limit = models.IntegerField(
         null=True,
         blank=True,
-        default=0,
+        default=None,
     )
     spend_limit = models.IntegerField(
         null=True,
         blank=True,
-        default=0,
+        default=None,
     )
 
     history = HistoricalRecords()
@@ -375,10 +375,17 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
         Checks if the given learner_id has a number of existing subsidy transactions
         LTE to the learner enrollment cap declared by this policy.
         """
-        if len(self.transactions_for_learner(learner_id)['transactions']) < self.per_learner_enrollment_limit:
-            return super().can_redeem(learner_id, content_key)
+        has_per_learner_enrollment_limit = self.per_learner_enrollment_limit is not None
 
-        return (False, REASON_LEARNER_MAX_ENROLLMENTS_REACHED)
+        if has_per_learner_enrollment_limit:
+            # only retrieve transactions if there is a per-learner enrollment limit
+            learner_transactions_count = len(self.transactions_for_learner(learner_id)['transactions'])
+            # check whether learner exceeded the per-learner enrollment limit
+            if learner_transactions_count >= self.per_learner_enrollment_limit:
+                return (False, REASON_LEARNER_MAX_ENROLLMENTS_REACHED)
+
+        # learner can redeem the subsidy access policy, so perform the generic access checks
+        return super().can_redeem(learner_id, content_key)
 
     def credit_available(self, learner_id=None):
         if self.remaining_balance_per_user(learner_id) > 0:
@@ -410,17 +417,24 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
 
     def can_redeem(self, learner_id, content_key):
         """
-        TODO: Well, can you?
+        Determines whether learner can redeem a subsidy access policy given the
+        limits specified on the policy.
         """
-        spent_amount = self.transactions_for_learner(learner_id)['aggregates'].get('total_quantity') or 0
-        course_price = self.subsidy_client.get_subsidy_content_data(
-            self.enterprise_customer_uuid,
-            content_key
-        )['content_price']
-        if (spent_amount + course_price) < self.per_learner_spend_limit:
-            return super().can_redeem(learner_id, content_key)
+        has_per_learner_spend_limit = self.per_learner_spend_limit is not None
+        if has_per_learner_spend_limit:
+            # only retrieve transactions if there is a per-learner spend limit
+            spent_amount = self.transactions_for_learner(learner_id)['aggregates'].get('total_quantity') or 0
+            course_price = self.subsidy_client.get_subsidy_content_data(
+                self.enterprise_customer_uuid,
+                content_key
+            )['content_price']
 
-        return (False, REASON_LEARNER_MAX_SPEND_REACHED)
+            # check whether learner exceeded per-learner spend limit
+            if (spent_amount + course_price) >= self.per_learner_spend_limit:
+                return (False, REASON_LEARNER_MAX_SPEND_REACHED)
+
+        # learner can redeem the subsidy access policy, so perform the generic access checks
+        return super().can_redeem(learner_id, content_key)
 
     def credit_available(self, learner_id=None):
         return self.remaining_balance_per_user(learner_id) > 0

@@ -20,6 +20,7 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
+from enterprise_access.apps.subsidy_access_policy.constants import TransactionStateChoices
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
@@ -1667,7 +1668,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         """
         mock_transaction_record = {
             'uuid': str(uuid4()),
-            'status': 'committed',
+            'state': TransactionStateChoices.COMMITTED,
             'other': True,
         }
         # HTTPError would be caused by a 404, indicating that a transaction does not already exist for this policy.
@@ -1689,7 +1690,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         """
         mock_transaction_record = {
             'uuid': str(uuid4()),
-            'status': 'committed',
+            'state': TransactionStateChoices.COMMITTED,
             'other': True,
             'content_key': 'course-v1:edX+test+courserun',
         }
@@ -1718,7 +1719,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         """
         mock_transaction_record = {
             'uuid': str(uuid4()),
-            'status': 'committed',
+            'state': TransactionStateChoices.COMMITTED,
             'other': True,
         }
         self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
@@ -1759,7 +1760,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         """
         mock_transaction_record = {
             'uuid': str(uuid4()),
-            'status': 'committed',
+            'state': TransactionStateChoices.COMMITTED,
             'other': True,
         }
         self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
@@ -1811,13 +1812,17 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         # Check the response for the first content_key given.
         assert response_list[0]["content_key"] == query_params["content_key"][0]
         assert len(response_list[0]["redemptions"]) == 0
-        assert response_list[0]["subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
+        assert response_list[0]["has_successful_redemption"] is False
+        assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
+        assert response_list[0]["can_redeem"] is True
         assert len(response_list[0]["reasons"]) == 0
 
         # Check the response for the second content_key given.
         assert response_list[1]["content_key"] == query_params["content_key"][1]
         assert len(response_list[1]["redemptions"]) == 0
-        assert response_list[1]["subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
+        assert response_list[1]["has_successful_redemption"] is False
+        assert response_list[1]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
+        assert response_list[1]["can_redeem"] is True
         assert len(response_list[1]["reasons"]) == 0
 
     def test_can_redeem_policy_none_redeemable(self):
@@ -1843,7 +1848,9 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         # Check the response for the first content_key given.
         assert response_list[0]["content_key"] == query_params["content_key"][0]
         assert len(response_list[0]["redemptions"]) == 0
-        assert response_list[0]["subsidy_access_policy"] is None
+        assert response_list[0]["has_successful_redemption"] is False
+        assert response_list[0]["redeemable_subsidy_access_policy"] is None
+        assert response_list[0]["can_redeem"] is False
         assert response_list[0]["reasons"] == [
             {
                 "reason": "Not enough remaining value in subsidy to redeem requested content.",
@@ -1854,7 +1861,9 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         # Check the response for the second content_key given.
         assert response_list[1]["content_key"] == query_params["content_key"][1]
         assert len(response_list[1]["redemptions"]) == 0
-        assert response_list[1]["subsidy_access_policy"] is None
+        assert response_list[1]["has_successful_redemption"] is False
+        assert response_list[1]["redeemable_subsidy_access_policy"] is None
+        assert response_list[1]["can_redeem"] is False
         assert response_list[1]["reasons"] == [
             {
                 "reason": "Not enough remaining value in subsidy to redeem requested content.",
@@ -1870,7 +1879,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
             "results": [{
                 "uuid": test_transaction_uuid,
-                "state": "committed",
+                "state": TransactionStateChoices.COMMITTED,
                 "idempotency_key": "the-idempotency-key",
                 "learner_id": self.user.lms_user_id,
                 "content_key": "course-v1:demox+1234+2T2023",
@@ -1898,5 +1907,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
             f"{settings.ENTERPRISE_SUBSIDY_URL}/api/v1/transactions/{test_transaction_uuid}/"
         assert response_list[0]["redemptions"][0]["courseware_url"] == \
             f"{settings.LMS_URL}/courses/course-v1:demox+1234+2T2023/courseware/"
-        assert response_list[0]["subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
+        assert response_list[0]["has_successful_redemption"] is True
+        assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
+        assert response_list[0]["can_redeem"] is True
         assert len(response_list[0]["reasons"]) == 0

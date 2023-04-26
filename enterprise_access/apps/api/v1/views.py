@@ -58,7 +58,10 @@ from enterprise_access.apps.events.utils import (
     send_access_policy_event_to_event_bus,
     send_subsidy_redemption_event_to_event_bus
 )
-from enterprise_access.apps.subsidy_access_policy.constants import POLICY_TYPES_WITH_CREDIT_LIMIT
+from enterprise_access.apps.subsidy_access_policy.constants import (
+    POLICY_TYPES_WITH_CREDIT_LIMIT,
+    TransactionStateChoices
+)
 from enterprise_access.apps.subsidy_access_policy.models import (
     SubsidyAccessPolicy,
     SubsidyAccessPolicyLockAttemptFailed
@@ -1018,7 +1021,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                  containing the following keys (sample values):
                  {
                      "uuid": "the-transaction-uuid",
-                     "state": "COMMITTED",
+                     "state": "committed",
                      "idempotency_key": "the-idempotency-key",
                      "lms_user_id": 54321,
                      "content_key": "demox_1234+2T2023",
@@ -1238,10 +1241,16 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
                 serialized_policy = serializers.SubsidyAccessPolicyRedeemableSerializer(resolved_policy).data
 
+            has_successful_redemption = any(
+                redemption['state'] == TransactionStateChoices.COMMITTED
+                for redemption in redemptions
+            )
             can_redeem_for_content_response = {
                 "content_key": content_key,
                 "redemptions": redemptions,
-                "subsidy_access_policy": serialized_policy,
+                "has_successful_redemption": has_successful_redemption,
+                "redeemable_subsidy_access_policy": serialized_policy,
+                "can_redeem": bool(serialized_policy),
                 "reasons": reasons,
             }
             response.append(can_redeem_for_content_response)
