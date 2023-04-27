@@ -917,7 +917,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         enterprise_customer_uuid = self.enterprise_customer_uuid
         return queryset.filter(enterprise_customer_uuid=enterprise_customer_uuid)
 
-    def evaluate_policies(self, enterprise_customer_uuid, learner_id, content_key):
+    def evaluate_policies(self, enterprise_customer_uuid, lms_user_id, content_key):
         """
         Evaluate all policies for the given enterprise customer to check if it can be redeemed against the given learner
         and content.
@@ -938,7 +938,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             active=True,
         )
         for policy in all_policies_for_enterprise:
-            redeemable, reason = policy.can_redeem(learner_id, content_key)
+            redeemable, reason = policy.can_redeem(lms_user_id, content_key)
             if redeemable:
                 redeemable_policies.append(policy)
             else:
@@ -948,7 +948,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
         return (redeemable_policies, non_redeemable_policies)
 
-    def policies_with_credit_available(self, enterprise_customer_uuid, learner_id):
+    def policies_with_credit_available(self, enterprise_customer_uuid, lms_user_id):
         """
         Return all redeemable policies in terms of "credit available".
         """
@@ -958,7 +958,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             enterprise_customer_uuid=enterprise_customer_uuid
         )
         for policy in all_policies:
-            if policy.credit_available(learner_id):
+            if policy.credit_available(lms_user_id):
                 policies.append(policy)
 
         return policies
@@ -969,17 +969,17 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         Return a list of all redeemable policies for given `enterprise_customer_uuid`, `lms_user_id` that have
         redeemable credit available.
         """
-        serializer = serializers.SubsidyAccessPolicyCreditAvailableListSerializer(data=request.query_params)
+        serializer = serializers.SubsidyAccessPolicyCreditsAvailableRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         enterprise_customer_uuid = serializer.data['enterprise_customer_uuid']
-        learner_id = serializer.data['lms_user_id']
+        lms_user_id = serializer.data['lms_user_id']
 
-        policies_with_credit_available = self.policies_with_credit_available(enterprise_customer_uuid, learner_id)
-        response_data = serializers.SubsidyAccessPolicyCreditAvailableSerializer(
+        policies_with_credit_available = self.policies_with_credit_available(enterprise_customer_uuid, lms_user_id)
+        response_data = serializers.SubsidyAccessPolicyCreditsAvailableResponseSerializer(
             policies_with_credit_available,
             many=True,
-            context={'learner_id': learner_id}
+            context={'lms_user_id': lms_user_id}
         ).data
 
         return Response(
@@ -989,17 +989,17 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
     def list(self, request):
         """
-        Return a list of all redeemable policies for given `enterprise_customer_uuid`, `learner_id` and `content_key`
+        Return a list of all redeemable policies for given `enterprise_customer_uuid`, `lms_user_id` and `content_key`
         """
-        serializer = serializers.SubsidyAccessPolicyRedeemListSerializer(data=request.query_params)
+        serializer = serializers.SubsidyAccessPolicyListRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         enterprise_customer_uuid = serializer.data['enterprise_customer_uuid']
-        learner_id = serializer.data['learner_id']
+        lms_user_id = serializer.data['lms_user_id']
         content_key = serializer.data['content_key']
 
-        redeemable_policies, _ = self.evaluate_policies(enterprise_customer_uuid, learner_id, content_key)
-        response_data = serializers.SubsidyAccessPolicyRedeemableSerializer(redeemable_policies, many=True).data
+        redeemable_policies, _ = self.evaluate_policies(enterprise_customer_uuid, lms_user_id, content_key)
+        response_data = serializers.SubsidyAccessPolicyRedeemableResponseSerializer(redeemable_policies, many=True).data
 
         return Response(
             response_data,
@@ -1009,9 +1009,15 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
     @action(detail=True, methods=['post'])
     def redeem(self, request, *args, **kwargs):
         """
-        Redeem a policy for given `learner_id` and `content_key`
+        Redeem a policy for given `lms_user_id` and `content_key`
 
-        URL Location: POST /api/v1/policy/<policy_uuid>/redeem/?learner_id=<>&content_key=<>
+        URL Location: POST /api/v1/policy/<policy_uuid>/redeem/
+
+        JSON body parameters:
+        {
+            "lms_user_id":
+            "content_key":
+        }
 
         status codes:
             400: There are missing or otherwise invalid input parameters.
@@ -1039,10 +1045,10 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         """
         policy = get_object_or_404(SubsidyAccessPolicy, pk=kwargs.get('policy_uuid'))
 
-        serializer = serializers.SubsidyAccessPolicyRedeemSerializer(data=request.data)
+        serializer = serializers.SubsidyAccessPolicyRedeemRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        learner_id = serializer.data['learner_id']
+        lms_user_id = serializer.data['lms_user_id']
         content_key = serializer.data['content_key']
         metadata = serializer.data.get('metadata')
         try:
@@ -1051,8 +1057,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             # point, we should also consider migrating this logic into the policy model so that different policy types
             # that have different locking needs can supply different lock kwargs.
             with policy.lock():
-                if policy.can_redeem(learner_id, content_key):
-                    redemption_result = policy.redeem(learner_id, content_key, metadata)
+                if policy.can_redeem(lms_user_id, content_key):
+                    redemption_result = policy.redeem(lms_user_id, content_key, metadata)
                     send_subsidy_redemption_event_to_event_bus(
                         SUBSIDY_REDEEMED.event_type,
                         serializer.data
@@ -1064,7 +1070,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             logger.exception(exc)
             raise SubsidyAccessPolicyLockedException() from exc
 
-    def get_redemptions_by_policy_uuid(self, enterprise_customer_uuid, learner_id, content_key):
+    def get_redemptions_by_policy_uuid(self, enterprise_customer_uuid, lms_user_id, content_key):
         """
         Get existing redemptions for the given enterprise, learner, and content, bucketed by policy.
 
@@ -1079,7 +1085,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                             "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
                             "state": "committed",
                             "idempotency_key": "the-idempotency-key",
-                            "learner_id": 54321,
+                            "lms_user_id": 54321,
                             "content_key": "course-v1:demox+1234+2T2023",
                             "quantity": -19900,
                             "unit": "USD_CENTS",
@@ -1100,7 +1106,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         policies = SubsidyAccessPolicy.objects.filter(enterprise_customer_uuid=enterprise_customer_uuid)
 
         for policy in policies:
-            if redemptions := policy.redemptions(learner_id, content_key):
+            if redemptions := policy.redemptions(lms_user_id, content_key):
                 for redemption in redemptions:
                     redemption["policy_redemption_status_url"] = os.path.join(
                         EnterpriseSubsidyAPIClient.TRANSACTIONS_ENDPOINT,
@@ -1118,19 +1124,19 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
     @action(detail=False, methods=['get'])
     def redemption(self, request, *args, **kwargs):
         """
-        Return redemption records for given `enterprise_customer_uuid`, `learner_id` and `content_key`
+        Return redemption records for given `enterprise_customer_uuid`, `lms_user_id` and `content_key`
 
-        URL Location: GET /api/v1/policy/redemption/?enterprise_customer_uuid=<>&learner_id=<>&content_key=<>
+        URL Location: GET /api/v1/policy/redemption/?enterprise_customer_uuid=<>&lms_user_id=<>&content_key=<>
         """
-        serializer = serializers.SubsidyAccessPolicyRedeemListSerializer(data=request.query_params)
+        serializer = serializers.SubsidyAccessPolicyRedemptionRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         enterprise_customer_uuid = serializer.data['enterprise_customer_uuid']
-        learner_id = serializer.data['learner_id']
+        lms_user_id = serializer.data['lms_user_id']
         content_key = serializer.data['content_key']
 
         return Response(
-            self.get_redemptions_by_policy_uuid(enterprise_customer_uuid, learner_id, content_key),
+            self.get_redemptions_by_policy_uuid(enterprise_customer_uuid, lms_user_id, content_key),
             status=status.HTTP_200_OK,
         )
 
@@ -1212,7 +1218,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
         enterprise_customer_uuid = serializer.data['enterprise_customer_uuid']
         content_keys = serializer.data['content_key']
-        learner_id = self.lms_user_id
+        lms_user_id = self.lms_user_id
 
         response = []
         for content_key in content_keys:
@@ -1221,7 +1227,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
             redemptions_by_policy_uuid = self.get_redemptions_by_policy_uuid(
                 enterprise_customer_uuid,
-                learner_id,
+                lms_user_id,
                 content_key
             )
             # Flatten dict of lists because the response doesn't need to be bucketed by policy_uuid.
@@ -1231,7 +1237,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 for redemption in redemptions
             ]
             redeemable_policies, non_redeemable_policies = self.evaluate_policies(
-                enterprise_customer_uuid, learner_id, content_key
+                enterprise_customer_uuid, lms_user_id, content_key
             )
             if not redemptions and not redeemable_policies:
                 for reason, policies in non_redeemable_policies.items():
@@ -1241,7 +1247,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                     })
             if redeemable_policies:
                 resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
-                serialized_policy = serializers.SubsidyAccessPolicyRedeemableSerializer(resolved_policy).data
+                serialized_policy = serializers.SubsidyAccessPolicyRedeemableResponseSerializer(resolved_policy).data
 
             has_successful_redemption = any(
                 redemption['state'] == TransactionStateChoices.COMMITTED

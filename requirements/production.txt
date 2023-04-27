@@ -183,7 +183,7 @@ edx-drf-extensions==8.7.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.2.5
+edx-enterprise-subsidy-client==0.2.6
     # via -r requirements/base.txt
 edx-opaque-keys[django]==2.3.0
     # via
@@ -354,7 +354,7 @@ pyyaml==6.0
     #   edx-django-release-util
 redis==4.5.4
     # via -r requirements/base.txt
-requests==2.28.2
+requests==2.29.0
     # via
     #   -r requirements/base.txt
     #   analytics-python
