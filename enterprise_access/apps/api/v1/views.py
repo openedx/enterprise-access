@@ -1044,6 +1044,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
         learner_id = serializer.data['learner_id']
         content_key = serializer.data['content_key']
+        metadata = serializer.data.get('metadata')
         try:
             # For now, we should lock the whole policy (i.e. pass nothing to policy.lock()).  In some cases this is more
             # aggressive than necessary, but we can optimize for performance at a later phase of this project.  At that
@@ -1051,7 +1052,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             # that have different locking needs can supply different lock kwargs.
             with policy.lock():
                 if policy.can_redeem(learner_id, content_key):
-                    redemption_result = policy.redeem(learner_id, content_key)
+                    redemption_result = policy.redeem(learner_id, content_key, metadata)
                     send_subsidy_redemption_event_to_event_bus(
                         SUBSIDY_REDEEMED.event_type,
                         serializer.data

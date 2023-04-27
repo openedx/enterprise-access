@@ -1684,6 +1684,31 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         response_json = self.load_json(response.content)
         assert response_json == mock_transaction_record
 
+    def test_redeem_policy_with_metadata(self):
+        """
+        Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint works as expected
+        """
+        mock_transaction_record = {
+            'uuid': str(uuid4()),
+            'status': 'committed',
+            'other': True,
+        }
+        # HTTPError would be caused by a 404, indicating that a transaction does not already exist for this policy.
+        self.redeemable_policy.get_subsidy_client.return_value.retrieve_subsidy_transaction.side_effect = HTTPError()
+        self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.side_effect = None
+        self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.return_value = \
+            mock_transaction_record
+        payload = {
+            'learner_id': '1234',
+            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
+            'metadata': {
+                'geag_first_name': 'John'
+            }
+        }
+        response = self.client.post(self.subsidy_access_policy_redeem_endpoint, payload)
+        response_json = self.load_json(response.content)
+        assert response_json == mock_transaction_record
+
     def test_redemption_endpoint(self):
         """
         Verify that SubsidyAccessPolicyViewset redemption endpoint works as expected
