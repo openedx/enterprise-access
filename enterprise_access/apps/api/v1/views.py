@@ -934,7 +934,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         redeemable_policies = []
         non_redeemable_policies = defaultdict(list)
         all_policies_for_enterprise = SubsidyAccessPolicy.objects.filter(
-            enterprise_customer_uuid=enterprise_customer_uuid
+            enterprise_customer_uuid=enterprise_customer_uuid,
+            active=True,
         )
         for policy in all_policies_for_enterprise:
             redeemable, reason = policy.can_redeem(learner_id, content_key)

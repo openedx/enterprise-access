@@ -20,6 +20,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import CREDIT_POLICY
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
 
+REASON_POLICY_NOT_ACTIVE = "Subsidy access policy is not active."
 REASON_CONTENT_NOT_IN_CATALOG = "Requested content_key not contained in policy's catalog."
 REASON_LEARNER_NOT_IN_ENTERPRISE = "Learner not part of enterprise associated with the access policy."
 REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY = "Not enough remaining value in subsidy to redeem requested content."
@@ -207,6 +208,8 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Check that a given learner can redeem the given content.
         """
+        if not self.active:
+            return (False, REASON_POLICY_NOT_ACTIVE)
         if not self.catalog_client.contains_content_items(self.catalog_uuid, [content_key]):
             return (False, REASON_CONTENT_NOT_IN_CATALOG)
         # TODO: can we rely on JWT roles to check this?
@@ -375,8 +378,12 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
         Checks if the given learner_id has a number of existing subsidy transactions
         LTE to the learner enrollment cap declared by this policy.
         """
-        has_per_learner_enrollment_limit = self.per_learner_enrollment_limit is not None
+        # perform generic access checks
+        should_attempt_redemption, reason = super().can_redeem(learner_id, content_key)
+        if not should_attempt_redemption:
+            return (False, reason)
 
+        has_per_learner_enrollment_limit = self.per_learner_enrollment_limit is not None
         if has_per_learner_enrollment_limit:
             # only retrieve transactions if there is a per-learner enrollment limit
             learner_transactions_count = len(self.transactions_for_learner(learner_id)['transactions'])
@@ -384,8 +391,8 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
             if learner_transactions_count >= self.per_learner_enrollment_limit:
                 return (False, REASON_LEARNER_MAX_ENROLLMENTS_REACHED)
 
-        # learner can redeem the subsidy access policy, so perform the generic access checks
-        return super().can_redeem(learner_id, content_key)
+        # learner can redeem the subsidy access policy
+        return (True, None)
 
     def credit_available(self, learner_id=None):
         if self.remaining_balance_per_user(learner_id) > 0:
@@ -420,6 +427,11 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
         Determines whether learner can redeem a subsidy access policy given the
         limits specified on the policy.
         """
+        # perform generic access checks
+        should_attempt_redemption, reason = super().can_redeem(learner_id, content_key)
+        if not should_attempt_redemption:
+            return (False, reason)
+
         has_per_learner_spend_limit = self.per_learner_spend_limit is not None
         if has_per_learner_spend_limit:
             # only retrieve transactions if there is a per-learner spend limit
@@ -433,8 +445,8 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
             if (spent_amount + course_price) >= self.per_learner_spend_limit:
                 return (False, REASON_LEARNER_MAX_SPEND_REACHED)
 
-        # learner can redeem the subsidy access policy, so perform the generic access checks
-        return super().can_redeem(learner_id, content_key)
+        # learner can redeem the subsidy access policy
+        return (True, None)
 
     def credit_available(self, learner_id=None):
         return self.remaining_balance_per_user(learner_id) > 0
