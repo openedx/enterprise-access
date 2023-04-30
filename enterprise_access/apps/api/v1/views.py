@@ -1159,48 +1159,61 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                      body is a JSON list of dict containing redemption evaluations for each given content_key.  See
                      below for a sample response to 3 passed content_keys: one which has existing redemptions, one
                      without, and a third that is not redeemable.:
-                     [
-                         {
-                             "content_key": "course-v1:demox+1234+2T2023_1",
-                             "redemptions": [
-                                 {
-                                     "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-                                     "state": "committed",
-                                     "policy_redemption_status_url": <API URL to check the redemtion status>,
-                                     "courseware_url": <URL to the courseware page>,
-                                     <remainder of serialized Transaction>
-                                 },
-                             ],
-                             "subsidy_access_policy": {
-                                 "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-                                 "policy_redemption_url": <API URL to redeem the policy>,
-                                 <remainder of serialized SubsidyAccessPolicy>
-                             },
-                             "reasons": []
-                         },
-                         {
-                             "content_key": "course-v1:demox+1234+2T2023_2",
-                             "redemptions": [],
-                             "subsidy_access_policy": {
-                                 "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-                                 "policy_redemption_url": <API URL to redeem the policy>,
-                                 <remainder of serialized SubsidyAccessPolicy>
-                             },
-                             "reasons": []
-                         },
-                         {
-                             "content_key": "course-v1:demox+1234+2T2023_3",
-                             "redemptions": [],
-                             "subsidy_access_policy": null,
-                             "reasons": [
-                                 {
-                                     "reason": "Not enough funds available for the course.",
-                                     "policy_uuids": ["56744a36-93ac-4e6c-b998-a2a1899f2ae4"],
-                                 }
-                             ]
-                         }
-                         ...
-                     ]
+                     {
+                        "redeemable_subsidy_access_policy": {
+                            "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
+                            "policy_redemption_url": <API URL to redeem the policy>,
+                            <remainder of serialized SubsidyAccessPolicy>
+                        },
+                        "redeemability_by_content_key": [
+                            {
+                                "content_key": "course-v1:demox+1234+2T2023_1",
+                                "redemptions": [
+                                    {
+                                        "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
+                                        "state": "committed",
+                                        "policy_redemption_status_url": <API URL to check the redemtion status>,
+                                        "courseware_url": <URL to the courseware page>,
+                                        <remainder of serialized Transaction>
+                                    },
+                                ],
+                                "has_successful_redemption": true,
+                                "subsidy_access_policy": {
+                                    "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
+                                    "policy_redemption_url": <API URL to redeem the policy>,
+                                    <remainder of serialized SubsidyAccessPolicy>
+                                },
+                                "can_redeem": true,
+                                "reasons": []
+                            },
+                            {
+                                "content_key": "course-v1:demox+1234+2T2023_2",
+                                "redemptions": [],
+                                "has_successful_redemption": false,
+                                "subsidy_access_policy": {
+                                    "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
+                                    "policy_redemption_url": <API URL to redeem the policy>,
+                                    <remainder of serialized SubsidyAccessPolicy>
+                                },
+                                "can_redeem": true,
+                                "reasons": []
+                            },
+                            {
+                                "content_key": "course-v1:demox+1234+2T2023_3",
+                                "has_successful_redemption": false,
+                                "redemptions": [],
+                                "subsidy_access_policy": null,
+                                "can_redeem": false,
+                                "reasons": [
+                                    {
+                                        "reason": "Not enough funds available for the course.",
+                                        "policy_uuids": ["56744a36-93ac-4e6c-b998-a2a1899f2ae4"],
+                                    }
+                                ]
+                            }
+                            ...
+                        ]
+                    }
         """
         all_request_params = QueryDict(mutable=True)
         all_request_params.update(request.query_params)
@@ -1212,7 +1225,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         content_keys = serializer.data['content_key']
         learner_id = self.lms_user_id
 
-        response = []
+        content_keys_redeemability = []
+        first_redeemable_policy = None
         for content_key in content_keys:
             serialized_policy = None
             reasons = []
@@ -1240,6 +1254,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             if redeemable_policies:
                 resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
                 serialized_policy = serializers.SubsidyAccessPolicyRedeemableSerializer(resolved_policy).data
+                if not first_redeemable_policy:
+                    first_redeemable_policy = serialized_policy
 
             has_successful_redemption = any(
                 redemption['state'] == TransactionStateChoices.COMMITTED
@@ -1253,6 +1269,10 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 "can_redeem": bool(serialized_policy),
                 "reasons": reasons,
             }
-            response.append(can_redeem_for_content_response)
+            content_keys_redeemability.append(can_redeem_for_content_response)
 
+        response = {
+            "redeemable_subsidy_access_policy": first_redeemable_policy,
+            "redeemability_per_content_key": content_keys_redeemability,
+        }
         return Response(response, status=status.HTTP_200_OK)

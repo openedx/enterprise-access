@@ -1804,26 +1804,32 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
             'content_key': ['course-v1:edX+edXPrivacy101+3T2020', 'course-v1:edX+edXPrivacy101+3T2020_2'],
         }
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
-        response_list = response.json()
+        response_dict = response.json()
 
         # Make sure we got responses for all two content_keys requested.
-        assert len(response_list) == 2
+        assert len(response_dict["redeemability_per_content_key"]) == 2
+
+        # Check for top-level redeemable_subsidy_access_policy field.
+        assert response_dict["redeemable_subsidy_access_policy"] is not None
+        assert response_dict["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
 
         # Check the response for the first content_key given.
-        assert response_list[0]["content_key"] == query_params["content_key"][0]
-        assert len(response_list[0]["redemptions"]) == 0
-        assert response_list[0]["has_successful_redemption"] is False
-        assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
-        assert response_list[0]["can_redeem"] is True
-        assert len(response_list[0]["reasons"]) == 0
+        first_content_key_result = response_dict["redeemability_per_content_key"][0]
+        assert first_content_key_result["content_key"] == query_params["content_key"][0]
+        assert len(first_content_key_result["redemptions"]) == 0
+        assert first_content_key_result["has_successful_redemption"] is False
+        assert first_content_key_result["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
+        assert first_content_key_result["can_redeem"] is True
+        assert len(first_content_key_result["reasons"]) == 0
 
         # Check the response for the second content_key given.
-        assert response_list[1]["content_key"] == query_params["content_key"][1]
-        assert len(response_list[1]["redemptions"]) == 0
-        assert response_list[1]["has_successful_redemption"] is False
-        assert response_list[1]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
-        assert response_list[1]["can_redeem"] is True
-        assert len(response_list[1]["reasons"]) == 0
+        second_content_key_result = response_dict["redeemability_per_content_key"][1]
+        assert second_content_key_result["content_key"] == query_params["content_key"][1]
+        assert len(second_content_key_result["redemptions"]) == 0
+        assert second_content_key_result["has_successful_redemption"] is False
+        assert second_content_key_result["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
+        assert second_content_key_result["can_redeem"] is True
+        assert len(second_content_key_result["reasons"]) == 0
 
     def test_can_redeem_policy_none_redeemable(self):
         """
@@ -1840,18 +1846,22 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
             'content_key': ['course-v1:edX+edXPrivacy101+3T2020', 'course-v1:edX+edXPrivacy101+3T2020_2'],
         }
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
-        response_list = response.json()
+        response_dict = response.json()
+
+        # Check for top-level redeemable_subsidy_access_policy field.
+        assert response_dict["redeemable_subsidy_access_policy"] is None
 
         # Make sure we got responses for all two content_keys requested.
-        assert len(response_list) == 2
+        assert len(response_dict["redeemability_per_content_key"]) == 2
 
         # Check the response for the first content_key given.
-        assert response_list[0]["content_key"] == query_params["content_key"][0]
-        assert len(response_list[0]["redemptions"]) == 0
-        assert response_list[0]["has_successful_redemption"] is False
-        assert response_list[0]["redeemable_subsidy_access_policy"] is None
-        assert response_list[0]["can_redeem"] is False
-        assert response_list[0]["reasons"] == [
+        first_content_key_result = response_dict["redeemability_per_content_key"][0]
+        assert first_content_key_result["content_key"] == query_params["content_key"][0]
+        assert len(first_content_key_result["redemptions"]) == 0
+        assert first_content_key_result["has_successful_redemption"] is False
+        assert first_content_key_result["redeemable_subsidy_access_policy"] is None
+        assert first_content_key_result["can_redeem"] is False
+        assert first_content_key_result["reasons"] == [
             {
                 "reason": "Not enough remaining value in subsidy to redeem requested content.",
                 "policy_uuids": [str(self.redeemable_policy.uuid)],
@@ -1859,12 +1869,13 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         ]
 
         # Check the response for the second content_key given.
-        assert response_list[1]["content_key"] == query_params["content_key"][1]
-        assert len(response_list[1]["redemptions"]) == 0
-        assert response_list[1]["has_successful_redemption"] is False
-        assert response_list[1]["redeemable_subsidy_access_policy"] is None
-        assert response_list[1]["can_redeem"] is False
-        assert response_list[1]["reasons"] == [
+        second_content_key_result = response_dict["redeemability_per_content_key"][1]
+        assert second_content_key_result["content_key"] == query_params["content_key"][1]
+        assert len(second_content_key_result["redemptions"]) == 0
+        assert second_content_key_result["has_successful_redemption"] is False
+        assert second_content_key_result["redeemable_subsidy_access_policy"] is None
+        assert second_content_key_result["can_redeem"] is False
+        assert second_content_key_result["reasons"] == [
             {
                 "reason": "Not enough remaining value in subsidy to redeem requested content.",
                 "policy_uuids": [str(self.redeemable_policy.uuid)],
@@ -1896,18 +1907,20 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         }
         query_params = {'content_key': 'course-v1:demox+1234+2T2023'}
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
-        response_list = response.json()
+        response_dict = response.json()
 
         # Make sure we got responses containing existing redemptions.
-        assert len(response_list) == 1
-        assert response_list[0]["content_key"] == query_params["content_key"]
-        assert len(response_list[0]["redemptions"]) == 1
-        assert response_list[0]["redemptions"][0]["uuid"] == test_transaction_uuid
-        assert response_list[0]["redemptions"][0]["policy_redemption_status_url"] == \
+        assert len(response_dict["redeemability_per_content_key"]) == 1
+
+        first_content_key_result = response_dict["redeemability_per_content_key"][0]
+        assert first_content_key_result["content_key"] == query_params["content_key"]
+        assert len(first_content_key_result["redemptions"]) == 1
+        assert first_content_key_result["redemptions"][0]["uuid"] == test_transaction_uuid
+        assert first_content_key_result["redemptions"][0]["policy_redemption_status_url"] == \
             f"{settings.ENTERPRISE_SUBSIDY_URL}/api/v1/transactions/{test_transaction_uuid}/"
-        assert response_list[0]["redemptions"][0]["courseware_url"] == \
+        assert first_content_key_result["redemptions"][0]["courseware_url"] == \
             f"{settings.LMS_URL}/courses/course-v1:demox+1234+2T2023/courseware/"
-        assert response_list[0]["has_successful_redemption"] is True
-        assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
-        assert response_list[0]["can_redeem"] is True
-        assert len(response_list[0]["reasons"]) == 0
+        assert first_content_key_result["has_successful_redemption"] is True
+        assert first_content_key_result["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
+        assert first_content_key_result["can_redeem"] is True
+        assert len(first_content_key_result["reasons"]) == 0
