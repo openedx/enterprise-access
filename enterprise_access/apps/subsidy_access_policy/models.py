@@ -20,6 +20,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import CREDIT_POLICY
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
 
+REASON_POLICY_NOT_ACTIVE = "Subsidy access policy is not active."
 REASON_CONTENT_NOT_IN_CATALOG = "Requested content_key not contained in policy's catalog."
 REASON_LEARNER_NOT_IN_ENTERPRISE = "Learner not part of enterprise associated with the access policy."
 REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY = "Not enough remaining value in subsidy to redeem requested content."
@@ -203,21 +204,23 @@ class SubsidyAccessPolicy(TimeStampedModel):
             'aggregates': response_payload['aggregates'],
         }
 
-    def can_redeem(self, learner_id, content_key):
+    def can_redeem(self, lms_user_id, content_key):
         """
         Check that a given learner can redeem the given content.
         """
+        if not self.active:
+            return (False, REASON_POLICY_NOT_ACTIVE)
         if not self.catalog_client.contains_content_items(self.catalog_uuid, [content_key]):
             return (False, REASON_CONTENT_NOT_IN_CATALOG)
         # TODO: can we rely on JWT roles to check this?
-        if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, learner_id):
+        if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
             return (False, REASON_LEARNER_NOT_IN_ENTERPRISE)
-        if not self.subsidy_client.can_redeem(self.subsidy_uuid, learner_id, content_key):
+        if not self.subsidy_client.can_redeem(self.subsidy_uuid, lms_user_id, content_key):
             return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
 
         return (True, None)
 
-    def redeem(self, learner_id, content_key):
+    def redeem(self, lms_user_id, content_key, metadata=None):
         """
         Redeem a subsidy for the given learner and content.
         Returns:
@@ -226,30 +229,31 @@ class SubsidyAccessPolicy(TimeStampedModel):
         if self.access_method == AccessMethods.DIRECT:
             return self.subsidy_client.create_subsidy_transaction(
                 subsidy_uuid=self.subsidy_uuid,
-                lms_user_id=learner_id,
+                lms_user_id=lms_user_id,
                 content_key=content_key,
                 subsidy_access_policy_uuid=self.uuid,
+                metadata=metadata,
             )
         else:
             raise ValueError(f"unknown access method {self.access_method}")
 
-    def has_redeemed(self, learner_id, content_key):
+    def has_redeemed(self, lms_user_id, content_key):
         """
         Check if any existing transactions are present in the subsidy
-        for the given learner_id and content_key.
+        for the given lms_user_id and content_key.
         """
         if self.access_method == AccessMethods.DIRECT:
-            return bool(self.transactions_for_learner_and_content(learner_id, content_key)['transactions'])
+            return bool(self.transactions_for_learner_and_content(lms_user_id, content_key)['transactions'])
         else:
             raise ValueError(f"unknown access method {self.access_method}")
 
-    def redemptions(self, learner_id, content_key):
+    def redemptions(self, lms_user_id, content_key):
         """
         Returns any existing transactions the policy's subsidy
-        that are associated with the given learner_id and content_key.
+        that are associated with the given lms_user_id and content_key.
         """
         if self.access_method == AccessMethods.DIRECT:
-            return self.transactions_for_learner_and_content(learner_id, content_key)['transactions']
+            return self.transactions_for_learner_and_content(lms_user_id, content_key)['transactions']
         else:
             raise ValueError(f"unknown access method {self.access_method}")
 
@@ -370,33 +374,37 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
         """
         proxy = True
 
-    def can_redeem(self, learner_id, content_key):
+    def can_redeem(self, lms_user_id, content_key):
         """
-        Checks if the given learner_id has a number of existing subsidy transactions
+        Checks if the given lms_user_id has a number of existing subsidy transactions
         LTE to the learner enrollment cap declared by this policy.
         """
-        has_per_learner_enrollment_limit = self.per_learner_enrollment_limit is not None
+        # perform generic access checks
+        should_attempt_redemption, reason = super().can_redeem(lms_user_id, content_key)
+        if not should_attempt_redemption:
+            return (False, reason)
 
+        has_per_learner_enrollment_limit = self.per_learner_enrollment_limit is not None
         if has_per_learner_enrollment_limit:
             # only retrieve transactions if there is a per-learner enrollment limit
-            learner_transactions_count = len(self.transactions_for_learner(learner_id)['transactions'])
+            learner_transactions_count = len(self.transactions_for_learner(lms_user_id)['transactions'])
             # check whether learner exceeded the per-learner enrollment limit
             if learner_transactions_count >= self.per_learner_enrollment_limit:
                 return (False, REASON_LEARNER_MAX_ENROLLMENTS_REACHED)
 
-        # learner can redeem the subsidy access policy, so perform the generic access checks
-        return super().can_redeem(learner_id, content_key)
+        # learner can redeem the subsidy access policy
+        return (True, None)
 
-    def credit_available(self, learner_id=None):
-        if self.remaining_balance_per_user(learner_id) > 0:
+    def credit_available(self, lms_user_id=None):
+        if self.remaining_balance_per_user(lms_user_id) > 0:
             return True
         return False
 
-    def remaining_balance_per_user(self, learner_id=None):
+    def remaining_balance_per_user(self, lms_user_id=None):
         """
         Returns the remaining redeemable credit for the user.
         """
-        existing_transaction_count = len(self.transactions_for_learner(learner_id)['transactions'])
+        existing_transaction_count = len(self.transactions_for_learner(lms_user_id)['transactions'])
         return self.per_learner_enrollment_limit - existing_transaction_count
 
 
@@ -415,15 +423,20 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
         """
         proxy = True
 
-    def can_redeem(self, learner_id, content_key):
+    def can_redeem(self, lms_user_id, content_key):
         """
         Determines whether learner can redeem a subsidy access policy given the
         limits specified on the policy.
         """
+        # perform generic access checks
+        should_attempt_redemption, reason = super().can_redeem(lms_user_id, content_key)
+        if not should_attempt_redemption:
+            return (False, reason)
+
         has_per_learner_spend_limit = self.per_learner_spend_limit is not None
         if has_per_learner_spend_limit:
             # only retrieve transactions if there is a per-learner spend limit
-            spent_amount = self.transactions_for_learner(learner_id)['aggregates'].get('total_quantity') or 0
+            spent_amount = self.transactions_for_learner(lms_user_id)['aggregates'].get('total_quantity') or 0
             course_price = self.subsidy_client.get_subsidy_content_data(
                 self.enterprise_customer_uuid,
                 content_key
@@ -433,15 +446,15 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
             if (spent_amount + course_price) >= self.per_learner_spend_limit:
                 return (False, REASON_LEARNER_MAX_SPEND_REACHED)
 
-        # learner can redeem the subsidy access policy, so perform the generic access checks
-        return super().can_redeem(learner_id, content_key)
+        # learner can redeem the subsidy access policy
+        return (True, None)
 
-    def credit_available(self, learner_id=None):
-        return self.remaining_balance_per_user(learner_id) > 0
+    def credit_available(self, lms_user_id=None):
+        return self.remaining_balance_per_user(lms_user_id) > 0
 
-    def remaining_balance_per_user(self, learner_id=None):
+    def remaining_balance_per_user(self, lms_user_id=None):
         """
         Returns the remaining redeemable credit for the user.
         """
-        spent_amount = self.transactions_for_learner(learner_id)['aggregates'].get('total_quantity') or 0
+        spent_amount = self.transactions_for_learner(lms_user_id)['aggregates'].get('total_quantity') or 0
         return self.per_learner_spend_limit - spent_amount

@@ -1599,7 +1599,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         """
         query_params = {
             'enterprise_customer_uuid': self.enterprise_uuid,
-            'learner_id': '1234',
+            'lms_user_id': '1234',
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
         }
         response = self.client.get(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, query_params)
@@ -1633,20 +1633,20 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
             },
             {
                 'content_key': ['This field is required.'],
-                'learner_id': ['This field is required.']
+                'lms_user_id': ['This field is required.']
             }
         ),
         (
             {
                 'enterprise_customer_uuid': '12aacfee-8ffa-4cb3-bed1-059565a57f06',
-                'learner_id': '1234',
-                'content_key': 'content_key',
+                'lms_user_id': '1234',
+                'content_key': 'invalid_content_key',
             },
-            {'content_key': ['Invalid course key: content_key']}
+            {'content_key': ['Invalid content_key: invalid_content_key']}
         ),
         (
             {
-                'learner_id': '1234',
+                'lms_user_id': '1234',
                 'content_key': 'content_key',
             },
             {'detail': 'MISSING: requests.has_learner_or_admin_access'}
@@ -1677,8 +1677,33 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.return_value = \
             mock_transaction_record
         payload = {
-            'learner_id': '1234',
+            'lms_user_id': '1234',
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
+        }
+        response = self.client.post(self.subsidy_access_policy_redeem_endpoint, payload)
+        response_json = self.load_json(response.content)
+        assert response_json == mock_transaction_record
+
+    def test_redeem_policy_with_metadata(self):
+        """
+        Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint works as expected
+        """
+        mock_transaction_record = {
+            'uuid': str(uuid4()),
+            'status': 'committed',
+            'other': True,
+        }
+        # HTTPError would be caused by a 404, indicating that a transaction does not already exist for this policy.
+        self.redeemable_policy.get_subsidy_client.return_value.retrieve_subsidy_transaction.side_effect = HTTPError()
+        self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.side_effect = None
+        self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.return_value = \
+            mock_transaction_record
+        payload = {
+            'lms_user_id': '1234',
+            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
+            'metadata': {
+                'geag_first_name': 'John'
+            }
         }
         response = self.client.post(self.subsidy_access_policy_redeem_endpoint, payload)
         response_json = self.load_json(response.content)
@@ -1704,7 +1729,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         }
         query_params = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),
-            'learner_id': '1234',
+            'lms_user_id': '1234',
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
         }
         response = self.client.get(self.subsidy_access_policy_redemption_endpoint, query_params)
@@ -1790,6 +1815,21 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         # only returns 1 policy created in the setup
         assert len(response_json) == 1
 
+    def test_can_redeem_policy_missing_params(self):
+        """
+        Test that the can_redeem endpoint returns an access policy when one is redeemable.
+        """
+        self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {
+                'total_quantity': 0,
+            },
+        }
+        query_params = {}  # Test what happens when we fail to supply a list of content_keys.
+        response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json() == {"content_key": ["This field is required."]}
+
     def test_can_redeem_policy(self):
         """
         Test that the can_redeem endpoint returns an access policy when one is redeemable.
@@ -1804,6 +1844,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
             'content_key': ['course-v1:edX+edXPrivacy101+3T2020', 'course-v1:edX+edXPrivacy101+3T2020_2'],
         }
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+        assert response.status_code == status.HTTP_200_OK
         response_dict = response.json()
 
         # Make sure we got responses for all two content_keys requested.
@@ -1846,6 +1887,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
             'content_key': ['course-v1:edX+edXPrivacy101+3T2020', 'course-v1:edX+edXPrivacy101+3T2020_2'],
         }
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+        assert response.status_code == status.HTTP_200_OK
         response_dict = response.json()
 
         # Check for top-level redeemable_subsidy_access_policy field.
@@ -1892,7 +1934,7 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
                 "uuid": test_transaction_uuid,
                 "state": TransactionStateChoices.COMMITTED,
                 "idempotency_key": "the-idempotency-key",
-                "learner_id": self.user.lms_user_id,
+                "lms_user_id": self.user.lms_user_id,
                 "content_key": "course-v1:demox+1234+2T2023",
                 "quantity": -19900,
                 "unit": "USD_CENTS",
@@ -1907,6 +1949,8 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         }
         query_params = {'content_key': 'course-v1:demox+1234+2T2023'}
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+        assert response.status_code == status.HTTP_200_OK
+        
         response_dict = response.json()
 
         # Make sure we got responses containing existing redemptions.

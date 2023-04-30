@@ -66,8 +66,16 @@ class SubsidyAccessPolicyTests(TestCase):
         cls.per_learner_enroll_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             per_learner_enrollment_limit=5,
         )
+        cls.inactive_per_learner_enroll_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            per_learner_enrollment_limit=5,
+            active=False,
+        )
         cls.per_learner_spend_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
-            per_learner_spend_limit=500
+            per_learner_spend_limit=500,
+        )
+        cls.inactive_per_learner_spend_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            per_learner_spend_limit=500,
+            active=False,
         )
 
     def test_can_not_create_parent_model_object(self, *args):
@@ -129,6 +137,7 @@ class SubsidyAccessPolicyTests(TestCase):
             # Happy path: content in catalog, learner in enterprise, subsidy has value,
             # existing transactions for learner below the policy limit.
             # Expected can_redeem result: True
+            'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': True,
@@ -138,6 +147,7 @@ class SubsidyAccessPolicyTests(TestCase):
         {
             # Content not in catalog, every other check would succeed.
             # Expected can_redeem result: False
+            'policy_is_active': True,
             'catalog_contains_content': False,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': True,
@@ -147,6 +157,7 @@ class SubsidyAccessPolicyTests(TestCase):
         {
             # Learner is not in the enterprise, every other check would succeed.
             # Expected can_redeem result: False
+            'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': False,
             'subsidy_is_redeemable': True,
@@ -156,6 +167,7 @@ class SubsidyAccessPolicyTests(TestCase):
         {
             # The subsidy is not redeemable, every other check would succeed.
             # Expected can_redeem result: False
+            'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': False,
@@ -166,6 +178,7 @@ class SubsidyAccessPolicyTests(TestCase):
             # The subsidy is redeemable, but the learner has already enrolled more than the limit.
             # Every other check would succeed.
             # Expected can_redeem result: False
+            'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': True,
@@ -178,10 +191,24 @@ class SubsidyAccessPolicyTests(TestCase):
                 "The learner's maximum number of enrollments given by this subsidy access policy has been reached."
             ),
         },
+        {
+            # The subsidy access policy is not active, every other check would succeed.
+            # Expected can_redeem result: False
+            'policy_is_active': False,
+            'catalog_contains_content': True,
+            'enterprise_contains_learner': True,
+            'subsidy_is_redeemable': True,
+            'transactions_for_learner': {'results': [], 'aggregates': {}},
+            'expected_policy_can_redeem': (
+                False,
+                "Subsidy access policy is not active."
+            ),
+        },
     )
     @ddt.unpack
     def test_learner_enrollment_cap_policy_can_redeem(
         self,
+        policy_is_active,
         catalog_contains_content,
         enterprise_contains_learner,
         subsidy_is_redeemable,
@@ -199,16 +226,19 @@ class SubsidyAccessPolicyTests(TestCase):
             'content_price': 200,
         }
 
-        self.assertEqual(
-            self.per_learner_enroll_policy.can_redeem(self.user, self.course_id),
-            expected_policy_can_redeem
+        actual_policy_can_redeem = (
+            self.per_learner_enroll_policy.can_redeem(self.user, self.course_id)
+            if policy_is_active else self.inactive_per_learner_enroll_policy.can_redeem(self.user, self.course_id)
         )
+
+        self.assertEqual(actual_policy_can_redeem, expected_policy_can_redeem)
 
     @ddt.data(
         {
             # Happy path: content in catalog, learner in enterprise, subsidy has value,
             # existing transactions for learner below the policy limit.
             # Expected can_redeem result: True
+            'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': True,
@@ -218,6 +248,7 @@ class SubsidyAccessPolicyTests(TestCase):
         {
             # Content not in catalog, every other check would succeed.
             # Expected can_redeem result: False
+            'policy_is_active': True,
             'catalog_contains_content': False,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': True,
@@ -227,6 +258,7 @@ class SubsidyAccessPolicyTests(TestCase):
         {
             # Learner is not in the enterprise, every other check would succeed.
             # Expected can_redeem result: False
+            'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': False,
             'subsidy_is_redeemable': True,
@@ -236,6 +268,7 @@ class SubsidyAccessPolicyTests(TestCase):
         {
             # The subsidy is not redeemable, every other check would succeed.
             # Expected can_redeem result: False
+            'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': False,
@@ -246,6 +279,7 @@ class SubsidyAccessPolicyTests(TestCase):
             # The subsidy is redeemable, but the learner has already enrolled more than the limit.
             # Every other check would succeed.
             # Expected can_redeem result: False
+            'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': True,
@@ -258,10 +292,24 @@ class SubsidyAccessPolicyTests(TestCase):
                 "The learner's maximum spend in this subsidy access policy has been reached."
             ),
         },
+        {
+            # The subsidy access policy is not active, every other check would succeed.
+            # Expected can_redeem result: False
+            'policy_is_active': False,
+            'catalog_contains_content': True,
+            'enterprise_contains_learner': True,
+            'subsidy_is_redeemable': True,
+            'transactions_for_learner': {'results': [], 'aggregates': {}},
+            'expected_policy_can_redeem': (
+                False,
+                "Subsidy access policy is not active."
+            ),
+        },
     )
     @ddt.unpack
     def test_learner_spend_cap_policy_can_redeem(
         self,
+        policy_is_active,
         catalog_contains_content,
         enterprise_contains_learner,
         subsidy_is_redeemable,
@@ -279,10 +327,12 @@ class SubsidyAccessPolicyTests(TestCase):
             'content_price': 200,
         }
 
-        self.assertEqual(
-            self.per_learner_spend_policy.can_redeem(self.user, self.course_id),
-            expected_policy_can_redeem
+        actual_policy_can_redeem = (
+            self.per_learner_spend_policy.can_redeem(self.user, self.course_id)
+            if policy_is_active else self.inactive_per_learner_spend_policy.can_redeem(self.user, self.course_id)
         )
+
+        self.assertEqual(actual_policy_can_redeem, expected_policy_can_redeem)
 
     def test_acquire_lock_release_lock_no_kwargs(self):
         """
