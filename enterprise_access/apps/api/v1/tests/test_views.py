@@ -1950,7 +1950,6 @@ class TestSubsidyAccessPolicyRedeemViewset(TestSubsidyRequestViewSet):
         query_params = {'content_key': 'course-v1:demox+1234+2T2023'}
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
         assert response.status_code == status.HTTP_200_OK
-        
         response_dict = response.json()
 
         # Make sure we got responses containing existing redemptions.
