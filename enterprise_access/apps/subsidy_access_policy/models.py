@@ -6,12 +6,13 @@ import sys
 from contextlib import contextmanager
 from uuid import uuid4
 
+from django.conf import settings
 from django.core.cache import cache as django_cache
 from django.db import models
 from django.utils.functional import cached_property
 from django_extensions.db.models import TimeStampedModel
 from edx_django_utils.cache.utils import get_cache_key
-from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient
+from edx_enterprise_subsidy_client import get_enterprise_subsidy_api_client
 from simple_history.models import HistoricalRecords
 
 from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
@@ -107,7 +108,10 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         A request-cached EnterpriseSubsidyAPIClient instance.
         """
-        return EnterpriseSubsidyAPIClient()
+        kwargs = {}
+        if getattr(settings, 'ENTERPRISE_SUBSIDY_API_CLIENT_VERSION', None):
+            kwargs['version'] = int(settings.ENTERPRISE_SUBSIDY_API_CLIENT_VERSION)
+        return get_enterprise_subsidy_api_client(**kwargs)
 
     @property
     def subsidy_client(self):

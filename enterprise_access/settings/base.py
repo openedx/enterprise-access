@@ -435,3 +435,6 @@ BRAZE_AUTO_DECLINE_NOTIFICATION_CAMPAIGN = ''
 BRAZE_API_URL = ''
 BRAZE_API_KEY = os.environ.get('BRAZE_API_KEY', '')
 BRAZE_APP_ID = os.environ.get('BRAZE_APP_ID', '')
+
+# Enterprise Subsidy API Client settings
+ENTERPRISE_SUBSIDY_API_CLIENT_VERSION = 2
