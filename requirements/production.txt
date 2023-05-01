@@ -127,7 +127,7 @@ django-crum==0.7.9
     #   edx-rbac
 django-extensions==3.2.1
     # via -r requirements/base.txt
-django-filter==23.1
+django-filter==23.2
     # via -r requirements/base.txt
 django-model-utils==4.3.1
     # via
@@ -183,7 +183,7 @@ edx-drf-extensions==8.7.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.2.6
+edx-enterprise-subsidy-client==0.3.0
     # via -r requirements/base.txt
 edx-opaque-keys[django]==2.3.0
     # via
