@@ -154,7 +154,7 @@ django-dynamic-fixture==3.1.2
     # via -r requirements/test.in
 django-extensions==3.2.1
     # via -r requirements/base.txt
-django-filter==23.1
+django-filter==23.2
     # via -r requirements/base.txt
 django-model-utils==4.3.1
     # via
@@ -212,7 +212,7 @@ edx-drf-extensions==8.7.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.2.6
+edx-enterprise-subsidy-client==0.3.0
     # via -r requirements/base.txt
 edx-lint==5.3.4
     # via -r requirements/test.in
@@ -539,7 +539,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.22.0
+virtualenv==20.23.0
     # via tox
 wcwidth==0.2.6
     # via

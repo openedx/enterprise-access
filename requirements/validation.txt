@@ -204,7 +204,7 @@ django-extensions==3.2.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-django-filter==23.1
+django-filter==23.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -291,7 +291,7 @@ edx-drf-extensions==8.7.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.2.6
+edx-enterprise-subsidy-client==0.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -816,7 +816,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.22.0
+virtualenv==20.23.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
