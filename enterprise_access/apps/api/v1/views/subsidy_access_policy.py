@@ -8,8 +8,8 @@ from contextlib import suppress
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.http.request import QueryDict
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient
 from edx_rbac.mixins import PermissionRequiredMixin
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
@@ -42,6 +42,16 @@ from .utils import PaginationWithPageCount
 logger = logging.getLogger(__name__)
 
 
+@extend_schema_view(
+    retrieve=extend_schema(
+        tags=['Subsidy Access Policy CRUD'],
+        summary='Retrieve subsidy access policy.',
+    ),
+    delete=extend_schema(
+        tags=['Subsidy Access Policy CRUD'],
+        summary='Delete subsidy access policy.',
+    ),
+)
 class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelViewSet):
     """
      Viewset for Subsidy Access Policy CRUD operations.
@@ -83,6 +93,10 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         """
         return self.requested_enterprise_customer_uuid
 
+    @extend_schema(
+        tags=['Subsidy Access Policy CRUD'],
+        summary='Create subsidy access policy.',
+    )
     def create(self, request, *args, **kwargs):
         """
         create action for SubsidyAccessPolicyCRUDViewset. Handles creation of policy after validation
@@ -97,6 +111,10 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @extend_schema(
+        tags=['Subsidy Access Policy CRUD'],
+        summary='Update subsidy access policy.',
+    )
     def partial_update(self, request, *args, **kwargs):
         """
         Used for http patch method. Updates the policy data passed in request after validation.
@@ -115,6 +133,10 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         )
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
+    @extend_schema(
+        tags=['Subsidy Access Policy CRUD'],
+        summary='List subsidy access policy.',
+    )
     def list(self, request, *args, **kwargs):
         """
         List action for SubsidyAccessPolicyCRUDViewset. Show all policies linked with the group uuid passed in request.
@@ -164,6 +186,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
     permission_classes = [permissions.IsAuthenticated]
     lookup_url_kwarg = 'policy_uuid'
     permission_required = 'requests.has_learner_or_admin_access'
+    http_method_names = ['get', 'post']
 
     @property
     def enterprise_customer_uuid(self):
@@ -242,6 +265,12 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
         return policies
 
+    @extend_schema(
+        tags=['Subsidy Access Policy Redemption'],
+        summary='List credits available.',
+        parameters=[serializers.SubsidyAccessPolicyCreditsAvailableRequestSerializer],
+        responses=serializers.SubsidyAccessPolicyCreditsAvailableResponseSerializer(many=True),
+    )
     @action(detail=False, methods=['get'])
     def credits_available(self, request):
         """
@@ -266,6 +295,12 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(
+        tags=['Subsidy Access Policy Redemption'],
+        summary='List redeemable policies.',
+        parameters=[serializers.SubsidyAccessPolicyListRequestSerializer],
+        responses=serializers.SubsidyAccessPolicyRedeemableResponseSerializer(many=True),
+    )
     def list(self, request):
         """
         Return a list of all redeemable policies for given `enterprise_customer_uuid`, `lms_user_id` and `content_key`
@@ -285,6 +320,11 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(
+        tags=['Subsidy Access Policy Redemption'],
+        summary='Redeem with a policy.',
+        request=serializers.SubsidyAccessPolicyRedeemRequestSerializer,
+    )
     @action(detail=True, methods=['post'])
     def redeem(self, request, *args, **kwargs):
         """
@@ -400,6 +440,11 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
         return redemptions_by_policy_uuid
 
+    @extend_schema(
+        tags=['Subsidy Access Policy Redemption'],
+        summary='Retrieve redemption.',
+        parameters=[serializers.SubsidyAccessPolicyRedemptionRequestSerializer],
+    )
     @action(detail=False, methods=['get'])
     def redemption(self, request, *args, **kwargs):
         """
@@ -419,33 +464,34 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(
+        tags=['Subsidy Access Policy Redemption'],
+        summary='Can redeem.',
+        parameters=[serializers.SubsidyAccessPolicyCanRedeemRequestSerializer],
+    )
     @action(
         detail=False,
         methods=['get'],
         url_name='can-redeem',
-        # TODO: more precise UUID pattern?
         url_path='enterprise-customer/(?P<enterprise_customer_uuid>[^/.]+)/can-redeem',
     )
-    def can_redeem(self, request, enterprise_customer_uuid=None):
+    def can_redeem(self, request, enterprise_customer_uuid):
         """
-        Retrieve single, redeemable access policy for a set of content keys.
+        Within a specified enterprise customer, retrieves a single, redeemable access policy (or null)
+        for each ``content_key`` in a provided list of content keys.
 
-        URL Location: GET /api/v1/policy/enterprise-customer/<enterprise_customer_uuid>/can-redeem/
-                          ?content_key=<>&content_key=<>&...&content_key=<>
+        Returns ``rest_framework.response.Response``:
 
-        Request Args:
-            enterprise_customer_uuid (URL, required): The enterprise customer to answer this question about.
-            content_key (query parameter, multiple, required): Possibly multiple content_keys to run this query against.
-
-        Returns:
-            rest_framework.response.Response:
                 400: If there are missing or otherwise invalid input parameters.  Response body is JSON with a single
                      `Error` key.
+
                 403: If the requester has insufficient permissions, Response body is JSON with a single `Error` key.
+
                 201: If a redeemable access policy was found, an existing redemption was found, or neither.  Response
                      body is a JSON list of dict containing redemption evaluations for each given content_key.  See
                      below for a sample response to 3 passed content_keys: one which has existing redemptions, one
-                     without, and a third that is not redeemable.:
+                     without, and a third that is not redeemable.
+
                      [
                          {
                              "content_key": "course-v1:demox+1234+2T2023_1",
@@ -489,13 +535,9 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                          ...
                      ]
         """
-        all_request_params = QueryDict(mutable=True)
-        all_request_params.update(request.query_params)
-        all_request_params.update({"enterprise_customer_uuid": enterprise_customer_uuid})
-        serializer = serializers.SubsidyAccessPolicyCanRedeemRequestSerializer(data=all_request_params)
+        serializer = serializers.SubsidyAccessPolicyCanRedeemRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
-        enterprise_customer_uuid = serializer.data['enterprise_customer_uuid']
         content_keys = serializer.data['content_key']
         lms_user_id = self.lms_user_id
 

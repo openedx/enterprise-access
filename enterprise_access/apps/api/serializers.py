@@ -266,8 +266,15 @@ class SubsidyAccessPolicyCanRedeemRequestSerializer(ValidateContentKeyMixin, ser
 
     For view: SubsidyAccessPolicyRedeemViewset.can_redeem
     """
-    enterprise_customer_uuid = serializers.UUIDField(required=True)
-    content_key = serializers.ListField(child=serializers.CharField(required=True), allow_empty=False)
+    # enterprise_customer_uuid = serializers.UUIDField(
+    #     required=False,
+    #     help_text='The enterprise customer UUID under which policies will be queried for redeemability.',
+    # )
+    content_key = serializers.ListField(
+        child=serializers.CharField(required=True),
+        allow_empty=False,
+        help_text='Content keys about which redeemability will be queried.',
+    )
 
 
 class SubsidyAccessPolicyRedeemableResponseSerializer(serializers.ModelSerializer):

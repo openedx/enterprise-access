@@ -9,6 +9,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from requests.exceptions import ConnectionError as RequestConnectionError
@@ -189,6 +190,24 @@ class SubsidyRequestViewSet(UserDetailsFromJwtMixin, viewsets.ModelViewSet):
         return Response(requests_overview, status=status.HTTP_200_OK)
 
 
+@extend_schema_view(
+    retrieve=extend_schema(
+        tags=['License Requests'],
+        summary='License request retrieve.',
+    ),
+    list=extend_schema(
+        tags=['License Requests'],
+        summary='License request list.',
+    ),
+    create=extend_schema(
+        tags=['License Requests'],
+        summary='License request create.',
+    ),
+    overview=extend_schema(
+        tags=['License Requests'],
+        summary='License request overview.',
+    ),
+)
 class LicenseRequestViewSet(SubsidyRequestViewSet):
     """
     Viewset for license requests
@@ -269,6 +288,10 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
             )
             raise SubsidyRequestError(error_msg, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
+    @extend_schema(
+        tags=['License Requests'],
+        summary='License request approve.',
+    )
     @permission_required(
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
         fn=get_enterprise_uuid_from_request_data,
@@ -343,6 +366,10 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(
+        tags=['License Requests'],
+        summary='License request deny.',
+    )
     @permission_required(
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
         fn=get_enterprise_uuid_from_request_data,
@@ -426,6 +453,24 @@ class LicenseRequestViewSet(SubsidyRequestViewSet):
         )
 
 
+@extend_schema_view(
+    retrieve=extend_schema(
+        tags=['Coupon Code Requests'],
+        summary='Coupon Code request retrieve.',
+    ),
+    list=extend_schema(
+        tags=['Coupon Code Requests'],
+        summary='Coupon Code request list.',
+    ),
+    create=extend_schema(
+        tags=['Coupon Code Requests'],
+        summary='Coupon Code request create.',
+    ),
+    overview=extend_schema(
+        tags=['Coupon Code Requests'],
+        summary='Coupon Code request overview.',
+    ),
+)
 class CouponCodeRequestViewSet(SubsidyRequestViewSet):
     """
     Viewset for coupon code requests
@@ -479,6 +524,10 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             error_msg = 'Not enough codes available for coupon {coupon_id} to approve the requests'
             raise SubsidyRequestError(error_msg, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
+    @extend_schema(
+        tags=['Coupon Code Requests'],
+        summary='Coupon Code request approve.',
+    )
     @permission_required(
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
         fn=get_enterprise_uuid_from_request_data,
@@ -556,6 +605,10 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(
+        tags=['Coupon Code Requests'],
+        summary='Coupon Code request deny.',
+    )
     @action(detail=False, url_path='decline', methods=['post'])
     def decline(self, *args, **kwargs):
         """
@@ -637,6 +690,16 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         )
 
 
+@extend_schema_view(
+    retrieve=extend_schema(
+        tags=['Subsidy Request Configuration'],
+        summary='Retrieve customer config.',
+    ),
+    list=extend_schema(
+        tags=['Subsidy Request Configuration'],
+        summary='List customer config.',
+    ),
+)
 class SubsidyRequestCustomerConfigurationViewSet(UserDetailsFromJwtMixin, viewsets.ModelViewSet):
     """ Viewset for customer configurations."""
 
@@ -653,6 +716,10 @@ class SubsidyRequestCustomerConfigurationViewSet(UserDetailsFromJwtMixin, viewse
 
     http_method_names = ['get', 'post', 'patch']
 
+    @extend_schema(
+        tags=['Subsidy Request Configuration'],
+        summary='Create customer config.',
+    )
     @permission_required(
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
         fn=get_enterprise_uuid_from_request_data,
@@ -666,6 +733,10 @@ class SubsidyRequestCustomerConfigurationViewSet(UserDetailsFromJwtMixin, viewse
         )
         return response
 
+    @extend_schema(
+        tags=['Subsidy Request Configuration'],
+        summary='Update customer config.',
+    )
     @permission_required(
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
         fn=lambda request, pk: pk
