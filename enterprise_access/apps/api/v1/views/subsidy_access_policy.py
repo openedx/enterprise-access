@@ -45,11 +45,13 @@ logger = logging.getLogger(__name__)
 @extend_schema_view(
     retrieve=extend_schema(
         tags=['Subsidy Access Policy CRUD'],
-        summary='Retrieve subsidy access policy.',
+        summary='Retrieve subsidy access policy',
+        description='Retrieves a single subsidy access policy record, given its UUID.',
     ),
-    delete=extend_schema(
+    destroy=extend_schema(
         tags=['Subsidy Access Policy CRUD'],
-        summary='Delete subsidy access policy.',
+        summary='Delete subsidy access policy',
+        description='De-activates the requested subsidy access policy record.'
     ),
 )
 class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelViewSet):
@@ -99,7 +101,7 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
     )
     def create(self, request, *args, **kwargs):
         """
-        create action for SubsidyAccessPolicyCRUDViewset. Handles creation of policy after validation
+        Creates a new ``SubsidyAccessPolicy`` record.
         """
         policy_data = request.data
         serializer = self.get_serializer(data=policy_data)
