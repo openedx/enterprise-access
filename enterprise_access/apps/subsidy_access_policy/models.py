@@ -4,7 +4,7 @@ Models for subsidy_access_policy
 import functools
 import sys
 from contextlib import contextmanager
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from django.conf import settings
 from django.core.cache import cache as django_cache
@@ -50,26 +50,44 @@ class SubsidyAccessPolicy(TimeStampedModel):
     """
 
     POLICY_FIELD_NAME = 'policy_type'
-    policy_type = models.CharField(max_length=64, editable=False)
+    policy_type = models.CharField(
+        max_length=64,
+        editable=False,
+        help_text='The type of this policy (e.g. the name of an access policy proxy model).'
+    )
 
     uuid = models.UUIDField(
         primary_key=True,
         default=uuid4,
         editable=False,
         unique=True,
+        help_text='The uuid that uniquely identifies this policy record.',
     )
     enterprise_customer_uuid = models.UUIDField(
         db_index=True,
-        null=True,
+        null=False,
         blank=False,
+        # This field should, in practice, never be null.
+        # However, we are retroactively requiring it and need a default
+        # for the sake of the historical table.
+        default=UUID('0' * 32),
         help_text=(
             "The owning Enterprise Customer's UUID.  Cannot be blank or null."
         ),
     )
     description = models.TextField(help_text="Brief description about a specific policy.")
-    active = models.BooleanField(default=False)
-    catalog_uuid = models.UUIDField(db_index=True)
-    subsidy_uuid = models.UUIDField(db_index=True)
+    active = models.BooleanField(
+        default=False,
+        help_text='Whether this policy is active, defaults to false.',
+    )
+    catalog_uuid = models.UUIDField(
+        db_index=True,
+        help_text='The primary identifier of the catalog associated with this policy.',
+    )
+    subsidy_uuid = models.UUIDField(
+        db_index=True,
+        help_text='The primary identifier of the subsidy associated with this policy.',
+    )
     group_uuid = models.UUIDField(
         db_index=True,
         null=True,
@@ -82,22 +100,37 @@ class SubsidyAccessPolicy(TimeStampedModel):
         max_length=32,
         choices=AccessMethods.CHOICES,
         default=AccessMethods.DIRECT,
+        help_text='The mechanism by which learners access content in this policy, defaults to "direct".',
     )
 
     per_learner_enrollment_limit = models.IntegerField(
         null=True,
         blank=True,
         default=None,
+        help_text=(
+            'The maximum number of enrollments allowed for a single learner under this policy. '
+            'Defaults to null, which means that no such maximum exists.'
+        ),
     )
     per_learner_spend_limit = models.IntegerField(
         null=True,
         blank=True,
         default=None,
+        help_text=(
+            'The maximum amount of allowed money spent for a single learner under this policy. '
+            'Denoted in USD cents. '
+            'Defaults to null, which means that no such maximum exists.'
+        ),
     )
     spend_limit = models.IntegerField(
         null=True,
         blank=True,
         default=None,
+        help_text=(
+            'The maximum number of allowed dollars to be spent, in aggregate, by all learners '
+            'under this policy. Denoted in USD cents. '
+            'Defaults to null, which means that no such maximum exists.'
+        ),
     )
 
     history = HistoricalRecords()
