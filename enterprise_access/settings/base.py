@@ -4,6 +4,8 @@ from os.path import abspath, dirname, join
 from corsheaders.defaults import default_headers as corsheaders_default_headers
 
 from enterprise_access.apps.core.constants import (
+    POLICY_ADMIN_ROLE,
+    POLICY_LEARNER_ROLE,
     REQUESTS_ADMIN_ROLE,
     REQUESTS_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -295,9 +297,9 @@ EDX_DRF_EXTENSIONS = {
 
 # Set up system-to-feature roles mapping for edx-rbac
 SYSTEM_TO_FEATURE_ROLE_MAPPING = {
-    SYSTEM_ENTERPRISE_OPERATOR_ROLE: [REQUESTS_ADMIN_ROLE],
-    SYSTEM_ENTERPRISE_ADMIN_ROLE: [REQUESTS_ADMIN_ROLE],
-    SYSTEM_ENTERPRISE_LEARNER_ROLE: [REQUESTS_LEARNER_ROLE],
+    SYSTEM_ENTERPRISE_OPERATOR_ROLE: [POLICY_ADMIN_ROLE, REQUESTS_ADMIN_ROLE],
+    SYSTEM_ENTERPRISE_ADMIN_ROLE: [POLICY_ADMIN_ROLE, REQUESTS_ADMIN_ROLE],
+    SYSTEM_ENTERPRISE_LEARNER_ROLE: [POLICY_LEARNER_ROLE, REQUESTS_LEARNER_ROLE],
 }
 
 # Request the user's permissions in the ID token
