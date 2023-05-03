@@ -143,3 +143,6 @@ dmypy.json
 
 # VSCode
 .vscode
+
+# Generated docs not useful
+docs/generated/

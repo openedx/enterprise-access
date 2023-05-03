@@ -6,6 +6,8 @@ from uuid import UUID
 
 from rest_framework.exceptions import ParseError
 
+from enterprise_access.apps.subsidy_access_policy.api import get_subsidy_access_policy
+
 
 def get_enterprise_uuid_from_query_params(request):
     """
@@ -47,3 +49,14 @@ def validate_uuid(uuid):
         return UUID(uuid)
     except ValueError as ex:
         raise ParseError('{} is not a valid uuid.'.format(uuid)) from ex
+
+
+def get_policy_customer_uuid(policy_uuid):
+    """
+    Given a policy uuid, returns the corresponding, string-ified
+    customer uuid associated with that policy, if found.
+    """
+    policy = get_subsidy_access_policy(policy_uuid)
+    if policy:
+        return str(policy.enterprise_customer_uuid)
+    return None

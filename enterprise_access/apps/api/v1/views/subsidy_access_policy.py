@@ -11,9 +11,12 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient
+from edx_rbac.decorators import permission_required
 from edx_rbac.mixins import PermissionRequiredMixin
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
-from rest_framework import filters, permissions
+from rest_framework import authentication
+from rest_framework import filters as rest_filters
+from rest_framework import permissions
 from rest_framework import serializers as rest_serializers
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -21,8 +24,9 @@ from rest_framework.exceptions import APIException
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
-from enterprise_access.apps.api import serializers
+from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.mixins import UserDetailsFromJwtMixin
+from enterprise_access.apps.core.constants import POLICY_READ_PERMISSION
 from enterprise_access.apps.events.signals import ACCESS_POLICY_CREATED, ACCESS_POLICY_UPDATED, SUBSIDY_REDEEMED
 from enterprise_access.apps.events.utils import (
     send_access_policy_event_to_event_bus,
@@ -42,25 +46,81 @@ from .utils import PaginationWithPageCount
 logger = logging.getLogger(__name__)
 
 
+SUBSIDY_ACCESS_POLICY_CRUD_API_TAG = 'DEPRECATED: Subsidy Access Policy views'
+SUBSIDY_ACCESS_POLICY_READ_ONLY_API_TAG = 'subsidy-access-policies read-only'
+
+
+def policy_permission_retrieve_fn(request, *args, uuid=None):
+    """
+    Helper to use with @permission_required when retrieving a policy record.
+    """
+    return utils.get_policy_customer_uuid(uuid)
+
+
+class SubsidyAccessPolicyReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Read-only viewset for listing or retrieving ``SubsidyAccessPolicy`` records.
+    """
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = serializers.SubsidyAccessPolicyResponseSerializer
+    authentication_classes = (JwtAuthentication, authentication.SessionAuthentication)
+    filter_backends = (filters.NoFilterOnRetrieveBackend,)
+    filterset_class = filters.SubsidyAccessPolicyFilter
+    pagination_class = PaginationWithPageCount
+    lookup_field = 'uuid'
+
+    def get_queryset(self):
+        """
+        A base queryset to list or retrieve `SubsidyAccessPolicy` records.
+        """
+        return SubsidyAccessPolicy.objects.all()
+
+    @extend_schema(
+        tags=[SUBSIDY_ACCESS_POLICY_READ_ONLY_API_TAG],
+        summary='Retrieve subsidy access policy by UUID.',
+    )
+    @permission_required(POLICY_READ_PERMISSION, fn=policy_permission_retrieve_fn)
+    def retrieve(self, request, *args, uuid=None, **kwargs):
+        """
+        Retrieves a single `SubsidyAccessPolicy` record by uuid.
+        """
+        return super().retrieve(request, *args, uuid=uuid, **kwargs)
+
+    @extend_schema(
+        tags=[SUBSIDY_ACCESS_POLICY_READ_ONLY_API_TAG],
+        summary='List subsidy access policies for an enterprise customer.',
+    )
+    @permission_required(
+        POLICY_READ_PERMISSION,
+        fn=lambda request: request.query_params.get('enterprise_customer_uuid')
+    )
+    def list(self, request, *args, **kwargs):
+        """
+        Lists `SubsidyAccessPolicy` records, filtered by the
+        given query parameters.
+        """
+        return super().list(request, *args, **kwargs)
+
+
 @extend_schema_view(
     retrieve=extend_schema(
-        tags=['Subsidy Access Policy CRUD'],
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
         summary='Retrieve subsidy access policy.',
     ),
     delete=extend_schema(
-        tags=['Subsidy Access Policy CRUD'],
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
         summary='Delete subsidy access policy.',
     ),
 )
 class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelViewSet):
     """
-     Viewset for Subsidy Access Policy CRUD operations.
+     DEPRECATED: Viewset for Subsidy Access Policy CRUD operations.
      """
 
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = serializers.SubsidyAccessPolicyCRUDSerializer
     authentication_classes = (JwtAuthentication,)
-    filter_backends = (filters.OrderingFilter, DjangoFilterBackend,)
+    filter_backends = (rest_filters.OrderingFilter, DjangoFilterBackend,)
     filterset_fields = ('enterprise_customer_uuid', 'policy_type',)
     pagination_class = PaginationWithPageCount
     http_method_names = ['get', 'post', 'patch', 'delete']
@@ -94,7 +154,7 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         return self.requested_enterprise_customer_uuid
 
     @extend_schema(
-        tags=['Subsidy Access Policy CRUD'],
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
         summary='Create subsidy access policy.',
     )
     def create(self, request, *args, **kwargs):
@@ -112,7 +172,7 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
-        tags=['Subsidy Access Policy CRUD'],
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
         summary='Update subsidy access policy.',
     )
     def partial_update(self, request, *args, **kwargs):
@@ -134,7 +194,7 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
     @extend_schema(
-        tags=['Subsidy Access Policy CRUD'],
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
         summary='List subsidy access policy.',
     )
     def list(self, request, *args, **kwargs):
