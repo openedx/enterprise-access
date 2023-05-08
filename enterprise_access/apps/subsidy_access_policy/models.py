@@ -140,7 +140,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
     @functools.lru_cache(maxsize=None)
     def get_subsidy_client(cls):
         """
-        A request-cached EnterpriseSubsidyAPIClient instance.
+        A process-cached EnterpriseSubsidyAPIClient instance.
         """
         kwargs = {}
         if getattr(settings, 'ENTERPRISE_SUBSIDY_API_CLIENT_VERSION', None):
@@ -154,14 +154,14 @@ class SubsidyAccessPolicy(TimeStampedModel):
     @cached_property
     def catalog_client(self):
         """
-        A request-cached EnterpriseCatalogApiClient instance.
+        A process-cached EnterpriseCatalogApiClient instance.
         """
         return EnterpriseCatalogApiClient()
 
     @cached_property
     def lms_api_client(self):
         """
-        A request-cached LmsApiClient instance.
+        A process-cached LmsApiClient instance.
         """
         return LmsApiClient()
 
@@ -253,6 +253,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         # TODO: can we rely on JWT roles to check this?
         if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
             return (False, REASON_LEARNER_NOT_IN_ENTERPRISE)
+        # FIXME: self.subsidy_client.can_redeem() returns a dictionary, not a bool!
         if not self.subsidy_client.can_redeem(self.subsidy_uuid, lms_user_id, content_key):
             return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
 

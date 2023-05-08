@@ -1,16 +1,18 @@
 """
 REST API views for the subsidy_access_policy app.
 """
+import functools
 import logging
 import os
 from collections import defaultdict
 from contextlib import suppress
 
+import requests
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient
+from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient, get_enterprise_subsidy_api_client
 from edx_rbac.decorators import permission_required
 from edx_rbac.mixins import PermissionRequiredMixin
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
@@ -255,6 +257,21 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
     lookup_url_kwarg = 'policy_uuid'
     permission_required = 'requests.has_learner_or_admin_access'
     http_method_names = ['get', 'post']
+
+    @classmethod
+    @functools.lru_cache(maxsize=None)
+    def get_subsidy_client(cls):
+        """
+        A process-cached EnterpriseSubsidyAPIClient instance.
+        """
+        kwargs = {}
+        if getattr(settings, 'ENTERPRISE_SUBSIDY_API_CLIENT_VERSION', None):
+            kwargs['version'] = int(settings.ENTERPRISE_SUBSIDY_API_CLIENT_VERSION)
+        return get_enterprise_subsidy_api_client(**kwargs)
+
+    @property
+    def subsidy_client(self):
+        return self.get_subsidy_client()
 
     @property
     def enterprise_customer_uuid(self):
@@ -565,12 +582,19 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         tags=['Subsidy Access Policy Redemption'],
         summary='Can redeem.',
         parameters=[serializers.SubsidyAccessPolicyCanRedeemRequestSerializer],
+        responses={
+            status.HTTP_200_OK: serializers.SubsidyAccessPolicyCanRedeemElementResponseSerializer(many=True),
+            # TODO: refine these other possible responses:
+            # status.HTTP_403_FORBIDDEN: PermissionDenied,
+            # status.HTTP_404_NOT_FOUND: NotFound,
+        },
     )
     @action(
         detail=False,
         methods=['get'],
         url_name='can-redeem',
         url_path='enterprise-customer/(?P<enterprise_customer_uuid>[^/.]+)/can-redeem',
+        pagination_class=None,
     )
     def can_redeem(self, request, enterprise_customer_uuid):
         """
@@ -584,53 +608,9 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
                 403: If the requester has insufficient permissions, Response body is JSON with a single `Error` key.
 
-                201: If a redeemable access policy was found, an existing redemption was found, or neither.  Response
+                200: If a redeemable access policy was found, an existing redemption was found, or neither.  Response
                      body is a JSON list of dict containing redemption evaluations for each given content_key.  See
-                     below for a sample response to 3 passed content_keys: one which has existing redemptions, one
-                     without, and a third that is not redeemable.
-
-                     [
-                         {
-                             "content_key": "course-v1:demox+1234+2T2023_1",
-                             "redemptions": [
-                                 {
-                                     "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-                                     "state": "committed",
-                                     "policy_redemption_status_url": <API URL to check the redemtion status>,
-                                     "courseware_url": <URL to the courseware page>,
-                                     <remainder of serialized Transaction>
-                                 },
-                             ],
-                             "subsidy_access_policy": {
-                                 "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-                                 "policy_redemption_url": <API URL to redeem the policy>,
-                                 <remainder of serialized SubsidyAccessPolicy>
-                             },
-                             "reasons": []
-                         },
-                         {
-                             "content_key": "course-v1:demox+1234+2T2023_2",
-                             "redemptions": [],
-                             "subsidy_access_policy": {
-                                 "uuid": "56744a36-93ac-4e6c-b998-a2a1899f2ae4",
-                                 "policy_redemption_url": <API URL to redeem the policy>,
-                                 <remainder of serialized SubsidyAccessPolicy>
-                             },
-                             "reasons": []
-                         },
-                         {
-                             "content_key": "course-v1:demox+1234+2T2023_3",
-                             "redemptions": [],
-                             "subsidy_access_policy": null,
-                             "reasons": [
-                                 {
-                                     "reason": "Not enough funds available for the course.",
-                                     "policy_uuids": ["56744a36-93ac-4e6c-b998-a2a1899f2ae4"],
-                                 }
-                             ]
-                         }
-                         ...
-                     ]
+                     redoc for a sample response.
         """
         serializer = serializers.SubsidyAccessPolicyCanRedeemRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
@@ -638,11 +618,11 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         content_keys = serializer.data['content_key']
         lms_user_id = self.lms_user_id
 
-        response = []
+        element_responses = []
         for content_key in content_keys:
-            serialized_policy = None
             reasons = []
 
+            # Look for any existing redemptions for this learner and content.
             redemptions_by_policy_uuid = self.get_redemptions_by_policy_uuid(
                 enterprise_customer_uuid,
                 lms_user_id,
@@ -654,6 +634,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 for redemptions in redemptions_by_policy_uuid.values()
                 for redemption in redemptions
             ]
+
+            # Of all policies for this customer, determine which are redeemable and which are not.
             redeemable_policies, non_redeemable_policies = self.evaluate_policies(
                 enterprise_customer_uuid, lms_user_id, content_key
             )
@@ -670,22 +652,57 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                         },
                         "policy_uuids": [policy.uuid for policy in policies],
                     })
+
+            # Select one redeemable policy (i.e. use the "policy resolver") and serialize it for output.
+            resolved_policy = None
             if redeemable_policies:
                 resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
-                serialized_policy = serializers.SubsidyAccessPolicyRedeemableResponseSerializer(resolved_policy).data
 
+            # Determine if the learner has already redeemed the requested content_key.
             has_successful_redemption = any(
                 redemption['state'] == TransactionStateChoices.COMMITTED
                 for redemption in redemptions
             )
-            can_redeem_for_content_response = {
+
+            # Determine the price for content for display purposes only.
+            try:
+                content_metadata = self.subsidy_client.get_subsidy_content_data(enterprise_customer_uuid, content_key)
+                # Note that the "content_price" key is guaranteed to exist, but the value may be None.  Also, the
+                # upstream field type is a string representing a decimal dollar.
+                list_price_decimal_dollars_str = content_metadata["content_price"]
+                if list_price_decimal_dollars_str:
+                    list_price_decimal_dollars = float(list_price_decimal_dollars_str)
+                    list_price_integer_cents = int(list_price_decimal_dollars * 100)
+                else:
+                    list_price_decimal_dollars = None
+                    list_price_integer_cents = None
+            except requests.exceptions.HTTPError:
+                # No need to record a failure reason here because evaluate_policies() -> policy.can_redeem() already
+                # caught any problematic or non-existent content keys, and provided a reason it could not be redeemed.
+                # Just set a None content_price and move along.
+                list_price_decimal_dollars = None
+                list_price_integer_cents = None
+
+            element_response = {
                 "content_key": content_key,
+                "list_price": {
+                    "usd": list_price_decimal_dollars,
+                    "usd_cents": list_price_integer_cents,
+                },
                 "redemptions": redemptions,
                 "has_successful_redemption": has_successful_redemption,
-                "redeemable_subsidy_access_policy": serialized_policy,
-                "can_redeem": bool(serialized_policy),
+                "redeemable_subsidy_access_policy": resolved_policy,
+                "can_redeem": bool(resolved_policy),
                 "reasons": reasons,
             }
-            response.append(can_redeem_for_content_response)
+            element_responses.append(element_response)
 
-        return Response(response, status=status.HTTP_200_OK)
+        response_serializer = serializers.SubsidyAccessPolicyCanRedeemElementResponseSerializer(
+            element_responses,
+            # many=True, when combined with pagination_class=None, will cause the serialized output representation to be
+            # a top-level array. This deviates from the industry norm of nesting results lists into the value of a
+            # top-level "results" key. The current implementation is already integrated with a frontend used in
+            # production, so the easiest thing to do is to NOT change it to match the industry norm more closely.
+            many=True,
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
