@@ -2,6 +2,7 @@
 Serializers for the `SubsidyAccessPolicy` model.
 """
 import logging
+from urllib.parse import urlparse, urlunparse
 
 from crum import get_current_request
 from django.apps import apps
@@ -206,8 +207,14 @@ class SubsidyAccessPolicyRedeemableResponseSerializer(serializers.ModelSerialize
           string manipulation because then it would break dev environments which don't use https.  As-is, it should
           still work in prod because the other non-app infrastructure should automatically 3xx redirect to "https".
         """
+        current_request = get_current_request()
+        current_scheme = current_request.scheme
+
         location = reverse('api:v1:policy-redeem', kwargs={'policy_uuid': obj.uuid})
-        return get_current_request().build_absolute_uri(location)
+        parsed_url = urlparse(current_request.build_absolute_uri(location))
+        return urlunparse(
+            parsed_url._replace(scheme=current_scheme)
+        )
 
 
 class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyRedeemableResponseSerializer):
