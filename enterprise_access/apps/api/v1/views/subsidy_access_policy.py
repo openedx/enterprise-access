@@ -35,12 +35,12 @@ from enterprise_access.apps.events.utils import (
 )
 from enterprise_access.apps.subsidy_access_policy.constants import (
     POLICY_TYPES_WITH_CREDIT_LIMIT,
-    REASON_POLICY_NOT_ACTIVE,
     REASON_CONTENT_NOT_IN_CATALOG,
+    REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
+    REASON_LEARNER_MAX_SPEND_REACHED,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
-    REASON_LEARNER_MAX_SPEND_REACHED,
-    REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
+    REASON_POLICY_NOT_ACTIVE,
     MissingSubsidyAccessReasonUserMessages,
     TransactionStateChoices
 )
