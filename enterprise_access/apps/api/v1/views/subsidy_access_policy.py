@@ -33,6 +33,7 @@ from enterprise_access.apps.events.utils import (
     send_subsidy_redemption_event_to_event_bus
 )
 from enterprise_access.apps.subsidy_access_policy.constants import (
+    MISSING_SUBSIDY_ACCESS_POLICY_REASONS,
     POLICY_TYPES_WITH_CREDIT_LIMIT,
     TransactionStateChoices
 )
@@ -524,6 +525,15 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             status=status.HTTP_200_OK,
         )
 
+    def _get_user_message_for_reason(self, reason_slug):
+        """
+        Return the user-facing message for a given reason slug.
+        """
+        if not reason_slug or not MISSING_SUBSIDY_ACCESS_POLICY_REASONS[reason_slug]:
+            return None
+
+        return MISSING_SUBSIDY_ACCESS_POLICY_REASONS[reason_slug]
+
     @extend_schema(
         tags=['Subsidy Access Policy Redemption'],
         summary='Can redeem.',
@@ -624,6 +634,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 for reason, policies in non_redeemable_policies.items():
                     reasons.append({
                         "reason": reason,
+                        "user_message": self._get_user_message_for_reason(reason),
                         "policy_uuids": [policy.uuid for policy in policies],
                     })
             if redeemable_policies:
