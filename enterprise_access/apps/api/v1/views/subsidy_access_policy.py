@@ -26,6 +26,7 @@ from rest_framework.response import Response
 
 from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.mixins import UserDetailsFromJwtMixin
+from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.core.constants import POLICY_READ_PERMISSION
 from enterprise_access.apps.events.signals import ACCESS_POLICY_CREATED, ACCESS_POLICY_UPDATED, SUBSIDY_REDEEMED
 from enterprise_access.apps.events.utils import (
@@ -34,6 +35,13 @@ from enterprise_access.apps.events.utils import (
 )
 from enterprise_access.apps.subsidy_access_policy.constants import (
     POLICY_TYPES_WITH_CREDIT_LIMIT,
+    REASON_CONTENT_NOT_IN_CATALOG,
+    REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
+    REASON_LEARNER_MAX_SPEND_REACHED,
+    REASON_LEARNER_NOT_IN_ENTERPRISE,
+    REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
+    REASON_POLICY_NOT_ACTIVE,
+    MissingSubsidyAccessReasonUserMessages,
     TransactionStateChoices
 )
 from enterprise_access.apps.subsidy_access_policy.models import (
@@ -524,6 +532,35 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             status=status.HTTP_200_OK,
         )
 
+    def _get_user_message_for_reason(self, reason_slug, enterprise_admin_users):
+        """
+        Return the user-facing message for a given reason slug.
+        """
+        if not reason_slug:
+            return None
+
+        has_enterprise_admin_users = len(enterprise_admin_users) > 0
+
+        user_message_organization_no_funds = (
+            MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS
+            if has_enterprise_admin_users
+            else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS_NO_ADMINS
+        )
+
+        MISSING_SUBSIDY_ACCESS_POLICY_REASONS = {
+            REASON_POLICY_NOT_ACTIVE: user_message_organization_no_funds,
+            REASON_CONTENT_NOT_IN_CATALOG: user_message_organization_no_funds,
+            REASON_LEARNER_NOT_IN_ENTERPRISE: user_message_organization_no_funds,
+            REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY: user_message_organization_no_funds,
+            REASON_LEARNER_MAX_SPEND_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
+            REASON_LEARNER_MAX_ENROLLMENTS_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
+        }
+
+        if reason_slug not in MISSING_SUBSIDY_ACCESS_POLICY_REASONS:
+            return None
+
+        return MISSING_SUBSIDY_ACCESS_POLICY_REASONS[reason_slug]
+
     @extend_schema(
         tags=['Subsidy Access Policy Redemption'],
         summary='Can redeem.',
@@ -621,9 +658,16 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 enterprise_customer_uuid, lms_user_id, content_key
             )
             if not redemptions and not redeemable_policies:
+                lms_client = LmsApiClient()
+                enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
+                enterprise_admin_users = enterprise_customer_data.get('admin_users')
                 for reason, policies in non_redeemable_policies.items():
                     reasons.append({
                         "reason": reason,
+                        "user_message": self._get_user_message_for_reason(reason, enterprise_admin_users),
+                        "metadata": {
+                            "enterprise_administrators": enterprise_admin_users,
+                        },
                         "policy_uuids": [policy.uuid for policy in policies],
                     })
             if redeemable_policies:

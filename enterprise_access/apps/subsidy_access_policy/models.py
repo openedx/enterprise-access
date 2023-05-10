@@ -17,17 +17,18 @@ from simple_history.models import HistoricalRecords
 
 from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
-from enterprise_access.apps.subsidy_access_policy.constants import CREDIT_POLICY_TYPE_PRIORITY, AccessMethods
+from enterprise_access.apps.subsidy_access_policy.constants import (
+    CREDIT_POLICY_TYPE_PRIORITY,
+    REASON_CONTENT_NOT_IN_CATALOG,
+    REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
+    REASON_LEARNER_MAX_SPEND_REACHED,
+    REASON_LEARNER_NOT_IN_ENTERPRISE,
+    REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
+    REASON_POLICY_NOT_ACTIVE,
+    AccessMethods
+)
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
-
-REASON_POLICY_NOT_ACTIVE = "Subsidy access policy is not active."
-REASON_CONTENT_NOT_IN_CATALOG = "Requested content_key not contained in policy's catalog."
-REASON_LEARNER_NOT_IN_ENTERPRISE = "Learner not part of enterprise associated with the access policy."
-REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY = "Not enough remaining value in subsidy to redeem requested content."
-REASON_LEARNER_MAX_SPEND_REACHED = "The learner's maximum spend in this subsidy access policy has been reached."
-REASON_LEARNER_MAX_ENROLLMENTS_REACHED = \
-    "The learner's maximum number of enrollments given by this subsidy access policy has been reached."
 
 
 class SubsidyAccessPolicyLockAttemptFailed(Exception):

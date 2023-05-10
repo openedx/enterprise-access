@@ -79,3 +79,22 @@ class TransactionStateChoices:
     PENDING = 'pending'
     COMMITTED = 'committed'
     FAILED = 'failed'
+
+
+class MissingSubsidyAccessReasonUserMessages:
+    """
+    User-friendly display messages explaining why the learner does not have subsidized access.
+    """
+    ORGANIZATION_NO_FUNDS = "You can't enroll right now because your organization doesn't have enough funds."
+    ORGANIZATION_NO_FUNDS_NO_ADMINS = \
+        "You can't enroll right now because your organization doesn't have enough funds. " \
+        "Contact your administrator to request more."
+    LEARNER_LIMITS_REACHED = "You can't enroll right now because of limits set by your organization."
+
+
+REASON_POLICY_NOT_ACTIVE = "policy_not_active"
+REASON_CONTENT_NOT_IN_CATALOG = "content_not_in_catalog"
+REASON_LEARNER_NOT_IN_ENTERPRISE = "learner_not_in_enterprise"
+REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY = "not_enough_value_in_subsidy"
+REASON_LEARNER_MAX_SPEND_REACHED = "learner_max_spend_reached"
+REASON_LEARNER_MAX_ENROLLMENTS_REACHED = "learner_max_enrollments_reached"

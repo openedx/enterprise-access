@@ -6,13 +6,18 @@ from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import ddt
+import mock
 from django.conf import settings
 from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
 
 from enterprise_access.apps.core.constants import SYSTEM_ENTERPRISE_LEARNER_ROLE
-from enterprise_access.apps.subsidy_access_policy.constants import TransactionStateChoices
+from enterprise_access.apps.subsidy_access_policy.constants import (
+    REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
+    MissingSubsidyAccessReasonUserMessages,
+    TransactionStateChoices
+)
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
@@ -366,10 +371,23 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
         assert response_list[1]["can_redeem"] is True
         assert len(response_list[1]["reasons"]) == 0
 
-    def test_can_redeem_policy_none_redeemable(self):
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient', return_value=mock.MagicMock())
+    @ddt.data(
+        {"has_admin_users": True},
+        {"has_admin_users": False},
+    )
+    @ddt.unpack
+    def test_can_redeem_policy_none_redeemable(self, mock_lms_client, has_admin_users):
         """
         Test that the can_redeem endpoint returns resons for why each non-redeemable policy failed.
         """
+        slug = 'sluggy'
+        admin_email = 'edx@example.org'
+        mock_lms_client().get_enterprise_customer_data.return_value = {
+            'slug': slug,
+            'admin_users': [{'email': admin_email}] if has_admin_users else [],
+        }
+
         self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
             'results': [],
             'aggregates': {
@@ -393,9 +411,21 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
         assert response_list[0]["has_successful_redemption"] is False
         assert response_list[0]["redeemable_subsidy_access_policy"] is None
         assert response_list[0]["can_redeem"] is False
+
+        expected_user_message = (
+            MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS
+            if has_admin_users
+            else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS_NO_ADMINS
+        )
+        expected_enterprise_admins = [{'email': admin_email}] if has_admin_users else []
+
         assert response_list[0]["reasons"] == [
             {
-                "reason": "Not enough remaining value in subsidy to redeem requested content.",
+                "reason": REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
+                "user_message": expected_user_message,
+                "metadata": {
+                    "enterprise_administrators": expected_enterprise_admins,
+                },
                 "policy_uuids": [str(self.redeemable_policy.uuid)],
             },
         ]
@@ -408,7 +438,11 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
         assert response_list[1]["can_redeem"] is False
         assert response_list[1]["reasons"] == [
             {
-                "reason": "Not enough remaining value in subsidy to redeem requested content.",
+                "reason": REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
+                "user_message": expected_user_message,
+                "metadata": {
+                    "enterprise_administrators": expected_enterprise_admins,
+                },
                 "policy_uuids": [str(self.redeemable_policy.uuid)],
             },
         ]
