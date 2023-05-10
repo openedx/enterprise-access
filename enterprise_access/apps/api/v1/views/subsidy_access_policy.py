@@ -556,7 +556,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             REASON_LEARNER_MAX_ENROLLMENTS_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
         }
 
-        if not MISSING_SUBSIDY_ACCESS_POLICY_REASONS[reason_slug]:
+        if not reason_slug in MISSING_SUBSIDY_ACCESS_POLICY_REASONS:
             return None
 
         return MISSING_SUBSIDY_ACCESS_POLICY_REASONS[reason_slug]
