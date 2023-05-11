@@ -29,7 +29,11 @@ from rest_framework.response import Response
 from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.mixins import UserDetailsFromJwtMixin
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
-from enterprise_access.apps.core.constants import POLICY_READ_PERMISSION
+from enterprise_access.apps.core.constants import (
+    POLICY_READ_PERMISSION,
+    POLICY_REDEMPTION_PERMISSION,
+    REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION
+)
 from enterprise_access.apps.events.signals import ACCESS_POLICY_CREATED, ACCESS_POLICY_UPDATED, SUBSIDY_REDEEMED
 from enterprise_access.apps.events.utils import (
     send_access_policy_event_to_event_bus,
@@ -135,7 +139,7 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
     pagination_class = PaginationWithPageCount
     http_method_names = ['get', 'post', 'patch', 'delete']
     lookup_field = 'uuid'
-    permission_required = 'requests.has_admin_access'
+    permission_required = REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION
 
     @property
     def requested_enterprise_customer_uuid(self):
@@ -255,7 +259,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
     authentication_classes = [JwtAuthentication]
     permission_classes = [permissions.IsAuthenticated]
     lookup_url_kwarg = 'policy_uuid'
-    permission_required = 'requests.has_learner_or_admin_access'
+    permission_required = POLICY_REDEMPTION_PERMISSION
     http_method_names = ['get', 'post']
 
     @classmethod
