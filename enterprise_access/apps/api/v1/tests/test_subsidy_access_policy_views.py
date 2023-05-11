@@ -12,6 +12,7 @@ from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
 
+from enterprise_access.apps.api.v1.views.subsidy_access_policy import SubsidyAccessPolicyRedeemViewset
 from enterprise_access.apps.core.constants import SYSTEM_ENTERPRISE_LEARNER_ROLE
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
@@ -345,8 +346,38 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
                 'total_quantity': 0,
             },
         }
+        test_content_key_1 = "course-v1:edX+edXPrivacy101+3T2020"
+        test_content_key_2 = "course-v1:edX+edXPrivacy101+3T2020_2"
+        test_content_key_1_metadata_price = "12.34"
+        test_content_key_2_metadata_price = "56.78"
+        test_content_key_1_float_price = 12.34
+        test_content_key_2_float_price = 56.78
+        test_content_key_1_cents_price = 1234
+        test_content_key_2_cents_price = 5678
+
+        def mock_get_subsidy_content_data(*args, **kwargs):
+            if test_content_key_1 in args:
+                return {
+                    "content_uuid": str(uuid4()),
+                    "content_key": test_content_key_1,
+                    "source": "edX",
+                    "content_price": test_content_key_1_metadata_price,
+                }
+            elif test_content_key_2 in args:
+                return {
+                    "content_uuid": str(uuid4()),
+                    "content_key": test_content_key_2,
+                    "source": "edX",
+                    "content_price": test_content_key_2_metadata_price,
+                }
+            else:
+                return {}
+
+        mock_subsidy_client = mock.Mock()
+        mock_subsidy_client.get_subsidy_content_data.side_effect = mock_get_subsidy_content_data
+        SubsidyAccessPolicyRedeemViewset.subsidy_client = mock_subsidy_client
         query_params = {
-            'content_key': ['course-v1:edX+edXPrivacy101+3T2020', 'course-v1:edX+edXPrivacy101+3T2020_2'],
+            'content_key': [test_content_key_1, test_content_key_2],
         }
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
         assert response.status_code == status.HTTP_200_OK
@@ -356,7 +387,11 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
         assert len(response_list) == 2
 
         # Check the response for the first content_key given.
-        assert response_list[0]["content_key"] == query_params["content_key"][0]
+        assert response_list[0]["content_key"] == test_content_key_1
+        assert response_list[0]["list_price"] == {
+            "usd": test_content_key_1_float_price,
+            "usd_cents": test_content_key_1_cents_price,
+        }
         assert len(response_list[0]["redemptions"]) == 0
         assert response_list[0]["has_successful_redemption"] is False
         assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
@@ -364,7 +399,11 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
         assert len(response_list[0]["reasons"]) == 0
 
         # Check the response for the second content_key given.
-        assert response_list[1]["content_key"] == query_params["content_key"][1]
+        assert response_list[1]["content_key"] == test_content_key_2
+        assert response_list[1]["list_price"] == {
+            "usd": test_content_key_2_float_price,
+            "usd_cents": test_content_key_2_cents_price,
+        }
         assert len(response_list[1]["redemptions"]) == 0
         assert response_list[1]["has_successful_redemption"] is False
         assert response_list[1]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
@@ -395,8 +434,38 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
             },
         }
         self.redeemable_policy.subsidy_client.can_redeem.return_value = False
+        test_content_key_1 = "course-v1:edX+edXPrivacy101+3T2020"
+        test_content_key_2 = "course-v1:edX+edXPrivacy101+3T2020_2"
+        test_content_key_1_metadata_price = "12.34"
+        test_content_key_2_metadata_price = "56.78"
+        test_content_key_1_float_price = 12.34
+        test_content_key_2_float_price = 56.78
+        test_content_key_1_cents_price = 1234
+        test_content_key_2_cents_price = 5678
+
+        def mock_get_subsidy_content_data(*args, **kwargs):
+            if test_content_key_1 in args:
+                return {
+                    "content_uuid": str(uuid4()),
+                    "content_key": test_content_key_1,
+                    "source": "edX",
+                    "content_price": test_content_key_1_metadata_price,
+                }
+            elif test_content_key_2 in args:
+                return {
+                    "content_uuid": str(uuid4()),
+                    "content_key": test_content_key_2,
+                    "source": "edX",
+                    "content_price": test_content_key_2_metadata_price,
+                }
+            else:
+                return {}
+
+        mock_subsidy_client = mock.Mock()
+        mock_subsidy_client.get_subsidy_content_data.side_effect = mock_get_subsidy_content_data
+        SubsidyAccessPolicyRedeemViewset.subsidy_client = mock_subsidy_client
         query_params = {
-            'content_key': ['course-v1:edX+edXPrivacy101+3T2020', 'course-v1:edX+edXPrivacy101+3T2020_2'],
+            'content_key': [test_content_key_1, test_content_key_2],
         }
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
         assert response.status_code == status.HTTP_200_OK
@@ -406,7 +475,11 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
         assert len(response_list) == 2
 
         # Check the response for the first content_key given.
-        assert response_list[0]["content_key"] == query_params["content_key"][0]
+        assert response_list[0]["content_key"] == test_content_key_1
+        assert response_list[0]["list_price"] == {
+            "usd": test_content_key_1_float_price,
+            "usd_cents": test_content_key_1_cents_price,
+        }
         assert len(response_list[0]["redemptions"]) == 0
         assert response_list[0]["has_successful_redemption"] is False
         assert response_list[0]["redeemable_subsidy_access_policy"] is None
@@ -431,7 +504,11 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
         ]
 
         # Check the response for the second content_key given.
-        assert response_list[1]["content_key"] == query_params["content_key"][1]
+        assert response_list[1]["content_key"] == test_content_key_2
+        assert response_list[1]["list_price"] == {
+            "usd": test_content_key_2_float_price,
+            "usd_cents": test_content_key_2_cents_price,
+        }
         assert len(response_list[1]["redemptions"]) == 0
         assert response_list[1]["has_successful_redemption"] is False
         assert response_list[1]["redeemable_subsidy_access_policy"] is None
@@ -470,6 +547,16 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
                 "total_quantity": -19900,
             },
         }
+
+        mock_subsidy_client = mock.Mock()
+        mock_subsidy_client.get_subsidy_content_data.return_value = {
+            "content_uuid": str(uuid4()),
+            "content_key": "course-v1:demox+1234+2T2023",
+            "source": "edX",
+            "content_price": "199.00",
+        }
+        SubsidyAccessPolicyRedeemViewset.subsidy_client = mock_subsidy_client
+
         query_params = {'content_key': 'course-v1:demox+1234+2T2023'}
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
         assert response.status_code == status.HTTP_200_OK
@@ -478,6 +565,10 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
         # Make sure we got responses containing existing redemptions.
         assert len(response_list) == 1
         assert response_list[0]["content_key"] == query_params["content_key"]
+        assert response_list[0]["list_price"] == {
+            "usd": 199.00,
+            "usd_cents": 19900,
+        }
         assert len(response_list[0]["redemptions"]) == 1
         assert response_list[0]["redemptions"][0]["uuid"] == test_transaction_uuid
         assert response_list[0]["redemptions"][0]["policy_redemption_status_url"] == \
@@ -488,3 +579,50 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
         assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
         assert response_list[0]["can_redeem"] is True
         assert len(response_list[0]["reasons"]) == 0
+
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient', return_value=mock.MagicMock())
+    def test_can_redeem_policy_no_price(self, mock_lms_client):
+        """
+        Test that the can_redeem endpoint successfuly serializes a response for content that has no price.
+        """
+        test_content_key = "course-v1:demox+1234+2T2023"
+        mock_lms_client().get_enterprise_customer_data.return_value = {
+            'slug': 'sluggy',
+            'admin_users': [{'email': 'edx@example.org'}],
+        }
+
+        # FIXME: subisdy client's can_redeem() function returns a dict in reality, so when we fix this in the policy
+        # model code, fix it here too by making it return a dictionary with a `can_redeem` key set to a value of False.
+        self.redeemable_policy.get_subsidy_client.return_value.can_redeem.return_value = False
+        self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {
+                'total_quantity': 0,
+            },
+        }
+
+        mock_subsidy_client = mock.Mock()
+        mock_subsidy_client.get_subsidy_content_data.return_value = {
+            "content_uuid": str(uuid4()),
+            "content_key": test_content_key,
+            "source": "edX",
+            "content_price": None,
+        }
+        SubsidyAccessPolicyRedeemViewset.subsidy_client = mock_subsidy_client
+
+        query_params = {'content_key': test_content_key}
+        response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+        assert response.status_code == status.HTTP_200_OK
+        response_list = response.json()
+
+        assert len(response_list) == 1
+        assert response_list[0]["content_key"] == test_content_key
+        assert response_list[0]["list_price"] == {
+            "usd": None,
+            "usd_cents": None,
+        }
+        assert len(response_list[0]["redemptions"]) == 0
+        assert response_list[0]["has_successful_redemption"] is False
+        assert response_list[0]["redeemable_subsidy_access_policy"] is None
+        assert response_list[0]["can_redeem"] is False
+        assert len(response_list[0]["reasons"]) == 1

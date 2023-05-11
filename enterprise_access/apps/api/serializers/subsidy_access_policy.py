@@ -97,59 +97,52 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class ValidateContentKeyMixin:
+class ContentKeyField(serializers.CharField):
     """
-    Mixin to provide validation function for the `content_key` serializer field.
-
-    Requires the inheriting serializer to declare a `content_key` field.  Supports one or many content keys (CharField
-    or ListField-of-CharField).
+    Serializer Field for Content Keys, created to add basic opaque-keys-based validation.
     """
-    def validate_content_key(self, value):
-        """
-        Validate `content_key` field.
-        """
-        content_keys = [value] if isinstance(value, str) else value
-        for content_key in content_keys:
-            try:
-                CourseKey.from_string(content_key)
-            except InvalidKeyError as exc:
-                raise serializers.ValidationError(f"Invalid content_key: {content_key}") from exc
-        return value
+    def to_internal_value(self, data):
+        content_key = data
+        try:
+            CourseKey.from_string(content_key)
+        except InvalidKeyError as exc:
+            raise serializers.ValidationError(f"Invalid content_key: {content_key}") from exc
+        return super().to_internal_value(content_key)
 
 
 # pylint: disable=abstract-method
-class SubsidyAccessPolicyRedeemRequestSerializer(ValidateContentKeyMixin, serializers.Serializer):
+class SubsidyAccessPolicyRedeemRequestSerializer(serializers.Serializer):
     """
     Request Serializer to validate policy redeem endpoint POST data.
 
     For view: SubsidyAccessPolicyRedeemViewset.redeem
     """
     lms_user_id = serializers.IntegerField(required=True)
-    content_key = serializers.CharField(required=True)
+    content_key = ContentKeyField(required=True)
     metadata = serializers.JSONField(required=False, allow_null=True)
 
 
 # pylint: disable=abstract-method
-class SubsidyAccessPolicyListRequestSerializer(ValidateContentKeyMixin, serializers.Serializer):
+class SubsidyAccessPolicyListRequestSerializer(serializers.Serializer):
     """
     Request Serializer to validate policy list endpoint query params.
 
     For view: SubsidyAccessPolicyRedeemViewset.list
     """
     lms_user_id = serializers.IntegerField(required=True)
-    content_key = serializers.CharField(required=True)
+    content_key = ContentKeyField(required=True)
     enterprise_customer_uuid = serializers.UUIDField(required=True)
 
 
 # pylint: disable=abstract-method
-class SubsidyAccessPolicyRedemptionRequestSerializer(ValidateContentKeyMixin, serializers.Serializer):
+class SubsidyAccessPolicyRedemptionRequestSerializer(serializers.Serializer):
     """
     Request Serializer to validate policy redemption endpoint query params.
 
     For view: SubsidyAccessPolicyRedeemViewset.redemption
     """
     lms_user_id = serializers.IntegerField(required=True)
-    content_key = serializers.CharField(required=True)
+    content_key = ContentKeyField(required=True)
     enterprise_customer_uuid = serializers.UUIDField(required=True)
 
 
@@ -165,18 +158,14 @@ class SubsidyAccessPolicyCreditsAvailableRequestSerializer(serializers.Serialize
 
 
 # pylint: disable=abstract-method
-class SubsidyAccessPolicyCanRedeemRequestSerializer(ValidateContentKeyMixin, serializers.Serializer):
+class SubsidyAccessPolicyCanRedeemRequestSerializer(serializers.Serializer):
     """
     Request serializer to validate can_redeem endpoint query params.
 
     For view: SubsidyAccessPolicyRedeemViewset.can_redeem
     """
-    # enterprise_customer_uuid = serializers.UUIDField(
-    #     required=False,
-    #     help_text='The enterprise customer UUID under which policies will be queried for redeemability.',
-    # )
     content_key = serializers.ListField(
-        child=serializers.CharField(required=True),
+        child=ContentKeyField(required=True),
         allow_empty=False,
         help_text='Content keys about which redeemability will be queried.',
     )
@@ -232,3 +221,62 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
 
     def get_remaining_balance(self, obj):
         return obj.remaining_balance()
+
+
+class SubsidyAccessPolicyCanRedeemReasonResponseSerializer(serializers.Serializer):
+    """
+    Response serializer used to document the structure of a "reason" a content key is not redeemable, used by the
+    can_redeem endpoint.
+    """
+    reason = serializers.CharField(
+        help_text="reason code (in camel_case) for why the following subsidy access policies are not redeemable."
+    )
+    user_message = serializers.CharField(
+        help_text="Description of why the following subsidy access policies are not redeemable."
+    )
+    policy_uuids = serializers.ListField(
+        child=serializers.UUIDField()
+    )
+    metadata = serializers.DictField(
+        help_text="context information about the failure reason."
+    )
+
+
+class ListPriceResponseSerializer(serializers.Serializer):
+    """
+    Response serializer representing a couple different representations of list (content) prices.
+    """
+    usd = serializers.FloatField(help_text="List price for content, in USD.")
+    usd_cents = serializers.IntegerField(help_text="List price for content, in USD cents.")
+
+
+class SubsidyAccessPolicyCanRedeemElementResponseSerializer(serializers.Serializer):
+    """
+    Response serializer representing a single element of the response list for the can_redeem endpoint.
+    """
+    content_key = ContentKeyField(help_text="requested content_key to which the rest of this element pertains.")
+    list_price = ListPriceResponseSerializer(help_text="List price for content.")
+    redemptions = serializers.ListField(
+        # TODO: figure out a way to import TransactionSerializer from enterprise-subsidy.  Until then, the output docs
+        # will not describe the redemption fields.
+        child=serializers.DictField(),
+        help_text="List of redemptions of this content_key by the requested lms_user_id.",
+    )
+    has_successful_redemption = serializers.BooleanField(
+        help_text="True if there are any committed redemptions of this content_key by the requested lms_user_id."
+    )
+    redeemable_subsidy_access_policy = SubsidyAccessPolicyRedeemableResponseSerializer(
+        help_text=(
+            "One subsidy access policy selected from potentially multiple redeemable policies for the requested "
+            "content_key and lms_user_id."
+        )
+    )
+    can_redeem = serializers.BooleanField(
+        help_text="True if there is a redeemable subsidy access policy for the requested content_key and lms_user_id."
+    )
+    reasons = serializers.ListField(
+        child=SubsidyAccessPolicyCanRedeemReasonResponseSerializer(),
+        help_text=(
+            "List of reasons why each of the enterprise's subsidy access policies are not redeemable, grouped by reason"
+        )
+    )
