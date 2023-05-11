@@ -92,15 +92,17 @@ order by subsidy.title, transaction.created
 
 -- calculate balance of subsidy A (expect it to be $851 = $1000 - $49 - $49 + $49):
 with all_quantities as (
-  select transaction.quantity
+  select iff(transaction.state in ('committed'), transaction.quantity, 0) as committed_quantity,
+         iff(transaction.state in ('created', 'pending', 'committed'), transaction.quantity, 0) as pending_quantity
     from prod.enterprise_subsidy.openedx_ledger_transaction as transaction
     join prod.enterprise_subsidy.subsidy_subsidy as subsidy
       on transaction.ledger_id = subsidy.ledger_id
    where subsidy.uuid = '<replace with LC2 Test Subsidy A>'
 
   union all
- 
-  select reversal.quantity
+
+  select iff(reversal.state in ('committed'), reversal.quantity, 0) as committed_quantity,
+         iff(reversal.state in ('created', 'pending', 'committed'), reversal.quantity, 0) as pending_quantity
     from prod.enterprise_subsidy.openedx_ledger_reversal as reversal
     join prod.enterprise_subsidy.openedx_ledger_transaction as transaction
       on reversal.transaction_id = transaction.uuid
@@ -108,6 +110,7 @@ with all_quantities as (
       on transaction.ledger_id = subsidy.ledger_id
    where subsidy.uuid = '<replace with LC2 Test Subsidy A>'
 )
-select concat('$', sum(quantity) / 100)
+select concat('$', sum(pending_quantity) / 100) as pending_balance,
+       concat('$', sum(committed_quantity) / 100) as final_balance
   from all_quantities 
 ;
