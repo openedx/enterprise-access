@@ -670,6 +670,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 # Note that the "content_price" key is guaranteed to exist, but the value may be None.  Also, the
                 # upstream field type is a string representing a decimal dollar.
                 list_price_decimal_dollars_str = content_metadata["content_price"]
+                # TODO: simplify this function by consolidating this conversion logic into the response serializer:
                 if list_price_decimal_dollars_str:
                     list_price_decimal_dollars = float(list_price_decimal_dollars_str)
                     list_price_integer_cents = int(list_price_decimal_dollars * 100)
