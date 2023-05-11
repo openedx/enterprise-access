@@ -2,6 +2,7 @@
 Tests for Enterprise Access Subsidy Access Policy app API v1 views.
 """
 import re
+from operator import itemgetter
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
@@ -16,7 +17,8 @@ from enterprise_access.apps.api.v1.views.subsidy_access_policy import SubsidyAcc
 from enterprise_access.apps.core.constants import (
     POLICY_REDEMPTION_PERMISSION,
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
-    SYSTEM_ENTERPRISE_LEARNER_ROLE
+    SYSTEM_ENTERPRISE_LEARNER_ROLE,
+    SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
@@ -33,6 +35,210 @@ SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:policy-list')
 SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT = reverse('api:v1:admin-policy-list')
 
 TEST_ENTERPRISE_UUID = uuid4()
+
+
+# pylint: disable=missing-function-docstring
+class CRUDViewTestMixin:
+    """
+    Mixin to set some basic state for test classes that cover the
+    subsidy access policy CRUD views.
+    """
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+
+        cls.enterprise_uuid = TEST_ENTERPRISE_UUID
+
+        cls.redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=cls.enterprise_uuid,
+            spend_limit=3,
+            active=True,
+        )
+        cls.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=cls.enterprise_uuid,
+            spend_limit=0,
+            active=True,
+        )
+
+    def setUp(self):
+        super().setUp()
+        # Start in an unauthenticated state.
+        self.client.logout()
+
+
+@ddt.ddt
+class TestPolicyCRUDAuthNAndPermissionChecks(CRUDViewTestMixin, APITestWithMocks):
+    """
+    Tests Authentication and Permission checking for Subsidy Access Policy CRUD views.
+    """
+    @ddt.data(
+        # A role that's not mapped to any feature perms will get you a 403.
+        (
+            {'system_wide_role': 'some-other-role', 'context': str(TEST_ENTERPRISE_UUID)},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A good admin role, but in a context/customer we're not aware of, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A good learner role, but in a context/customer we're not aware of, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # An operator role, but in a context/customer we're not aware of, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # No JWT based auth, no soup for you.
+        (
+            None,
+            status.HTTP_401_UNAUTHORIZED,
+        ),
+    )
+    @ddt.unpack
+    def test_policy_crud_views_unauthorized_forbidden(self, role_context_dict, expected_response_code):
+        """
+        Tests that we get expected 40x responses for all of the policy readonly views.
+        """
+        # Set the JWT-based auth that we'll use for every request
+        if role_context_dict:
+            self.set_jwt_cookie([role_context_dict])
+
+        request_kwargs = {'uuid': str(self.redeemable_policy.uuid)}
+
+        # Test the retrieve endpoint
+        response = self.client.get(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
+        self.assertEqual(response.status_code, expected_response_code)
+
+        # Test the list endpoint
+        response = self.client.get(reverse('api:v1:subsidy-access-policies-list'))
+        self.assertEqual(response.status_code, expected_response_code)
+
+        # Test all the deprecated viewset actions.
+        detail_url = reverse('api:v1:admin-policy-detail', kwargs=request_kwargs)
+        list_url = reverse('api:v1:admin-policy-list')
+
+        # Test the deprecated retrieve endpoint
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, expected_response_code)
+
+        # Test the deprecated list endpoint
+        response = self.client.get(list_url)
+        self.assertEqual(response.status_code, expected_response_code)
+
+        # Test the deprecated create action
+        response = self.client.post(list_url, data={'any': 'payload'})
+        self.assertEqual(response.status_code, expected_response_code)
+
+        # Test the deprecated patch action
+        response = self.client.patch(detail_url, data={'any': 'other payload'})
+        self.assertEqual(response.status_code, expected_response_code)
+
+        # Test the deprecated destroy action
+        response = self.client.delete(detail_url)
+        self.assertEqual(response.status_code, expected_response_code)
+
+
+@ddt.ddt
+class TestAuthenticatedPolicyReadOnlyViews(CRUDViewTestMixin, APITestWithMocks):
+    """
+    Test the list and detail views for subsidy access policy records.
+    """
+    @ddt.data(
+        # A good admin role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
+        {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good learner role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
+        {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good operator role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
+        {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+    )
+    def test_detail_view(self, role_context_dict):
+        """
+        Test that the detail view returns a 200 response code and the expected results of serialization.
+        """
+        # Set the JWT-based auth that we'll use for every request
+        self.set_jwt_cookie([role_context_dict])
+
+        request_kwargs = {'uuid': str(self.redeemable_policy.uuid)}
+
+        # Test the retrieve endpoint
+        response = self.client.get(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual({
+            'access_method': 'direct',
+            'active': True,
+            'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
+            'description': '',
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'per_learner_enrollment_limit': self.redeemable_policy.per_learner_enrollment_limit,
+            'per_learner_spend_limit': self.redeemable_policy.per_learner_spend_limit,
+            'policy_type': 'PerLearnerEnrollmentCreditAccessPolicy',
+            'spend_limit': 3,
+            'subsidy_uuid': str(self.redeemable_policy.subsidy_uuid),
+            'uuid': str(self.redeemable_policy.uuid),
+        }, response.json())
+
+    @ddt.data(
+        # A good admin role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
+        {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good learner role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
+        {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good operator role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
+        {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+    )
+    def test_list_view(self, role_context_dict):
+        """
+        Test that the list view returns a 200 response code and the expected (list) results of serialization.
+        """
+        # Set the JWT-based auth that we'll use for every request
+        self.set_jwt_cookie([role_context_dict])
+
+        # Test the retrieve endpoint
+        response = self.client.get(
+            reverse('api:v1:subsidy-access-policies-list'),
+            {'enterprise_customer_uuid': str(self.enterprise_uuid)},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response_json = response.json()
+        self.assertEqual(response_json['count'], 2)
+
+        expected_results = [
+            {
+                'access_method': 'direct',
+                'active': True,
+                'catalog_uuid': str(self.non_redeemable_policy.catalog_uuid),
+                'description': '',
+                'enterprise_customer_uuid': str(self.enterprise_uuid),
+                'per_learner_enrollment_limit': self.non_redeemable_policy.per_learner_enrollment_limit,
+                'per_learner_spend_limit': self.non_redeemable_policy.per_learner_spend_limit,
+                'policy_type': 'PerLearnerEnrollmentCreditAccessPolicy',
+                'spend_limit': 0,
+                'subsidy_uuid': str(self.non_redeemable_policy.subsidy_uuid),
+                'uuid': str(self.non_redeemable_policy.uuid),
+            },
+            {
+                'access_method': 'direct',
+                'active': True,
+                'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
+                'description': '',
+                'enterprise_customer_uuid': str(self.enterprise_uuid),
+                'per_learner_enrollment_limit': self.redeemable_policy.per_learner_enrollment_limit,
+                'per_learner_spend_limit': self.redeemable_policy.per_learner_spend_limit,
+                'policy_type': 'PerLearnerEnrollmentCreditAccessPolicy',
+                'spend_limit': 3,
+                'subsidy_uuid': str(self.redeemable_policy.subsidy_uuid),
+                'uuid': str(self.redeemable_policy.uuid),
+            },
+        ]
+
+        sort_key = itemgetter('spend_limit')
+        self.assertEqual(
+            sorted(expected_results, key=sort_key),
+            sorted(response_json['results'], key=sort_key),
+        )
 
 
 @ddt.ddt
@@ -59,6 +265,16 @@ class TestPolicyRedemptionAuthNAndPermissionChecks(APITestWithMocks):
         # The right role, but in a context/customer we don't have, get's you a 403.
         (
             {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A learner role is also fine, but in a context/customer we don't have, get's you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # An operator role is fine, too, but in a context/customer we don't have, get's you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(uuid4())},
             status.HTTP_403_FORBIDDEN,
         ),
         # No JWT based auth, no soup for you.
