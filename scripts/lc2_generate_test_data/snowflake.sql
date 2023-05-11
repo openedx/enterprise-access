@@ -69,18 +69,32 @@ order by subsidy.title, transaction.created
 order by subsidy.title, reversal.created
 ;
 
--- list OCM enrollments created for testing:
+-- List OCM enrollments created for testing.  Link the following chain of models:
+--
+-- * Subsidy ->
+-- * Transaction ->
+-- * LearnerCreditEnterpriseCourseEnrollment ->
+-- * EnterpriseCourseEnrollment ->
+-- * CourseEnrollment
+--
   select subsidy.title as subsidy_title,
          subsidy.uuid as subsidy_uuid,
          transaction.uuid as transaction_uuid,
-         sce.id as enrollment_id,
-         sce.is_active as enrollment_is_active,
-         sce.mode as enrollment_mode
-    from prod.lms.student_courseenrollment as sce
-    join prod.enterprise_subsidy.openedx_ledger_transaction as transaction
-      on transaction.lms_user_id = sce.user_id and transaction.content_key = sce.course_id
+         lcece.id as fulfillment_identifier,
+         lcece.is_revoked as fulfillment_revoked,
+         ece.id as enterprise_course_enrollment_id,
+         sce.id as lms_enrollment_id,
+         sce.is_active as lms_enrollment_is_active,
+         sce.mode as lms_enrollment_mode
+    from prod.enterprise_subsidy.openedx_ledger_transaction as transaction
     join prod.enterprise_subsidy.subsidy_subsidy as subsidy
       on transaction.ledger_id = subsidy.ledger_id
+    join prod.lms.enterprise_learnercreditenterprisecourseenrollment lcece
+      on lcece.transaction_id = transaction.uuid
+    join prod.lms.enterprise_enterprisecourseenrollment ece
+      on lcece.enterprise_course_enrollment_id = ece.id
+    join prod.lms.student_courseenrollment as sce
+      on transaction.lms_user_id = sce.user_id and transaction.content_key = sce.course_id
    where subsidy.uuid in (
             '<replace with LC2 Test Subsidy A>', -- LP2 Test Subsidy A
             '<replace with LC2 Test Subsidy B>', -- LP2 Test Subsidy B
