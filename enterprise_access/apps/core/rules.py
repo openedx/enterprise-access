@@ -174,3 +174,9 @@ rules.add_perm(
     constants.POLICY_READ_PERMISSION,
     has_subsidy_access_policy_admin_access | has_subsidy_access_policy_learner_access
 )
+
+# Grants policy redemption permission if the user is a policy learner or admin
+rules.add_perm(
+    constants.POLICY_REDEMPTION_PERMISSION,
+    has_subsidy_access_policy_admin_access | has_subsidy_access_policy_learner_access
+)

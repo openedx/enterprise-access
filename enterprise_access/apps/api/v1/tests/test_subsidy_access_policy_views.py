@@ -13,7 +13,11 @@ from rest_framework import status
 from rest_framework.reverse import reverse
 
 from enterprise_access.apps.api.v1.views.subsidy_access_policy import SubsidyAccessPolicyRedeemViewset
-from enterprise_access.apps.core.constants import SYSTEM_ENTERPRISE_LEARNER_ROLE
+from enterprise_access.apps.core.constants import (
+    POLICY_REDEMPTION_PERMISSION,
+    SYSTEM_ENTERPRISE_ADMIN_ROLE,
+    SYSTEM_ENTERPRISE_LEARNER_ROLE
+)
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     MissingSubsidyAccessReasonUserMessages,
@@ -23,15 +27,95 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
 )
-
-from .utils import BaseEnterpriseAccessTestCase
+from test_utils import APITestWithMocks
 
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:policy-list')
 SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT = reverse('api:v1:admin-policy-list')
 
+TEST_ENTERPRISE_UUID = uuid4()
+
 
 @ddt.ddt
-class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
+class TestPolicyRedemptionAuthNAndPermissionChecks(APITestWithMocks):
+    """
+    Tests Authentication and Permission checking for Subsidy Access Policy views.
+    Specifically, test all the non-happy-path conditions.
+    """
+    def setUp(self):
+        super().setUp()
+        self.enterprise_uuid = TEST_ENTERPRISE_UUID
+        self.redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            spend_limit=3,
+        )
+        self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
+
+    @ddt.data(
+        # A role that's not mapped to any feature perms will get you a 403.
+        (
+            {'system_wide_role': 'some-other-role', 'context': str(TEST_ENTERPRISE_UUID)},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # The right role, but in a context/customer we don't have, get's you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # No JWT based auth, no soup for you.
+        (
+            None,
+            status.HTTP_401_UNAUTHORIZED,
+        ),
+    )
+    @ddt.unpack
+    def test_policy_redemption_forbidden_requests(self, role_context_dict, expected_response_code):
+        """
+        Tests that we get expected 403s for all of the policy redemption endpoints.
+        """
+        # Set the JWT-based auth that we'll use for every request
+        if role_context_dict:
+            self.set_jwt_cookie([role_context_dict])
+
+        # The policy redemption list endpoint
+        query_params = {
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'lms_user_id': '1234',
+            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
+        }
+        response = self.client.get(reverse('api:v1:policy-redemption'), query_params)
+        self.assertEqual(response.status_code, expected_response_code)
+
+        # The redeem endpoint
+        url = reverse('api:v1:policy-redeem', kwargs={'policy_uuid': self.redeemable_policy.uuid})
+        payload = {
+            'lms_user_id': '1234',
+            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
+        }
+        response = self.client.post(url, payload)
+        self.assertEqual(response.status_code, expected_response_code)
+
+        # The credits_available endpoint
+        query_params = {
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'lms_user_id': 1234,
+        }
+        response = self.client.get(reverse('api:v1:policy-credits-available'), query_params)
+        self.assertEqual(response.status_code, expected_response_code)
+
+        # The can_redeem endpoint
+        url = reverse(
+            "api:v1:policy-can-redeem",
+            kwargs={"enterprise_customer_uuid": self.enterprise_uuid},
+        )
+        query_params = {
+            'content_key': ['course-v1:edX+edXPrivacy101+3T2020', 'course-v1:edX+edXPrivacy101+3T2020_2'],
+        }
+        response = self.client.get(url, query_params)
+        self.assertEqual(response.status_code, expected_response_code)
+
+
+@ddt.ddt
+class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
     """
     Tests for SubsidyAccessPolicyRedeemViewset.
     """
@@ -155,7 +239,7 @@ class TestSubsidyAccessPolicyRedeemViewset(BaseEnterpriseAccessTestCase):
                 'lms_user_id': '1234',
                 'content_key': 'content_key',
             },
-            {'detail': 'MISSING: requests.has_learner_or_admin_access'}
+            {'detail': f'MISSING: {POLICY_REDEMPTION_PERMISSION}'}
         )
     )
     @ddt.unpack

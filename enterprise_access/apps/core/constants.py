@@ -14,6 +14,7 @@ REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION = 'requests.has_learner_or_admin_access
 POLICY_ADMIN_ROLE = 'enterprise_access_subsidy_access_policy_admin'
 POLICY_LEARNER_ROLE = 'enterprise_access_subsidy_access_policy_learner'
 POLICY_READ_PERMISSION = 'policy.has_read_access'
+POLICY_REDEMPTION_PERMISSION = 'policy.has_redemption_access'
 
 ALL_ACCESS_CONTEXT = '*'
 
