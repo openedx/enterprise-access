@@ -69,18 +69,32 @@ order by subsidy.title, transaction.created
 order by subsidy.title, reversal.created
 ;
 
--- list OCM enrollments created for testing:
+-- List OCM enrollments created for testing.  Link the following chain of models:
+--
+-- * Subsidy ->
+-- * Transaction ->
+-- * LearnerCreditEnterpriseCourseEnrollment ->
+-- * EnterpriseCourseEnrollment ->
+-- * CourseEnrollment
+--
   select subsidy.title as subsidy_title,
          subsidy.uuid as subsidy_uuid,
          transaction.uuid as transaction_uuid,
-         sce.id as enrollment_id,
-         sce.is_active as enrollment_is_active,
-         sce.mode as enrollment_mode
-    from prod.lms.student_courseenrollment as sce
-    join prod.enterprise_subsidy.openedx_ledger_transaction as transaction
-      on transaction.lms_user_id = sce.user_id and transaction.content_key = sce.course_id
+         lcece.id as fulfillment_identifier,
+         lcece.is_revoked as fulfillment_revoked,
+         ece.id as enterprise_course_enrollment_id,
+         sce.id as lms_enrollment_id,
+         sce.is_active as lms_enrollment_is_active,
+         sce.mode as lms_enrollment_mode
+    from prod.enterprise_subsidy.openedx_ledger_transaction as transaction
     join prod.enterprise_subsidy.subsidy_subsidy as subsidy
       on transaction.ledger_id = subsidy.ledger_id
+    join prod.lms.enterprise_learnercreditenterprisecourseenrollment lcece
+      on lcece.transaction_id = transaction.uuid
+    join prod.lms.enterprise_enterprisecourseenrollment ece
+      on lcece.enterprise_course_enrollment_id = ece.id
+    join prod.lms.student_courseenrollment as sce
+      on transaction.lms_user_id = sce.user_id and transaction.content_key = sce.course_id
    where subsidy.uuid in (
             '<replace with LC2 Test Subsidy A>', -- LP2 Test Subsidy A
             '<replace with LC2 Test Subsidy B>', -- LP2 Test Subsidy B
@@ -92,15 +106,17 @@ order by subsidy.title, transaction.created
 
 -- calculate balance of subsidy A (expect it to be $851 = $1000 - $49 - $49 + $49):
 with all_quantities as (
-  select transaction.quantity
+  select iff(transaction.state in ('committed'), transaction.quantity, 0) as committed_quantity,
+         iff(transaction.state in ('created', 'pending', 'committed'), transaction.quantity, 0) as pending_quantity
     from prod.enterprise_subsidy.openedx_ledger_transaction as transaction
     join prod.enterprise_subsidy.subsidy_subsidy as subsidy
       on transaction.ledger_id = subsidy.ledger_id
    where subsidy.uuid = '<replace with LC2 Test Subsidy A>'
 
   union all
- 
-  select reversal.quantity
+
+  select iff(reversal.state in ('committed'), reversal.quantity, 0) as committed_quantity,
+         iff(reversal.state in ('created', 'pending', 'committed'), reversal.quantity, 0) as pending_quantity
     from prod.enterprise_subsidy.openedx_ledger_reversal as reversal
     join prod.enterprise_subsidy.openedx_ledger_transaction as transaction
       on reversal.transaction_id = transaction.uuid
@@ -108,6 +124,7 @@ with all_quantities as (
       on transaction.ledger_id = subsidy.ledger_id
    where subsidy.uuid = '<replace with LC2 Test Subsidy A>'
 )
-select concat('$', sum(quantity) / 100)
+select concat('$', sum(pending_quantity) / 100) as pending_balance,
+       concat('$', sum(committed_quantity) / 100) as final_balance
   from all_quantities 
 ;
