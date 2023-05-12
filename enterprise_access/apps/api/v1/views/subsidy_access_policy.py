@@ -1,7 +1,6 @@
 """
 REST API views for the subsidy_access_policy app.
 """
-import functools
 import logging
 import os
 from collections import defaultdict
@@ -262,20 +261,15 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
     permission_required = POLICY_REDEMPTION_PERMISSION
     http_method_names = ['get', 'post']
 
-    @classmethod
-    @functools.lru_cache(maxsize=None)
-    def get_subsidy_client(cls):
+    @property
+    def subsidy_client(self):
         """
-        A process-cached EnterpriseSubsidyAPIClient instance.
+        An EnterpriseSubsidyAPIClient instance.
         """
         kwargs = {}
         if getattr(settings, 'ENTERPRISE_SUBSIDY_API_CLIENT_VERSION', None):
             kwargs['version'] = int(settings.ENTERPRISE_SUBSIDY_API_CLIENT_VERSION)
         return get_enterprise_subsidy_api_client(**kwargs)
-
-    @property
-    def subsidy_client(self):
-        return self.get_subsidy_client()
 
     @property
     def enterprise_customer_uuid(self):

@@ -1,6 +1,6 @@
 """ Mock clients for subsidy_access_policy models. """
 
-import mock
+from unittest import mock
 
 
 class group_client():

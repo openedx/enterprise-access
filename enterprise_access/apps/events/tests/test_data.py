@@ -1,9 +1,9 @@
 """
 Tests for data module in events django application.
 """
+from unittest import mock
 from uuid import uuid4
 
-import mock
 from django.test import TestCase
 from faker import Faker
 

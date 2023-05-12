@@ -90,9 +90,9 @@ django==3.2.19
     #   jsonfield2
     #   openedx-events
     #   social-auth-app-django
-django-celery-results==2.5.0
+django-celery-results==2.5.1
     # via -r requirements/base.in
-django-cors-headers==3.14.0
+django-cors-headers==4.0.0
     # via -r requirements/base.in
 django-crum==0.7.9
     # via
@@ -206,7 +206,7 @@ oauthlib==3.2.2
     #   social-auth-core
 openapi-codec==1.3.2
     # via django-rest-swagger
-openedx-events==7.1.0
+openedx-events==7.2.0
     # via -r requirements/base.in
 packaging==23.1
     # via drf-yasg
@@ -226,7 +226,7 @@ pycryptodomex==3.17
     # via pyjwkest
 pyjwkest==1.4.2
     # via edx-drf-extensions
-pyjwt[crypto]==2.6.0
+pyjwt[crypto]==2.7.0
     # via
     #   drf-jwt
     #   edx-auth-backends
@@ -270,7 +270,7 @@ requests==2.30.0
     #   social-auth-core
 requests-oauthlib==1.3.1
     # via social-auth-core
-ruamel-yaml==0.17.24
+ruamel-yaml==0.17.26
     # via drf-yasg
 ruamel-yaml-clib==0.2.7
     # via ruamel-yaml

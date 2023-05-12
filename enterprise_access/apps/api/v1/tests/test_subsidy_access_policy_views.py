@@ -3,11 +3,10 @@ Tests for Enterprise Access Subsidy Access Policy app API v1 views.
 """
 import re
 from operator import itemgetter
-from unittest.mock import patch
+from unittest import mock
 from uuid import UUID, uuid4
 
 import ddt
-import mock
 from django.conf import settings
 from requests.exceptions import HTTPError
 from rest_framework import status
@@ -368,35 +367,36 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         """
         Setup mocks for different api clients.
         """
-        get_subsidy_client_path = (
-            'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_subsidy_client'
+        subsidy_client_path = (
+            'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client'
         )
-        get_subsidy_client_patcher = patch(get_subsidy_client_path)
-        get_subsidy_client = get_subsidy_client_patcher.start()
-        get_subsidy_client.return_value.can_redeem.return_value = True
-        get_subsidy_client.return_value.transactions_for_learner.return_value = 2
-        get_subsidy_client.return_value.amount_spent_for_learner.return_value = 2
-        get_subsidy_client.return_value.amount_spent_for_group_and_catalog.return_value = 2
-        get_subsidy_client.return_value.get_current_balance.return_value = 10
-        get_subsidy_client.return_value.list_subsidy_transactions.return_value = {"results": [], "aggregates": []}
-        get_subsidy_client.return_value.retrieve_subsidy_transaction.side_effect = \
+        subsidy_client_patcher = mock.patch(subsidy_client_path)
+        subsidy_client = subsidy_client_patcher.start()
+        subsidy_client.can_redeem.return_value = True
+        subsidy_client.transactions_for_learner.return_value = 2
+        subsidy_client.amount_spent_for_learner.return_value = 2
+        subsidy_client.amount_spent_for_group_and_catalog.return_value = 2
+        subsidy_client.get_current_balance.return_value = 10
+        subsidy_client.list_subsidy_transactions.return_value = {"results": [], "aggregates": []}
+        subsidy_client.retrieve_subsidy_transaction.side_effect = (
             NotImplementedError("unit test must override retrieve_subsidy_transaction to use.")
-        get_subsidy_client.return_value.create_subsidy_transaction.side_effect = \
+        )
+        subsidy_client.create_subsidy_transaction.side_effect = (
             NotImplementedError("unit test must override create_subsidy_transaction to use.")
+        )
 
         catalog_client_path = 'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_client'
-        enterprise_catalog_client_patcher = patch(catalog_client_path)
+        enterprise_catalog_client_patcher = mock.patch(catalog_client_path)
         enterprise_catalog_client = enterprise_catalog_client_patcher.start()
-        enterprise_catalog_client_instance = enterprise_catalog_client.return_value
-        enterprise_catalog_client_instance.contains_content_items.return_value = True
+        enterprise_catalog_client.contains_content_items.return_value = True
 
-        lms_client_patcher = patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
+        lms_client_patcher = mock.patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
         lms_client = lms_client_patcher.start()
         lms_client_instance = lms_client.return_value
         lms_client_instance.enterprise_contains_learner.return_value = True
 
         self.addCleanup(lms_client_patcher.stop)
-        self.addCleanup(get_subsidy_client_patcher.stop)
+        self.addCleanup(subsidy_client_patcher.stop)
         self.addCleanup(enterprise_catalog_client_patcher.stop)
 
     def test_list(self):
@@ -478,15 +478,16 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'other': True,
         }
         # HTTPError would be caused by a 404, indicating that a transaction does not already exist for this policy.
-        self.redeemable_policy.get_subsidy_client.return_value.retrieve_subsidy_transaction.side_effect = HTTPError()
-        self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.side_effect = None
-        self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.return_value = \
-            mock_transaction_record
+        self.redeemable_policy.subsidy_client.retrieve_subsidy_transaction.side_effect = HTTPError()
+        self.redeemable_policy.subsidy_client.create_subsidy_transaction.side_effect = None
+        self.redeemable_policy.subsidy_client.create_subsidy_transaction.return_value = mock_transaction_record
         payload = {
             'lms_user_id': '1234',
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
         }
+
         response = self.client.post(self.subsidy_access_policy_redeem_endpoint, payload)
+
         response_json = self.load_json(response.content)
         assert response_json == mock_transaction_record
 
@@ -500,10 +501,9 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'other': True,
         }
         # HTTPError would be caused by a 404, indicating that a transaction does not already exist for this policy.
-        self.redeemable_policy.get_subsidy_client.return_value.retrieve_subsidy_transaction.side_effect = HTTPError()
-        self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.side_effect = None
-        self.redeemable_policy.get_subsidy_client.return_value.create_subsidy_transaction.return_value = \
-            mock_transaction_record
+        self.redeemable_policy.subsidy_client.retrieve_subsidy_transaction.side_effect = HTTPError()
+        self.redeemable_policy.subsidy_client.create_subsidy_transaction.side_effect = None
+        self.redeemable_policy.subsidy_client.create_subsidy_transaction.return_value = mock_transaction_record
         payload = {
             'lms_user_id': '1234',
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
@@ -511,7 +511,9 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
                 'geag_first_name': 'John'
             }
         }
+
         response = self.client.post(self.subsidy_access_policy_redeem_endpoint, payload)
+
         response_json = self.load_json(response.content)
         assert response_json == mock_transaction_record
 
@@ -824,7 +826,8 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             },
         ]
 
-    def test_can_redeem_policy_existing_redemptions(self):
+    @mock.patch('enterprise_access.apps.api.v1.views.SubsidyAccessPolicyRedeemViewset.subsidy_client')
+    def test_can_redeem_policy_existing_redemptions(self, mock_view_subsidy_client):
         """
         Test that the can_redeem endpoint shows existing redemptions too.
         """
@@ -848,14 +851,12 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             },
         }
 
-        mock_subsidy_client = mock.Mock()
-        mock_subsidy_client.get_subsidy_content_data.return_value = {
+        mock_view_subsidy_client.get_subsidy_content_data.return_value = {
             "content_uuid": str(uuid4()),
             "content_key": "course-v1:demox+1234+2T2023",
             "source": "edX",
             "content_price": "199.00",
         }
-        SubsidyAccessPolicyRedeemViewset.subsidy_client = mock_subsidy_client
 
         query_params = {'content_key': 'course-v1:demox+1234+2T2023'}
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
@@ -880,20 +881,21 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         assert response_list[0]["can_redeem"] is True
         assert len(response_list[0]["reasons"]) == 0
 
-    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient', return_value=mock.MagicMock())
-    def test_can_redeem_policy_no_price(self, mock_lms_client):
+    @mock.patch('enterprise_access.apps.api.v1.views.SubsidyAccessPolicyRedeemViewset.subsidy_client')
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
+    def test_can_redeem_policy_no_price(self, mock_lms_client, mock_view_subsidy_client):
         """
         Test that the can_redeem endpoint successfuly serializes a response for content that has no price.
         """
         test_content_key = "course-v1:demox+1234+2T2023"
-        mock_lms_client().get_enterprise_customer_data.return_value = {
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
             'slug': 'sluggy',
             'admin_users': [{'email': 'edx@example.org'}],
         }
 
         # FIXME: subisdy client's can_redeem() function returns a dict in reality, so when we fix this in the policy
         # model code, fix it here too by making it return a dictionary with a `can_redeem` key set to a value of False.
-        self.redeemable_policy.get_subsidy_client.return_value.can_redeem.return_value = False
+        self.redeemable_policy.subsidy_client.can_redeem.return_value = False
         self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
             'results': [],
             'aggregates': {
@@ -901,17 +903,17 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             },
         }
 
-        mock_subsidy_client = mock.Mock()
-        mock_subsidy_client.get_subsidy_content_data.return_value = {
+        mock_view_subsidy_client.get_subsidy_content_data.return_value = {
             "content_uuid": str(uuid4()),
             "content_key": test_content_key,
             "source": "edX",
             "content_price": None,
         }
-        SubsidyAccessPolicyRedeemViewset.subsidy_client = mock_subsidy_client
 
         query_params = {'content_key': test_content_key}
+
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
         assert response.status_code == status.HTTP_200_OK
         response_list = response.json()
 

@@ -1,6 +1,7 @@
 """Test subsidy_requests.admin"""
 
-import mock
+from unittest import mock
+
 from django.contrib.admin.sites import AdminSite
 from django.http import HttpRequest
 

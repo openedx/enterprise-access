@@ -1,10 +1,10 @@
 """
 Unit tests for the utility functions.
 """
+from unittest import mock
 from unittest.mock import ANY
 from uuid import uuid4
 
-import mock
 from confluent_kafka.error import ValueSerializationError
 from django.conf import settings
 from django.test import TestCase
