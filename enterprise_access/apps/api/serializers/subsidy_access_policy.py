@@ -58,9 +58,9 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
     subsidy_uuid = serializers.UUIDField(allow_null=False)
     access_method = serializers.ChoiceField(choices=AccessMethods.CHOICES)
 
-    per_learner_enrollment_limit = serializers.IntegerField()
-    per_learner_spend_limit = serializers.IntegerField()
-    spend_limit = serializers.IntegerField()
+    per_learner_enrollment_limit = serializers.IntegerField(allow_null=True, required=False)
+    per_learner_spend_limit = serializers.IntegerField(allow_null=True, required=False)
+    spend_limit = serializers.IntegerField(allow_null=True, required=False)
 
     class Meta:
         model = SubsidyAccessPolicy
