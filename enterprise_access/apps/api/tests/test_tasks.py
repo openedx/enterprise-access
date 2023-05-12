@@ -2,10 +2,10 @@
 Tests for Enterprise Access API tasks.
 """
 
+from unittest import mock
 from uuid import uuid4
 
 import ddt
-import mock
 
 from enterprise_access.apps.api.serializers import CouponCodeRequestSerializer, LicenseRequestSerializer
 from enterprise_access.apps.api.tasks import (

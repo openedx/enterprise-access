@@ -2,9 +2,9 @@
 Tests for Subsidy Request Management commands.
 """
 from datetime import datetime
+from unittest import mock
 from uuid import uuid4
 
-import mock
 from django.conf import settings
 from django.core.management import call_command
 from pytest import mark

@@ -150,9 +150,9 @@ django==3.2.19
     #   jsonfield2
     #   openedx-events
     #   social-auth-app-django
-django-celery-results==2.5.0
+django-celery-results==2.5.1
     # via -r requirements/test.txt
-django-cors-headers==3.14.0
+django-cors-headers==4.0.0
     # via -r requirements/test.txt
 django-crum==0.7.9
     # via
@@ -192,7 +192,7 @@ djangorestframework==3.14.0
     #   drf-yasg
     #   edx-api-doc-tools
     #   edx-drf-extensions
-docutils==0.19
+docutils==0.20
     # via readme-renderer
 drf-jwt==1.19.2
     # via
@@ -246,7 +246,7 @@ exceptiongroup==1.1.1
     #   pytest
 factory-boy==3.2.1
     # via -r requirements/test.txt
-faker==18.6.2
+faker==18.7.0
     # via
     #   -r requirements/test.txt
     #   factory-boy
@@ -337,8 +337,6 @@ mccabe==0.7.0
     #   pylint
 mdurl==0.1.2
     # via markdown-it-py
-mock==5.0.2
-    # via -r requirements/test.txt
 monotonic==1.6
     # via
     #   -r requirements/test.txt
@@ -360,7 +358,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==7.1.0
+openedx-events==7.2.0
     # via -r requirements/test.txt
 packaging==23.1
     # via
@@ -378,7 +376,7 @@ pkgutil-resolve-name==1.3.10
     # via
     #   -r requirements/test.txt
     #   jsonschema
-platformdirs==3.5.0
+platformdirs==3.5.1
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -424,7 +422,7 @@ pyjwkest==1.4.2
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
-pyjwt[crypto]==2.6.0
+pyjwt[crypto]==2.7.0
     # via
     #   -r requirements/test.txt
     #   drf-jwt
@@ -527,7 +525,7 @@ rfc3986==2.0.0
     # via twine
 rich==13.3.5
     # via twine
-ruamel-yaml==0.17.24
+ruamel-yaml==0.17.26
     # via
     #   -r requirements/test.txt
     #   drf-yasg

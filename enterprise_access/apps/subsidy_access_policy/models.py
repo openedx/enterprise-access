@@ -1,7 +1,6 @@
 """
 Models for subsidy_access_policy
 """
-import functools
 import sys
 from contextlib import contextmanager
 from uuid import UUID, uuid4
@@ -9,7 +8,6 @@ from uuid import UUID, uuid4
 from django.conf import settings
 from django.core.cache import cache as django_cache
 from django.db import models
-from django.utils.functional import cached_property
 from django_extensions.db.models import TimeStampedModel
 from edx_django_utils.cache.utils import get_cache_key
 from edx_enterprise_subsidy_client import get_enterprise_subsidy_api_client
@@ -136,11 +134,10 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
     history = HistoricalRecords()
 
-    @classmethod
-    @functools.lru_cache(maxsize=None)
-    def get_subsidy_client(cls):
+    @property
+    def subsidy_client(self):
         """
-        A process-cached EnterpriseSubsidyAPIClient instance.
+        An EnterpriseSubsidyAPIClient instance.
         """
         kwargs = {}
         if getattr(settings, 'ENTERPRISE_SUBSIDY_API_CLIENT_VERSION', None):
@@ -148,20 +145,16 @@ class SubsidyAccessPolicy(TimeStampedModel):
         return get_enterprise_subsidy_api_client(**kwargs)
 
     @property
-    def subsidy_client(self):
-        return self.get_subsidy_client()
-
-    @cached_property
     def catalog_client(self):
         """
-        A process-cached EnterpriseCatalogApiClient instance.
+        An EnterpriseCatalogApiClient instance.
         """
         return EnterpriseCatalogApiClient()
 
-    @cached_property
+    @property
     def lms_api_client(self):
         """
-        A process-cached LmsApiClient instance.
+        An LmsApiClient instance.
         """
         return LmsApiClient()
 
@@ -374,11 +367,10 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Returns:
            SubsidyAccessPolicy: one policy selected from the input list.
         """
-        subsidy_client = cls.get_subsidy_client()
         # For now, we inefficiently make one call per subsidy record.
         subsidy_uuids = set(redeemable_policy.subsidy_uuid for redeemable_policy in redeemable_policies)
         subsidy_balances = {
-            subsidy_uuid: subsidy_client.retrieve_subsidy(subsidy_uuid)["current_balance"]
+            subsidy_uuid: cls.subsidy_client.retrieve_subsidy(subsidy_uuid)["current_balance"]
             for subsidy_uuid in subsidy_uuids
         }
         sorted_policies = sorted(

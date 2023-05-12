@@ -9,8 +9,8 @@ in multiple test modules (i.e. factoryboy factories, base test classes).
 So this package is the place to put them.
 """
 import json
+from unittest import mock
 
-import mock
 from django.test import TestCase
 from django.test.client import RequestFactory
 from edx_rest_framework_extensions.auth.jwt.cookies import jwt_cookie_name
