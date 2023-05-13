@@ -138,7 +138,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         An EnterpriseSubsidyAPIClient instance.
         """
-        print('subsidy client!!!', get_versioned_subsidy_client, get_versioned_subsidy_client())
         return get_versioned_subsidy_client()
 
     @property

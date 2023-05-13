@@ -669,7 +669,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 list_price_integer_cents = content_metadata["content_price"]
                 # TODO: simplify this function by consolidating this conversion logic into the response serializer:
                 if list_price_integer_cents is not None:
-                    list_price_decimal_dollars = float(list_price_integer_cents / 100)
+                    list_price_decimal_dollars = float(list_price_integer_cents) / 100
                 else:
                     list_price_decimal_dollars = None
             except requests.exceptions.HTTPError:
