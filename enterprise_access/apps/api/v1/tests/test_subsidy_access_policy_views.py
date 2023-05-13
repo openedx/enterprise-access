@@ -368,7 +368,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         Setup mocks for different api clients.
         """
         subsidy_client_path = (
-            'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client'
+            'enterprise_access.apps.subsidy_access_policy.models.get_versioned_subsidy_client'
         )
         subsidy_client_patcher = mock.patch(subsidy_client_path)
         subsidy_client = subsidy_client_patcher.start()
@@ -650,14 +650,14 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         }
         test_content_key_1 = "course-v1:edX+edXPrivacy101+3T2020"
         test_content_key_2 = "course-v1:edX+edXPrivacy101+3T2020_2"
-        test_content_key_1_metadata_price = "12.34"
-        test_content_key_2_metadata_price = "56.78"
-        test_content_key_1_float_price = 12.34
-        test_content_key_2_float_price = 56.78
-        test_content_key_1_cents_price = 1234
-        test_content_key_2_cents_price = 5678
+        test_content_key_1_metadata_price = 29900
+        test_content_key_2_metadata_price = 81900
+        test_content_key_1_usd_price = 299
+        test_content_key_2_usd_price = 819
+        test_content_key_1_cents_price = 29900
+        test_content_key_2_cents_price = 81900
 
-        def mock_get_subsidy_content_data(*args, **kwargs):
+        def mock_get_subsidy_content_data(*args):
             if test_content_key_1 in args:
                 return {
                     "content_uuid": str(uuid4()),
@@ -691,7 +691,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         # Check the response for the first content_key given.
         assert response_list[0]["content_key"] == test_content_key_1
         assert response_list[0]["list_price"] == {
-            "usd": test_content_key_1_float_price,
+            "usd": test_content_key_1_usd_price,
             "usd_cents": test_content_key_1_cents_price,
         }
         assert len(response_list[0]["redemptions"]) == 0
@@ -703,7 +703,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         # Check the response for the second content_key given.
         assert response_list[1]["content_key"] == test_content_key_2
         assert response_list[1]["list_price"] == {
-            "usd": test_content_key_2_float_price,
+            "usd": test_content_key_2_usd_price,
             "usd_cents": test_content_key_2_cents_price,
         }
         assert len(response_list[1]["redemptions"]) == 0
@@ -738,12 +738,12 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         self.redeemable_policy.subsidy_client.can_redeem.return_value = False
         test_content_key_1 = "course-v1:edX+edXPrivacy101+3T2020"
         test_content_key_2 = "course-v1:edX+edXPrivacy101+3T2020_2"
-        test_content_key_1_metadata_price = "12.34"
-        test_content_key_2_metadata_price = "56.78"
-        test_content_key_1_float_price = 12.34
-        test_content_key_2_float_price = 56.78
-        test_content_key_1_cents_price = 1234
-        test_content_key_2_cents_price = 5678
+        test_content_key_1_metadata_price = 29900
+        test_content_key_2_metadata_price = 81900
+        test_content_key_1_usd_price = 299
+        test_content_key_2_usd_price = 819
+        test_content_key_1_cents_price = 29900
+        test_content_key_2_cents_price = 81900
 
         def mock_get_subsidy_content_data(*args, **kwargs):
             if test_content_key_1 in args:
@@ -779,7 +779,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         # Check the response for the first content_key given.
         assert response_list[0]["content_key"] == test_content_key_1
         assert response_list[0]["list_price"] == {
-            "usd": test_content_key_1_float_price,
+            "usd": test_content_key_1_usd_price,
             "usd_cents": test_content_key_1_cents_price,
         }
         assert len(response_list[0]["redemptions"]) == 0
@@ -808,7 +808,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         # Check the response for the second content_key given.
         assert response_list[1]["content_key"] == test_content_key_2
         assert response_list[1]["list_price"] == {
-            "usd": test_content_key_2_float_price,
+            "usd": test_content_key_2_usd_price,
             "usd_cents": test_content_key_2_cents_price,
         }
         assert len(response_list[1]["redemptions"]) == 0
@@ -855,7 +855,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             "content_uuid": str(uuid4()),
             "content_key": "course-v1:demox+1234+2T2023",
             "source": "edX",
-            "content_price": "199.00",
+            "content_price": 19900,
         }
 
         query_params = {'content_key': 'course-v1:demox+1234+2T2023'}
