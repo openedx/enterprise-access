@@ -5,7 +5,6 @@ import sys
 from contextlib import contextmanager
 from uuid import UUID, uuid4
 
-from django.conf import settings
 from django.core.cache import cache as django_cache
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
@@ -27,6 +26,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
 from enterprise_access.apps.subsidy_access_policy.utils import get_versioned_subsidy_client
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
+
 
 class SubsidyAccessPolicyLockAttemptFailed(Exception):
     """
