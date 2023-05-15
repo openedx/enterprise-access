@@ -18,7 +18,7 @@ asgiref==3.6.0
     # via
     #   -r requirements/test.txt
     #   django
-astroid==2.15.4
+astroid==2.15.5
     # via
     #   -r requirements/test.txt
     #   pylint
