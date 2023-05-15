@@ -21,7 +21,7 @@ from rest_framework import permissions
 from rest_framework import serializers as rest_serializers
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import APIException, NotFound
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
@@ -46,9 +46,11 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_LEARNER_NOT_IN_ENTERPRISE,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     REASON_POLICY_NOT_ACTIVE,
+    REASON_POLICY_SPEND_LIMIT_REACHED,
     MissingSubsidyAccessReasonUserMessages,
     TransactionStateChoices
 )
+from enterprise_access.apps.subsidy_access_policy.exceptions import ContentPriceNullException
 from enterprise_access.apps.subsidy_access_policy.models import (
     SubsidyAccessPolicy,
     SubsidyAccessPolicyLockAttemptFailed
@@ -323,7 +325,13 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             active=True,
         )
         for policy in all_policies_for_enterprise:
-            redeemable, reason = policy.can_redeem(lms_user_id, content_key)
+            try:
+                redeemable, reason = policy.can_redeem(lms_user_id, content_key)
+            except ContentPriceNullException as exc:
+                logger.warning(f'{exc} when checking can_redeem() for {enterprise_customer_uuid}')
+                raise RedemptionRequestException(
+                    detail=f'Could not determine price for content_key: {content_key}',
+                ) from exc
             if redeemable:
                 redeemable_policies.append(policy)
             else:
@@ -567,6 +575,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             REASON_CONTENT_NOT_IN_CATALOG: user_message_organization_no_funds,
             REASON_LEARNER_NOT_IN_ENTERPRISE: user_message_organization_no_funds,
             REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY: user_message_organization_no_funds,
+            REASON_POLICY_SPEND_LIMIT_REACHED: user_message_organization_no_funds,
             REASON_LEARNER_MAX_SPEND_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
             REASON_LEARNER_MAX_ENROLLMENTS_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
         }
@@ -614,7 +623,13 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         serializer.is_valid(raise_exception=True)
 
         content_keys = serializer.data['content_key']
-        lms_user_id = self.lms_user_id
+        lms_user_id = self.lms_user_id or request.user.lms_user_id
+        if not lms_user_id:
+            logger.warning(
+                f'No lms_user_id found when checking if we can redeem {content_keys} '
+                f'in customer {enterprise_customer_uuid}'
+            )
+            raise NotFound(detail='Could not determine a value for lms_user_id')
 
         element_responses = []
         for content_key in content_keys:
@@ -672,12 +687,11 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                     list_price_decimal_dollars = float(list_price_integer_cents) / 100
                 else:
                     list_price_decimal_dollars = None
-            except requests.exceptions.HTTPError:
-                # No need to record a failure reason here because evaluate_policies() -> policy.can_redeem() already
-                # caught any problematic or non-existent content keys, and provided a reason it could not be redeemed.
-                # Just set a None content_price and move along.
-                list_price_decimal_dollars = None
-                list_price_integer_cents = None
+            except requests.exceptions.HTTPError as exc:
+                logger.warning(f'{exc} when checking can_redeem() for {enterprise_customer_uuid}')
+                raise RedemptionRequestException(
+                    detail=f'Could not determine price for content_key: {content_key}',
+                ) from exc
 
             element_response = {
                 "content_key": content_key,
