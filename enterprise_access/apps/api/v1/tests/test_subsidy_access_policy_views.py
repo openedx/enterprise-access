@@ -24,6 +24,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     MissingSubsidyAccessReasonUserMessages,
     TransactionStateChoices
 )
+from enterprise_access.apps.subsidy_access_policy.exceptions import ContentPriceNullException
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
@@ -347,7 +348,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         self.redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
-            spend_limit=3
+            spend_limit=500000,
         )
         self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
 
@@ -368,16 +369,12 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         Setup mocks for different api clients.
         """
         subsidy_client_path = (
-            'enterprise_access.apps.subsidy_access_policy.models.get_versioned_subsidy_client'
+            'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client'
         )
         subsidy_client_patcher = mock.patch(subsidy_client_path)
         subsidy_client = subsidy_client_patcher.start()
         subsidy_client.can_redeem.return_value = True
-        subsidy_client.transactions_for_learner.return_value = 2
-        subsidy_client.amount_spent_for_learner.return_value = 2
-        subsidy_client.amount_spent_for_group_and_catalog.return_value = 2
-        subsidy_client.get_current_balance.return_value = 10
-        subsidy_client.list_subsidy_transactions.return_value = {"results": [], "aggregates": []}
+        subsidy_client.list_subsidy_transactions.return_value = {"results": [], "aggregates": {}}
         subsidy_client.retrieve_subsidy_transaction.side_effect = (
             NotImplementedError("unit test must override retrieve_subsidy_transaction to use.")
         )
@@ -399,7 +396,11 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         self.addCleanup(subsidy_client_patcher.stop)
         self.addCleanup(enterprise_catalog_client_patcher.stop)
 
-    def test_list(self):
+    @mock.patch(
+        'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_price',
+        return_value=100,
+    )
+    def test_list(self, mock_get_content_price):
         """
         list endpoint should return only the redeemable policy, and also check the serialized output fields.
         """
@@ -431,6 +432,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             f"http.*/api/v1/policy/{self.redeemable_policy.uuid}/redeem/",
             response_json[0]["policy_redemption_url"],
         )
+        mock_get_content_price.assert_called_once_with(query_params['content_key'])
 
     @ddt.data(
         (
@@ -468,7 +470,11 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         assert response_json == expected_result
 
-    def test_redeem_policy(self):
+    @mock.patch(
+        'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_price',
+        return_value=200,
+    )
+    def test_redeem_policy(self, mock_get_content_price):
         """
         Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint works as expected
         """
@@ -490,8 +496,13 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         response_json = self.load_json(response.content)
         assert response_json == mock_transaction_record
+        mock_get_content_price.assert_called_once_with(payload['content_key'])
 
-    def test_redeem_policy_with_metadata(self):
+    @mock.patch(
+        'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_price',
+        return_value=200,
+    )
+    def test_redeem_policy_with_metadata(self, mock_get_content_price):
         """
         Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint works as expected
         """
@@ -516,6 +527,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         response_json = self.load_json(response.content)
         assert response_json == mock_transaction_record
+        mock_get_content_price.assert_called_once_with(payload['content_key'])
 
     def test_redemption_endpoint(self):
         """
@@ -678,6 +690,8 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         mock_subsidy_client = mock.Mock()
         mock_subsidy_client.get_subsidy_content_data.side_effect = mock_get_subsidy_content_data
         SubsidyAccessPolicyRedeemViewset.subsidy_client = mock_subsidy_client
+        self.redeemable_policy.subsidy_client.get_subsidy_content_data.side_effect = mock_get_subsidy_content_data
+
         query_params = {
             'content_key': [test_content_key_1, test_content_key_2],
         }
@@ -827,7 +841,11 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         ]
 
     @mock.patch('enterprise_access.apps.api.v1.views.SubsidyAccessPolicyRedeemViewset.subsidy_client')
-    def test_can_redeem_policy_existing_redemptions(self, mock_view_subsidy_client):
+    @mock.patch(
+        'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_price',
+        return_value=19900,
+    )
+    def test_can_redeem_policy_existing_redemptions(self, mock_get_content_price, mock_view_subsidy_client):
         """
         Test that the can_redeem endpoint shows existing redemptions too.
         """
@@ -880,10 +898,14 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
         assert response_list[0]["can_redeem"] is True
         assert len(response_list[0]["reasons"]) == 0
+        mock_get_content_price.assert_called_once_with(query_params['content_key'])
 
     @mock.patch('enterprise_access.apps.api.v1.views.SubsidyAccessPolicyRedeemViewset.subsidy_client')
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
-    def test_can_redeem_policy_no_price(self, mock_lms_client, mock_view_subsidy_client):
+    @mock.patch(
+        'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_price',
+    )
+    def test_can_redeem_policy_no_price(self, mock_get_content_price, mock_lms_client, mock_view_subsidy_client):
         """
         Test that the can_redeem endpoint successfuly serializes a response for content that has no price.
         """
@@ -893,9 +915,11 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'admin_users': [{'email': 'edx@example.org'}],
         }
 
+        mock_get_content_price.side_effect = ContentPriceNullException
+
         # FIXME: subisdy client's can_redeem() function returns a dict in reality, so when we fix this in the policy
         # model code, fix it here too by making it return a dictionary with a `can_redeem` key set to a value of False.
-        self.redeemable_policy.subsidy_client.can_redeem.return_value = False
+        self.redeemable_policy.subsidy_client.can_redeem.return_value = True
         self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
             'results': [],
             'aggregates': {
@@ -914,17 +938,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
 
-        assert response.status_code == status.HTTP_200_OK
-        response_list = response.json()
-
-        assert len(response_list) == 1
-        assert response_list[0]["content_key"] == test_content_key
-        assert response_list[0]["list_price"] == {
-            "usd": None,
-            "usd_cents": None,
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.json() == {
+            'detail': f'Could not determine price for content_key: {test_content_key}',
         }
-        assert len(response_list[0]["redemptions"]) == 0
-        assert response_list[0]["has_successful_redemption"] is False
-        assert response_list[0]["redeemable_subsidy_access_policy"] is None
-        assert response_list[0]["can_redeem"] is False
-        assert len(response_list[0]["reasons"]) == 1

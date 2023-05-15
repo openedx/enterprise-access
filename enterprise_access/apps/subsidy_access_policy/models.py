@@ -13,7 +13,8 @@ from simple_history.models import HistoricalRecords
 
 from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
-from enterprise_access.apps.subsidy_access_policy.constants import (
+
+from .constants import (
     CREDIT_POLICY_TYPE_PRIORITY,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
@@ -21,17 +22,13 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_LEARNER_NOT_IN_ENTERPRISE,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     REASON_POLICY_NOT_ACTIVE,
+    REASON_POLICY_SPEND_LIMIT_REACHED,
     AccessMethods
 )
-from enterprise_access.apps.subsidy_access_policy.utils import get_versioned_subsidy_client
+from .exceptions import ContentPriceNullException, SubsidyAccessPolicyLockAttemptFailed
+from .utils import get_versioned_subsidy_client
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
-
-
-class SubsidyAccessPolicyLockAttemptFailed(Exception):
-    """
-    Raise when attempt to lock SubsidyAccessPolicy failed due to an already existing lock acquired on the same resource.
-    """
 
 
 class PolicyManager(models.Manager):
@@ -200,6 +197,31 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         return self.subsidy_balance()
 
+    def get_content_price(self, content_key):
+        """
+        Returns the price for some content key, as told by the enterprise-subsidy service.
+
+        Returns: The price (in USD cents) for the given content key.
+        Raises: UnredeemableContentException if the price is null.
+        """
+        content_price = self.subsidy_client.get_subsidy_content_data(
+            self.enterprise_customer_uuid,
+            content_key
+        )['content_price']
+        if content_price is None:
+            raise ContentPriceNullException(f'The price for {content_key} is null')
+        return content_price
+
+    def aggregates_for_policy(self):
+        """
+        Returns aggregate transaction data for this policy.
+        """
+        response_payload = self.subsidy_client.list_subsidy_transactions(
+            subsidy_uuid=self.subsidy_uuid,
+            subsidy_access_policy_uuid=self.uuid,
+        )
+        return response_payload['aggregates']
+
     def transactions_for_learner(self, lms_user_id):
         """
         TODO: figure out cache?
@@ -231,6 +253,18 @@ class SubsidyAccessPolicy(TimeStampedModel):
             'aggregates': response_payload['aggregates'],
         }
 
+    def will_exceed_spend_limit(self, content_key):
+        """
+        Returns true if redeeming this course would exceed
+        the ``spend_limit`` set by this policy.
+        """
+        if self.spend_limit is None:
+            return False
+
+        content_price = self.get_content_price(content_key)
+        spent_amount = self.aggregates_for_policy().get('total_quantity') or 0
+        return (spent_amount + content_price) >= self.spend_limit
+
     def can_redeem(self, lms_user_id, content_key):
         """
         Check that a given learner can redeem the given content.
@@ -245,6 +279,8 @@ class SubsidyAccessPolicy(TimeStampedModel):
         # FIXME: self.subsidy_client.can_redeem() returns a dictionary, not a bool!
         if not self.subsidy_client.can_redeem(self.subsidy_uuid, lms_user_id, content_key):
             return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
+        if self.will_exceed_spend_limit(content_key):
+            return (False, REASON_POLICY_SPEND_LIMIT_REACHED)
 
         return (True, None)
 
@@ -364,15 +400,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
            SubsidyAccessPolicy: one policy selected from the input list.
         """
         # For now, we inefficiently make one call per subsidy record.
-        subsidy_uuids = set(redeemable_policy.subsidy_uuid for redeemable_policy in redeemable_policies)
-        subsidy_client = get_versioned_subsidy_client()
-        subsidy_balances = {
-            subsidy_uuid: subsidy_client.retrieve_subsidy(subsidy_uuid)["current_balance"]
-            for subsidy_uuid in subsidy_uuids
-        }
         sorted_policies = sorted(
             redeemable_policies,
-            key=lambda p: (p.priority, subsidy_balances[p.subsidy_uuid]),
+            key=lambda p: (p.priority, p.subsidy_balance()),
         )
         return sorted_policies[0]
 
@@ -465,13 +495,8 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
         if has_per_learner_spend_limit:
             # only retrieve transactions if there is a per-learner spend limit
             spent_amount = self.transactions_for_learner(lms_user_id)['aggregates'].get('total_quantity') or 0
-            course_price = self.subsidy_client.get_subsidy_content_data(
-                self.enterprise_customer_uuid,
-                content_key
-            )['content_price']
-
-            # check whether learner exceeded per-learner spend limit
-            if (spent_amount + course_price) >= self.per_learner_spend_limit:
+            content_price = self.get_content_price(content_key)
+            if (spent_amount + content_price) >= self.per_learner_spend_limit:
                 return (False, REASON_LEARNER_MAX_SPEND_REACHED)
 
         # learner can redeem the subsidy access policy
