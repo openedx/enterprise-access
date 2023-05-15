@@ -665,16 +665,13 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             # Determine the price for content for display purposes only.
             try:
                 content_metadata = self.subsidy_client.get_subsidy_content_data(enterprise_customer_uuid, content_key)
-                # Note that the "content_price" key is guaranteed to exist, but the value may be None.  Also, the
-                # upstream field type is a string representing a decimal dollar.
-                list_price_decimal_dollars_str = content_metadata["content_price"]
+                # Note that the "content_price" key is guaranteed to exist, but the value may be None.
+                list_price_integer_cents = content_metadata["content_price"]
                 # TODO: simplify this function by consolidating this conversion logic into the response serializer:
-                if list_price_decimal_dollars_str:
-                    list_price_decimal_dollars = float(list_price_decimal_dollars_str)
-                    list_price_integer_cents = int(list_price_decimal_dollars * 100)
+                if list_price_integer_cents is not None:
+                    list_price_decimal_dollars = float(list_price_integer_cents) / 100
                 else:
                     list_price_decimal_dollars = None
-                    list_price_integer_cents = None
             except requests.exceptions.HTTPError:
                 # No need to record a failure reason here because evaluate_policies() -> policy.can_redeem() already
                 # caught any problematic or non-existent content keys, and provided a reason it could not be redeemed.

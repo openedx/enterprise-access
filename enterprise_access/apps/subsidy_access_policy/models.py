@@ -5,12 +5,10 @@ import sys
 from contextlib import contextmanager
 from uuid import UUID, uuid4
 
-from django.conf import settings
 from django.core.cache import cache as django_cache
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from edx_django_utils.cache.utils import get_cache_key
-from edx_enterprise_subsidy_client import get_enterprise_subsidy_api_client
 from simple_history.models import HistoricalRecords
 
 from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
@@ -25,6 +23,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_POLICY_NOT_ACTIVE,
     AccessMethods
 )
+from enterprise_access.apps.subsidy_access_policy.utils import get_versioned_subsidy_client
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
 
@@ -139,10 +138,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         An EnterpriseSubsidyAPIClient instance.
         """
-        kwargs = {}
-        if getattr(settings, 'ENTERPRISE_SUBSIDY_API_CLIENT_VERSION', None):
-            kwargs['version'] = int(settings.ENTERPRISE_SUBSIDY_API_CLIENT_VERSION)
-        return get_enterprise_subsidy_api_client(**kwargs)
+        return get_versioned_subsidy_client()
 
     @property
     def catalog_client(self):
@@ -369,8 +365,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         # For now, we inefficiently make one call per subsidy record.
         subsidy_uuids = set(redeemable_policy.subsidy_uuid for redeemable_policy in redeemable_policies)
+        subsidy_client = get_versioned_subsidy_client()
         subsidy_balances = {
-            subsidy_uuid: cls.subsidy_client.retrieve_subsidy(subsidy_uuid)["current_balance"]
+            subsidy_uuid: subsidy_client.retrieve_subsidy(subsidy_uuid)["current_balance"]
             for subsidy_uuid in subsidy_uuids
         }
         sorted_policies = sorted(
