@@ -146,6 +146,7 @@ django==3.2.19
     #   django-debug-toolbar
     #   django-extensions
     #   django-filter
+    #   django-log-request-id
     #   django-model-utils
     #   djangorestframework
     #   drf-jwt
@@ -179,6 +180,8 @@ django-dynamic-fixture==3.1.2
 django-extensions==3.2.1
     # via -r requirements/validation.txt
 django-filter==23.2
+    # via -r requirements/validation.txt
+django-log-request-id==2.1.0
     # via -r requirements/validation.txt
 django-model-utils==4.3.1
     # via
@@ -385,7 +388,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/validation.txt
     #   django-rest-swagger
-openedx-events==7.2.0
+openedx-events==7.3.0
     # via -r requirements/validation.txt
 packaging==23.1
     # via
@@ -485,7 +488,7 @@ pylint-django==2.5.3
     # via
     #   -r requirements/validation.txt
     #   edx-lint
-pylint-plugin-utils==0.7
+pylint-plugin-utils==0.8.1
     # via
     #   -r requirements/validation.txt
     #   pylint-celery
@@ -637,7 +640,7 @@ sqlparse==0.4.4
     #   -r requirements/validation.txt
     #   django
     #   django-debug-toolbar
-stevedore==5.0.0
+stevedore==5.1.0
     # via
     #   -r requirements/validation.txt
     #   code-annotations
