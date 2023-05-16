@@ -44,7 +44,7 @@ class PerLearnerEnrollmentCreditAccessPolicy(BaseSubsidyAccessPolicyMixin):
 @admin.register(models.PerLearnerSpendCreditAccessPolicy)
 class PerLearnerSpendCreditAccessPolicy(BaseSubsidyAccessPolicyMixin):
     """
-    Admin configuration for PerLearnerEnrollmentCreditAccessPolicy.
+    Admin configuration for PerLearnerSpendCreditAccessPolicy.
     """
     list_display = BaseSubsidyAccessPolicyMixin.list_display + (
         'per_learner_spend_limit',
