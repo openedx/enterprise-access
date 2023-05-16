@@ -25,9 +25,8 @@ def get_logger_config(logging_env="no_env",
     syslog_format = (
         "[service_variant={service_variant}]"
         "[%(name)s][env:{logging_env}] %(levelname)s "
-        "[{hostname}  %(process)d] [user %(userid)s] [ip %(remoteip)s] "
-        "[%(filename)s:%(lineno)d] "
-        "- %(request_id)s %(message)s"
+        "[{hostname}  %(process)d] [user %(userid)s] [ip %(remoteip)s] [%(filename)s:%(lineno)d] "
+        "- %(message)s"
     ).format(
         service_variant=service_variant,
         logging_env=logging_env, hostname=hostname
@@ -41,8 +40,7 @@ def get_logger_config(logging_env="no_env",
         'formatters': {
             'standard': {
                 'format': '%(asctime)s %(levelname)s %(process)d '
-                          '[%(name)s] [user %(userid)s] [ip %(remoteip)s] '
-                          '%(filename)s:%(lineno)d - %(request_id)s %(message)s',
+                          '[%(name)s] [user %(userid)s] [ip %(remoteip)s] %(filename)s:%(lineno)d - %(message)s',
             },
             'syslog_format': {'format': syslog_format},
             'raw': {'format': '%(message)s'},
@@ -56,9 +54,6 @@ def get_logger_config(logging_env="no_env",
             },
             'remoteip_context': {
                 '()': 'edx_django_utils.logging.RemoteIpFilter',
-            },
-            'request_id': {
-                '()': 'log_request_id.filters.RequestIDFilter'
             }
         },
         'handlers': {
@@ -66,7 +61,7 @@ def get_logger_config(logging_env="no_env",
                 'level': 'DEBUG' if debug else 'INFO',
                 'class': 'logging.StreamHandler',
                 'formatter': 'standard',
-                'filters': ['userid_context', 'remoteip_context', 'request_id'],
+                'filters': ['userid_context', 'remoteip_context'],
                 'stream': sys.stdout,
             },
         },
