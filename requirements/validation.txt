@@ -314,7 +314,7 @@ edx-rbac==1.7.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-edx-rest-api-client==5.5.0
+edx-rest-api-client==5.5.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt

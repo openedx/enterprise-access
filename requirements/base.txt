@@ -165,7 +165,7 @@ edx-opaque-keys[django]==2.3.0
     #   openedx-events
 edx-rbac==1.7.0
     # via -r requirements/base.in
-edx-rest-api-client==5.5.0
+edx-rest-api-client==5.5.1
     # via
     #   -r requirements/base.in
     #   edx-enterprise-subsidy-client
