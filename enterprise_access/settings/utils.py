@@ -26,8 +26,8 @@ def get_logger_config(logging_env="no_env",
         "[service_variant={service_variant}]"
         "[%(name)s][env:{logging_env}] %(levelname)s "
         "[{hostname}  %(process)d] [user %(userid)s] [ip %(remoteip)s] "
-        "[rid %(request_id)s] [%(filename)s:%(lineno)d] "
-        "- %(message)s"
+        "[%(filename)s:%(lineno)d] "
+        "- %(request_id)s %(message)s"
     ).format(
         service_variant=service_variant,
         logging_env=logging_env, hostname=hostname
@@ -42,7 +42,7 @@ def get_logger_config(logging_env="no_env",
             'standard': {
                 'format': '%(asctime)s %(levelname)s %(process)d '
                           '[%(name)s] [user %(userid)s] [ip %(remoteip)s] '
-                          '[rid %(request_id)s] %(filename)s:%(lineno)d - %(message)s',
+                          '%(filename)s:%(lineno)d - %(request_id)s %(message)s',
             },
             'syslog_format': {'format': syslog_format},
             'raw': {'format': '%(message)s'},
