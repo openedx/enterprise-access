@@ -90,6 +90,10 @@ class MissingSubsidyAccessReasonUserMessages:
         "You can't enroll right now because your organization doesn't have enough funds. " \
         "Contact your administrator to request more."
     LEARNER_LIMITS_REACHED = "You can't enroll right now because of limits set by your organization."
+    CONTENT_NOT_IN_CATALOG = \
+        "You can't enroll right now because this course is no longer available in your organization's catalog."
+    LEARNER_NOT_IN_ENTERPRISE = \
+        "You can't enroll right now because your account is no longer associated with the organization."
 
 
 REASON_POLICY_NOT_ACTIVE = "policy_not_active"

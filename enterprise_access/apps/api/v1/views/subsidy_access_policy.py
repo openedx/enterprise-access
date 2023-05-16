@@ -572,12 +572,12 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
         MISSING_SUBSIDY_ACCESS_POLICY_REASONS = {
             REASON_POLICY_NOT_ACTIVE: user_message_organization_no_funds,
-            REASON_CONTENT_NOT_IN_CATALOG: user_message_organization_no_funds,
-            REASON_LEARNER_NOT_IN_ENTERPRISE: user_message_organization_no_funds,
             REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY: user_message_organization_no_funds,
             REASON_POLICY_SPEND_LIMIT_REACHED: user_message_organization_no_funds,
+            REASON_LEARNER_NOT_IN_ENTERPRISE: MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_IN_ENTERPRISE,
             REASON_LEARNER_MAX_SPEND_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
             REASON_LEARNER_MAX_ENROLLMENTS_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
+            REASON_CONTENT_NOT_IN_CATALOG: MissingSubsidyAccessReasonUserMessages.CONTENT_NOT_IN_CATALOG,
         }
 
         if reason_slug not in MISSING_SUBSIDY_ACCESS_POLICY_REASONS:
