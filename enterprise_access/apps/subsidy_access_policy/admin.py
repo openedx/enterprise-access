@@ -22,7 +22,6 @@ class BaseSubsidyAccessPolicyMixin(admin.ModelAdmin):
     list_filter = (
         'active',
         'access_method',
-        'subsidy_uuid',
     )
     search_fields = (
         'uuid',
