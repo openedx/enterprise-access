@@ -166,7 +166,6 @@ django==3.2.19
     #   django-crum
     #   django-extensions
     #   django-filter
-    #   django-log-request-id
     #   django-model-utils
     #   djangorestframework
     #   drf-jwt
@@ -209,10 +208,6 @@ django-filter==23.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-django-log-request-id==2.1.0
-    # via
-    #   -r requirements/quality.txt
-    #   -r requirements/test.txt
 django-model-utils==4.3.1
     # via
     #   -r requirements/quality.txt
@@ -247,7 +242,7 @@ djangorestframework==3.14.0
     #   drf-yasg
     #   edx-api-doc-tools
     #   edx-drf-extensions
-docutils==0.20
+docutils==0.20.1
     # via
     #   -r requirements/quality.txt
     #   readme-renderer
@@ -291,12 +286,12 @@ edx-django-utils==5.4.0
     #   -r requirements/test.txt
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.7.0
+edx-drf-extensions==8.8.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.3.1
+edx-enterprise-subsidy-client==0.3.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -328,7 +323,7 @@ factory-boy==3.2.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==18.7.0
+faker==18.9.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -344,11 +339,6 @@ filelock==3.12.0
     #   -r requirements/test.txt
     #   tox
     #   virtualenv
-future==0.18.3
-    # via
-    #   -r requirements/quality.txt
-    #   -r requirements/test.txt
-    #   pyjwkest
 idna==3.4
     # via
     #   -r requirements/quality.txt
@@ -476,7 +466,7 @@ openapi-codec==1.3.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==7.3.0
+openedx-events==8.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -540,11 +530,6 @@ pycparser==2.21
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   cffi
-pycryptodomex==3.17
-    # via
-    #   -r requirements/quality.txt
-    #   -r requirements/test.txt
-    #   pyjwkest
 pydocstyle==6.3.0
     # via -r requirements/quality.txt
 pygments==2.15.1
@@ -552,11 +537,6 @@ pygments==2.15.1
     #   -r requirements/quality.txt
     #   readme-renderer
     #   rich
-pyjwkest==1.4.2
-    # via
-    #   -r requirements/quality.txt
-    #   -r requirements/test.txt
-    #   edx-drf-extensions
 pyjwt[crypto]==2.7.0
     # via
     #   -r requirements/quality.txt
@@ -667,7 +647,6 @@ requests==2.30.0
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
-    #   pyjwkest
     #   requests-oauthlib
     #   requests-toolbelt
     #   slumber
@@ -731,7 +710,6 @@ six==1.16.0
     #   edx-drf-extensions
     #   edx-lint
     #   edx-rbac
-    #   pyjwkest
     #   python-dateutil
     #   tox
 slumber==0.7.1
