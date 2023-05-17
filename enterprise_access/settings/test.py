@@ -31,6 +31,7 @@ ENTERPRISE_ADMIN_PORTAL_URL = 'http://enterprise-admin-portal.example.com'
 DISCOVERY_URL = 'http://discovery.example.com'
 ENTERPRISE_CATALOG_URL = 'http://enterprise-catalog.example.com'
 ENTERPRISE_SUBSIDY_URL = 'http://enterprise-subsidy.example.com'
+ENTERPRISE_ACCESS_URL = 'http://enterprise-access.example.com'
 
 BRAZE_APPROVE_NOTIFICATION_CAMPAIGN = 'test-approve-campaign'
 BRAZE_DECLINE_NOTIFICATION_CAMPAIGN = 'test-decline-campaign'

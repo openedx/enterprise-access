@@ -2,10 +2,10 @@
 Serializers for the `SubsidyAccessPolicy` model.
 """
 import logging
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urljoin
 
-from crum import get_current_request
 from django.apps import apps
+from django.conf import settings
 from django.urls import reverse
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
@@ -189,21 +189,9 @@ class SubsidyAccessPolicyRedeemableResponseSerializer(serializers.ModelSerialize
     def get_policy_redemption_url(self, obj):
         """
         Generate a fully qualified URI that can be POSTed to redeem a policy.
-
-        Deficiencies:
-        * In a prod-like environment, this may return an "http" URL because the protocol is inferred from django
-          settings, however we tend to deploy TLS above the application layer.  We can't just force it to "https" using
-          string manipulation because then it would break dev environments which don't use https.  As-is, it should
-          still work in prod because the other non-app infrastructure should automatically 3xx redirect to "https".
         """
-        current_request = get_current_request()
-        current_scheme = current_request.scheme
-
         location = reverse('api:v1:policy-redeem', kwargs={'policy_uuid': obj.uuid})
-        parsed_url = urlparse(current_request.build_absolute_uri(location))
-        return urlunparse(
-            parsed_url._replace(scheme=current_scheme)
-        )
+        return urljoin(settings.ENTERPRISE_ACCESS_URL, location)
 
 
 class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyRedeemableResponseSerializer):
