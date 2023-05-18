@@ -206,11 +206,12 @@ edx-django-utils==5.4.0
     #   -r requirements/base.txt
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.8.0
+edx-drf-extensions==8.7.0
     # via
+    #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.3.2
+edx-enterprise-subsidy-client==0.3.3
     # via -r requirements/base.txt
 edx-lint==5.3.4
     # via -r requirements/test.in
@@ -239,6 +240,10 @@ filelock==3.12.0
     # via
     #   tox
     #   virtualenv
+future==0.18.3
+    # via
+    #   -r requirements/base.txt
+    #   pyjwkest
 idna==3.4
     # via
     #   -r requirements/base.txt
@@ -348,6 +353,14 @@ pycparser==2.21
     # via
     #   -r requirements/base.txt
     #   cffi
+pycryptodomex==3.17
+    # via
+    #   -r requirements/base.txt
+    #   pyjwkest
+pyjwkest==1.4.2
+    # via
+    #   -r requirements/base.txt
+    #   edx-drf-extensions
 pyjwt[crypto]==2.7.0
     # via
     #   -r requirements/base.txt
@@ -424,6 +437,7 @@ requests==2.30.0
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
+    #   pyjwkest
     #   requests-oauthlib
     #   slumber
     #   social-auth-core
@@ -460,6 +474,7 @@ six==1.16.0
     #   edx-drf-extensions
     #   edx-lint
     #   edx-rbac
+    #   pyjwkest
     #   python-dateutil
     #   tox
 slumber==0.7.1
