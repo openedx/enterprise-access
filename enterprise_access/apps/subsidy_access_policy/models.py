@@ -273,11 +273,17 @@ class SubsidyAccessPolicy(TimeStampedModel):
             return (False, REASON_POLICY_NOT_ACTIVE)
         if not self.catalog_client.contains_content_items(self.catalog_uuid, [content_key]):
             return (False, REASON_CONTENT_NOT_IN_CATALOG)
-        # TODO: can we rely on JWT roles to check this?
+
+        # TODO: https://2u-internal.atlassian.net/browse/ENT-7162
         if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
             return (False, REASON_LEARNER_NOT_IN_ENTERPRISE)
-        # FIXME: self.subsidy_client.can_redeem() returns a dictionary, not a bool!
-        if not self.subsidy_client.can_redeem(self.subsidy_uuid, lms_user_id, content_key):
+
+        subsidy_can_redeem_payload = self.subsidy_client.can_redeem(
+            self.subsidy_uuid,
+            lms_user_id,
+            content_key,
+        )
+        if not subsidy_can_redeem_payload.get('can_redeem', False):
             return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
         if self.will_exceed_spend_limit(content_key):
             return (False, REASON_POLICY_SPEND_LIMIT_REACHED)

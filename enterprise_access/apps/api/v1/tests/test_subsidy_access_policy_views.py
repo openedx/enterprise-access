@@ -373,7 +373,11 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         )
         subsidy_client_patcher = mock.patch(subsidy_client_path)
         subsidy_client = subsidy_client_patcher.start()
-        subsidy_client.can_redeem.return_value = True
+        subsidy_client.can_redeem.return_value = {
+            'can_redeem': True,
+            'content_price': 0,
+            'unit': 'usd_cents',
+        }
         subsidy_client.list_subsidy_transactions.return_value = {"results": [], "aggregates": {}}
         subsidy_client.retrieve_subsidy_transaction.side_effect = (
             NotImplementedError("unit test must override retrieve_subsidy_transaction to use.")
@@ -749,7 +753,9 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
                 'total_quantity': 0,
             },
         }
-        self.redeemable_policy.subsidy_client.can_redeem.return_value = False
+        self.redeemable_policy.subsidy_client.can_redeem.return_value = {
+            'can_redeem': False,
+        }
         test_content_key_1 = "course-v1:edX+edXPrivacy101+3T2020"
         test_content_key_2 = "course-v1:edX+edXPrivacy101+3T2020_2"
         test_content_key_1_metadata_price = 29900
@@ -917,9 +923,6 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         mock_get_content_price.side_effect = ContentPriceNullException
 
-        # FIXME: subisdy client's can_redeem() function returns a dict in reality, so when we fix this in the policy
-        # model code, fix it here too by making it return a dictionary with a `can_redeem` key set to a value of False.
-        self.redeemable_policy.subsidy_client.can_redeem.return_value = True
         self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
             'results': [],
             'aggregates': {

@@ -234,11 +234,11 @@ edx-django-utils==5.4.0
     #   -r requirements/validation.txt
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.8.0
+edx-drf-extensions==8.7.0
     # via
     #   -r requirements/validation.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.3.2
+edx-enterprise-subsidy-client==0.3.3
     # via -r requirements/validation.txt
 edx-i18n-tools==0.9.2
     # via -r requirements/dev.in
@@ -274,6 +274,10 @@ filelock==3.12.0
     #   -r requirements/validation.txt
     #   tox
     #   virtualenv
+future==0.18.3
+    # via
+    #   -r requirements/validation.txt
+    #   pyjwkest
 idna==3.4
     # via
     #   -r requirements/validation.txt
@@ -442,6 +446,10 @@ pycparser==2.21
     # via
     #   -r requirements/validation.txt
     #   cffi
+pycryptodomex==3.17
+    # via
+    #   -r requirements/validation.txt
+    #   pyjwkest
 pydocstyle==6.3.0
     # via -r requirements/validation.txt
 pygments==2.15.1
@@ -450,6 +458,10 @@ pygments==2.15.1
     #   diff-cover
     #   readme-renderer
     #   rich
+pyjwkest==1.4.2
+    # via
+    #   -r requirements/validation.txt
+    #   edx-drf-extensions
 pyjwt[crypto]==2.7.0
     # via
     #   -r requirements/validation.txt
@@ -544,6 +556,7 @@ requests==2.30.0
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
+    #   pyjwkest
     #   requests-oauthlib
     #   requests-toolbelt
     #   slumber
@@ -599,6 +612,7 @@ six==1.16.0
     #   edx-drf-extensions
     #   edx-lint
     #   edx-rbac
+    #   pyjwkest
     #   python-dateutil
     #   tox
 slumber==0.7.1
