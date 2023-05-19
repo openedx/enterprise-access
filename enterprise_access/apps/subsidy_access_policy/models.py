@@ -5,6 +5,7 @@ import sys
 from contextlib import contextmanager
 from uuid import UUID, uuid4
 
+import requests
 from django.core.cache import cache as django_cache
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
@@ -25,7 +26,7 @@ from .constants import (
     REASON_POLICY_SPEND_LIMIT_REACHED,
     AccessMethods
 )
-from .exceptions import ContentPriceNullException, SubsidyAccessPolicyLockAttemptFailed
+from .exceptions import ContentPriceNullException, SubsidyAccessPolicyLockAttemptFailed, SubsidyAPIHTTPError
 from .utils import get_versioned_subsidy_client
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
@@ -297,13 +298,16 @@ class SubsidyAccessPolicy(TimeStampedModel):
             A ledger transaction, or None if the subsidy was not redeemed.
         """
         if self.access_method == AccessMethods.DIRECT:
-            return self.subsidy_client.create_subsidy_transaction(
-                subsidy_uuid=self.subsidy_uuid,
-                lms_user_id=lms_user_id,
-                content_key=content_key,
-                subsidy_access_policy_uuid=self.uuid,
-                metadata=metadata,
-            )
+            try:
+                return self.subsidy_client.create_subsidy_transaction(
+                    subsidy_uuid=self.subsidy_uuid,
+                    lms_user_id=lms_user_id,
+                    content_key=content_key,
+                    subsidy_access_policy_uuid=self.uuid,
+                    metadata=metadata,
+                )
+            except requests.exceptions.HTTPError as exc:
+                raise SubsidyAPIHTTPError('HTTPError occurred in Subsidy API request.') from exc
         else:
             raise ValueError(f"unknown access method {self.access_method}")
 
