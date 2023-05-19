@@ -118,7 +118,7 @@ class TestLmsApiClient(TestCase):
             'http://edx-platform.example.com/'
             'enterprise/api/v1/'
             'enterprise-customer/'
-            'some-uuid'
+            'some-uuid/'
         )
         mock_oauth_client.return_value.get.assert_called_with(
             expected_url,
