@@ -30,7 +30,7 @@ class LmsApiClient(BaseOAuthClient):
         """
 
         try:
-            endpoint = f'{self.enterprise_customer_endpoint}{enterprise_customer_uuid}'
+            endpoint = f'{self.enterprise_customer_endpoint}{enterprise_customer_uuid}/'
             response = self.client.get(endpoint, timeout=settings.LMS_CLIENT_TIMEOUT)
             response.raise_for_status()
             return response.json()
