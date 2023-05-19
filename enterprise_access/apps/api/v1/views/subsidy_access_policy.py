@@ -50,7 +50,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     MissingSubsidyAccessReasonUserMessages,
     TransactionStateChoices
 )
-from enterprise_access.apps.subsidy_access_policy.exceptions import ContentPriceNullException
+from enterprise_access.apps.subsidy_access_policy.exceptions import ContentPriceNullException, SubsidyAPIHTTPError
 from enterprise_access.apps.subsidy_access_policy.models import (
     SubsidyAccessPolicy,
     SubsidyAccessPolicyLockAttemptFailed
@@ -479,6 +479,13 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         except SubsidyAccessPolicyLockAttemptFailed as exc:
             logger.exception(exc)
             raise SubsidyAccessPolicyLockedException() from exc
+        except SubsidyAPIHTTPError as exc:
+            logger.exception(f'{exc} when creating transaction in subsidy API')
+            error_payload = exc.error_payload()
+            error_payload['detail'] = f"Subsidy Transaction API error: {error_payload['detail']}"
+            raise RedemptionRequestException(
+                detail=error_payload,
+            ) from exc
 
     def get_redemptions_by_policy_uuid(self, enterprise_customer_uuid, lms_user_id, content_key):
         """
