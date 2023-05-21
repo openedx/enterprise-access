@@ -713,7 +713,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             "usd_cents": test_content_key_1_cents_price,
         }
         assert len(response_list[0]["redemptions"]) == 0
-        assert response_list[0]["has_successful_redemption"] is False
+        assert response_list[0]["has_committed_redemption"] is False
         assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
         assert response_list[0]["can_redeem"] is True
         assert len(response_list[0]["reasons"]) == 0
@@ -725,7 +725,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             "usd_cents": test_content_key_2_cents_price,
         }
         assert len(response_list[1]["redemptions"]) == 0
-        assert response_list[1]["has_successful_redemption"] is False
+        assert response_list[1]["has_committed_redemption"] is False
         assert response_list[1]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
         assert response_list[1]["can_redeem"] is True
         assert len(response_list[1]["reasons"]) == 0
@@ -803,7 +803,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             "usd_cents": test_content_key_1_cents_price,
         }
         assert len(response_list[0]["redemptions"]) == 0
-        assert response_list[0]["has_successful_redemption"] is False
+        assert response_list[0]["has_committed_redemption"] is False
         assert response_list[0]["redeemable_subsidy_access_policy"] is None
         assert response_list[0]["can_redeem"] is False
 
@@ -832,7 +832,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             "usd_cents": test_content_key_2_cents_price,
         }
         assert len(response_list[1]["redemptions"]) == 0
-        assert response_list[1]["has_successful_redemption"] is False
+        assert response_list[1]["has_committed_redemption"] is False
         assert response_list[1]["redeemable_subsidy_access_policy"] is None
         assert response_list[1]["can_redeem"] is False
         assert response_list[1]["reasons"] == [
@@ -851,11 +851,23 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_price',
         return_value=19900,
     )
-    def test_can_redeem_policy_existing_redemptions(self, mock_get_content_price, mock_view_subsidy_client):
+    @ddt.data(
+        {'has_reversal': True},
+        {'has_reversal': False},
+    )
+    @ddt.unpack
+    def test_can_redeem_policy_existing_redemptions(
+        self,
+        mock_get_content_price,
+        mock_view_subsidy_client,
+        has_reversal,
+    ):
         """
         Test that the can_redeem endpoint shows existing redemptions too.
         """
         test_transaction_uuid = str(uuid4())
+        test_reversal_uuid = str(uuid4())
+        mock_reversal = {'uuid': test_reversal_uuid, 'state': TransactionStateChoices.CREATED}
         self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
             "results": [{
                 "uuid": test_transaction_uuid,
@@ -868,7 +880,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
                 "enterprise_fulfillment_uuid": "6ff2c1c9-d5fc-48a8-81da-e6a675263f67",
                 "subsidy_access_policy_uuid": str(self.redeemable_policy.uuid),
                 "metadata": {},
-                "reversals": [],
+                "reversal": mock_reversal if has_reversal else None,
             }],
             "aggregates": {
                 "total_quantity": -19900,
@@ -900,7 +912,10 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             f"{settings.ENTERPRISE_SUBSIDY_URL}/api/v1/transactions/{test_transaction_uuid}/"
         assert response_list[0]["redemptions"][0]["courseware_url"] == \
             f"{settings.LMS_URL}/courses/course-v1:demox+1234+2T2023/courseware/"
-        assert response_list[0]["has_successful_redemption"] is True
+
+        expected_has_committed_redemption = not has_reversal
+        assert response_list[0]["has_committed_redemption"] is expected_has_committed_redemption
+
         assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
         assert response_list[0]["can_redeem"] is True
         assert len(response_list[0]["reasons"]) == 0

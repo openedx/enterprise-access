@@ -672,8 +672,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
 
             # Determine if the learner has already redeemed the requested content_key.
-            has_successful_redemption = any(
-                redemption['state'] == TransactionStateChoices.COMMITTED
+            has_committed_redemption = any(
+                redemption['state'] == TransactionStateChoices.COMMITTED and not redemption['reversal']
                 for redemption in redemptions
             )
 
@@ -700,7 +700,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                     "usd_cents": list_price_integer_cents,
                 },
                 "redemptions": redemptions,
-                "has_successful_redemption": has_successful_redemption,
+                "has_committed_redemption": has_committed_redemption,
                 "redeemable_subsidy_access_policy": resolved_policy,
                 "can_redeem": bool(resolved_policy),
                 "reasons": reasons,

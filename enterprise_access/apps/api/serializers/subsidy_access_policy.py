@@ -250,7 +250,7 @@ class SubsidyAccessPolicyCanRedeemElementResponseSerializer(serializers.Serializ
         child=serializers.DictField(),
         help_text="List of redemptions of this content_key by the requested lms_user_id.",
     )
-    has_successful_redemption = serializers.BooleanField(
+    has_committed_redemption = serializers.BooleanField(
         help_text="True if there are any committed redemptions of this content_key by the requested lms_user_id."
     )
     redeemable_subsidy_access_policy = SubsidyAccessPolicyRedeemableResponseSerializer(
