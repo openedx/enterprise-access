@@ -652,8 +652,12 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             )
             if not redemptions and not redeemable_policies:
                 lms_client = LmsApiClient()
-                enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-                enterprise_admin_users = enterprise_customer_data.get('admin_users')
+                try:
+                    enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
+                    enterprise_admin_users = enterprise_customer_data.get('admin_users')
+                except requests.exceptions.HTTPError as exc:
+                    logger.warning(f"enterprise_customer {enterprise_customer_uuid} not found.")
+                    raise NotFound(detail="Could not find given enterprise_customer.") from exc
                 for reason, policies in non_redeemable_policies.items():
                     reasons.append({
                         "reason": reason,

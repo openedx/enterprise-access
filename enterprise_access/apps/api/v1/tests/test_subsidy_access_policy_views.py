@@ -954,3 +954,59 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         assert response.json() == {
             'detail': f'Could not determine price for content_key: {test_content_key}',
         }
+
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
+    @ddt.data(
+        # A role that's not mapped to any feature perms will get you a 403.
+        (
+            {'system_wide_role': 'some-other-role', 'context': str(TEST_ENTERPRISE_UUID)},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # Real learners requesting a fake enterprise get 403 since edx-rbac stops the request.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': TEST_ENTERPRISE_UUID},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # Real enterprise admins requesting a fake enterprise get 403 since edx-rbac stops the request.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': TEST_ENTERPRISE_UUID},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # Real all-access operators requesting a fake enterprise get 404 since our own view code stops the request.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': '*'},
+            status.HTTP_404_NOT_FOUND,
+        ),
+        # No JWT based auth, no soup for you.
+        (
+            None,
+            status.HTTP_403_FORBIDDEN,
+        ),
+    )
+    @ddt.unpack
+    def test_can_redeem_policy_invalid_enterprise(
+        self,
+        role_context_dict,
+        expected_response_code,
+        mock_lms_client,
+    ):
+        """
+        Test can_redeem 4xx response codes when the enterprise_uuid (in URL location) is invalid.
+        """
+        # Set the JWT-based auth that we'll use for every request
+        if role_context_dict:
+            self.set_jwt_cookie([role_context_dict])
+        self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {
+                'total_quantity': 0,
+            },
+        }
+        mock_lms_client.return_value.get_enterprise_customer_data.side_effect = HTTPError()
+        query_params = {'content_key': 'course-v1:demox+1234+2T2023'}
+        can_redeem_endpoint_invalid_enterprise = self.subsidy_access_policy_can_redeem_endpoint = reverse(
+            "api:v1:policy-can-redeem",
+            kwargs={"enterprise_customer_uuid": str(uuid4())},  # This is where we test a fake enterprise_customer_uuid
+        )
+        response = self.client.get(can_redeem_endpoint_invalid_enterprise, query_params)
+        assert response.status_code == expected_response_code

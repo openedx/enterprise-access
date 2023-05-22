@@ -313,6 +313,14 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Redeem a subsidy for the given learner and content.
         Returns:
             A ledger transaction, or None if the subsidy was not redeemed.
+        Raises:
+            HTTPError:
+                - 403 Forbidden: If auth failed.
+                - 429 Too Many Requests: If the ledger was locked (resource contention, try again later).
+                - 422 Unprocessable Entity: Catchall status for anything that prevented the transaction from being
+                  created.  Reasons include, but are not limited to:
+                      * Redemption of the given content_key would have exceeded the ledger balance.
+                      * The given content_key is not in any catalog for this customer.
         """
         if self.access_method == AccessMethods.DIRECT:
             try:
