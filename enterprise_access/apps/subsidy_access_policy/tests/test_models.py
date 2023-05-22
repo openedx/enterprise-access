@@ -48,21 +48,31 @@ class SubsidyAccessPolicyTests(TestCase):
             SubsidyAccessPolicy, 'subsidy_client'
         )
         self.mock_subsidy_client = self.subsidy_client_patcher.start()
-        self.catalog_client_patcher = patch.object(
-            SubsidyAccessPolicy, 'catalog_client'
+
+        self.catalog_contains_content_key_patcher = patch.object(
+            SubsidyAccessPolicy, 'catalog_contains_content_key'
         )
-        self.mock_catalog_client = self.catalog_client_patcher.start()
+        self.mock_catalog_contains_content_key = self.catalog_contains_content_key_patcher.start()
+
+        self.get_content_metadata_patcher = patch.object(
+            SubsidyAccessPolicy, 'get_content_metadata'
+        )
+        self.mock_get_content_metadata = self.get_content_metadata_patcher.start()
+
         self.lms_api_client_patcher = patch.object(
             SubsidyAccessPolicy, 'lms_api_client'
         )
         self.mock_lms_api_client = self.lms_api_client_patcher.start()
 
-    def tearDown(self):
-        super().tearDown()
-        self.subsidy_client_patcher.stop()
-        self.catalog_client_patcher.stop()
-        self.lms_api_client_patcher.stop()
-        django_cache.clear()  # clear any leftover policy locks.
+        cleanup_functions = (
+            self.subsidy_client_patcher.stop,
+            self.catalog_contains_content_key_patcher.stop,
+            self.get_content_metadata_patcher.stop,
+            self.lms_api_client_patcher.stop,
+            django_cache.clear,  # clear any leftover policy locks.
+        )
+        for func in cleanup_functions:
+            self.addCleanup(func)
 
     @classmethod
     def setUpClass(cls):
@@ -240,12 +250,12 @@ class SubsidyAccessPolicyTests(TestCase):
         """
         Test the can_redeem method of PerLearnerEnrollmentCapLearnerCreditAccessPolicy model
         """
-        self.mock_catalog_client.contains_content_items.return_value = catalog_contains_content
         self.mock_lms_api_client.enterprise_contains_learner.return_value = enterprise_contains_learner
-        self.mock_subsidy_client.can_redeem.return_value = subsidy_is_redeemable
-        self.mock_subsidy_client.get_subsidy_content_data.return_value = {
+        self.mock_catalog_contains_content_key.return_value = catalog_contains_content
+        self.mock_get_content_metadata.return_value = {
             'content_price': 200,
         }
+        self.mock_subsidy_client.can_redeem.return_value = subsidy_is_redeemable
 
         def mock_list_transactions(*args, **kwargs):
             if 'lms_user_id' in kwargs:
@@ -364,12 +374,12 @@ class SubsidyAccessPolicyTests(TestCase):
         """
         Test the can_redeem method of PerLearnerSpendCapLearnerCreditAccessPolicy model
         """
-        self.mock_catalog_client.contains_content_items.return_value = catalog_contains_content
         self.mock_lms_api_client.enterprise_contains_learner.return_value = enterprise_contains_learner
-        self.mock_subsidy_client.can_redeem.return_value = subsidy_is_redeemable
-        self.mock_subsidy_client.get_subsidy_content_data.return_value = {
+        self.mock_catalog_contains_content_key.return_value = catalog_contains_content
+        self.mock_get_content_metadata.return_value = {
             'content_price': 200,
         }
+        self.mock_subsidy_client.can_redeem.return_value = subsidy_is_redeemable
 
         def mock_list_transactions(*args, **kwargs):
             if 'lms_user_id' in kwargs:

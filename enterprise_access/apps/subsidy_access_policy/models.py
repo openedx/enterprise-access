@@ -12,7 +12,6 @@ from django_extensions.db.models import TimeStampedModel
 from edx_django_utils.cache.utils import get_cache_key
 from simple_history.models import HistoricalRecords
 
-from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 
 from .constants import (
@@ -26,6 +25,7 @@ from .constants import (
     REASON_POLICY_SPEND_LIMIT_REACHED,
     AccessMethods
 )
+from .content_metadata_api import get_and_cache_catalog_contains_content, get_and_cache_content_metadata
 from .exceptions import ContentPriceNullException, SubsidyAccessPolicyLockAttemptFailed, SubsidyAPIHTTPError
 from .utils import get_versioned_subsidy_client
 
@@ -139,13 +139,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
         return get_versioned_subsidy_client()
 
     @property
-    def catalog_client(self):
-        """
-        An EnterpriseCatalogApiClient instance.
-        """
-        return EnterpriseCatalogApiClient()
-
-    @property
     def lms_api_client(self):
         """
         An LmsApiClient instance.
@@ -198,17 +191,35 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         return self.subsidy_balance()
 
-    def get_content_price(self, content_key):
+    def catalog_contains_content_key(self, content_key):
+        """
+        Returns a boolean indicating if the given content_key
+        is part of this policy's catalog.
+        """
+        return get_and_cache_catalog_contains_content(
+            self.catalog_uuid,
+            content_key,
+        )
+
+    def get_content_metadata(self, content_key):
+        """
+        Returns a dict of content metadata for the given key.
+        """
+        return get_and_cache_content_metadata(
+            self.enterprise_customer_uuid,
+            content_key,
+        )
+
+    def get_content_price(self, content_key, content_metadata=None):
         """
         Returns the price for some content key, as told by the enterprise-subsidy service.
 
         Returns: The price (in USD cents) for the given content key.
         Raises: UnredeemableContentException if the price is null.
         """
-        content_price = self.subsidy_client.get_subsidy_content_data(
-            self.enterprise_customer_uuid,
-            content_key
-        )['content_price']
+        if not content_metadata:
+            content_metadata = self.get_content_metadata(content_key)
+        content_price = content_metadata['content_price']
         if content_price is None:
             raise ContentPriceNullException(f'The price for {content_key} is null')
         return content_price
@@ -254,7 +265,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             'aggregates': response_payload['aggregates'],
         }
 
-    def will_exceed_spend_limit(self, content_key):
+    def will_exceed_spend_limit(self, content_key, content_metadata=None):
         """
         Returns true if redeeming this course would exceed
         the ``spend_limit`` set by this policy.
@@ -262,22 +273,23 @@ class SubsidyAccessPolicy(TimeStampedModel):
         if self.spend_limit is None:
             return False
 
-        content_price = self.get_content_price(content_key)
+        content_price = self.get_content_price(content_key, content_metadata=content_metadata)
         spent_amount = self.aggregates_for_policy().get('total_quantity') or 0
         return (spent_amount + content_price) >= self.spend_limit
 
-    def can_redeem(self, lms_user_id, content_key):
+    def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
         """
         Check that a given learner can redeem the given content.
         """
         if not self.active:
             return (False, REASON_POLICY_NOT_ACTIVE)
-        if not self.catalog_client.contains_content_items(self.catalog_uuid, [content_key]):
-            return (False, REASON_CONTENT_NOT_IN_CATALOG)
 
-        # TODO: https://2u-internal.atlassian.net/browse/ENT-7162
-        if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
-            return (False, REASON_LEARNER_NOT_IN_ENTERPRISE)
+        if not skip_customer_user_check:
+            if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
+                return (False, REASON_LEARNER_NOT_IN_ENTERPRISE)
+
+        if not self.catalog_contains_content_key(content_key):
+            return (False, REASON_CONTENT_NOT_IN_CATALOG)
 
         subsidy_can_redeem_payload = self.subsidy_client.can_redeem(
             self.subsidy_uuid,
@@ -286,7 +298,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
         )
         if not subsidy_can_redeem_payload.get('can_redeem', False):
             return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
-        if self.will_exceed_spend_limit(content_key):
+
+        content_metadata = self.get_content_metadata(content_key)
+        if not content_metadata:
+            return (False, REASON_CONTENT_NOT_IN_CATALOG)
+
+        if self.will_exceed_spend_limit(content_key, content_metadata=content_metadata):
             return (False, REASON_POLICY_SPEND_LIMIT_REACHED)
 
         return (True, None)
@@ -409,6 +426,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Returns:
            SubsidyAccessPolicy: one policy selected from the input list.
         """
+        if len(redeemable_policies) == 1:
+            return redeemable_policies[0]
+
         # For now, we inefficiently make one call per subsidy record.
         sorted_policies = sorted(
             redeemable_policies,
@@ -442,13 +462,13 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
         """
         proxy = True
 
-    def can_redeem(self, lms_user_id, content_key):
+    def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
         """
         Checks if the given lms_user_id has a number of existing subsidy transactions
         LTE to the learner enrollment cap declared by this policy.
         """
         # perform generic access checks
-        should_attempt_redemption, reason = super().can_redeem(lms_user_id, content_key)
+        should_attempt_redemption, reason = super().can_redeem(lms_user_id, content_key, skip_customer_user_check)
         if not should_attempt_redemption:
             return (False, reason)
 
@@ -491,13 +511,13 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
         """
         proxy = True
 
-    def can_redeem(self, lms_user_id, content_key):
+    def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
         """
         Determines whether learner can redeem a subsidy access policy given the
         limits specified on the policy.
         """
         # perform generic access checks
-        should_attempt_redemption, reason = super().can_redeem(lms_user_id, content_key)
+        should_attempt_redemption, reason = super().can_redeem(lms_user_id, content_key, skip_customer_user_check)
         if not should_attempt_redemption:
             return (False, reason)
 

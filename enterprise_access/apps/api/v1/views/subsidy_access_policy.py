@@ -11,7 +11,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient, get_enterprise_subsidy_api_client
+from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient
 from edx_rbac.decorators import permission_required
 from edx_rbac.mixins import PermissionRequiredMixin
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
@@ -50,6 +50,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     MissingSubsidyAccessReasonUserMessages,
     TransactionStateChoices
 )
+from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
 from enterprise_access.apps.subsidy_access_policy.exceptions import ContentPriceNullException, SubsidyAPIHTTPError
 from enterprise_access.apps.subsidy_access_policy.models import (
     SubsidyAccessPolicy,
@@ -264,16 +265,6 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
     http_method_names = ['get', 'post']
 
     @property
-    def subsidy_client(self):
-        """
-        An EnterpriseSubsidyAPIClient instance.
-        """
-        kwargs = {}
-        if getattr(settings, 'ENTERPRISE_SUBSIDY_API_CLIENT_VERSION', None):
-            kwargs['version'] = int(settings.ENTERPRISE_SUBSIDY_API_CLIENT_VERSION)
-        return get_enterprise_subsidy_api_client(**kwargs)
-
-    @property
     def enterprise_customer_uuid(self):
         """Returns the enterprise customer uuid from query params or request data based on action type. """
         enterprise_uuid = ''
@@ -326,7 +317,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         )
         for policy in all_policies_for_enterprise:
             try:
-                redeemable, reason = policy.can_redeem(lms_user_id, content_key)
+                redeemable, reason = policy.can_redeem(lms_user_id, content_key, skip_customer_user_check=True)
             except ContentPriceNullException as exc:
                 logger.warning(f'{exc} when checking can_redeem() for {enterprise_customer_uuid}')
                 raise RedemptionRequestException(
@@ -686,7 +677,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
             # Determine the price for content for display purposes only.
             try:
-                content_metadata = self.subsidy_client.get_subsidy_content_data(enterprise_customer_uuid, content_key)
+                content_metadata = get_and_cache_content_metadata(enterprise_customer_uuid, content_key)
                 # Note that the "content_price" key is guaranteed to exist, but the value may be None.
                 list_price_integer_cents = content_metadata["content_price"]
                 # TODO: simplify this function by consolidating this conversion logic into the response serializer:
