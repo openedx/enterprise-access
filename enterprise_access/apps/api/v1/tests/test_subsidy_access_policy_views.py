@@ -12,7 +12,6 @@ from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
 
-from enterprise_access.apps.api.v1.views.subsidy_access_policy import SubsidyAccessPolicyRedeemViewset
 from enterprise_access.apps.core.constants import (
     POLICY_REDEMPTION_PERMISSION,
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -24,7 +23,6 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     MissingSubsidyAccessReasonUserMessages,
     TransactionStateChoices
 )
-from enterprise_access.apps.subsidy_access_policy.exceptions import ContentPriceNullException
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
@@ -386,10 +384,15 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             NotImplementedError("unit test must override create_subsidy_transaction to use.")
         )
 
-        catalog_client_path = 'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_client'
-        enterprise_catalog_client_patcher = mock.patch(catalog_client_path)
-        enterprise_catalog_client = enterprise_catalog_client_patcher.start()
-        enterprise_catalog_client.contains_content_items.return_value = True
+        path_prefix = 'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.'
+
+        contains_key_patcher = mock.patch(path_prefix + 'catalog_contains_content_key')
+        self.mock_contains_key = contains_key_patcher.start()
+        self.mock_contains_key.return_value = True
+
+        get_content_metadata_patcher = mock.patch(path_prefix + 'get_content_metadata')
+        self.mock_get_content_metadata = get_content_metadata_patcher.start()
+        self.mock_get_content_metadata.return_value = {}
 
         lms_client_patcher = mock.patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
         lms_client = lms_client_patcher.start()
@@ -398,22 +401,24 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
-        self.addCleanup(enterprise_catalog_client_patcher.stop)
+        self.addCleanup(contains_key_patcher.stop)
+        self.addCleanup(get_content_metadata_patcher.stop)
 
-    @mock.patch(
-        'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_price',
-        return_value=100,
-    )
-    def test_list(self, mock_get_content_price):
+    def test_list(self):
         """
         list endpoint should return only the redeemable policy, and also check the serialized output fields.
         """
+        self.mock_get_content_metadata.return_value = {
+            'content_price': 12300,
+        }
         query_params = {
             'enterprise_customer_uuid': self.enterprise_uuid,
             'lms_user_id': '1234',
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
         }
+
         response = self.client.get(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, query_params)
+
         response_json = self.load_json(response.content)
 
         # Response should only include the one redeemable policy.
@@ -436,7 +441,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             f"http.*/api/v1/policy/{self.redeemable_policy.uuid}/redeem/",
             response_json[0]["policy_redemption_url"],
         )
-        mock_get_content_price.assert_called_once_with(query_params['content_key'])
+        self.mock_get_content_metadata.assert_called_once_with(query_params['content_key'])
 
     @ddt.data(
         (
@@ -474,14 +479,11 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         assert response_json == expected_result
 
-    @mock.patch(
-        'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_price',
-        return_value=200,
-    )
-    def test_redeem_policy(self, mock_get_content_price):
+    def test_redeem_policy(self):
         """
         Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint works as expected
         """
+        self.mock_get_content_metadata.return_value = {'content_price': 123}
         mock_transaction_record = {
             'uuid': str(uuid4()),
             'state': TransactionStateChoices.COMMITTED,
@@ -500,16 +502,13 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         response_json = self.load_json(response.content)
         assert response_json == mock_transaction_record
-        mock_get_content_price.assert_called_once_with(payload['content_key'])
+        self.mock_get_content_metadata.assert_called_once_with(payload['content_key'])
 
-    @mock.patch(
-        'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_price',
-        return_value=200,
-    )
-    def test_redeem_policy_with_metadata(self, mock_get_content_price):
+    def test_redeem_policy_with_metadata(self):
         """
         Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint works as expected
         """
+        self.mock_get_content_metadata.return_value = {'content_price': 123}
         mock_transaction_record = {
             'uuid': str(uuid4()),
             'status': 'committed',
@@ -531,7 +530,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         response_json = self.load_json(response.content)
         assert response_json == mock_transaction_record
-        mock_get_content_price.assert_called_once_with(payload['content_key'])
+        self.mock_get_content_metadata.assert_called_once_with(payload['content_key'])
 
     def test_redemption_endpoint(self):
         """
@@ -691,15 +690,15 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             else:
                 return {}
 
-        mock_subsidy_client = mock.Mock()
-        mock_subsidy_client.get_subsidy_content_data.side_effect = mock_get_subsidy_content_data
-        SubsidyAccessPolicyRedeemViewset.subsidy_client = mock_subsidy_client
-        self.redeemable_policy.subsidy_client.get_subsidy_content_data.side_effect = mock_get_subsidy_content_data
+        self.mock_get_content_metadata.side_effect = mock_get_subsidy_content_data
 
-        query_params = {
-            'content_key': [test_content_key_1, test_content_key_2],
-        }
-        response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+        with mock.patch(
+            'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_content_metadata',
+            side_effect=mock_get_subsidy_content_data,
+        ):
+            query_params = {'content_key': [test_content_key_1, test_content_key_2]}
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
         assert response.status_code == status.HTTP_200_OK
         response_list = response.json()
 
@@ -783,13 +782,15 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             else:
                 return {}
 
-        mock_subsidy_client = mock.Mock()
-        mock_subsidy_client.get_subsidy_content_data.side_effect = mock_get_subsidy_content_data
-        SubsidyAccessPolicyRedeemViewset.subsidy_client = mock_subsidy_client
-        query_params = {
-            'content_key': [test_content_key_1, test_content_key_2],
-        }
-        response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+        self.mock_get_content_metadata.side_effect = mock_get_subsidy_content_data
+
+        with mock.patch(
+            'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_content_metadata',
+            side_effect=mock_get_subsidy_content_data,
+        ):
+            query_params = {'content_key': [test_content_key_1, test_content_key_2]}
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
         assert response.status_code == status.HTTP_200_OK
         response_list = response.json()
 
@@ -846,12 +847,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             },
         ]
 
-    @mock.patch('enterprise_access.apps.api.v1.views.SubsidyAccessPolicyRedeemViewset.subsidy_client')
-    @mock.patch(
-        'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_price',
-        return_value=19900,
-    )
-    def test_can_redeem_policy_existing_redemptions(self, mock_get_content_price, mock_view_subsidy_client):
+    def test_can_redeem_policy_existing_redemptions(self):
         """
         Test that the can_redeem endpoint shows existing redemptions too.
         """
@@ -875,15 +871,25 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             },
         }
 
-        mock_view_subsidy_client.get_subsidy_content_data.return_value = {
+        self.redeemable_policy.subsidy_client.can_redeem.return_value = {
+            'can_redeem': False,
+        }
+        self.mock_get_content_metadata.return_value = {'content_price': 19900}
+
+        mocked_content_data_from_view = {
             "content_uuid": str(uuid4()),
             "content_key": "course-v1:demox+1234+2T2023",
             "source": "edX",
             "content_price": 19900,
         }
 
-        query_params = {'content_key': 'course-v1:demox+1234+2T2023'}
-        response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+        with mock.patch(
+            'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_content_metadata',
+            return_value=mocked_content_data_from_view,
+        ):
+            query_params = {'content_key': 'course-v1:demox+1234+2T2023'}
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
         assert response.status_code == status.HTTP_200_OK
         response_list = response.json()
 
@@ -900,18 +906,16 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             f"{settings.ENTERPRISE_SUBSIDY_URL}/api/v1/transactions/{test_transaction_uuid}/"
         assert response_list[0]["redemptions"][0]["courseware_url"] == \
             f"{settings.LMS_URL}/courses/course-v1:demox+1234+2T2023/courseware/"
-        assert response_list[0]["has_successful_redemption"] is True
-        assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
-        assert response_list[0]["can_redeem"] is True
-        assert len(response_list[0]["reasons"]) == 0
-        mock_get_content_price.assert_called_once_with(query_params['content_key'])
+        self.assertTrue(response_list[0]["has_successful_redemption"])
+        self.assertIsNone(response_list[0]["redeemable_subsidy_access_policy"])
+        self.assertFalse(response_list[0]["can_redeem"])
+        self.assertEqual(response_list[0]["reasons"], [])
+        # the subsidy.can_redeem check returns false, so we don't make
+        # it to the point of fetching subsidy content data
+        self.assertFalse(self.mock_get_content_metadata.called)
 
-    @mock.patch('enterprise_access.apps.api.v1.views.SubsidyAccessPolicyRedeemViewset.subsidy_client')
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
-    @mock.patch(
-        'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_price',
-    )
-    def test_can_redeem_policy_no_price(self, mock_get_content_price, mock_lms_client, mock_view_subsidy_client):
+    def test_can_redeem_policy_no_price(self, mock_lms_client):
         """
         Test that the can_redeem endpoint successfuly serializes a response for content that has no price.
         """
@@ -921,7 +925,9 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'admin_users': [{'email': 'edx@example.org'}],
         }
 
-        mock_get_content_price.side_effect = ContentPriceNullException
+        self.mock_get_content_metadata.return_value = {
+            'content_price': None,
+        }
 
         self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
             'results': [],
@@ -930,16 +936,19 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             },
         }
 
-        mock_view_subsidy_client.get_subsidy_content_data.return_value = {
+        mocked_content_data_from_view = {
             "content_uuid": str(uuid4()),
             "content_key": test_content_key,
             "source": "edX",
             "content_price": None,
         }
 
-        query_params = {'content_key': test_content_key}
-
-        response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+        with mock.patch(
+            'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_content_metadata',
+            return_value=mocked_content_data_from_view,
+        ):
+            query_params = {'content_key': test_content_key}
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         assert response.json() == {
