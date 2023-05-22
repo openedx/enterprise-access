@@ -412,15 +412,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         """
         Redeem a policy for given `lms_user_id` and `content_key`
 
-        URL Location: POST /api/v1/policy/<policy_uuid>/redeem/
+        status codes::
 
-        JSON body parameters:
-        {
-            "lms_user_id":
-            "content_key":
-        }
-
-        status codes:
             400: There are missing or otherwise invalid input parameters.
             403: The requester has insufficient redeem permissions.
             422: The subisdy access policy is not redeemable in a way that IS NOT retryable.
@@ -528,30 +521,6 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 redemptions_by_policy_uuid[str(policy.uuid)] = redemptions
 
         return redemptions_by_policy_uuid
-
-    @extend_schema(
-        tags=['Subsidy Access Policy Redemption'],
-        summary='Retrieve redemption.',
-        parameters=[serializers.SubsidyAccessPolicyRedemptionRequestSerializer],
-    )
-    @action(detail=False, methods=['get'])
-    def redemption(self, request, *args, **kwargs):
-        """
-        Return redemption records for given `enterprise_customer_uuid`, `lms_user_id` and `content_key`
-
-        URL Location: GET /api/v1/policy/redemption/?enterprise_customer_uuid=<>&lms_user_id=<>&content_key=<>
-        """
-        serializer = serializers.SubsidyAccessPolicyRedemptionRequestSerializer(data=request.query_params)
-        serializer.is_valid(raise_exception=True)
-
-        enterprise_customer_uuid = serializer.data['enterprise_customer_uuid']
-        lms_user_id = serializer.data['lms_user_id']
-        content_key = serializer.data['content_key']
-
-        return Response(
-            self.get_redemptions_by_policy_uuid(enterprise_customer_uuid, lms_user_id, content_key),
-            status=status.HTTP_200_OK,
-        )
 
     def _get_user_message_for_reason(self, reason_slug, enterprise_admin_users):
         """

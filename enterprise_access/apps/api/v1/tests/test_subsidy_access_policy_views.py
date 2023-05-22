@@ -290,15 +290,6 @@ class TestPolicyRedemptionAuthNAndPermissionChecks(APITestWithMocks):
         if role_context_dict:
             self.set_jwt_cookie([role_context_dict])
 
-        # The policy redemption list endpoint
-        query_params = {
-            'enterprise_customer_uuid': str(self.enterprise_uuid),
-            'lms_user_id': '1234',
-            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
-        }
-        response = self.client.get(reverse('api:v1:policy-redemption'), query_params)
-        self.assertEqual(response.status_code, expected_response_code)
-
         # The redeem endpoint
         url = reverse('api:v1:policy-redeem', kwargs={'policy_uuid': self.redeemable_policy.uuid})
         payload = {
@@ -354,7 +345,6 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'api:v1:policy-redeem',
             kwargs={'policy_uuid': self.redeemable_policy.uuid}
         )
-        self.subsidy_access_policy_redemption_endpoint = reverse('api:v1:policy-redemption')
         self.subsidy_access_policy_credits_available_endpoint = reverse('api:v1:policy-credits-available')
         self.subsidy_access_policy_can_redeem_endpoint = reverse(
             "api:v1:policy-can-redeem",
@@ -531,35 +521,6 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         response_json = self.load_json(response.content)
         assert response_json == mock_transaction_record
         self.mock_get_content_metadata.assert_called_once_with(payload['content_key'])
-
-    def test_redemption_endpoint(self):
-        """
-        Verify that SubsidyAccessPolicyViewset redemption endpoint works as expected
-        """
-        mock_transaction_record = {
-            'uuid': str(uuid4()),
-            'state': TransactionStateChoices.COMMITTED,
-            'other': True,
-            'content_key': 'course-v1:edX+test+courserun',
-        }
-        self.redeemable_policy.subsidy_client.list_subsidy_transactions.return_value = {
-            'results': [
-                mock_transaction_record
-            ],
-            'aggregates': {
-                'total_quantity': 100,
-            },
-        }
-        query_params = {
-            'enterprise_customer_uuid': str(self.enterprise_uuid),
-            'lms_user_id': '1234',
-            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
-        }
-        response = self.client.get(self.subsidy_access_policy_redemption_endpoint, query_params)
-        response_json = self.load_json(response.content)
-        assert response_json == {
-            str(self.redeemable_policy.uuid): [mock_transaction_record],
-        }
 
     def test_credits_available_endpoint(self):
         """
