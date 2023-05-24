@@ -8,7 +8,7 @@ amqp==5.1.1
     # via kombu
 analytics-python==1.4.post1
     # via -r requirements/base.in
-asgiref==3.6.0
+asgiref==3.7.1
     # via django
 async-timeout==4.0.2
     # via redis
@@ -74,6 +74,7 @@ django==3.2.19
     #   django-crum
     #   django-extensions
     #   django-filter
+    #   django-log-request-id
     #   django-model-utils
     #   djangorestframework
     #   drf-jwt
@@ -102,6 +103,8 @@ django-crum==0.7.9
 django-extensions==3.2.1
     # via -r requirements/base.in
 django-filter==23.2
+    # via -r requirements/base.in
+django-log-request-id==2.1.0
     # via -r requirements/base.in
 django-model-utils==4.3.1
     # via
@@ -150,9 +153,8 @@ edx-django-utils==5.4.0
     #   -r requirements/base.in
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.7.0
+edx-drf-extensions==8.8.0
     # via
-    #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/base.in
     #   edx-rbac
 edx-enterprise-subsidy-client==0.3.3
@@ -171,8 +173,6 @@ fastavro==1.7.4
     # via
     #   -r requirements/base.in
     #   openedx-events
-future==0.18.3
-    # via pyjwkest
 idna==3.4
     # via requests
 importlib-resources==5.12.0
@@ -223,10 +223,6 @@ psutil==5.9.5
     # via edx-django-utils
 pycparser==2.21
     # via cffi
-pycryptodomex==3.17
-    # via pyjwkest
-pyjwkest==1.4.2
-    # via edx-drf-extensions
 pyjwt[crypto]==2.7.0
     # via
     #   drf-jwt
@@ -259,13 +255,12 @@ pyyaml==6.0
     #   edx-django-release-util
 redis==4.5.5
     # via -r requirements/base.in
-requests==2.30.0
+requests==2.31.0
     # via
     #   analytics-python
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
-    #   pyjwkest
     #   requests-oauthlib
     #   slumber
     #   social-auth-core
@@ -289,7 +284,6 @@ six==1.16.0
     #   edx-django-release-util
     #   edx-drf-extensions
     #   edx-rbac
-    #   pyjwkest
     #   python-dateutil
 slumber==0.7.1
     # via edx-rest-api-client
@@ -305,6 +299,8 @@ stevedore==5.1.0
     # via
     #   edx-django-utils
     #   edx-opaque-keys
+typing-extensions==4.6.1
+    # via asgiref
 uritemplate==4.1.1
     # via
     #   coreapi

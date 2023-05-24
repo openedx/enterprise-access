@@ -10,7 +10,7 @@ amqp==5.1.1
     #   kombu
 analytics-python==1.4.post1
     # via -r requirements/base.txt
-asgiref==3.6.0
+asgiref==3.7.1
     # via
     #   -r requirements/base.txt
     #   django
@@ -95,7 +95,7 @@ coreschema==0.0.4
     #   -r requirements/base.txt
     #   coreapi
     #   drf-yasg
-coverage[toml]==7.2.5
+coverage[toml]==7.2.6
     # via
     #   -r requirements/test.in
     #   pytest-cov
@@ -123,6 +123,7 @@ distlib==0.3.6
     #   django-crum
     #   django-extensions
     #   django-filter
+    #   django-log-request-id
     #   django-model-utils
     #   djangorestframework
     #   drf-jwt
@@ -153,6 +154,8 @@ django-dynamic-fixture==3.1.2
 django-extensions==3.2.1
     # via -r requirements/base.txt
 django-filter==23.2
+    # via -r requirements/base.txt
+django-log-request-id==2.1.0
     # via -r requirements/base.txt
 django-model-utils==4.3.1
     # via
@@ -206,9 +209,8 @@ edx-django-utils==5.4.0
     #   -r requirements/base.txt
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.7.0
+edx-drf-extensions==8.8.0
     # via
-    #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/base.txt
     #   edx-rbac
 edx-enterprise-subsidy-client==0.3.3
@@ -240,10 +242,6 @@ filelock==3.12.0
     # via
     #   tox
     #   virtualenv
-future==0.18.3
-    # via
-    #   -r requirements/base.txt
-    #   pyjwkest
 idna==3.4
     # via
     #   -r requirements/base.txt
@@ -353,14 +351,6 @@ pycparser==2.21
     # via
     #   -r requirements/base.txt
     #   cffi
-pycryptodomex==3.17
-    # via
-    #   -r requirements/base.txt
-    #   pyjwkest
-pyjwkest==1.4.2
-    # via
-    #   -r requirements/base.txt
-    #   edx-drf-extensions
 pyjwt[crypto]==2.7.0
     # via
     #   -r requirements/base.txt
@@ -379,7 +369,7 @@ pylint-celery==0.3
     # via edx-lint
 pylint-django==2.5.3
     # via edx-lint
-pylint-plugin-utils==0.8.1
+pylint-plugin-utils==0.8.2
     # via
     #   pylint-celery
     #   pylint-django
@@ -430,14 +420,13 @@ pyyaml==6.0
     #   edx-django-release-util
 redis==4.5.5
     # via -r requirements/base.txt
-requests==2.30.0
+requests==2.31.0
     # via
     #   -r requirements/base.txt
     #   analytics-python
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
-    #   pyjwkest
     #   requests-oauthlib
     #   slumber
     #   social-auth-core
@@ -474,7 +463,6 @@ six==1.16.0
     #   edx-drf-extensions
     #   edx-lint
     #   edx-rbac
-    #   pyjwkest
     #   python-dateutil
     #   tox
 slumber==0.7.1
@@ -514,8 +502,10 @@ tox==3.28.0
     # via
     #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/test.in
-typing-extensions==4.5.0
+typing-extensions==4.6.1
     # via
+    #   -r requirements/base.txt
+    #   asgiref
     #   astroid
     #   pylint
 uritemplate==4.1.1
