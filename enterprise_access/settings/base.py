@@ -72,6 +72,7 @@ INSTALLED_APPS += THIRD_PARTY_APPS
 INSTALLED_APPS += PROJECT_APPS
 
 MIDDLEWARE = (
+    'log_request_id.middleware.RequestIDMiddleware',
     # Resets RequestCache utility for added safety.
     'edx_django_utils.cache.middleware.RequestCacheMiddleware',
     # Enables monitoring utility for writing custom metrics.
@@ -98,6 +99,13 @@ MIDDLEWARE = (
     # Used to get request inside serializers.
     'crum.CurrentRequestUserMiddleware',
 )
+
+# https://github.com/dabapps/django-log-request-id
+LOG_REQUEST_ID_HEADER = "HTTP_X_REQUEST_ID"
+GENERATE_REQUEST_ID_IF_NOT_IN_HEADER = False
+REQUEST_ID_RESPONSE_HEADER = "X-Request-ID"
+NO_REQUEST_ID = "None"
+LOG_REQUESTS = False
 
 # Enable CORS
 CORS_ALLOW_CREDENTIALS = True
