@@ -158,7 +158,7 @@ distlib==0.3.6
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   virtualenv
-django==3.2.18
+django==3.2.19
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
