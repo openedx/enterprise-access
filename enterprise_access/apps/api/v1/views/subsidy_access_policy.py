@@ -291,9 +291,14 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         return self.enterprise_customer_uuid
 
     def get_queryset(self):
-        queryset = SubsidyAccessPolicy.objects.order_by('-created')
-        enterprise_customer_uuid = self.enterprise_customer_uuid
-        return queryset.filter(enterprise_customer_uuid=enterprise_customer_uuid)
+        """
+        Base queryset that returns all active policies associated
+        with the customer uuid requested by the client.
+        """
+        return SubsidyAccessPolicy.objects.filter(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            active=True,
+        ).order_by('-created')
 
     def evaluate_policies(self, enterprise_customer_uuid, lms_user_id, content_key):
         """
@@ -311,10 +316,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         """
         redeemable_policies = []
         non_redeemable_policies = defaultdict(list)
-        all_policies_for_enterprise = SubsidyAccessPolicy.objects.filter(
-            enterprise_customer_uuid=enterprise_customer_uuid,
-            active=True,
-        )
+        all_policies_for_enterprise = self.get_queryset()
+
         for policy in all_policies_for_enterprise:
             try:
                 redeemable, reason = policy.can_redeem(lms_user_id, content_key, skip_customer_user_check=True)
@@ -597,6 +600,9 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 f'in customer {enterprise_customer_uuid}'
             )
             raise NotFound(detail='Could not determine a value for lms_user_id')
+
+        if not self.get_queryset():
+            raise NotFound(detail='No active policies for this customer')
 
         element_responses = []
         for content_key in content_keys:
