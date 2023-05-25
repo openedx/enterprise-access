@@ -29,6 +29,7 @@ edx-rest-api-client
 jsonfield2
 mysqlclient
 openedx-events
+pymemcache
 pytz
 redis
 rules

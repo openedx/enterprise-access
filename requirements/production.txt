@@ -307,6 +307,8 @@ pyjwt[crypto]==2.7.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
+pymemcache==4.0.0
+    # via -r requirements/base.txt
 pymongo==3.13.0
     # via
     #   -r requirements/base.txt
@@ -410,7 +412,7 @@ stevedore==5.1.0
     #   -r requirements/base.txt
     #   edx-django-utils
     #   edx-opaque-keys
-typing-extensions==4.6.1
+typing-extensions==4.6.2
     # via
     #   -r requirements/base.txt
     #   asgiref
