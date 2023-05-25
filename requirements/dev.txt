@@ -481,6 +481,8 @@ pylint-plugin-utils==0.8.2
     #   -r requirements/validation.txt
     #   pylint-celery
     #   pylint-django
+pymemcache==4.0.0
+    # via -r requirements/validation.txt
 pymongo==3.13.0
     # via
     #   -r requirements/validation.txt
@@ -502,7 +504,7 @@ pytest==7.3.1
     #   -r requirements/validation.txt
     #   pytest-cov
     #   pytest-django
-pytest-cov==4.0.0
+pytest-cov==4.1.0
     # via -r requirements/validation.txt
 pytest-django==4.5.2
     # via -r requirements/validation.txt
@@ -654,7 +656,7 @@ tox==3.28.0
     # via -r requirements/validation.txt
 twine==4.0.2
     # via -r requirements/validation.txt
-typing-extensions==4.6.1
+typing-extensions==4.6.2
     # via
     #   -r requirements/validation.txt
     #   asgiref

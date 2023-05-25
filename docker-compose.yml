@@ -14,6 +14,9 @@ services:
   memcache:
     image: memcached:1.4.24
     container_name: enterprise_access.memcache
+    networks:
+      - devstack_default
+    command: memcached -vv
 
   app:
     # Uncomment this line to use the official enterprise_access base image

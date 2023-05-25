@@ -575,6 +575,10 @@ pylint-plugin-utils==0.8.2
     #   -r requirements/test.txt
     #   pylint-celery
     #   pylint-django
+pymemcache==4.0.0
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
 pymongo==3.13.0
     # via
     #   -r requirements/quality.txt
@@ -596,7 +600,7 @@ pytest==7.3.1
     #   -r requirements/test.txt
     #   pytest-cov
     #   pytest-django
-pytest-cov==4.0.0
+pytest-cov==4.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -773,7 +777,7 @@ tox==3.28.0
     #   -r requirements/test.txt
 twine==4.0.2
     # via -r requirements/quality.txt
-typing-extensions==4.6.1
+typing-extensions==4.6.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
