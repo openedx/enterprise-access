@@ -40,7 +40,7 @@ def get_logger_config(logging_env="no_env",
         'formatters': {
             'standard': {
                 'format': '%(asctime)s %(levelname)s %(process)d '
-                          '[%(name)s] [user %(userid)s] [ip %(remoteip)s] [request_id %(request_id)s]'
+                          '[%(name)s] [user %(userid)s] [ip %(remoteip)s] [request_id %(request_id)s] '
                           '%(filename)s:%(lineno)d - %(message)s',
             },
             'syslog_format': {'format': syslog_format},
