@@ -6,6 +6,9 @@ import os
 from collections import defaultdict
 from contextlib import suppress
 
+from celery import shared_task, states, group
+from enterprise_access.tasks import LoggedTaskWithRetry
+
 import requests
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
@@ -64,6 +67,205 @@ logger = logging.getLogger(__name__)
 
 SUBSIDY_ACCESS_POLICY_CRUD_API_TAG = 'DEPRECATED: Subsidy Access Policy views'
 SUBSIDY_ACCESS_POLICY_READ_ONLY_API_TAG = 'subsidy-access-policies read-only'
+
+
+def get_user_message_for_reason(reason_slug, enterprise_admin_users):
+    """
+    Return the user-facing message for a given reason slug.
+    """
+    if not reason_slug:
+        return None
+
+    has_enterprise_admin_users = len(enterprise_admin_users) > 0
+
+    user_message_organization_no_funds = (
+        MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS
+        if has_enterprise_admin_users
+        else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS_NO_ADMINS
+    )
+
+    MISSING_SUBSIDY_ACCESS_POLICY_REASONS = {
+        REASON_POLICY_NOT_ACTIVE: user_message_organization_no_funds,
+        REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY: user_message_organization_no_funds,
+        REASON_POLICY_SPEND_LIMIT_REACHED: user_message_organization_no_funds,
+        REASON_LEARNER_NOT_IN_ENTERPRISE: MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_IN_ENTERPRISE,
+        REASON_LEARNER_MAX_SPEND_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
+        REASON_LEARNER_MAX_ENROLLMENTS_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
+        REASON_CONTENT_NOT_IN_CATALOG: MissingSubsidyAccessReasonUserMessages.CONTENT_NOT_IN_CATALOG,
+    }
+
+    if reason_slug not in MISSING_SUBSIDY_ACCESS_POLICY_REASONS:
+        return None
+
+    return MISSING_SUBSIDY_ACCESS_POLICY_REASONS[reason_slug]
+
+def evaluate_policies(enterprise_customer_uuid, lms_user_id, content_key):
+    """
+    Evaluate all policies for the given enterprise customer to check if it can be redeemed against the given learner
+    and content.
+
+    Note: Calling this will cause multiple backend API calls to the enterprise-subsidy can_redeem endpoint, one for
+    each access policy evaluated.
+
+    Returns:
+        tuple of (list of SubsidyAccessPolicy, dict mapping str -> list of SubsidyAccessPolicy): The first tuple
+        element is a list of redeemable policies, and the second tuple element is a mapping of reason strings to
+        non-redeemable policies.  The reason strings are non-specific, short explanations for why each bucket of
+        policies has been deemed non-redeemable.
+    """
+    redeemable_policies = []
+    non_redeemable_policies = defaultdict(list)
+    all_policies_for_enterprise = SubsidyAccessPolicy.objects.filter(
+        enterprise_customer_uuid=enterprise_customer_uuid,
+        active=True,
+    )
+    for policy in all_policies_for_enterprise:
+        try:
+            redeemable, reason = policy.can_redeem(lms_user_id, content_key, skip_customer_user_check=True)
+        except ContentPriceNullException as exc:
+            logger.warning(f'{exc} when checking can_redeem() for {enterprise_customer_uuid}')
+            raise RedemptionRequestException(
+                detail=f'Could not determine price for content_key: {content_key}',
+            ) from exc
+        if redeemable:
+            redeemable_policies.append(policy)
+        else:
+            # Aggregate the reasons for policies not being redeemable.  This really only works if the reason string
+            # is short and generic because the bucketing logic simply treats entire string as the bucket key.
+            non_redeemable_policies[reason].append(policy)
+
+        return (redeemable_policies, non_redeemable_policies)
+
+def get_redemptions_by_policy_uuid(enterprise_customer_uuid, lms_user_id, content_key):
+    """
+    Get existing redemptions for the given enterprise, learner, and content, bucketed by policy.
+
+    Note: Calling this will cause multiple backend API calls to the enterprise-subsidy can_redeem endpoint, one for
+    each access policy evaluated.
+
+    Returns:
+        dict of list of policy data: mapping of policy UUID to a list of deserialized ledger transactions. e.g.:
+            {
+                "316b0f76-a69c-464b-93d7-7c0142f003aa": [
+                    {
+                        "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
+                        "state": "committed",
+                        "idempotency_key": "the-idempotency-key",
+                        "lms_user_id": 54321,
+                        "content_key": "course-v1:demox+1234+2T2023",
+                        "quantity": -19900,
+                        "unit": "USD_CENTS",
+                        "reference_id": "6ff2c1c9-d5fc-48a8-81da-e6a675263f67",
+                        "reference_type": "enterprise_fufillment_source_uuid",
+                        "subsidy_access_policy_uuid": "ac4cca18-4857-402d-963a-790c2f6fcc53",
+                        "metadata": {...},
+                        "created": <created-datetime>,
+                        "modified": <modified-datetime>,
+                        "reversals": [],
+                        "policy_redemption_status_url": <API URL to check redemption status>,
+                        "courseware_url": "https://courses.edx.org/courses/course-v1:demox+1234+2T2023/courseware/",
+                    },
+                ]
+            }
+    """
+    redemptions_by_policy_uuid = {}
+    policies = SubsidyAccessPolicy.objects.filter(enterprise_customer_uuid=enterprise_customer_uuid)
+
+    for policy in policies:
+        if redemptions := policy.redemptions(lms_user_id, content_key):
+            for redemption in redemptions:
+                redemption["policy_redemption_status_url"] = os.path.join(
+                    EnterpriseSubsidyAPIClient.TRANSACTIONS_ENDPOINT,
+                    f"{redemption['uuid']}/",
+                )
+                # TODO: this is currently hard-coded to only support OCM courses.
+                redemption["courseware_url"] = os.path.join(
+                    settings.LMS_URL,
+                    f"courses/{redemption['content_key']}/courseware/",
+                )
+            redemptions_by_policy_uuid[str(policy.uuid)] = redemptions
+
+    return redemptions_by_policy_uuid
+
+@shared_task(base=LoggedTaskWithRetry, bind=True)
+def for_content_key(self, enterprise_customer_uuid, lms_user_id, content_key):
+    reasons = []
+
+    # Look for any existing redemptions for this learner and content.
+    redemptions_by_policy_uuid = get_redemptions_by_policy_uuid(
+        enterprise_customer_uuid,
+        lms_user_id,
+        content_key
+    )
+    # Flatten dict of lists because the response doesn't need to be bucketed by policy_uuid.
+    redemptions = [
+        redemption
+        for redemptions in redemptions_by_policy_uuid.values()
+        for redemption in redemptions
+    ]
+
+    # Of all policies for this customer, determine which are redeemable and which are not.
+    redeemable_policies, non_redeemable_policies = evaluate_policies(
+        enterprise_customer_uuid, lms_user_id, content_key
+    )
+    if not redemptions and not redeemable_policies:
+        lms_client = LmsApiClient()
+        enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
+        enterprise_admin_users = enterprise_customer_data.get('admin_users')
+        for reason, policies in non_redeemable_policies.items():
+            reasons.append({
+                "reason": reason,
+                "user_message": get_user_message_for_reason(reason, enterprise_admin_users),
+                "metadata": {
+                    "enterprise_administrators": enterprise_admin_users,
+                },
+                "policy_uuids": [policy.uuid for policy in policies],
+            })
+
+    # Select one redeemable policy (i.e. use the "policy resolver") and serialize it for output.
+    resolved_policy = None
+    if redeemable_policies:
+        resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
+
+    # Determine if the learner has already redeemed the requested content_key.
+    has_successful_redemption = any(
+        redemption['state'] == TransactionStateChoices.COMMITTED
+        for redemption in redemptions
+    )
+
+    # Determine the price for content for display purposes only.
+    try:
+        content_metadata = get_and_cache_content_metadata(enterprise_customer_uuid, content_key)
+        # Note that the "content_price" key is guaranteed to exist, but the value may be None.
+        list_price_integer_cents = content_metadata["content_price"]
+        # TODO: simplify this function by consolidating this conversion logic into the response serializer:
+        if list_price_integer_cents is not None:
+            list_price_decimal_dollars = float(list_price_integer_cents) / 100
+        else:
+            list_price_decimal_dollars = None
+    except requests.exceptions.HTTPError as exc:
+        logger.warning(f'{exc} when checking can_redeem() for {enterprise_customer_uuid}')
+        raise RedemptionRequestException(
+            detail=f'Could not determine price for content_key: {content_key}',
+        ) from exc
+
+    element_response = {
+        "content_key": content_key,
+        "list_price": {
+            "usd": list_price_decimal_dollars,
+            "usd_cents": list_price_integer_cents,
+        },
+        "redemptions": redemptions,
+        "has_successful_redemption": has_successful_redemption,
+        "redeemable_subsidy_access_policy": resolved_policy,
+        "can_redeem": bool(resolved_policy),
+        "reasons": reasons,
+    }
+    return element_response
+
+
+def for_content_key_task(enterprise_customer_uuid, lms_user_id, content_key):
+    return for_content_key.s(enterprise_customer_uuid, lms_user_id, content_key)
 
 
 def policy_permission_retrieve_fn(request, *args, uuid=None):
@@ -471,57 +673,6 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 detail=error_payload,
             ) from exc
 
-    def get_redemptions_by_policy_uuid(self, enterprise_customer_uuid, lms_user_id, content_key):
-        """
-        Get existing redemptions for the given enterprise, learner, and content, bucketed by policy.
-
-        Note: Calling this will cause multiple backend API calls to the enterprise-subsidy can_redeem endpoint, one for
-        each access policy evaluated.
-
-        Returns:
-            dict of list of policy data: mapping of policy UUID to a list of deserialized ledger transactions. e.g.:
-                {
-                    "316b0f76-a69c-464b-93d7-7c0142f003aa": [
-                        {
-                            "uuid": "26cdce7f-b13d-46fe-a395-06d8a50932e9",
-                            "state": "committed",
-                            "idempotency_key": "the-idempotency-key",
-                            "lms_user_id": 54321,
-                            "content_key": "course-v1:demox+1234+2T2023",
-                            "quantity": -19900,
-                            "unit": "USD_CENTS",
-                            "reference_id": "6ff2c1c9-d5fc-48a8-81da-e6a675263f67",
-                            "reference_type": "enterprise_fufillment_source_uuid",
-                            "subsidy_access_policy_uuid": "ac4cca18-4857-402d-963a-790c2f6fcc53",
-                            "metadata": {...},
-                            "created": <created-datetime>,
-                            "modified": <modified-datetime>,
-                            "reversals": [],
-                            "policy_redemption_status_url": <API URL to check redemption status>,
-                            "courseware_url": "https://courses.edx.org/courses/course-v1:demox+1234+2T2023/courseware/",
-                        },
-                    ]
-                }
-        """
-        redemptions_by_policy_uuid = {}
-        policies = SubsidyAccessPolicy.objects.filter(enterprise_customer_uuid=enterprise_customer_uuid)
-
-        for policy in policies:
-            if redemptions := policy.redemptions(lms_user_id, content_key):
-                for redemption in redemptions:
-                    redemption["policy_redemption_status_url"] = os.path.join(
-                        EnterpriseSubsidyAPIClient.TRANSACTIONS_ENDPOINT,
-                        f"{redemption['uuid']}/",
-                    )
-                    # TODO: this is currently hard-coded to only support OCM courses.
-                    redemption["courseware_url"] = os.path.join(
-                        settings.LMS_URL,
-                        f"courses/{redemption['content_key']}/courseware/",
-                    )
-                redemptions_by_policy_uuid[str(policy.uuid)] = redemptions
-
-        return redemptions_by_policy_uuid
-
     def _get_user_message_for_reason(self, reason_slug, enterprise_admin_users):
         """
         Return the user-facing message for a given reason slug.
@@ -599,80 +750,25 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             raise NotFound(detail='Could not determine a value for lms_user_id')
 
         element_responses = []
-        for content_key in content_keys:
-            reasons = []
+        # _for_content_key_arguments = []
+        # for content_key in content_keys:
+        #     _for_content_key_arguments.append([enterprise_customer_uuid, lms_user_id, content_key])
+        # with multiprocessing.Pool(processes=3) as pool:
+        #     element_responses = pool.starmap(for_content_key, _for_content_key_arguments)
 
-            # Look for any existing redemptions for this learner and content.
-            redemptions_by_policy_uuid = self.get_redemptions_by_policy_uuid(
-                enterprise_customer_uuid,
-                lms_user_id,
-                content_key
-            )
-            # Flatten dict of lists because the response doesn't need to be bucketed by policy_uuid.
-            redemptions = [
-                redemption
-                for redemptions in redemptions_by_policy_uuid.values()
-                for redemption in redemptions
+        content_key_group = group(
+            [
+                for_content_key_task(enterprise_customer_uuid, lms_user_id, content_key)
+                for content_key in content_keys
             ]
+        )
 
-            # Of all policies for this customer, determine which are redeemable and which are not.
-            redeemable_policies, non_redeemable_policies = self.evaluate_policies(
-                enterprise_customer_uuid, lms_user_id, content_key
-            )
-            if not redemptions and not redeemable_policies:
-                lms_client = LmsApiClient()
-                enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-                enterprise_admin_users = enterprise_customer_data.get('admin_users')
-                for reason, policies in non_redeemable_policies.items():
-                    reasons.append({
-                        "reason": reason,
-                        "user_message": self._get_user_message_for_reason(reason, enterprise_admin_users),
-                        "metadata": {
-                            "enterprise_administrators": enterprise_admin_users,
-                        },
-                        "policy_uuids": [policy.uuid for policy in policies],
-                    })
-
-            # Select one redeemable policy (i.e. use the "policy resolver") and serialize it for output.
-            resolved_policy = None
-            if redeemable_policies:
-                resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
-
-            # Determine if the learner has already redeemed the requested content_key.
-            has_successful_redemption = any(
-                redemption['state'] == TransactionStateChoices.COMMITTED
-                for redemption in redemptions
+        element_responses = content_key_group.apply().get(
+                timeout=5,
+                propagate=True,
             )
 
-            # Determine the price for content for display purposes only.
-            try:
-                content_metadata = get_and_cache_content_metadata(enterprise_customer_uuid, content_key)
-                # Note that the "content_price" key is guaranteed to exist, but the value may be None.
-                list_price_integer_cents = content_metadata["content_price"]
-                # TODO: simplify this function by consolidating this conversion logic into the response serializer:
-                if list_price_integer_cents is not None:
-                    list_price_decimal_dollars = float(list_price_integer_cents) / 100
-                else:
-                    list_price_decimal_dollars = None
-            except requests.exceptions.HTTPError as exc:
-                logger.warning(f'{exc} when checking can_redeem() for {enterprise_customer_uuid}')
-                raise RedemptionRequestException(
-                    detail=f'Could not determine price for content_key: {content_key}',
-                ) from exc
-
-            element_response = {
-                "content_key": content_key,
-                "list_price": {
-                    "usd": list_price_decimal_dollars,
-                    "usd_cents": list_price_integer_cents,
-                },
-                "redemptions": redemptions,
-                "has_successful_redemption": has_successful_redemption,
-                "redeemable_subsidy_access_policy": resolved_policy,
-                "can_redeem": bool(resolved_policy),
-                "reasons": reasons,
-            }
-            element_responses.append(element_response)
+        logger.info(element_responses)
 
         response_serializer = serializers.SubsidyAccessPolicyCanRedeemElementResponseSerializer(
             element_responses,
