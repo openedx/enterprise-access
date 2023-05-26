@@ -31,6 +31,9 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
 )
 
+ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID = uuid4()
+ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID = uuid4()
+
 
 @ddt.ddt
 class SubsidyAccessPolicyTests(TestCase):
@@ -44,40 +47,43 @@ class SubsidyAccessPolicyTests(TestCase):
         Initialize mocked service clients.
         """
         super().setUp()
-        self.subsidy_client_patcher = patch.object(
+        subsidy_client_patcher = patch.object(
             SubsidyAccessPolicy, 'subsidy_client'
         )
-        self.mock_subsidy_client = self.subsidy_client_patcher.start()
+        self.mock_subsidy_client = subsidy_client_patcher.start()
 
-        self.catalog_contains_content_key_patcher = patch.object(
+        transactions_cache_for_learner_patcher = patch(
+            'enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner'
+        )
+        self.mock_transactions_cache_for_learner = transactions_cache_for_learner_patcher.start()
+
+        catalog_contains_content_key_patcher = patch.object(
             SubsidyAccessPolicy, 'catalog_contains_content_key'
         )
-        self.mock_catalog_contains_content_key = self.catalog_contains_content_key_patcher.start()
+        self.mock_catalog_contains_content_key = catalog_contains_content_key_patcher.start()
 
-        self.get_content_metadata_patcher = patch.object(
+        get_content_metadata_patcher = patch.object(
             SubsidyAccessPolicy, 'get_content_metadata'
         )
-        self.mock_get_content_metadata = self.get_content_metadata_patcher.start()
+        self.mock_get_content_metadata = get_content_metadata_patcher.start()
 
-        self.lms_api_client_patcher = patch.object(
+        lms_api_client_patcher = patch.object(
             SubsidyAccessPolicy, 'lms_api_client'
         )
-        self.mock_lms_api_client = self.lms_api_client_patcher.start()
+        self.mock_lms_api_client = lms_api_client_patcher.start()
 
-        cleanup_functions = (
-            self.subsidy_client_patcher.stop,
-            self.catalog_contains_content_key_patcher.stop,
-            self.get_content_metadata_patcher.stop,
-            self.lms_api_client_patcher.stop,
-            django_cache.clear,  # clear any leftover policy locks.
-        )
-        for func in cleanup_functions:
-            self.addCleanup(func)
+        self.addCleanup(subsidy_client_patcher.stop)
+        self.addCleanup(transactions_cache_for_learner_patcher.stop)
+        self.addCleanup(catalog_contains_content_key_patcher.stop)
+        self.addCleanup(get_content_metadata_patcher.stop)
+        self.addCleanup(lms_api_client_patcher.stop)
+        self.addCleanup(django_cache.clear)  # clear any leftover policy locks.
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.per_learner_enroll_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            uuid=ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID,
             per_learner_enrollment_limit=5,
             spend_limit=10000,
         )
@@ -86,6 +92,7 @@ class SubsidyAccessPolicyTests(TestCase):
             active=False,
         )
         cls.per_learner_spend_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            uuid=ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID,
             per_learner_spend_limit=500,
             spend_limit=10000
         )
@@ -157,7 +164,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
-            'transactions_for_learner': {'results': [], 'aggregates': {'total_quantity': 100}},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': 100}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
             'expected_policy_can_redeem': (True, None),
         },
@@ -168,7 +175,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'catalog_contains_content': False,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
-            'transactions_for_learner': {'results': [], 'aggregates': {}},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
             'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG),
         },
@@ -179,7 +186,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'catalog_contains_content': True,
             'enterprise_contains_learner': False,
             'subsidy_is_redeemable': {'can_redeem': True},
-            'transactions_for_learner': {'results': [], 'aggregates': {}},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE),
         },
@@ -190,7 +197,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': False},
-            'transactions_for_learner': {'results': [], 'aggregates': {}},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
             'expected_policy_can_redeem': (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY),
         },
@@ -203,8 +210,13 @@ class SubsidyAccessPolicyTests(TestCase):
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {
-                'results': [{'foo': 'bar'} for _ in range(10)],
-                'aggregates': {'total_quantity': 100}
+                'transactions': [{
+                    'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID),
+                    'uuid': str(uuid4()),
+                    'content_key': 'anything',
+                    'quantity': 5,
+                } for _ in range(10)],
+                'aggregates': {'total_quantity': 100},
             },
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_MAX_ENROLLMENTS_REACHED),
@@ -218,8 +230,13 @@ class SubsidyAccessPolicyTests(TestCase):
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {
-                'results': [{'foo': 'bar'} for _ in range(10)],
-                'aggregates': {'total_quantity': 100}
+                'transactions': [{
+                    'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID),
+                    'uuid': str(uuid4()),
+                    'content_key': 'anything',
+                    'quantity': 5,
+                } for _ in range(10)],
+                'aggregates': {'total_quantity': 100},
             },
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 9999}},
             'expected_policy_can_redeem': (False, REASON_POLICY_SPEND_LIMIT_REACHED),
@@ -231,7 +248,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
-            'transactions_for_learner': {'results': [], 'aggregates': {}},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
             'expected_policy_can_redeem': (False, REASON_POLICY_NOT_ACTIVE),
         },
@@ -256,13 +273,8 @@ class SubsidyAccessPolicyTests(TestCase):
             'content_price': 200,
         }
         self.mock_subsidy_client.can_redeem.return_value = subsidy_is_redeemable
-
-        def mock_list_transactions(*args, **kwargs):
-            if 'lms_user_id' in kwargs:
-                return transactions_for_learner
-            return transactions_for_policy
-
-        self.mock_subsidy_client.list_subsidy_transactions.side_effect = mock_list_transactions
+        self.mock_transactions_cache_for_learner.return_value = transactions_for_learner
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = transactions_for_policy
 
         policy_record = self.inactive_per_learner_enroll_policy
         if policy_is_active:
@@ -281,7 +293,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
-            'transactions_for_learner': {'results': [], 'aggregates': {'total_quantity': 100}},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': 100}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
             'expected_policy_can_redeem': (True, None),
         },
@@ -292,7 +304,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'catalog_contains_content': False,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
-            'transactions_for_learner': {'results': [], 'aggregates': {}},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
             'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG),
         },
@@ -303,7 +315,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'catalog_contains_content': True,
             'enterprise_contains_learner': False,
             'subsidy_is_redeemable': {'can_redeem': True},
-            'transactions_for_learner': {'results': [], 'aggregates': {}},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE),
         },
@@ -314,7 +326,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': False},
-            'transactions_for_learner': {'results': [], 'aggregates': {}},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
             'expected_policy_can_redeem': (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY),
         },
@@ -327,7 +339,12 @@ class SubsidyAccessPolicyTests(TestCase):
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {
-                'results': [{'foo': 'bar'}],
+                'transactions': [{
+                    'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID),
+                    'uuid': str(uuid4()),
+                    'content_key': 'anything',
+                    'quantity': 50000,
+                }],
                 'aggregates': {'total_quantity': 50000}
             },
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
@@ -342,7 +359,12 @@ class SubsidyAccessPolicyTests(TestCase):
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {
-                'results': [{'foo': 'bar'}],
+                'transactions': [{
+                    'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID),
+                    'uuid': str(uuid4()),
+                    'content_key': 'anything',
+                    'quantity': 100,
+                }],
                 'aggregates': {'total_quantity': 100}
             },
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 15000}},
@@ -355,7 +377,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
-            'transactions_for_learner': {'results': [], 'aggregates': {}},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
             'expected_policy_can_redeem': (False, REASON_POLICY_NOT_ACTIVE),
         },
@@ -380,13 +402,8 @@ class SubsidyAccessPolicyTests(TestCase):
             'content_price': 200,
         }
         self.mock_subsidy_client.can_redeem.return_value = subsidy_is_redeemable
-
-        def mock_list_transactions(*args, **kwargs):
-            if 'lms_user_id' in kwargs:
-                return transactions_for_learner
-            return transactions_for_policy
-
-        self.mock_subsidy_client.list_subsidy_transactions.side_effect = mock_list_transactions
+        self.mock_transactions_cache_for_learner.return_value = transactions_for_learner
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = transactions_for_policy
 
         policy_record = self.inactive_per_learner_spend_policy
         if policy_is_active:

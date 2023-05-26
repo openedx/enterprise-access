@@ -27,6 +27,7 @@ from .constants import (
 )
 from .content_metadata_api import get_and_cache_catalog_contains_content, get_and_cache_content_metadata
 from .exceptions import ContentPriceNullException, SubsidyAccessPolicyLockAttemptFailed, SubsidyAPIHTTPError
+from .subsidy_api import get_and_cache_transactions_for_learner
 from .utils import get_versioned_subsidy_client
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
@@ -236,16 +237,23 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
     def transactions_for_learner(self, lms_user_id):
         """
-        TODO: figure out cache?
+        Returns a request-cached version of all transactions and aggregate quantities
+        for this learner and this policy.
         """
-        response_payload = self.subsidy_client.list_subsidy_transactions(
-            subsidy_uuid=self.subsidy_uuid,
-            lms_user_id=lms_user_id,
-            subsidy_access_policy_uuid=self.uuid,
-        )
+        subsidy_transactions = get_and_cache_transactions_for_learner(
+            self.subsidy_uuid, lms_user_id
+        )['transactions']
+
+        policy_transactions = [
+            transaction for transaction in subsidy_transactions
+            if str(transaction['subsidy_access_policy_uuid']) == str(self.uuid)
+        ]
+        policy_aggregates = {
+            'total_quantity': sum(tx['quantity'] for tx in policy_transactions),
+        }
         return {
-            'transactions': response_payload['results'],
-            'aggregates': response_payload['aggregates'],
+            'transactions': policy_transactions,
+            'aggregates': policy_aggregates,
         }
 
     def transactions_for_learner_and_content(self, lms_user_id, content_key):
@@ -524,7 +532,8 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
         has_per_learner_spend_limit = self.per_learner_spend_limit is not None
         if has_per_learner_spend_limit:
             # only retrieve transactions if there is a per-learner spend limit
-            spent_amount = self.transactions_for_learner(lms_user_id)['aggregates'].get('total_quantity') or 0
+            existing_learner_transaction_aggregates = self.transactions_for_learner(lms_user_id)['aggregates']
+            spent_amount = existing_learner_transaction_aggregates.get('total_quantity') or 0
             content_price = self.get_content_price(content_key)
             if (spent_amount + content_price) >= self.per_learner_spend_limit:
                 return (False, REASON_LEARNER_MAX_SPEND_REACHED)
