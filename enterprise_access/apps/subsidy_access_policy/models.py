@@ -243,7 +243,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
         subsidy_transactions = get_and_cache_transactions_for_learner(
             self.subsidy_uuid, lms_user_id
         )['transactions']
-
         policy_transactions = [
             transaction for transaction in subsidy_transactions
             if str(transaction['subsidy_access_policy_uuid']) == str(self.uuid)
