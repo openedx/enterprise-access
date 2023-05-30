@@ -8,7 +8,6 @@ from uuid import UUID, uuid4
 
 import ddt
 from django.conf import settings
-from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
 
@@ -27,6 +26,7 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
 )
+from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
 from test_utils import APITestWithMocks
 
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:policy-list')
@@ -293,7 +293,7 @@ class TestPolicyRedemptionAuthNAndPermissionChecks(APITestWithMocks):
         # The redeem endpoint
         url = reverse('api:v1:policy-redeem', kwargs={'policy_uuid': self.redeemable_policy.uuid})
         payload = {
-            'lms_user_id': '1234',
+            'lms_user_id': 1234,
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
         }
         response = self.client.post(url, payload)
@@ -365,11 +365,9 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'can_redeem': True,
             'content_price': 0,
             'unit': 'usd_cents',
+            'all_transactions': [],
         }
         subsidy_client.list_subsidy_transactions.return_value = {"results": [], "aggregates": {}}
-        subsidy_client.retrieve_subsidy_transaction.side_effect = (
-            NotImplementedError("unit test must override retrieve_subsidy_transaction to use.")
-        )
         subsidy_client.create_subsidy_transaction.side_effect = (
             NotImplementedError("unit test must override create_subsidy_transaction to use.")
         )
@@ -410,7 +408,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         }
         query_params = {
             'enterprise_customer_uuid': self.enterprise_uuid,
-            'lms_user_id': '1234',
+            'lms_user_id': 1234,
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
         }
 
@@ -453,14 +451,14 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         (
             {
                 'enterprise_customer_uuid': '12aacfee-8ffa-4cb3-bed1-059565a57f06',
-                'lms_user_id': '1234',
+                'lms_user_id': 1234,
                 'content_key': 'invalid_content_key',
             },
             {'content_key': ['Invalid content_key: invalid_content_key']}
         ),
         (
             {
-                'lms_user_id': '1234',
+                'lms_user_id': 1234,
                 'content_key': 'content_key',
             },
             {'detail': f'MISSING: {POLICY_REDEMPTION_PERMISSION}'}
@@ -487,12 +485,10 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'state': TransactionStateChoices.COMMITTED,
             'other': True,
         }
-        # HTTPError would be caused by a 404, indicating that a transaction does not already exist for this policy.
-        self.redeemable_policy.subsidy_client.retrieve_subsidy_transaction.side_effect = HTTPError()
         self.redeemable_policy.subsidy_client.create_subsidy_transaction.side_effect = None
         self.redeemable_policy.subsidy_client.create_subsidy_transaction.return_value = mock_transaction_record
         payload = {
-            'lms_user_id': '1234',
+            'lms_user_id': 1234,
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
         }
 
@@ -501,6 +497,20 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         response_json = self.load_json(response.content)
         assert response_json == mock_transaction_record
         self.mock_get_content_metadata.assert_called_once_with(payload['content_key'])
+        self.redeemable_policy.subsidy_client.create_subsidy_transaction.assert_called_once_with(
+            subsidy_uuid=str(self.redeemable_policy.subsidy_uuid),
+            lms_user_id=payload['lms_user_id'],
+            content_key=payload['content_key'],
+            subsidy_access_policy_uuid=str(self.redeemable_policy.uuid),
+            metadata=None,
+            idempotency_key=create_idempotency_key_for_transaction(
+                subsidy_uuid=str(self.redeemable_policy.subsidy_uuid),
+                lms_user_id=payload['lms_user_id'],
+                content_key=payload['content_key'],
+                subsidy_access_policy_uuid=str(self.redeemable_policy.uuid),
+                historical_redemptions_uuids=[],
+            ),
+        )
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
     def test_redeem_policy_with_metadata(self, mock_transactions_cache_for_learner):  # pylint: disable=unused-argument
@@ -513,12 +523,10 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'status': 'committed',
             'other': True,
         }
-        # HTTPError would be caused by a 404, indicating that a transaction does not already exist for this policy.
-        self.redeemable_policy.subsidy_client.retrieve_subsidy_transaction.side_effect = HTTPError()
         self.redeemable_policy.subsidy_client.create_subsidy_transaction.side_effect = None
         self.redeemable_policy.subsidy_client.create_subsidy_transaction.return_value = mock_transaction_record
         payload = {
-            'lms_user_id': '1234',
+            'lms_user_id': 1234,
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
             'metadata': {
                 'geag_first_name': 'John'
@@ -530,6 +538,117 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         response_json = self.load_json(response.content)
         assert response_json == mock_transaction_record
         self.mock_get_content_metadata.assert_called_once_with(payload['content_key'])
+        self.redeemable_policy.subsidy_client.create_subsidy_transaction.assert_called_once_with(
+            subsidy_uuid=str(self.redeemable_policy.subsidy_uuid),
+            lms_user_id=payload['lms_user_id'],
+            content_key=payload['content_key'],
+            subsidy_access_policy_uuid=str(self.redeemable_policy.uuid),
+            metadata=payload['metadata'],
+            idempotency_key=create_idempotency_key_for_transaction(
+                subsidy_uuid=str(self.redeemable_policy.subsidy_uuid),
+                lms_user_id=payload['lms_user_id'],
+                content_key=payload['content_key'],
+                subsidy_access_policy_uuid=str(self.redeemable_policy.uuid),
+                historical_redemptions_uuids=[],
+            ),
+        )
+
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
+    @ddt.data(
+        {
+            "existing_transaction_state": None,
+            "existing_transaction_reversed": None,
+            "idempotency_key_versioned": False,
+        },
+        {
+            "existing_transaction_state": TransactionStateChoices.CREATED,
+            "existing_transaction_reversed": False,
+            "idempotency_key_versioned": False,
+        },
+        {
+            "existing_transaction_state": TransactionStateChoices.PENDING,
+            "existing_transaction_reversed": False,
+            "idempotency_key_versioned": False,
+        },
+        {
+            "existing_transaction_state": TransactionStateChoices.COMMITTED,
+            "existing_transaction_reversed": False,
+            "idempotency_key_versioned": False,
+        },
+        {
+            "existing_transaction_state": TransactionStateChoices.COMMITTED,
+            "existing_transaction_reversed": True,
+            "idempotency_key_versioned": True,
+        },
+        {
+            "existing_transaction_state": TransactionStateChoices.FAILED,
+            "existing_transaction_reversed": False,
+            "idempotency_key_versioned": True,
+        },
+    )
+    @ddt.unpack
+    def test_redeem_policy_redemption_idempotency_key_versions(
+        self,
+        mock_transactions_cache_for_learner,
+        existing_transaction_state,
+        existing_transaction_reversed,
+        idempotency_key_versioned,
+    ):  # pylint: disable=unused-argument
+        """
+        Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint sends either a baseline or a versioned idempotency
+        key, depending on any existing transactions.
+        """
+        self.mock_get_content_metadata.return_value = {'content_price': 5000}
+
+        lms_user_id = 1234
+        content_key = 'course-v1:edX+edXPrivacy101+3T2020'
+        historical_redemption_uuid = str(uuid4())
+        baseline_idempotency_key = create_idempotency_key_for_transaction(
+            subsidy_uuid=str(self.redeemable_policy.subsidy_uuid),
+            lms_user_id=lms_user_id,
+            content_key=content_key,
+            subsidy_access_policy_uuid=str(self.redeemable_policy.uuid),
+            historical_redemptions_uuids=[],
+        )
+        existing_transactions = []
+        if existing_transaction_state:
+            existing_transaction = {
+                'uuid': historical_redemption_uuid,
+                'state': existing_transaction_state,
+                'idempotency_key': baseline_idempotency_key,
+                'reversal': None,
+            }
+            if existing_transaction_reversed:
+                existing_transaction['reversal'] = {'state': TransactionStateChoices.COMMITTED}
+            existing_transactions.append(existing_transaction)
+        self.redeemable_policy.subsidy_client.can_redeem.return_value = {
+            'can_redeem': True,
+            'content_price': 5000,
+            'unit': 'usd_cents',
+            'all_transactions': existing_transactions,
+        }
+        mock_transaction_record = {
+            'uuid': str(uuid4()),
+            'state': TransactionStateChoices.COMMITTED,
+            'other': True,
+        }
+        self.redeemable_policy.subsidy_client.create_subsidy_transaction.side_effect = None
+        self.redeemable_policy.subsidy_client.create_subsidy_transaction.return_value = mock_transaction_record
+
+        payload = {
+            'lms_user_id': lms_user_id,
+            'content_key': content_key,
+        }
+        response = self.client.post(self.subsidy_access_policy_redeem_endpoint, payload)
+
+        assert response.status_code == status.HTTP_200_OK
+
+        new_idempotency_key_sent = \
+            self.redeemable_policy.subsidy_client.create_subsidy_transaction.call_args.kwargs['idempotency_key']
+        if idempotency_key_versioned:
+            assert new_idempotency_key_sent != baseline_idempotency_key
+        else:
+            assert new_idempotency_key_sent == baseline_idempotency_key
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
     def test_credits_available_endpoint(self, mock_transactions_cache_for_learner):
@@ -615,13 +734,11 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         subsidy_client = subsidy_client_patcher.start()
         subsidy_client.can_redeem.return_value = {
             'can_redeem': True,
-            'content_price': 0,
+            'content_price': 5000,
             'unit': 'usd_cents',
+            'all_transactions': [],
         }
         subsidy_client.list_subsidy_transactions.return_value = {"results": [], "aggregates": {}}
-        subsidy_client.retrieve_subsidy_transaction.side_effect = (
-            NotImplementedError("unit test must override retrieve_subsidy_transaction to use.")
-        )
         subsidy_client.create_subsidy_transaction.side_effect = (
             NotImplementedError("unit test must override create_subsidy_transaction to use.")
         )
@@ -774,6 +891,9 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         }
         self.redeemable_policy.subsidy_client.can_redeem.return_value = {
             'can_redeem': False,
+            'content_price': 5000,  # value is ignored.
+            'unit': 'usd_cents',
+            'all_transactions': [],
         }
         test_content_key_1 = "course-v1:edX+edXPrivacy101+3T2020"
         test_content_key_2 = "course-v1:edX+edXPrivacy101+3T2020_2"

@@ -23,12 +23,13 @@ from .constants import (
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     REASON_POLICY_NOT_ACTIVE,
     REASON_POLICY_SPEND_LIMIT_REACHED,
-    AccessMethods
+    AccessMethods,
+    TransactionStateChoices
 )
 from .content_metadata_api import get_and_cache_catalog_contains_content, get_and_cache_content_metadata
 from .exceptions import ContentPriceNullException, SubsidyAccessPolicyLockAttemptFailed, SubsidyAPIHTTPError
 from .subsidy_api import get_and_cache_transactions_for_learner
-from .utils import get_versioned_subsidy_client
+from .utils import create_idempotency_key_for_transaction, get_versioned_subsidy_client
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
 
@@ -287,48 +288,104 @@ class SubsidyAccessPolicy(TimeStampedModel):
     def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
         """
         Check that a given learner can redeem the given content.
+
+        Returns:
+            3-tuple of (bool, str, list of dict):
+                * first element is true if the learner can redeem the content,
+                * second element contains a reason code if the content is not redeemable,
+                * third a list of any transactions represending existing redemptions (any state).
         """
         if not self.active:
-            return (False, REASON_POLICY_NOT_ACTIVE)
+            return (False, REASON_POLICY_NOT_ACTIVE, [])
 
         if not skip_customer_user_check:
             if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
-                return (False, REASON_LEARNER_NOT_IN_ENTERPRISE)
+                return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
 
         if not self.catalog_contains_content_key(content_key):
-            return (False, REASON_CONTENT_NOT_IN_CATALOG)
+            return (False, REASON_CONTENT_NOT_IN_CATALOG, [])
 
         subsidy_can_redeem_payload = self.subsidy_client.can_redeem(
             self.subsidy_uuid,
             lms_user_id,
             content_key,
         )
+        existing_transactions = subsidy_can_redeem_payload.get('all_transactions', [])
+
         if not subsidy_can_redeem_payload.get('can_redeem', False):
-            return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
+            return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, existing_transactions)
 
         content_metadata = self.get_content_metadata(content_key)
         if not content_metadata:
-            return (False, REASON_CONTENT_NOT_IN_CATALOG)
+            return (False, REASON_CONTENT_NOT_IN_CATALOG, existing_transactions)
 
         if self.will_exceed_spend_limit(content_key, content_metadata=content_metadata):
-            return (False, REASON_POLICY_SPEND_LIMIT_REACHED)
+            return (False, REASON_POLICY_SPEND_LIMIT_REACHED, existing_transactions)
 
-        return (True, None)
+        return (True, None, existing_transactions)
 
-    def redeem(self, lms_user_id, content_key, metadata=None):
+    def _redemptions_for_idempotency_key(self, all_transactions):
+        """
+        Select the historical redemptions (transactions) that may contribute to the idempotency key.
+
+        Currently, only failed or reversed transactions qualify, allowing us to re-attempt a previously failed or
+        reversed transaction for that same (subsidy, policy, learner, content) combination.  In all other cases, the
+        same idempotency_key as the last redeem attempt will be generated, which results in redeem() returning an
+        existing transaction instead of a new one.
+
+        Reasons for qualifying scenarios:
+
+        * Failed transaction:
+          * This is a terminal state, so there's nothing more acting on this particular redemption request.  This does
+            not imply redemption cannot be retried, so it qualifies as a versioning event for the idempotency_key.
+        * Reversed transaction:
+          * A prior attempt to redeem has been reversed, inactivating it.  Similarly to the failed transaction case,
+            this is a terminal state which should allow for a new idempotency_key to be generated and redemption to be
+            retried.
+
+        Reasons for non-qualifying scenarios:
+
+        * Committed transaction without reversal:
+          * There should be at most one of these, and it represents an active redemption which we just want subsequent
+            redeem() calls to return as-is without creating a new one.
+        * Created/pending transaction:
+          * If any of these exist, prior call(s) to redeem must have returned asynchronously.  There's obviously
+            something already brewing in the background, so lets not add fuel to the fire by allowing the creation of
+            yet another redemption attempt.
+
+        Returns:
+            list of str: Transaction UUIDs which should cause the idempotency_key to change.
+        """
+        return [
+            transaction['uuid'] for transaction in all_transactions
+            if transaction['state'] == TransactionStateChoices.FAILED or (
+                isinstance(transaction['reversal'], dict) and
+                transaction['reversal'].get('state') == TransactionStateChoices.COMMITTED
+            )
+        ]
+
+    def redeem(self, lms_user_id, content_key, all_transactions, metadata=None):
         """
         Redeem a subsidy for the given learner and content.
         Returns:
             A ledger transaction, or None if the subsidy was not redeemed.
         """
         if self.access_method == AccessMethods.DIRECT:
+            idempotency_key = create_idempotency_key_for_transaction(
+                subsidy_uuid=str(self.subsidy_uuid),
+                lms_user_id=lms_user_id,
+                content_key=content_key,
+                subsidy_access_policy_uuid=str(self.uuid),
+                historical_redemptions_uuids=self._redemptions_for_idempotency_key(all_transactions),
+            )
             try:
                 return self.subsidy_client.create_subsidy_transaction(
-                    subsidy_uuid=self.subsidy_uuid,
+                    subsidy_uuid=str(self.subsidy_uuid),
                     lms_user_id=lms_user_id,
                     content_key=content_key,
-                    subsidy_access_policy_uuid=self.uuid,
+                    subsidy_access_policy_uuid=str(self.uuid),
                     metadata=metadata,
+                    idempotency_key=idempotency_key,
                 )
             except requests.exceptions.HTTPError as exc:
                 raise SubsidyAPIHTTPError('HTTPError occurred in Subsidy API request.') from exc
@@ -475,9 +532,10 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
         LTE to the learner enrollment cap declared by this policy.
         """
         # perform generic access checks
-        should_attempt_redemption, reason = super().can_redeem(lms_user_id, content_key, skip_customer_user_check)
+        should_attempt_redemption, reason, existing_redemptions = \
+            super().can_redeem(lms_user_id, content_key, skip_customer_user_check)
         if not should_attempt_redemption:
-            return (False, reason)
+            return (False, reason, existing_redemptions)
 
         has_per_learner_enrollment_limit = self.per_learner_enrollment_limit is not None
         if has_per_learner_enrollment_limit:
@@ -485,10 +543,10 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
             learner_transactions_count = len(self.transactions_for_learner(lms_user_id)['transactions'])
             # check whether learner exceeded the per-learner enrollment limit
             if learner_transactions_count >= self.per_learner_enrollment_limit:
-                return (False, REASON_LEARNER_MAX_ENROLLMENTS_REACHED)
+                return (False, REASON_LEARNER_MAX_ENROLLMENTS_REACHED, existing_redemptions)
 
         # learner can redeem the subsidy access policy
-        return (True, None)
+        return (True, None, existing_redemptions)
 
     def credit_available(self, lms_user_id=None):
         if self.remaining_balance_per_user(lms_user_id) > 0:
@@ -524,9 +582,10 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
         limits specified on the policy.
         """
         # perform generic access checks
-        should_attempt_redemption, reason = super().can_redeem(lms_user_id, content_key, skip_customer_user_check)
+        should_attempt_redemption, reason, existing_redemptions = \
+            super().can_redeem(lms_user_id, content_key, skip_customer_user_check)
         if not should_attempt_redemption:
-            return (False, reason)
+            return (False, reason, existing_redemptions)
 
         has_per_learner_spend_limit = self.per_learner_spend_limit is not None
         if has_per_learner_spend_limit:
@@ -535,10 +594,10 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
             spent_amount = existing_learner_transaction_aggregates.get('total_quantity') or 0
             content_price = self.get_content_price(content_key)
             if (spent_amount + content_price) >= self.per_learner_spend_limit:
-                return (False, REASON_LEARNER_MAX_SPEND_REACHED)
+                return (False, REASON_LEARNER_MAX_SPEND_REACHED, existing_redemptions)
 
         # learner can redeem the subsidy access policy
-        return (True, None)
+        return (True, None, existing_redemptions)
 
     def credit_available(self, lms_user_id=None):
         return self.remaining_balance_per_user(lms_user_id) > 0
