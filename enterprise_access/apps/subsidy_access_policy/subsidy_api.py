@@ -39,11 +39,21 @@ def get_and_cache_transactions_for_learner(subsidy_uuid, lms_user_id):
     response_payload = client.list_subsidy_transactions(
         subsidy_uuid=subsidy_uuid,
         lms_user_id=lms_user_id,
+        include_aggregates=False,
     )
+
     result = {
         'transactions': response_payload['results'],
-        'aggregates': response_payload['aggregates'],
+        # TODO: this is some tech. debt  we're going to live with
+        # for the moment in pursuit of https://2u-internal.atlassian.net/browse/ENT-7222
+        'aggregates': {},
     }
+    next_page = response_payload.get('next')
+    while next_page:
+        next_response = client.client.get(next_page)
+        result['transactions'].extend(next_response['results'])
+        next_page = next_response.get('next')
+
     logger.info('[LEARNER TRANSACTIONS CACHE SET] for key %s', cache_key)
     request_cache().set(cache_key, result)
     return result

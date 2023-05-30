@@ -13,7 +13,7 @@ analytics-python==1.4.post1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-asgiref==3.7.1
+asgiref==3.7.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -125,7 +125,7 @@ coreschema==0.0.4
     #   -r requirements/test.txt
     #   coreapi
     #   drf-yasg
-coverage[toml]==7.2.6
+coverage[toml]==7.2.7
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -296,7 +296,7 @@ edx-drf-extensions==8.8.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.3.3
+edx-enterprise-subsidy-client==0.3.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -678,7 +678,7 @@ rich==13.3.5
     # via
     #   -r requirements/quality.txt
     #   twine
-ruamel-yaml==0.17.26
+ruamel-yaml==0.17.30
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
