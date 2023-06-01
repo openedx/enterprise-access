@@ -99,7 +99,7 @@ coverage[toml]==7.2.7
     # via
     #   -r requirements/test.in
     #   pytest-cov
-cryptography==40.0.2
+cryptography==41.0.0
     # via
     #   -r requirements/base.txt
     #   pyjwt
@@ -213,7 +213,7 @@ edx-drf-extensions==8.8.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.3.4
+edx-enterprise-subsidy-client==0.3.5
     # via -r requirements/base.txt
 edx-lint==5.3.4
     # via -r requirements/test.in
@@ -436,7 +436,7 @@ requests-oauthlib==1.3.1
     # via
     #   -r requirements/base.txt
     #   social-auth-core
-ruamel-yaml==0.17.30
+ruamel-yaml==0.17.31
     # via
     #   -r requirements/base.txt
     #   drf-yasg

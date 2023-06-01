@@ -130,7 +130,7 @@ coverage[toml]==7.2.7
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pytest-cov
-cryptography==40.0.2
+cryptography==41.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -296,7 +296,7 @@ edx-drf-extensions==8.8.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.3.4
+edx-enterprise-subsidy-client==0.3.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -674,11 +674,11 @@ rfc3986==2.0.0
     # via
     #   -r requirements/quality.txt
     #   twine
-rich==13.3.5
+rich==13.4.1
     # via
     #   -r requirements/quality.txt
     #   twine
-ruamel-yaml==0.17.30
+ruamel-yaml==0.17.31
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
