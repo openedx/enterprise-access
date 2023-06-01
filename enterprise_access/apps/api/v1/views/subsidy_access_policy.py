@@ -320,7 +320,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         all_policies_for_enterprise = self.get_queryset()
         for policy in all_policies_for_enterprise:
             try:
-                redeemable, reason = policy.can_redeem(lms_user_id, content_key, skip_customer_user_check=True)
+                redeemable, reason, _ = policy.can_redeem(lms_user_id, content_key, skip_customer_user_check=True)
             except ContentPriceNullException as exc:
                 logger.warning(f'{exc} when checking can_redeem() for {enterprise_customer_uuid}')
                 raise RedemptionRequestException(
@@ -454,15 +454,21 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             # point, we should also consider migrating this logic into the policy model so that different policy types
             # that have different locking needs can supply different lock kwargs.
             with policy.lock():
-                if policy.can_redeem(lms_user_id, content_key):
-                    redemption_result = policy.redeem(lms_user_id, content_key, metadata)
+                can_redeem, reason, existing_transactions = policy.can_redeem(lms_user_id, content_key)
+                if can_redeem:
+                    redemption_result = policy.redeem(lms_user_id, content_key, existing_transactions, metadata)
                     send_subsidy_redemption_event_to_event_bus(
                         SUBSIDY_REDEEMED.event_type,
                         serializer.data
                     )
                     return Response(redemption_result, status=status.HTTP_200_OK)
                 else:
-                    raise RedemptionRequestException()
+                    raise RedemptionRequestException(
+                        detail=self._get_reasons_for_no_redeemable_policies(
+                            policy.enterprise_customer_uuid,
+                            {reason: [policy]}
+                        )
+                    )
         except SubsidyAccessPolicyLockAttemptFailed as exc:
             logger.exception(exc)
             raise SubsidyAccessPolicyLockedException() from exc
