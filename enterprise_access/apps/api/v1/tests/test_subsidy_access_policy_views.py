@@ -1005,7 +1005,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
                 "enterprise_fulfillment_uuid": "6ff2c1c9-d5fc-48a8-81da-e6a675263f67",
                 "subsidy_access_policy_uuid": str(self.redeemable_policy.uuid),
                 "metadata": {},
-                "reversals": [],
+                "reversal": None,
             }],
             "aggregates": {
                 "total_quantity": -19900,
@@ -1054,6 +1054,76 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         # the subsidy.can_redeem check returns false, so we don't make
         # it to the point of fetching subsidy content data
         self.assertFalse(self.mock_get_content_metadata.called)
+
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
+    def test_can_redeem_policy_existing_reversed_redemptions(self, mock_transactions_cache_for_learner):
+        """
+        Test that the can_redeem endpoint returns can_redeem=True even with an existing reversed transaction.
+        """
+        test_transaction_uuid = str(uuid4())
+        mock_transactions_cache_for_learner.return_value = {
+            "transactions": [{
+                "uuid": test_transaction_uuid,
+                "state": TransactionStateChoices.COMMITTED,
+                "idempotency_key": "the-idempotency-key",
+                "lms_user_id": self.user.lms_user_id,
+                "content_key": "course-v1:demox+1234+2T2023",
+                "quantity": -19900,
+                "unit": "USD_CENTS",
+                "enterprise_fulfillment_uuid": "6ff2c1c9-d5fc-48a8-81da-e6a675263f67",
+                "subsidy_access_policy_uuid": str(self.redeemable_policy.uuid),
+                "metadata": {},
+                "reversal": {
+                    "uuid": str(uuid4()),
+                    "state": TransactionStateChoices.COMMITTED,
+                    "idempotency_key": f"admin-invoked-reverse-{test_transaction_uuid}",
+                    "quantity": -19900,
+                },
+            }],
+            "aggregates": {
+                "total_quantity": 0,
+            },
+        }
+
+        self.redeemable_policy.subsidy_client.can_redeem.return_value = {
+            'can_redeem': True,
+        }
+        self.mock_get_content_metadata.return_value = {'content_price': 19900}
+
+        mocked_content_data_from_view = {
+            "content_uuid": str(uuid4()),
+            "content_key": "course-v1:demox+1234+2T2023",
+            "source": "edX",
+            "content_price": 19900,
+        }
+
+        with mock.patch(
+            'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_content_metadata',
+            return_value=mocked_content_data_from_view,
+        ):
+            query_params = {'content_key': 'course-v1:demox+1234+2T2023'}
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
+        assert response.status_code == status.HTTP_200_OK
+        response_list = response.json()
+
+        # Make sure we got responses containing existing redemptions.
+        assert len(response_list) == 1
+        assert response_list[0]["content_key"] == query_params["content_key"]
+        assert response_list[0]["list_price"] == {
+            "usd": 199.00,
+            "usd_cents": 19900,
+        }
+        assert len(response_list[0]["redemptions"]) == 1
+        assert response_list[0]["redemptions"][0]["uuid"] == test_transaction_uuid
+        assert response_list[0]["redemptions"][0]["policy_redemption_status_url"] == \
+            f"{settings.ENTERPRISE_SUBSIDY_URL}/api/v1/transactions/{test_transaction_uuid}/"
+        assert response_list[0]["redemptions"][0]["courseware_url"] == \
+            f"{settings.LMS_URL}/courses/course-v1:demox+1234+2T2023/courseware/"
+        assert response_list[0]["has_successful_redemption"] is False
+        assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
+        assert response_list[0]["can_redeem"] is True
+        assert response_list[0]["reasons"] == []
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
