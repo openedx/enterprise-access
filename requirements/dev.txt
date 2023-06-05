@@ -32,6 +32,10 @@ backoff==1.10.0
     # via
     #   -r requirements/validation.txt
     #   analytics-python
+backports-zoneinfo[tzdata]==0.2.1
+    # via
+    #   -r requirements/validation.txt
+    #   kombu
 billiard==3.6.4.0
     # via
     #   -r requirements/validation.txt
@@ -232,7 +236,7 @@ edx-celeryutils==1.2.2
     # via -r requirements/validation.txt
 edx-django-release-util==1.2.0
     # via -r requirements/validation.txt
-edx-django-utils==5.4.0
+edx-django-utils==5.5.0
     # via
     #   -r requirements/validation.txt
     #   edx-drf-extensions
@@ -241,7 +245,7 @@ edx-drf-extensions==8.8.0
     # via
     #   -r requirements/validation.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.3.6
+edx-enterprise-subsidy-client==0.3.7
     # via -r requirements/validation.txt
 edx-i18n-tools==0.9.2
     # via -r requirements/dev.in
@@ -264,7 +268,7 @@ exceptiongroup==1.1.1
     #   pytest
 factory-boy==3.2.1
     # via -r requirements/validation.txt
-faker==18.10.0
+faker==18.10.1
     # via
     #   -r requirements/validation.txt
     #   factory-boy
@@ -337,7 +341,7 @@ keyring==23.13.1
     # via
     #   -r requirements/validation.txt
     #   twine
-kombu==5.2.4
+kombu==5.3.0
     # via
     #   -r requirements/validation.txt
     #   celery
@@ -349,7 +353,7 @@ markdown-it-py==2.2.0
     # via
     #   -r requirements/validation.txt
     #   rich
-markupsafe==2.1.2
+markupsafe==2.1.3
     # via
     #   -r requirements/validation.txt
     #   jinja2
@@ -384,7 +388,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/validation.txt
     #   django-rest-swagger
-openedx-events==8.0.0
+openedx-events==8.0.1
     # via -r requirements/validation.txt
 packaging==23.1
     # via
@@ -656,13 +660,18 @@ tox==3.28.0
     # via -r requirements/validation.txt
 twine==4.0.2
     # via -r requirements/validation.txt
-typing-extensions==4.6.2
+typing-extensions==4.6.3
     # via
     #   -r requirements/validation.txt
     #   asgiref
     #   astroid
+    #   kombu
     #   pylint
     #   rich
+tzdata==2023.3
+    # via
+    #   -r requirements/validation.txt
+    #   backports-zoneinfo
 uritemplate==4.1.1
     # via
     #   -r requirements/validation.txt
