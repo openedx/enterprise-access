@@ -602,9 +602,14 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 for redemption in redemptions
             ]
 
-            # Determine if the learner has already redeemed the requested content_key.
+            # Determine if the learner has already redeemed the requested content_key.  Just because a transaction has
+            # state='committed' doesn't mean it counts as a successful redemption; it must also NOT have a committed
+            # reversal.
             has_successful_redemption = any(
-                redemption['state'] == TransactionStateChoices.COMMITTED
+                redemption['state'] == TransactionStateChoices.COMMITTED and (
+                    not redemption['reversal'] or
+                    redemption['reversal'].get('state') != TransactionStateChoices.COMMITTED
+                )
                 for redemption in redemptions
             )
 
