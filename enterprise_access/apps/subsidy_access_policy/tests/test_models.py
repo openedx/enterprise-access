@@ -166,7 +166,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': 100}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
-            'expected_policy_can_redeem': (True, None),
+            'expected_policy_can_redeem': (True, None, []),
         },
         {
             # Content not in catalog, every other check would succeed.
@@ -177,7 +177,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
-            'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG),
+            'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG, []),
         },
         {
             # Learner is not in the enterprise, every other check would succeed.
@@ -188,7 +188,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
-            'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE),
+            'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE, []),
         },
         {
             # The subsidy is not redeemable, every other check would succeed.
@@ -199,7 +199,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'subsidy_is_redeemable': {'can_redeem': False},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
-            'expected_policy_can_redeem': (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY),
+            'expected_policy_can_redeem': (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, []),
         },
         {
             # The subsidy is redeemable, but the learner has already enrolled more than the limit.
@@ -219,7 +219,7 @@ class SubsidyAccessPolicyTests(TestCase):
                 'aggregates': {'total_quantity': 100},
             },
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
-            'expected_policy_can_redeem': (False, REASON_LEARNER_MAX_ENROLLMENTS_REACHED),
+            'expected_policy_can_redeem': (False, REASON_LEARNER_MAX_ENROLLMENTS_REACHED, []),
         },
         {
             # The subsidy is redeemable, but another redemption would exceed the policy-wide ``spend_limit``.
@@ -239,7 +239,7 @@ class SubsidyAccessPolicyTests(TestCase):
                 'aggregates': {'total_quantity': 100},
             },
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 9999}},
-            'expected_policy_can_redeem': (False, REASON_POLICY_SPEND_LIMIT_REACHED),
+            'expected_policy_can_redeem': (False, REASON_POLICY_SPEND_LIMIT_REACHED, []),
         },
         {
             # The subsidy access policy is not active, every other check would succeed.
@@ -250,7 +250,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
-            'expected_policy_can_redeem': (False, REASON_POLICY_NOT_ACTIVE),
+            'expected_policy_can_redeem': (False, REASON_POLICY_NOT_ACTIVE, []),
         },
     )
     @ddt.unpack
@@ -282,7 +282,7 @@ class SubsidyAccessPolicyTests(TestCase):
 
         can_redeem_result = policy_record.can_redeem(self.user, self.course_id)
 
-        self.assertEqual(can_redeem_result, expected_policy_can_redeem)
+        self.assertEqual(can_redeem_result, expected_policy_can_redeem, [])
 
     @ddt.data(
         {
@@ -295,7 +295,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': 100}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
-            'expected_policy_can_redeem': (True, None),
+            'expected_policy_can_redeem': (True, None, []),
         },
         {
             # Content not in catalog, every other check would succeed.
@@ -306,7 +306,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
-            'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG),
+            'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG, []),
         },
         {
             # Learner is not in the enterprise, every other check would succeed.
@@ -317,7 +317,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
-            'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE),
+            'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE, []),
         },
         {
             # The subsidy is not redeemable, every other check would succeed.
@@ -328,7 +328,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'subsidy_is_redeemable': {'can_redeem': False},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
-            'expected_policy_can_redeem': (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY),
+            'expected_policy_can_redeem': (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, []),
         },
         {
             # The subsidy is redeemable, but the learner has already enrolled more than the limit.
@@ -348,7 +348,7 @@ class SubsidyAccessPolicyTests(TestCase):
                 'aggregates': {'total_quantity': 50000}
             },
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
-            'expected_policy_can_redeem': (False, REASON_LEARNER_MAX_SPEND_REACHED),
+            'expected_policy_can_redeem': (False, REASON_LEARNER_MAX_SPEND_REACHED, []),
         },
         {
             # The subsidy is redeemable, but another redemption would exceed the policy-wide ``spend_limit``.
@@ -368,7 +368,7 @@ class SubsidyAccessPolicyTests(TestCase):
                 'aggregates': {'total_quantity': 100}
             },
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 15000}},
-            'expected_policy_can_redeem': (False, REASON_POLICY_SPEND_LIMIT_REACHED),
+            'expected_policy_can_redeem': (False, REASON_POLICY_SPEND_LIMIT_REACHED, []),
         },
         {
             # The subsidy access policy is not active, every other check would succeed.
@@ -379,7 +379,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
-            'expected_policy_can_redeem': (False, REASON_POLICY_NOT_ACTIVE),
+            'expected_policy_can_redeem': (False, REASON_POLICY_NOT_ACTIVE, []),
         },
     )
     @ddt.unpack
