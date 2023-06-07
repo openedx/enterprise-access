@@ -2,6 +2,7 @@
 
 
 from django.contrib import admin
+from django.utils.text import Truncator  # for shortening a text
 
 from enterprise_access.apps.subsidy_access_policy import models
 
@@ -12,11 +13,9 @@ class BaseSubsidyAccessPolicyMixin(admin.ModelAdmin):
     """
     list_display = (
         'uuid',
+        'modified',
         'active',
-        'enterprise_customer_uuid',
-        'catalog_uuid',
-        'subsidy_uuid',
-        'access_method',
+        'short_description',
         'spend_limit',
     )
     list_filter = (
@@ -29,6 +28,10 @@ class BaseSubsidyAccessPolicyMixin(admin.ModelAdmin):
         'catalog_uuid',
         'subsidy_uuid',
     )
+    ordering = ['-modified']
+
+    def short_description(self, obj):
+        return Truncator(str(obj.description)).chars(255)
 
 
 @admin.register(models.PerLearnerEnrollmentCreditAccessPolicy)
