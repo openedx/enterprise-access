@@ -273,6 +273,19 @@ class SubsidyAccessPolicy(TimeStampedModel):
             'aggregates': response_payload['aggregates'],
         }
 
+    @staticmethod
+    def content_would_exceed_limit(spent_amount, limit_to_check, content_price):
+        """
+        Returns true if redeeming for this content price would exceed
+        the given ``limit_to_check`` after taking into account the amount already
+        spent.  ``spent_amount`` is assumed to be an integer <= 0.
+        """
+        if spent_amount > 0:
+            raise Exception('Expected a sum of transaction quantities <= 0')
+
+        positive_spent_amount = spent_amount * -1
+        return (positive_spent_amount + content_price) >= limit_to_check
+
     def will_exceed_spend_limit(self, content_key, content_metadata=None):
         """
         Returns true if redeeming this course would exceed
@@ -283,7 +296,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         content_price = self.get_content_price(content_key, content_metadata=content_metadata)
         spent_amount = self.aggregates_for_policy().get('total_quantity') or 0
-        return (spent_amount + content_price) >= self.spend_limit
+        return self.content_would_exceed_limit(spent_amount, self.spend_limit, content_price)
 
     def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
         """
@@ -593,7 +606,7 @@ class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
             existing_learner_transaction_aggregates = self.transactions_for_learner(lms_user_id)['aggregates']
             spent_amount = existing_learner_transaction_aggregates.get('total_quantity') or 0
             content_price = self.get_content_price(content_key)
-            if (spent_amount + content_price) >= self.per_learner_spend_limit:
+            if self.content_would_exceed_limit(spent_amount, self.per_learner_spend_limit, content_price):
                 return (False, REASON_LEARNER_MAX_SPEND_REACHED, existing_redemptions)
 
         # learner can redeem the subsidy access policy

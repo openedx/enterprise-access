@@ -164,8 +164,8 @@ class SubsidyAccessPolicyTests(TestCase):
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
-            'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': 100}},
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': -100}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (True, None, []),
         },
         {
@@ -176,7 +176,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG, []),
         },
         {
@@ -187,7 +187,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'enterprise_contains_learner': False,
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE, []),
         },
         {
@@ -198,7 +198,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': False},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, []),
         },
         {
@@ -214,11 +214,11 @@ class SubsidyAccessPolicyTests(TestCase):
                     'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID),
                     'uuid': str(uuid4()),
                     'content_key': 'anything',
-                    'quantity': 5,
+                    'quantity': -5,
                 } for _ in range(10)],
-                'aggregates': {'total_quantity': 100},
+                'aggregates': {'total_quantity': -100},
             },
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_MAX_ENROLLMENTS_REACHED, []),
         },
         {
@@ -234,11 +234,11 @@ class SubsidyAccessPolicyTests(TestCase):
                     'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID),
                     'uuid': str(uuid4()),
                     'content_key': 'anything',
-                    'quantity': 5,
-                } for _ in range(10)],
-                'aggregates': {'total_quantity': 100},
+                    'quantity': -5,
+                } for _ in range(3)],
+                'aggregates': {'total_quantity': -100},
             },
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 9999}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -10001}},
             'expected_policy_can_redeem': (False, REASON_POLICY_SPEND_LIMIT_REACHED, []),
         },
         {
@@ -249,7 +249,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_POLICY_NOT_ACTIVE, []),
         },
     )
@@ -293,8 +293,8 @@ class SubsidyAccessPolicyTests(TestCase):
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
-            'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': 100}},
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': -100}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (True, None, []),
         },
         {
@@ -305,7 +305,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG, []),
         },
         {
@@ -316,7 +316,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'enterprise_contains_learner': False,
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE, []),
         },
         {
@@ -327,7 +327,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': False},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, []),
         },
         {
@@ -343,11 +343,11 @@ class SubsidyAccessPolicyTests(TestCase):
                     'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID),
                     'uuid': str(uuid4()),
                     'content_key': 'anything',
-                    'quantity': 50000,
+                    'quantity': -50000,
                 }],
-                'aggregates': {'total_quantity': 50000}
+                'aggregates': {'total_quantity': -50000}
             },
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_MAX_SPEND_REACHED, []),
         },
         {
@@ -365,9 +365,9 @@ class SubsidyAccessPolicyTests(TestCase):
                     'content_key': 'anything',
                     'quantity': 100,
                 }],
-                'aggregates': {'total_quantity': 100}
+                'aggregates': {'total_quantity': -100}
             },
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 15000}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -15000}},
             'expected_policy_can_redeem': (False, REASON_POLICY_SPEND_LIMIT_REACHED, []),
         },
         {
@@ -378,7 +378,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
-            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': 200}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_POLICY_NOT_ACTIVE, []),
         },
     )
@@ -469,3 +469,10 @@ class SubsidyAccessPolicyTests(TestCase):
             with self.per_learner_enroll_policy.lock():
                 pass
         self.per_learner_enroll_policy.release_lock()
+
+    def test_content_would_exceed_limit_positive_spent_amount(self):
+        """
+        Ensures that passing a positive spent_amount will raise an exception.
+        """
+        with self.assertRaisesRegex(Exception, 'Expected a sum of transaction quantities <= 0'):
+            self.per_learner_enroll_policy.content_would_exceed_limit(10, 100, 15)
