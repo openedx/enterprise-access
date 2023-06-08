@@ -105,6 +105,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         null=True,
         blank=True,
         default=None,
+        verbose_name='Per-learner enrollment limit',
         help_text=(
             'The maximum number of enrollments allowed for a single learner under this policy. '
             'Defaults to null, which means that no such maximum exists.'
@@ -114,6 +115,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         null=True,
         blank=True,
         default=None,
+        verbose_name='Per-learner spend limit (USD cents)',
         help_text=(
             'The maximum amount of allowed money spent for a single learner under this policy. '
             'Denoted in USD cents. '
@@ -124,6 +126,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         null=True,
         blank=True,
         default=None,
+        verbose_name='Policy-wide spend limit (USD cents)',
         help_text=(
             'The maximum number of allowed dollars to be spent, in aggregate, by all learners '
             'under this policy. Denoted in USD cents. '
