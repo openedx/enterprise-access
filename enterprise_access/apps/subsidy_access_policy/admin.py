@@ -12,6 +12,8 @@ def cents_to_usd_string(cents):
     Helper to convert cents as an int to dollars as a
     nicely formatted string.
     """
+    if cents is None:
+        return None
     return "${:,.2f}".format(float(cents) / constants.CENTS_PER_DOLLAR)
 
 
@@ -114,4 +116,6 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
     @admin.display(description='Per-learner spend limit (dollars)')
     def per_learner_spend_limit_dollars(self, obj):
         """Returns this policy's per_learner_spend_limit as a US Dollar string."""
+        if obj.per_learner_spend_limit is None:
+            return None
         return cents_to_usd_string(obj.per_learner_spend_limit)
