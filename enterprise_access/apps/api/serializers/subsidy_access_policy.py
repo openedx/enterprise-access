@@ -11,13 +11,7 @@ from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from rest_framework import serializers
 
-from enterprise_access.apps.subsidy_access_policy.constants import (
-    POLICY_TYPE_CREDIT_LIMIT_FIELDS,
-    POLICY_TYPE_FIELD_MAPPER,
-    POLICY_TYPES_WITH_CREDIT_LIMIT,
-    AccessMethods,
-    PolicyTypes
-)
+from enterprise_access.apps.subsidy_access_policy.constants import PolicyTypes
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 
 logger = logging.getLogger(__name__)
@@ -49,18 +43,10 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
     """
     Serializer to validate policy data for CRUD operations.
     """
-    uuid = serializers.UUIDField(read_only=True)
-    policy_type = serializers.ChoiceField(choices=PolicyTypes.CHOICES)
-    description = serializers.CharField(max_length=None, min_length=None, allow_blank=False, trim_whitespace=True)
-    active = serializers.BooleanField()
-    enterprise_customer_uuid = serializers.UUIDField(allow_null=False, required=True)
-    catalog_uuid = serializers.UUIDField(allow_null=False)
-    subsidy_uuid = serializers.UUIDField(allow_null=False)
-    access_method = serializers.ChoiceField(choices=AccessMethods.CHOICES)
 
-    per_learner_enrollment_limit = serializers.IntegerField(allow_null=True, required=False)
-    per_learner_spend_limit = serializers.IntegerField(allow_null=True, required=False)
-    spend_limit = serializers.IntegerField(allow_null=True, required=False)
+    # Since the upstream model field has editable=False, we must redefine the field here because editable fields are
+    # automatically skipped by validation, but we do actually want it to be validated.
+    policy_type = serializers.ChoiceField(choices=PolicyTypes.CHOICES)
 
     class Meta:
         model = SubsidyAccessPolicy
@@ -78,6 +64,40 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
             'spend_limit',
         ]
         read_only_fields = ['uuid']
+        extra_kwargs = {
+            'uuid': {'read_only': True},
+            'description': {
+                'allow_blank': False,
+                'min_length': None,
+                'max_length': 200,
+                'trim_whitespace': True,
+            },
+            'enterprise_customer_uuid': {
+                'allow_null': False,
+                'required': True,
+            },
+            'catalog_uuid': {
+                'allow_null': False,
+                'required': True,
+            },
+            'subsidy_uuid': {
+                'allow_null': False,
+                'required': True,
+            },
+            'access_method': {'required': True},
+            'spend_limit': {
+                'allow_null': True,
+                'required': False,
+            },
+            'per_learner_enrollment_limit': {
+                'allow_null': True,
+                'required': False,
+            },
+            'per_learner_spend_limit': {
+                'allow_null': True,
+                'required': False,
+            },
+        }
 
     def create(self, validated_data):
         policy_type = validated_data.get('policy_type')
@@ -87,13 +107,28 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         super().validate(attrs)
-        policy_type = attrs.get('policy_type', None)
-        if policy_type:
-            # just some extra caution around discarding the other two credit limits if they have a non-zero value
-            if policy_type in POLICY_TYPES_WITH_CREDIT_LIMIT:
-                for field in POLICY_TYPE_CREDIT_LIMIT_FIELDS:
-                    if field != POLICY_TYPE_FIELD_MAPPER.get(policy_type):
-                        attrs.pop(field)
+
+        # Get the policy subclass.
+        # super().validate() already checked that attrs contains a "policy_type" key and valid value.
+        policy_type = attrs['policy_type']
+        policy_class = SubsidyAccessPolicy.get_policy_class_by_type(policy_type)
+
+        # Must specify exactly the required custom fields as declared by the policy subclass, no more no less.
+        custom_policy_field_errors = []
+        # Here's the "no less" part:
+        if not set(policy_class.REQUIRED_CUSTOM_FIELDS).issubset(attrs.keys()):
+            custom_policy_field_errors.append(
+                f"Missing fields for {policy_type} policy type: {policy_class.REQUIRED_CUSTOM_FIELDS}."
+            )
+        # Here's the "no more" part:
+        unused_custom_fields = set(policy_class.ALL_CUSTOM_FIELDS) - set(policy_class.REQUIRED_CUSTOM_FIELDS)
+        if unused_custom_fields.intersection(attrs.keys()):
+            custom_policy_field_errors.append(
+                f"Extraneous fields for {policy_type} policy type: {list(unused_custom_fields)}."
+            )
+        if custom_policy_field_errors:
+            raise serializers.ValidationError(custom_policy_field_errors)
+
         return attrs
 
 
