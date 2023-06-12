@@ -28,33 +28,27 @@ class SegmentEvents:
     SUBSIDY_ACCESS_POLICY_REDEEMED = 'edx.server.enterprise-access.enrollment-lifecycle.subsidy-access-policy.redeemed'
 
 
-PER_LEARNER_ENROLL_CREDIT = 'PerLearnerEnrollmentCreditAccessPolicy'
-PER_LEARNER_SPEND_CREDIT = 'PerLearnerSpendCreditAccessPolicy'
-
+# Configure the priority of each policy type here.  When given multiple redeemable policies to select for redemption,
+# the policy resolution engine will select policies with the lowest priority number.
 CREDIT_POLICY_TYPE_PRIORITY = 1
 SUBSCRIPTION_POLICY_TYPE_PRIORITY = 2
 
 
 class PolicyTypes:
-    """Subsidy Access Policy Types. """
+    """
+    Subsidy Access Policy Types.
+
+    This must be manually maintained to be in sync with all sub-classes of the SubsidyAccessPolicy model.
+    """
+
+    PER_LEARNER_ENROLLMENT_CREDIT = 'PerLearnerEnrollmentCreditAccessPolicy'
+    PER_LEARNER_SPEND_CREDIT = 'PerLearnerSpendCreditAccessPolicy'
 
     CHOICES = (
-        (PER_LEARNER_ENROLL_CREDIT, PER_LEARNER_ENROLL_CREDIT),
+        (PER_LEARNER_ENROLLMENT_CREDIT, PER_LEARNER_ENROLLMENT_CREDIT),
         (PER_LEARNER_SPEND_CREDIT, PER_LEARNER_SPEND_CREDIT),
     )
 
-
-POLICY_TYPES_WITH_CREDIT_LIMIT = [
-    PER_LEARNER_ENROLL_CREDIT,
-    PER_LEARNER_SPEND_CREDIT,
-]
-
-POLICY_TYPE_CREDIT_LIMIT_FIELDS = [
-    'per_learner_enrollment_limit',
-    'per_learner_spend_limit',
-]
-
-POLICY_TYPE_FIELD_MAPPER = dict(zip(POLICY_TYPES_WITH_CREDIT_LIMIT, POLICY_TYPE_CREDIT_LIMIT_FIELDS))
 
 CENTS_PER_DOLLAR = 100.0
 

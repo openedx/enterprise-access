@@ -39,7 +39,6 @@ from enterprise_access.apps.events.utils import (
     send_subsidy_redemption_event_to_event_bus
 )
 from enterprise_access.apps.subsidy_access_policy.constants import (
-    POLICY_TYPES_WITH_CREDIT_LIMIT,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
     REASON_LEARNER_MAX_SPEND_REACHED,
@@ -142,6 +141,8 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
     pagination_class = PaginationWithPageCount
     http_method_names = ['get', 'post', 'patch', 'delete']
     lookup_field = 'uuid'
+    # TODO: Whoever refactors this viewset should make it possible for operators to create policies, and should make it
+    # impossible for learners to create policies.
     permission_required = REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION
 
     @property
@@ -176,7 +177,7 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
     )
     def create(self, request, *args, **kwargs):
         """
-        create action for SubsidyAccessPolicyCRUDViewset. Handles creation of policy after validation
+        Create a SubsidyAccessPolicy.
         """
         policy_data = request.data
         serializer = self.get_serializer(data=policy_data)
@@ -337,14 +338,14 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
     def policies_with_credit_available(self, enterprise_customer_uuid, lms_user_id):
         """
-        Return all redeemable policies in terms of "credit available".
+        Return policies with credit availble, associated with the given customer, and redeemable by the given learner.
         """
         policies = []
-        all_policies = SubsidyAccessPolicy.objects.filter(
-            policy_type__in=POLICY_TYPES_WITH_CREDIT_LIMIT,
+        # TODO: maybe we should use self.get_queryset()?
+        all_policies_for_enterprise = SubsidyAccessPolicy.objects.filter(
             enterprise_customer_uuid=enterprise_customer_uuid
         )
-        for policy in all_policies:
+        for policy in all_policies_for_enterprise:
             if policy.credit_available(lms_user_id):
                 policies.append(policy)
 

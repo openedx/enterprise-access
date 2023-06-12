@@ -19,7 +19,9 @@ from enterprise_access.apps.core.constants import (
 )
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
+    AccessMethods,
     MissingSubsidyAccessReasonUserMessages,
+    PolicyTypes,
     TransactionStateChoices
 )
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
@@ -237,6 +239,117 @@ class TestAuthenticatedPolicyReadOnlyViews(CRUDViewTestMixin, APITestWithMocks):
             sorted(expected_results, key=sort_key),
             sorted(response_json['results'], key=sort_key),
         )
+
+
+@ddt.ddt
+class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
+    """
+    Test the create view for subsidy access policy records.
+    """
+
+    @ddt.data(
+        {
+            'policy_type': PolicyTypes.PER_LEARNER_ENROLLMENT_CREDIT,
+            'extra_fields': {
+                'per_learner_enrollment_limit': None,
+            },
+            'expected_response_code': status.HTTP_201_CREATED,
+            'expected_error_keywords': [],
+        },
+        {
+            'policy_type': PolicyTypes.PER_LEARNER_ENROLLMENT_CREDIT,
+            'extra_fields': {
+                'per_learner_enrollment_limit': 10,
+            },
+            'expected_response_code': status.HTTP_201_CREATED,
+            'expected_error_keywords': [],
+        },
+        {
+            'policy_type': PolicyTypes.PER_LEARNER_SPEND_CREDIT,
+            'extra_fields': {
+                'per_learner_spend_limit': None,
+            },
+            'expected_response_code': status.HTTP_201_CREATED,
+            'expected_error_keywords': [],
+        },
+        {
+            'policy_type': PolicyTypes.PER_LEARNER_SPEND_CREDIT,
+            'extra_fields': {
+                'per_learner_spend_limit': 30000,
+            },
+            'expected_response_code': status.HTTP_201_CREATED,
+            'expected_error_keywords': [],
+        },
+        {
+            'policy_type': PolicyTypes.PER_LEARNER_ENROLLMENT_CREDIT,
+            'extra_fields': {
+                'per_learner_spend_limit': 30000,
+            },
+            'expected_response_code': status.HTTP_400_BAD_REQUEST,
+            'expected_error_keywords': ['Missing fields', 'Extraneous fields'],
+        },
+        {
+            'policy_type': PolicyTypes.PER_LEARNER_ENROLLMENT_CREDIT,
+            'extra_fields': {
+                'per_learner_spend_limit': 30000,
+                'per_learner_enrollment_limit': 10,
+            },
+            'expected_response_code': status.HTTP_400_BAD_REQUEST,
+            'expected_error_keywords': ['Extraneous fields'],
+        },
+        {
+            'policy_type': PolicyTypes.PER_LEARNER_SPEND_CREDIT,
+            'extra_fields': {
+                'per_learner_enrollment_limit': 10,
+            },
+            'expected_response_code': status.HTTP_400_BAD_REQUEST,
+            'expected_error_keywords': ['Missing fields', 'Extraneous fields'],
+        },
+        {
+            'policy_type': PolicyTypes.PER_LEARNER_SPEND_CREDIT,
+            'extra_fields': {
+                'per_learner_enrollment_limit': 10,
+                'per_learner_spend_limit': 30000,
+            },
+            'expected_response_code': status.HTTP_400_BAD_REQUEST,
+            'expected_error_keywords': ['Extraneous fields'],
+        },
+    )
+    @ddt.unpack
+    def test_create_view(self, policy_type, extra_fields, expected_response_code, expected_error_keywords):
+        """
+        Test the (deprecated) policy create view.  make sure "extra" fields which pertain to the specific policy type
+        are correctly validated for existence/non-existence.
+        """
+        # Set the JWT-based auth that we'll use for every request
+        self.set_jwt_cookie([{'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}])
+
+        # Test the retrieve endpoint
+        create_url = SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT
+        payload = {
+            'policy_type': policy_type,
+            'description': 'test description',
+            'active': True,
+            'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
+            'catalog_uuid': str(uuid4()),
+            'subsidy_uuid': str(uuid4()),
+            'access_method': AccessMethods.DIRECT,
+            'spend_limit': None,
+        }
+        payload.update(extra_fields)
+        response = self.client.post(create_url, payload)
+        assert response.status_code == expected_response_code
+
+        if expected_response_code == status.HTTP_201_CREATED:
+            response_json = response.json()
+            del response_json['uuid']
+            expected_response = payload.copy()
+            expected_response.setdefault("per_learner_enrollment_limit")
+            expected_response.setdefault("per_learner_spend_limit")
+            assert response_json == expected_response
+        elif expected_response_code == status.HTTP_400_BAD_REQUEST:
+            for expected_error_keyword in expected_error_keywords:
+                assert expected_error_keyword in response.content.decode("utf-8")
 
 
 @ddt.ddt

@@ -100,7 +100,26 @@ class SubsidyAccessPolicy(TimeStampedModel):
         default=AccessMethods.DIRECT,
         help_text='The mechanism by which learners access content in this policy, defaults to "direct".',
     )
+    spend_limit = models.IntegerField(
+        null=True,
+        blank=True,
+        default=None,
+        verbose_name='Policy-wide spend limit (USD cents)',
+        help_text=(
+            'The maximum number of allowed dollars to be spent, in aggregate, by all learners '
+            'under this policy. Denoted in USD cents. '
+            'Defaults to null, which means that no such maximum exists.'
+        ),
+    )
 
+    # Update this list to match the following "custom" fields, which are ones only used by sub-classes.
+    ALL_CUSTOM_FIELDS = [
+        'per_learner_enrollment_limit',
+        'per_learner_spend_limit',
+    ]
+    # Sub-classes should override this class variable to declare which custom fields to use.
+    REQUIRED_CUSTOM_FIELDS = []
+    # Begin definitions of custom fields:
     per_learner_enrollment_limit = models.IntegerField(
         null=True,
         blank=True,
@@ -108,7 +127,8 @@ class SubsidyAccessPolicy(TimeStampedModel):
         verbose_name='Per-learner enrollment limit',
         help_text=(
             'The maximum number of enrollments allowed for a single learner under this policy. '
-            'Defaults to null, which means that no such maximum exists.'
+            'Null value means no limit is set, which disables this feature. '
+            'Required if policy_type = "PerLearnerEnrollmentCreditAccessPolicy".'
         ),
     )
     per_learner_spend_limit = models.IntegerField(
@@ -119,18 +139,8 @@ class SubsidyAccessPolicy(TimeStampedModel):
         help_text=(
             'The maximum amount of allowed money spent for a single learner under this policy. '
             'Denoted in USD cents. '
-            'Defaults to null, which means that no such maximum exists.'
-        ),
-    )
-    spend_limit = models.IntegerField(
-        null=True,
-        blank=True,
-        default=None,
-        verbose_name='Policy-wide spend limit (USD cents)',
-        help_text=(
-            'The maximum number of allowed dollars to be spent, in aggregate, by all learners '
-            'under this policy. Denoted in USD cents. '
-            'Defaults to null, which means that no such maximum exists.'
+            'Null value means no limit is set, which disables this feature. '
+            'Required if policy_type = "PerLearnerSpendCreditAccessPolicy".'
         ),
     )
 
@@ -149,6 +159,16 @@ class SubsidyAccessPolicy(TimeStampedModel):
         An LmsApiClient instance.
         """
         return LmsApiClient()
+
+    @classmethod
+    def get_policy_class_by_type(cls, policy_type):
+        """
+        Given a policy_type str, return the appropriate subclass of SubsidyAccessPolicy.
+        """
+        for policy_class in SubsidyAccessPolicy.__subclasses__():
+            if policy_type == policy_class.__name__:
+                return policy_class
+        return None
 
     def save(self, *args, **kwargs):
         """
@@ -527,12 +547,14 @@ class CreditPolicyMixin:
         return CREDIT_POLICY_TYPE_PRIORITY
 
 
-class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
+class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
     """
     Policy that limits the number of enrollments transactions for a learner in a subsidy.
 
     .. no_pii: This model has no PII
     """
+
+    REQUIRED_CUSTOM_FIELDS = ['per_learner_enrollment_limit']
 
     objects = PolicyManager()
 
@@ -577,12 +599,14 @@ class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMi
         return self.per_learner_enrollment_limit - existing_transaction_count
 
 
-class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy, CreditPolicyMixin):
+class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
     """
     Policy that limits the amount of learner spend for enrollment transactions.
 
     .. no_pii: This model has no PII
     """
+
+    REQUIRED_CUSTOM_FIELDS = ['per_learner_spend_limit']
 
     objects = PolicyManager()
 
