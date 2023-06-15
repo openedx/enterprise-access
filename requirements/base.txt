@@ -19,10 +19,12 @@ attrs==23.1.0
 backoff==1.10.0
     # via analytics-python
 backports-zoneinfo[tzdata]==0.2.1
-    # via kombu
-billiard==3.6.4.0
+    # via
+    #   celery
+    #   kombu
+billiard==4.1.0
     # via celery
-celery==5.2.7
+celery==5.3.0
     # via
     #   -r requirements/base.in
     #   django-celery-results
@@ -95,14 +97,14 @@ django==3.2.19
     #   social-auth-app-django
 django-celery-results==2.5.1
     # via -r requirements/base.in
-django-cors-headers==4.0.0
+django-cors-headers==4.1.0
     # via -r requirements/base.in
 django-crum==0.7.9
     # via
     #   -r requirements/base.in
     #   edx-django-utils
     #   edx-rbac
-django-extensions==3.2.1
+django-extensions==3.2.3
     # via -r requirements/base.in
 django-filter==23.2
     # via -r requirements/base.in
@@ -243,13 +245,13 @@ pyrsistent==0.19.3
 python-dateutil==2.8.2
     # via
     #   analytics-python
+    #   celery
     #   edx-drf-extensions
 python3-openid==3.2.0
     # via social-auth-core
 pytz==2023.3
     # via
     #   -r requirements/base.in
-    #   celery
     #   django
     #   djangorestframework
     #   drf-yasg
@@ -308,13 +310,15 @@ typing-extensions==4.6.3
     #   asgiref
     #   kombu
 tzdata==2023.3
-    # via backports-zoneinfo
+    # via
+    #   backports-zoneinfo
+    #   celery
 uritemplate==4.1.1
     # via
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.0.2
+urllib3==2.0.3
     # via requests
 vine==5.0.0
     # via

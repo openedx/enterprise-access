@@ -30,12 +30,13 @@ backoff==1.10.0
 backports-zoneinfo[tzdata]==0.2.1
     # via
     #   -r requirements/base.txt
+    #   celery
     #   kombu
-billiard==3.6.4.0
+billiard==4.1.0
     # via
     #   -r requirements/base.txt
     #   celery
-celery==5.2.7
+celery==5.3.0
     # via
     #   -r requirements/base.txt
     #   django-celery-results
@@ -123,14 +124,14 @@ django==3.2.19
     #   social-auth-app-django
 django-celery-results==2.5.1
     # via -r requirements/base.txt
-django-cors-headers==4.0.0
+django-cors-headers==4.1.0
     # via -r requirements/base.txt
 django-crum==0.7.9
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
     #   edx-rbac
-django-extensions==3.2.1
+django-extensions==3.2.3
     # via -r requirements/base.txt
 django-filter==23.2
     # via -r requirements/base.txt
@@ -329,6 +330,7 @@ python-dateutil==2.8.2
     # via
     #   -r requirements/base.txt
     #   analytics-python
+    #   celery
     #   edx-drf-extensions
 python-memcached==1.59
     # via -r requirements/production.in
@@ -339,7 +341,6 @@ python3-openid==3.2.0
 pytz==2023.3
     # via
     #   -r requirements/base.txt
-    #   celery
     #   django
     #   djangorestframework
     #   drf-yasg
@@ -425,13 +426,14 @@ tzdata==2023.3
     # via
     #   -r requirements/base.txt
     #   backports-zoneinfo
+    #   celery
 uritemplate==4.1.1
     # via
     #   -r requirements/base.txt
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.0.2
+urllib3==2.0.3
     # via
     #   -r requirements/base.txt
     #   requests

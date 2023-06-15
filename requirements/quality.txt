@@ -35,14 +35,15 @@ backoff==1.10.0
 backports-zoneinfo[tzdata]==0.2.1
     # via
     #   -r requirements/test.txt
+    #   celery
     #   kombu
-billiard==3.6.4.0
+billiard==4.1.0
     # via
     #   -r requirements/test.txt
     #   celery
 bleach==6.0.0
     # via readme-renderer
-celery==5.2.7
+celery==5.3.0
     # via
     #   -r requirements/test.txt
     #   django-celery-results
@@ -157,7 +158,7 @@ django==3.2.19
     #   social-auth-app-django
 django-celery-results==2.5.1
     # via -r requirements/test.txt
-django-cors-headers==4.0.0
+django-cors-headers==4.1.0
     # via -r requirements/test.txt
 django-crum==0.7.9
     # via
@@ -166,7 +167,7 @@ django-crum==0.7.9
     #   edx-rbac
 django-dynamic-fixture==3.1.2
     # via -r requirements/test.txt
-django-extensions==3.2.1
+django-extensions==3.2.3
     # via -r requirements/test.txt
 django-filter==23.2
     # via -r requirements/test.txt
@@ -261,7 +262,7 @@ fastavro==1.7.4
     # via
     #   -r requirements/test.txt
     #   openedx-events
-filelock==3.12.0
+filelock==3.12.2
     # via
     #   -r requirements/test.txt
     #   tox
@@ -328,7 +329,7 @@ lazy-object-proxy==1.9.0
     # via
     #   -r requirements/test.txt
     #   astroid
-markdown-it-py==2.2.0
+markdown-it-py==3.0.0
     # via rich
 markupsafe==2.1.3
     # via
@@ -379,7 +380,7 @@ pkgutil-resolve-name==1.3.10
     # via
     #   -r requirements/test.txt
     #   jsonschema
-platformdirs==3.5.1
+platformdirs==3.5.3
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -459,7 +460,7 @@ pyrsistent==0.19.3
     # via
     #   -r requirements/test.txt
     #   jsonschema
-pytest==7.3.1
+pytest==7.3.2
     # via
     #   -r requirements/test.txt
     #   pytest-cov
@@ -472,6 +473,7 @@ python-dateutil==2.8.2
     # via
     #   -r requirements/test.txt
     #   analytics-python
+    #   celery
     #   edx-drf-extensions
     #   faker
 python-slugify==8.0.1
@@ -485,7 +487,6 @@ python3-openid==3.2.0
 pytz==2023.3
     # via
     #   -r requirements/test.txt
-    #   celery
     #   django
     #   djangorestframework
     #   drf-yasg
@@ -519,7 +520,7 @@ requests-toolbelt==1.0.0
     # via twine
 rfc3986==2.0.0
     # via twine
-rich==13.4.1
+rich==13.4.2
     # via twine
 ruamel-yaml==0.17.31
     # via
@@ -613,13 +614,14 @@ tzdata==2023.3
     # via
     #   -r requirements/test.txt
     #   backports-zoneinfo
+    #   celery
 uritemplate==4.1.1
     # via
     #   -r requirements/test.txt
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.0.2
+urllib3==2.0.3
     # via
     #   -r requirements/test.txt
     #   requests
