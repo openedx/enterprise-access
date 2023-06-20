@@ -351,6 +351,64 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             for expected_error_keyword in expected_error_keywords:
                 assert expected_error_keyword in response.content.decode("utf-8")
 
+    @ddt.data(
+        {
+            'policy_type': PolicyTypes.PER_LEARNER_SPEND_CREDIT,
+            'extra_fields': {
+                'per_learner_spend_limit': 30000,
+            },
+            'expected_response_code': status.HTTP_201_CREATED,
+        }
+    )
+    @ddt.unpack
+    def test_idempotent_create_view(self, policy_type, extra_fields, expected_response_code):
+        """
+        Test the (deprecated) policy create view's idempotency.
+        """
+        # Set the JWT-based auth that we'll use for every request
+        self.set_jwt_cookie([{'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}])
+
+        # Test the retrieve endpoint
+        create_url = SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT
+        enterprise_customer_uuid = str(TEST_ENTERPRISE_UUID)
+        catalog_uuid = str(uuid4())
+        subsidy_uuid = str(uuid4())
+        payload = {
+            'policy_type': policy_type,
+            'description': 'test description',
+            'active': True,
+            'enterprise_customer_uuid': enterprise_customer_uuid,
+            'catalog_uuid': catalog_uuid,
+            'subsidy_uuid': subsidy_uuid,
+            'access_method': AccessMethods.DIRECT,
+            'spend_limit': None,
+        }
+        payload.update(extra_fields)
+        response = self.client.post(create_url, payload)
+        assert response.status_code == expected_response_code
+
+        if expected_response_code == status.HTTP_201_CREATED:
+            response_json = response.json()
+            del response_json['uuid']
+            expected_response = payload.copy()
+            expected_response.setdefault("per_learner_enrollment_limit")
+            expected_response.setdefault("per_learner_spend_limit")
+            assert response_json == expected_response
+
+        # Test idempotency
+        response = self.client.post(create_url, payload)
+        duplicate_status_code = status.HTTP_200_OK
+
+        assert response.status_code == duplicate_status_code
+
+        if response.status_code == status.HTTP_200_OK:
+            response_json = response.json()
+            del response_json['uuid']
+            expected_response = payload.copy()
+            expected_response.setdefault("per_learner_enrollment_limit")
+            expected_response.setdefault("per_learner_spend_limit")
+            assert response_json == expected_response
+
 
 @ddt.ddt
 class TestPolicyRedemptionAuthNAndPermissionChecks(APITestWithMocks):

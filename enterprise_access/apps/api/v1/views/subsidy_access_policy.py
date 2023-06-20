@@ -145,6 +145,13 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
     # impossible for learners to create policies.
     permission_required = REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION
 
+    def __init__(self, *args, **kwargs):
+        self.extra_context = {}
+        super().__init__(*args, **kwargs)
+
+    def set_policy_created(self, created):
+        self.extra_context['created'] = created
+
     @property
     def requested_enterprise_customer_uuid(self):
         """
@@ -183,11 +190,14 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         serializer = self.get_serializer(data=policy_data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        policy_created = self.extra_context.get('created')
         send_access_policy_event_to_event_bus(
             ACCESS_POLICY_CREATED.event_type,
             serializer.data
         )
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        if policy_created:
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
         tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],

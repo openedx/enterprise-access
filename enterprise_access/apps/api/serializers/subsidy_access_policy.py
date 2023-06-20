@@ -99,9 +99,27 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
             },
         }
 
+    @property
+    def calling_view(self):
+        """
+        Return the view that called this serializer.
+        """
+        return self.context['view']
+
     def create(self, validated_data):
         policy_type = validated_data.get('policy_type')
         policy_model = apps.get_model(app_label='subsidy_access_policy', model_name=policy_type)
+        filtered_policy = policy_model.objects.filter(
+            enterprise_customer_uuid=validated_data['enterprise_customer_uuid'],
+            subsidy_uuid=validated_data['subsidy_uuid'],
+            catalog_uuid=validated_data['catalog_uuid'],
+            access_method=validated_data['access_method'],
+            active=True,
+        ).first()
+        if filtered_policy:
+            self.calling_view.set_policy_created(False)
+            return filtered_policy
+        self.calling_view.set_policy_created(True)
         policy = policy_model.objects.create(**validated_data)
         return policy
 
