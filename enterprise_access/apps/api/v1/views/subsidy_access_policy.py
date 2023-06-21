@@ -21,7 +21,7 @@ from rest_framework import permissions
 from rest_framework import serializers as rest_serializers
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import APIException, NotFound
+from rest_framework.exceptions import NotFound
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
@@ -57,6 +57,11 @@ from enterprise_access.apps.subsidy_access_policy.models import (
 )
 from enterprise_access.apps.subsidy_access_policy.subsidy_api import get_redemptions_by_content_and_policy_for_learner
 
+from ..exceptions import (
+    RedemptionRequestException,
+    SubsidyAccessPolicyLockedException,
+    SubsidyAPIRedemptionRequestException
+)
 from .utils import PaginationWithPageCount
 
 logger = logging.getLogger(__name__)
@@ -242,28 +247,6 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         queryset = SubsidyAccessPolicy.objects.order_by('-created')
         enterprise_customer_uuid = self.requested_enterprise_customer_uuid
         return queryset.filter(enterprise_customer_uuid=enterprise_customer_uuid)
-
-
-class RedemptionRequestException(APIException):
-    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
-    default_detail = 'Could not redeem'
-
-
-class SubsidyAccessPolicyLockedException(APIException):
-    """
-    Throw this exception when an attempt to acquire a policy lock failed because it was already locked by another agent.
-
-    Note: status.HTTP_423_LOCKED is NOT acceptable as a status code for delivery to web browsers.  According to Mozilla:
-
-      > The ability to lock a resource is specific to some WebDAV servers. Browsers accessing web pages will never
-      > encounter this status code; in the erroneous cases it happens, they will handle it as a generic 400 status code.
-
-    See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/423
-
-    HTTP 429 Too Many Requests is the next best thing, and implies retryability.
-    """
-    status_code = status.HTTP_429_TOO_MANY_REQUESTS
-    default_detail = 'Enrollment currently locked for this subsidy access policy.'
 
 
 class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequiredMixin, viewsets.GenericViewSet):
@@ -484,11 +467,10 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             logger.exception(exc)
             raise SubsidyAccessPolicyLockedException() from exc
         except SubsidyAPIHTTPError as exc:
-            logger.exception(f'{exc} when creating transaction in subsidy API')
-            error_payload = exc.error_payload()
-            error_payload['detail'] = f"Subsidy Transaction API error: {error_payload['detail']}"
-            raise RedemptionRequestException(
-                detail=error_payload,
+            logger.exception(f'{exc} when creating transaction in subsidy API with payload {exc.error_payload()}')
+            raise SubsidyAPIRedemptionRequestException(
+                policy=policy,
+                subsidy_api_error=exc,
             ) from exc
 
     def get_existing_redemptions(self, policies, lms_user_id):
@@ -673,9 +655,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         for each non-redeemable policy.
         """
         reasons = []
-        lms_client = LmsApiClient()
-        enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-        enterprise_admin_users = enterprise_customer_data.get('admin_users')
+        enterprise_admin_users = self._get_enterprise_admin_users(enterprise_customer_uuid)
 
         for reason, policies in non_redeemable_policies.items():
             reasons.append({
@@ -688,6 +668,14 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             })
 
         return reasons
+
+    def _get_enterprise_admin_users(self, enterprise_customer_uuid):
+        """
+        Helper to fetch admin users for the given customer uuid.
+        """
+        lms_client = LmsApiClient()
+        enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
+        return enterprise_customer_data.get('admin_users')
 
     def _get_list_price(self, enterprise_customer_uuid, content_key):
         """

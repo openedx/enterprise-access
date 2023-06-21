@@ -7,6 +7,7 @@ from unittest import mock
 from uuid import UUID, uuid4
 
 import ddt
+import requests
 from django.conf import settings
 from rest_framework import status
 from rest_framework.reverse import reverse
@@ -22,6 +23,8 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     AccessMethods,
     MissingSubsidyAccessReasonUserMessages,
     PolicyTypes,
+    SubsidyFulfillmentErrorReasons,
+    SubsidyRedemptionErrorCodes,
     TransactionStateChoices
 )
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
@@ -681,6 +684,65 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
                 historical_redemptions_uuids=[],
             ),
         )
+
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
+    @mock.patch('enterprise_access.apps.api.v1.exceptions.LmsApiClient')
+    @ddt.data(
+        {
+            'subsidy_error_code': 'fulfillment_error',
+            'subsidy_error_detail': [
+                {'message': 'woozit duplicate order woohoo!'},
+            ],
+            'expected_redeem_error_detail': {
+                'reason': SubsidyFulfillmentErrorReasons.DUPLICATE_FULFILLMENT,
+                'user_message': SubsidyFulfillmentErrorReasons.USER_MESSAGES_BY_REASON[
+                    SubsidyFulfillmentErrorReasons.DUPLICATE_FULFILLMENT
+                ],
+                'metadata': {
+                    'enterprise_administrators': [{'email': 'edx@example.com'}],
+                    'subsidy_error_detail': [
+                        {'message': 'woozit duplicate order woohoo!'}
+                    ],
+                },
+            },
+            'expected_redeem_error_code': SubsidyRedemptionErrorCodes.FULFILLMENT_ERROR,
+        },
+    )
+    @ddt.unpack
+    def test_redeem_policy_subsidy_api_error(
+        self, mock_lms_api_client, mock_transactions_cache_for_learner,  # pylint: disable=unused-argument
+        subsidy_error_code, subsidy_error_detail,
+        expected_redeem_error_detail, expected_redeem_error_code
+    ):
+        """
+        Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint returns a well-structured
+        error response payload when the subsidy API call to redeem/fulfill responds with an error.
+        """
+        mock_lms_api_client().get_enterprise_customer_data.return_value = {
+            'slug': 'the-slug',
+            'admin_users': [{'email': 'edx@example.com'}],
+        }
+        self.mock_get_content_metadata.return_value = {'content_price': 123}
+        mock_response = mock.MagicMock()
+        mock_response.json.return_value = {
+            'code': subsidy_error_code,
+            'detail': subsidy_error_detail,
+        }
+        self.redeemable_policy.subsidy_client.create_subsidy_transaction.side_effect = requests.exceptions.HTTPError(
+            response=mock_response
+        )
+
+        payload = {
+            'lms_user_id': 1234,
+            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
+        }
+
+        response = self.client.post(self.subsidy_access_policy_redeem_endpoint, payload)
+
+        response_json = self.load_json(response.content)
+        self.maxDiff = None
+        self.assertEqual(response_json['detail'], expected_redeem_error_detail)
+        self.assertEqual(response_json['code'], expected_redeem_error_code)
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
     def test_redeem_policy_with_metadata(self, mock_transactions_cache_for_learner):  # pylint: disable=unused-argument
