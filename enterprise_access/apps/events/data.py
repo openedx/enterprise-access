@@ -138,7 +138,6 @@ class AccessPolicyData:
 
     uuid = attr.ib(type=str)
     active = attr.ib(type=bool)
-    group_uuid = attr.ib(type=str)
     catalog_uuid = attr.ib(type=str)
     subsidy_uuid = attr.ib(type=str)
     access_method = attr.ib(type=str)
@@ -157,7 +156,6 @@ class AccessPolicyEvent:
             "fields": [
                 {"name": "uuid", "type": "string"},
                 {"name": "active", "type": "boolean"},
-                {"name": "group_uuid", "type": "string"},
                 {"name": "subsidy_uuid", "type": "string"},
                 {"name": "access_method", "type": "string"}
             ]
@@ -167,7 +165,6 @@ class AccessPolicyEvent:
     def __init__(self, *args, **kwargs):
         self.uuid = kwargs['uuid']
         self.active = kwargs['active']
-        self.group_uuid = kwargs['group_uuid']
         self.subsidy_uuid = kwargs['subsidy_uuid']
         self.access_method = kwargs['access_method']
 
@@ -180,7 +177,6 @@ class AccessPolicyEvent:
         return {
             'uuid': obj.uuid,
             'active': obj.active,
-            'group_uuid': obj.group_uuid,
             'subsidy_uuid': obj.subsidy_uuid,
             'access_method': obj.access_method,
         }

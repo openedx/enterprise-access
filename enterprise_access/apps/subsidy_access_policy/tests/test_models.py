@@ -108,7 +108,6 @@ class SubsidyAccessPolicyTests(TestCase):
         with self.assertRaises(TypeError):
             SubsidyAccessPolicy.objects.create(
                 description='Base policy',
-                group_uuid='7c9daa69-519c-4313-ad81-90862bc08ca1',
                 catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08c21',
                 subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3',
             )
@@ -123,12 +122,10 @@ class SubsidyAccessPolicyTests(TestCase):
         }
 
         PerLearnerSpendCreditAccessPolicy.objects.create(
-            group_uuid='7c9daa69-519c-4313-ad81-90862bc08ca1',
             catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08ca2',
             subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3'
         )
         PerLearnerEnrollmentCreditAccessPolicy.objects.create(
-            group_uuid='7c9daa69-519c-4313-ad81-90862bc08ca2',
             catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3',
             subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca4'
         )
@@ -147,7 +144,6 @@ class SubsidyAccessPolicyTests(TestCase):
         expected_policy_type = 'PerLearnerSpendCreditAccessPolicy'
 
         policy = SubsidyAccessPolicy.objects.create(
-            group_uuid='7c9daa69-519c-4313-ad81-90862bc08ca1',
             catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08ca2',
             subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3',
             policy_type=expected_policy_type

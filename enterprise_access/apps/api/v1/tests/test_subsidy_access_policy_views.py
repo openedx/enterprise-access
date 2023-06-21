@@ -540,7 +540,6 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         assert response_json[0]["catalog_uuid"] == str(self.redeemable_policy.catalog_uuid)
         assert response_json[0]["description"] == self.redeemable_policy.description
         assert response_json[0]["enterprise_customer_uuid"] == str(self.enterprise_uuid)
-        assert response_json[0]["group_uuid"] == str(self.redeemable_policy.group_uuid)
         assert response_json[0]["per_learner_enrollment_limit"] == self.redeemable_policy.per_learner_enrollment_limit
         assert response_json[0]["per_learner_spend_limit"] == self.redeemable_policy.per_learner_spend_limit
         assert response_json[0]["spend_limit"] == self.redeemable_policy.spend_limit
