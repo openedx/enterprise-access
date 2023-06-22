@@ -86,14 +86,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
         db_index=True,
         help_text='The primary identifier of the subsidy associated with this policy.',
     )
-    group_uuid = models.UUIDField(
-        db_index=True,
-        null=True,
-        blank=True,
-        help_text=(
-            "Optional, currently useless field for future Enterprise Groups implementation."
-        ),
-    )
     access_method = models.CharField(
         max_length=32,
         choices=AccessMethods.CHOICES,

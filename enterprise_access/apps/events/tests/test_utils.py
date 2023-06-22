@@ -36,7 +36,6 @@ class UtilsTests(TestCase):
         access_policy_event_data = {
             'uuid': uuid4(),
             'active': True,
-            'group_uuid': uuid4(),
             'subsidy_uuid': uuid4(),
             'access_method': AccessMethods.DIRECT,
         }

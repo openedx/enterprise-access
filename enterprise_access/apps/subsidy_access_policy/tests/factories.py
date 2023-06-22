@@ -23,7 +23,6 @@ class SubsidyAccessPolicyFactory(factory.django.DjangoModelFactory):
 
     uuid = factory.LazyFunction(uuid4)
     enterprise_customer_uuid = factory.LazyFunction(uuid4)
-    group_uuid = factory.LazyFunction(uuid4)
     catalog_uuid = factory.LazyFunction(uuid4)
     subsidy_uuid = factory.LazyFunction(uuid4)
     access_method = AccessMethods.DIRECT
