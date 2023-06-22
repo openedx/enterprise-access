@@ -594,6 +594,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             redeemable_policies = []
             non_redeemable_policies = []
             resolved_policy = None
+            list_price = None
 
             redemptions_by_policy_uuid = redemptions_by_content_and_policy[content_key]
             # Flatten dict of lists because the response doesn't need to be bucketed by policy_uuid.
@@ -632,9 +633,12 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             if redeemable_policies:
                 resolved_policy = redeemable_policies[0]
 
+            if resolved_policy or has_successful_redemption:
+                list_price = self._get_list_price(enterprise_customer_uuid, content_key)
+
             element_response = {
                 "content_key": content_key,
-                "list_price": self._get_list_price(enterprise_customer_uuid, content_key),
+                "list_price": list_price,
                 "redemptions": redemptions,
                 "has_successful_redemption": has_successful_redemption,
                 "redeemable_subsidy_access_policy": resolved_policy,

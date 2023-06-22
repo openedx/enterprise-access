@@ -1012,10 +1012,6 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         test_content_key_2 = "course-v1:edX+edXPrivacy101+3T2020_2"
         test_content_key_1_metadata_price = 29900
         test_content_key_2_metadata_price = 81900
-        test_content_key_1_usd_price = 299
-        test_content_key_2_usd_price = 819
-        test_content_key_1_cents_price = 29900
-        test_content_key_2_cents_price = 81900
 
         def mock_get_subsidy_content_data(*args, **kwargs):
             if test_content_key_1 in args:
@@ -1052,10 +1048,9 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
 
         # Check the response for the first content_key given.
         assert response_list[0]["content_key"] == test_content_key_1
-        assert response_list[0]["list_price"] == {
-            "usd": test_content_key_1_usd_price,
-            "usd_cents": test_content_key_1_cents_price,
-        }
+        # We should not assume that a list price is fetchable if the
+        # content cant' be redeemed - the content may not be in any catalog for any policy.
+        assert response_list[0]["list_price"] is None
         assert len(response_list[0]["redemptions"]) == 0
         assert response_list[0]["has_successful_redemption"] is False
         assert response_list[0]["redeemable_subsidy_access_policy"] is None
@@ -1081,10 +1076,8 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
 
         # Check the response for the second content_key given.
         assert response_list[1]["content_key"] == test_content_key_2
-        assert response_list[1]["list_price"] == {
-            "usd": test_content_key_2_usd_price,
-            "usd_cents": test_content_key_2_cents_price,
-        }
+        assert response_list[1]["list_price"] is None
+
         assert len(response_list[1]["redemptions"]) == 0
         assert response_list[1]["has_successful_redemption"] is False
         assert response_list[1]["redeemable_subsidy_access_policy"] is None
