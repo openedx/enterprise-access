@@ -1,15 +1,17 @@
 0008 Additional Metadata for Policy Redemption
-************************************************************
+**********************************************
 
 Status
 ======
 
-Proposed
+Accepted May 2023
 
 Context
 =======
 
-This document intends to outline modifications to existing API endpoint(s) such that MFEs can pass additional metadata into the redemption flow. This extension was devised to support required GetSmarter Enterprise Api Gateway (GEAG) meatadata such as DOB and terms acceptance dates.
+This document intends to outline modifications to existing API endpoint(s) such that MFEs can pass
+additional metadata into the redemption flow. This extension was devised to support required
+GetSmarter Enterprise Api Gateway (GEAG) meatadata such as DOB and terms acceptance dates.
 
 Decision
 =======

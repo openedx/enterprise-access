@@ -8,6 +8,8 @@ Status
 
 March 2023
 
+*Superceded by `<0007-access-policy-locks-revised.rst>`_*
+
 
 Context
 *******
