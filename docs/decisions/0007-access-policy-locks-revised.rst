@@ -6,6 +6,8 @@ Status
 
 **Accepted** (April 2023)
 
+*Supercedes `<0005-access-policy-locks.rst>`_*
+
 Context
 *******
 
