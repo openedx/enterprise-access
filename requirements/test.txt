@@ -34,12 +34,13 @@ backoff==1.10.0
 backports-zoneinfo[tzdata]==0.2.1
     # via
     #   -r requirements/base.txt
+    #   celery
     #   kombu
-billiard==3.6.4.0
+billiard==4.1.0
     # via
     #   -r requirements/base.txt
     #   celery
-celery==5.2.7
+celery==5.3.1
     # via
     #   -r requirements/base.txt
     #   django-celery-results
@@ -78,7 +79,7 @@ click-plugins==1.1.1
     # via
     #   -r requirements/base.txt
     #   celery
-click-repl==0.2.0
+click-repl==0.3.0
     # via
     #   -r requirements/base.txt
     #   celery
@@ -92,13 +93,11 @@ coreapi==2.3.3
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
-    #   drf-yasg
     #   openapi-codec
 coreschema==0.0.4
     # via
     #   -r requirements/base.txt
     #   coreapi
-    #   drf-yasg
 coverage[toml]==7.2.7
     # via
     #   -r requirements/test.in
@@ -146,7 +145,7 @@ distlib==0.3.6
     #   social-auth-app-django
 django-celery-results==2.5.1
     # via -r requirements/base.txt
-django-cors-headers==4.0.0
+django-cors-headers==4.1.0
     # via -r requirements/base.txt
 django-crum==0.7.9
     # via
@@ -155,7 +154,7 @@ django-crum==0.7.9
     #   edx-rbac
 django-dynamic-fixture==3.1.2
     # via -r requirements/test.in
-django-extensions==3.2.1
+django-extensions==3.2.3
     # via -r requirements/base.txt
 django-filter==23.2
     # via -r requirements/base.txt
@@ -192,9 +191,9 @@ drf-jwt==1.19.2
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
-drf-spectacular==0.26.2
+drf-spectacular==0.26.3
     # via -r requirements/base.txt
-drf-yasg==1.21.5
+drf-yasg==1.21.6
     # via
     #   -r requirements/base.txt
     #   edx-api-doc-tools
@@ -236,13 +235,13 @@ exceptiongroup==1.1.1
     # via pytest
 factory-boy==3.2.1
     # via -r requirements/test.in
-faker==18.10.1
+faker==18.11.2
     # via factory-boy
 fastavro==1.7.4
     # via
     #   -r requirements/base.txt
     #   openedx-events
-filelock==3.12.0
+filelock==3.12.2
     # via
     #   tox
     #   virtualenv
@@ -282,7 +281,7 @@ jsonschema==4.17.3
     # via
     #   -r requirements/base.txt
     #   drf-spectacular
-kombu==5.3.0
+kombu==5.3.1
     # via
     #   -r requirements/base.txt
     #   celery
@@ -298,9 +297,9 @@ monotonic==1.6
     # via
     #   -r requirements/base.txt
     #   analytics-python
-mysqlclient==2.1.1
+mysqlclient==2.2.0
     # via -r requirements/base.txt
-newrelic==8.8.0
+newrelic==8.8.1
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -313,7 +312,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
-openedx-events==8.0.1
+openedx-events==8.2.0
     # via -r requirements/base.txt
 packaging==23.1
     # via
@@ -329,11 +328,11 @@ pkgutil-resolve-name==1.3.10
     # via
     #   -r requirements/base.txt
     #   jsonschema
-platformdirs==3.5.1
+platformdirs==3.8.0
     # via
     #   pylint
     #   virtualenv
-pluggy==1.0.0
+pluggy==1.2.0
     # via
     #   pytest
     #   tox
@@ -391,7 +390,7 @@ pyrsistent==0.19.3
     # via
     #   -r requirements/base.txt
     #   jsonschema
-pytest==7.3.1
+pytest==7.4.0
     # via
     #   pytest-cov
     #   pytest-django
@@ -403,6 +402,7 @@ python-dateutil==2.8.2
     # via
     #   -r requirements/base.txt
     #   analytics-python
+    #   celery
     #   edx-drf-extensions
     #   faker
 python-slugify==8.0.1
@@ -414,7 +414,6 @@ python3-openid==3.2.0
 pytz==2023.3
     # via
     #   -r requirements/base.txt
-    #   celery
     #   django
     #   djangorestframework
     #   drf-yasg
@@ -423,8 +422,9 @@ pyyaml==6.0
     #   -r requirements/base.txt
     #   code-annotations
     #   drf-spectacular
+    #   drf-yasg
     #   edx-django-release-util
-redis==4.5.5
+redis==4.6.0
     # via -r requirements/base.txt
 requests==2.31.0
     # via
@@ -440,14 +440,6 @@ requests-oauthlib==1.3.1
     # via
     #   -r requirements/base.txt
     #   social-auth-core
-ruamel-yaml==0.17.31
-    # via
-    #   -r requirements/base.txt
-    #   drf-yasg
-ruamel-yaml-clib==0.2.7
-    # via
-    #   -r requirements/base.txt
-    #   ruamel-yaml
 rules==3.3
     # via -r requirements/base.txt
 semantic-version==2.10.0
@@ -462,7 +454,6 @@ six==1.16.0
     # via
     #   -r requirements/base.txt
     #   analytics-python
-    #   click-repl
     #   django-dynamic-fixture
     #   edx-auth-backends
     #   edx-django-release-util
@@ -508,7 +499,7 @@ tox==3.28.0
     # via
     #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/test.in
-typing-extensions==4.6.3
+typing-extensions==4.7.0
     # via
     #   -r requirements/base.txt
     #   asgiref
@@ -519,13 +510,14 @@ tzdata==2023.3
     # via
     #   -r requirements/base.txt
     #   backports-zoneinfo
+    #   celery
 uritemplate==4.1.1
     # via
     #   -r requirements/base.txt
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.0.2
+urllib3==2.0.3
     # via
     #   -r requirements/base.txt
     #   requests
@@ -535,7 +527,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.23.0
+virtualenv==20.23.1
     # via tox
 wcwidth==0.2.6
     # via

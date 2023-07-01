@@ -19,10 +19,12 @@ attrs==23.1.0
 backoff==1.10.0
     # via analytics-python
 backports-zoneinfo[tzdata]==0.2.1
-    # via kombu
-billiard==3.6.4.0
+    # via
+    #   celery
+    #   kombu
+billiard==4.1.0
     # via celery
-celery==5.2.7
+celery==5.3.1
     # via
     #   -r requirements/base.in
     #   django-celery-results
@@ -46,19 +48,16 @@ click-didyoumean==0.3.0
     # via celery
 click-plugins==1.1.1
     # via celery
-click-repl==0.2.0
+click-repl==0.3.0
     # via celery
 confluent-kafka==2.1.1
     # via -r requirements/base.in
 coreapi==2.3.3
     # via
     #   django-rest-swagger
-    #   drf-yasg
     #   openapi-codec
 coreschema==0.0.4
-    # via
-    #   coreapi
-    #   drf-yasg
+    # via coreapi
 cryptography==41.0.1
     # via
     #   pyjwt
@@ -95,14 +94,14 @@ django==3.2.19
     #   social-auth-app-django
 django-celery-results==2.5.1
     # via -r requirements/base.in
-django-cors-headers==4.0.0
+django-cors-headers==4.1.0
     # via -r requirements/base.in
 django-crum==0.7.9
     # via
     #   -r requirements/base.in
     #   edx-django-utils
     #   edx-rbac
-django-extensions==3.2.1
+django-extensions==3.2.3
     # via -r requirements/base.in
 django-filter==23.2
     # via -r requirements/base.in
@@ -136,9 +135,9 @@ djangorestframework==3.14.0
     #   edx-drf-extensions
 drf-jwt==1.19.2
     # via edx-drf-extensions
-drf-spectacular==0.26.2
+drf-spectacular==0.26.3
     # via -r requirements/base.in
-drf-yasg==1.21.5
+drf-yasg==1.21.6
     # via edx-api-doc-tools
 edx-api-doc-tools==1.6.0
     # via -r requirements/base.in
@@ -193,15 +192,15 @@ jsonfield2==4.0.0.post0
     # via -r requirements/base.in
 jsonschema==4.17.3
     # via drf-spectacular
-kombu==5.3.0
+kombu==5.3.1
     # via celery
 markupsafe==2.1.3
     # via jinja2
 monotonic==1.6
     # via analytics-python
-mysqlclient==2.1.1
+mysqlclient==2.2.0
     # via -r requirements/base.in
-newrelic==8.8.0
+newrelic==8.8.1
     # via edx-django-utils
 oauthlib==3.2.2
     # via
@@ -209,7 +208,7 @@ oauthlib==3.2.2
     #   social-auth-core
 openapi-codec==1.3.2
     # via django-rest-swagger
-openedx-events==8.0.1
+openedx-events==8.2.0
     # via -r requirements/base.in
 packaging==23.1
     # via drf-yasg
@@ -243,21 +242,22 @@ pyrsistent==0.19.3
 python-dateutil==2.8.2
     # via
     #   analytics-python
+    #   celery
     #   edx-drf-extensions
 python3-openid==3.2.0
     # via social-auth-core
 pytz==2023.3
     # via
     #   -r requirements/base.in
-    #   celery
     #   django
     #   djangorestframework
     #   drf-yasg
 pyyaml==6.0
     # via
     #   drf-spectacular
+    #   drf-yasg
     #   edx-django-release-util
-redis==4.5.5
+redis==4.6.0
     # via -r requirements/base.in
 requests==2.31.0
     # via
@@ -270,10 +270,6 @@ requests==2.31.0
     #   social-auth-core
 requests-oauthlib==1.3.1
     # via social-auth-core
-ruamel-yaml==0.17.31
-    # via drf-yasg
-ruamel-yaml-clib==0.2.7
-    # via ruamel-yaml
 rules==3.3
     # via -r requirements/base.in
 semantic-version==2.10.0
@@ -283,7 +279,6 @@ simplejson==3.19.1
 six==1.16.0
     # via
     #   analytics-python
-    #   click-repl
     #   edx-auth-backends
     #   edx-django-release-util
     #   edx-drf-extensions
@@ -303,18 +298,20 @@ stevedore==5.1.0
     # via
     #   edx-django-utils
     #   edx-opaque-keys
-typing-extensions==4.6.3
+typing-extensions==4.7.0
     # via
     #   asgiref
     #   kombu
 tzdata==2023.3
-    # via backports-zoneinfo
+    # via
+    #   backports-zoneinfo
+    #   celery
 uritemplate==4.1.1
     # via
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.0.2
+urllib3==2.0.3
     # via requests
 vine==5.0.0
     # via
