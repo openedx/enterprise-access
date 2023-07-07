@@ -15,6 +15,9 @@ MAINTAINER sre@edx.org
 
 # python3-pip; install pip to install application requirements.txt files
 
+# pkg-config
+#     mysqlclient>=2.2.0 requires this (https://github.com/PyMySQL/mysqlclient/issues/620)
+
 # libmysqlclient-dev; to install header files needed to use native C implementation for
 # MySQL-python for performance gains.
 
@@ -32,6 +35,7 @@ RUN apt-get update && apt-get -qy install --no-install-recommends \
  python3-pip \
  python3.8-venv \
  python3.8-dev \
+ pkg-config \
  libmysqlclient-dev \
  libssl-dev \
  build-essential \
