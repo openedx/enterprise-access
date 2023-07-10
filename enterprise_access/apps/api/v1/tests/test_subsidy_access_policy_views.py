@@ -1,7 +1,6 @@
 """
 Tests for Enterprise Access Subsidy Access Policy app API v1 views.
 """
-import re
 from operator import itemgetter
 from unittest import mock
 from uuid import UUID, uuid4
@@ -12,7 +11,6 @@ from rest_framework import status
 from rest_framework.reverse import reverse
 
 from enterprise_access.apps.core.constants import (
-    POLICY_REDEMPTION_PERMISSION,
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
@@ -31,7 +29,6 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
 from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
 from test_utils import APITestWithMocks
 
-SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:policy-list')
 SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT = reverse('api:v1:admin-policy-list')
 
 TEST_ENTERPRISE_UUID = uuid4()
@@ -462,7 +459,7 @@ class TestPolicyRedemptionAuthNAndPermissionChecks(APITestWithMocks):
             self.set_jwt_cookie([role_context_dict])
 
         # The redeem endpoint
-        url = reverse('api:v1:policy-redeem', kwargs={'policy_uuid': self.redeemable_policy.uuid})
+        url = reverse('api:v1:policy-redemption-redeem', kwargs={'policy_uuid': self.redeemable_policy.uuid})
         payload = {
             'lms_user_id': 1234,
             'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
@@ -475,12 +472,12 @@ class TestPolicyRedemptionAuthNAndPermissionChecks(APITestWithMocks):
             'enterprise_customer_uuid': str(self.enterprise_uuid),
             'lms_user_id': 1234,
         }
-        response = self.client.get(reverse('api:v1:policy-credits-available'), query_params)
+        response = self.client.get(reverse('api:v1:policy-redemption-credits-available'), query_params)
         self.assertEqual(response.status_code, expected_response_code)
 
         # The can_redeem endpoint
         url = reverse(
-            "api:v1:policy-can-redeem",
+            "api:v1:policy-redemption-can-redeem",
             kwargs={"enterprise_customer_uuid": self.enterprise_uuid},
         )
         query_params = {
@@ -513,12 +510,12 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
 
         self.subsidy_access_policy_redeem_endpoint = reverse(
-            'api:v1:policy-redeem',
+            'api:v1:policy-redemption-redeem',
             kwargs={'policy_uuid': self.redeemable_policy.uuid}
         )
-        self.subsidy_access_policy_credits_available_endpoint = reverse('api:v1:policy-credits-available')
+        self.subsidy_access_policy_credits_available_endpoint = reverse('api:v1:policy-redemption-credits-available')
         self.subsidy_access_policy_can_redeem_endpoint = reverse(
-            "api:v1:policy-can-redeem",
+            "api:v1:policy-redemption-can-redeem",
             kwargs={"enterprise_customer_uuid": self.enterprise_uuid},
         )
         self.setup_mocks()
@@ -562,87 +559,6 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         self.addCleanup(subsidy_client_patcher.stop)
         self.addCleanup(contains_key_patcher.stop)
         self.addCleanup(get_content_metadata_patcher.stop)
-
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
-    def test_list(self, mock_transactions_cache_for_learner):
-        """
-        list endpoint should return only the redeemable policy, and also check the serialized output fields.
-        """
-        self.mock_get_content_metadata.return_value = {
-            'content_price': 12300,
-        }
-        mock_transactions_cache_for_learner.return_value = {
-            'transactions': [],
-            'aggregates': {
-                'total_quantity': 0,
-            },
-        }
-        query_params = {
-            'enterprise_customer_uuid': self.enterprise_uuid,
-            'lms_user_id': 1234,
-            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
-        }
-
-        response = self.client.get(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, query_params)
-
-        response_json = self.load_json(response.content)
-
-        # Response should only include the one redeemable policy.
-        assert len(response_json) == 1
-        assert response_json[0]["uuid"] == str(self.redeemable_policy.uuid)
-
-        # Check remainder of serialized fields.
-        assert response_json[0]["policy_type"] == 'PerLearnerEnrollmentCreditAccessPolicy'
-        assert response_json[0]["access_method"] == self.redeemable_policy.access_method
-        assert response_json[0]["active"] == self.redeemable_policy.active
-        assert response_json[0]["catalog_uuid"] == str(self.redeemable_policy.catalog_uuid)
-        assert response_json[0]["description"] == self.redeemable_policy.description
-        assert response_json[0]["enterprise_customer_uuid"] == str(self.enterprise_uuid)
-        assert response_json[0]["per_learner_enrollment_limit"] == self.redeemable_policy.per_learner_enrollment_limit
-        assert response_json[0]["per_learner_spend_limit"] == self.redeemable_policy.per_learner_spend_limit
-        assert response_json[0]["spend_limit"] == self.redeemable_policy.spend_limit
-        assert response_json[0]["subsidy_uuid"] == str(self.redeemable_policy.subsidy_uuid)
-        assert re.fullmatch(
-            f"http.*/api/v1/policy/{self.redeemable_policy.uuid}/redeem/",
-            response_json[0]["policy_redemption_url"],
-        )
-        self.mock_get_content_metadata.assert_called_once_with(query_params['content_key'])
-
-    @ddt.data(
-        (
-            {
-                'enterprise_customer_uuid': '12aacfee-8ffa-4cb3-bed1-059565a57f06'
-            },
-            {
-                'content_key': ['This field is required.'],
-                'lms_user_id': ['This field is required.']
-            }
-        ),
-        (
-            {
-                'enterprise_customer_uuid': '12aacfee-8ffa-4cb3-bed1-059565a57f06',
-                'lms_user_id': 1234,
-                'content_key': 'invalid_content_key',
-            },
-            {'content_key': ['Invalid content_key: invalid_content_key']}
-        ),
-        (
-            {
-                'lms_user_id': 1234,
-                'content_key': 'content_key',
-            },
-            {'detail': f'MISSING: {POLICY_REDEMPTION_PERMISSION}'}
-        )
-    )
-    @ddt.unpack
-    def test_list_endpoint_with_invalid_data(self, query_params, expected_result):
-        """
-        Verify that SubsidyAccessPolicyRedeemViewset list raises correct exception if request data is invalid.
-        """
-        response = self.client.get(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, query_params)
-        response_json = self.load_json(response.content)
-
-        assert response_json == expected_result
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
     def test_redeem_policy(self, mock_transactions_cache_for_learner):  # pylint: disable=unused-argument
@@ -888,7 +804,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
 
         self.subsidy_access_policy_can_redeem_endpoint = reverse(
-            "api:v1:policy-can-redeem",
+            "api:v1:policy-redemption-can-redeem",
             kwargs={"enterprise_customer_uuid": self.enterprise_uuid},
         )
         self.setup_mocks()

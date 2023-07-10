@@ -393,31 +393,6 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
     @extend_schema(
         tags=['Subsidy Access Policy Redemption'],
-        summary='List redeemable policies.',
-        parameters=[serializers.SubsidyAccessPolicyListRequestSerializer],
-        responses=serializers.SubsidyAccessPolicyRedeemableResponseSerializer(many=True),
-    )
-    def list(self, request):
-        """
-        Return a list of all redeemable policies for given `enterprise_customer_uuid`, `lms_user_id` and `content_key`
-        """
-        serializer = serializers.SubsidyAccessPolicyListRequestSerializer(data=request.query_params)
-        serializer.is_valid(raise_exception=True)
-
-        enterprise_customer_uuid = serializer.data['enterprise_customer_uuid']
-        lms_user_id = serializer.data['lms_user_id']
-        content_key = serializer.data['content_key']
-
-        redeemable_policies, _ = self.evaluate_policies(enterprise_customer_uuid, lms_user_id, content_key)
-        response_data = serializers.SubsidyAccessPolicyRedeemableResponseSerializer(redeemable_policies, many=True).data
-
-        return Response(
-            response_data,
-            status=status.HTTP_200_OK,
-        )
-
-    @extend_schema(
-        tags=['Subsidy Access Policy Redemption'],
         summary='Redeem with a policy.',
         request=serializers.SubsidyAccessPolicyRedeemRequestSerializer,
     )
