@@ -243,7 +243,7 @@ class SubsidyAccessPolicyRedeemableResponseSerializer(serializers.ModelSerialize
         """
         Generate a fully qualified URI that can be POSTed to redeem a policy.
         """
-        location = reverse('api:v1:policy-redeem', kwargs={'policy_uuid': obj.uuid})
+        location = reverse('api:v1:policy-redemption-redeem', kwargs={'policy_uuid': obj.uuid})
         return urljoin(settings.ENTERPRISE_ACCESS_URL, location)
 
 

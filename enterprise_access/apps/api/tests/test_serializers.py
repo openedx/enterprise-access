@@ -18,7 +18,7 @@ class TestSubsidyAccessPolicyRedeemableResponseSerializer(TestCase):
     def setUp(self):
         self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
         self.subsidy_access_policy_redeem_endpoint = reverse(
-            'api:v1:policy-redeem',
+            'api:v1:policy-redemption-redeem',
             kwargs={'policy_uuid': self.non_redeemable_policy.uuid}
         )
 
@@ -32,5 +32,6 @@ class TestSubsidyAccessPolicyRedeemableResponseSerializer(TestCase):
 
         data = serializer.data
         self.assertIn("policy_redemption_url", data)
-        expected_url = f"{settings.ENTERPRISE_ACCESS_URL}/api/v1/policy/{self.non_redeemable_policy.uuid}/redeem/"
+        expected_url = f"{settings.ENTERPRISE_ACCESS_URL}/api/v1/policy-redemption/" \
+                       f"{self.non_redeemable_policy.uuid}/redeem/"
         self.assertEqual(data["policy_redemption_url"], expected_url)
