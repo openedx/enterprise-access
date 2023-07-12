@@ -68,10 +68,10 @@ coverage: clean
 	$(BROWSER) htmlcov/index.html
 
 isort_check: ## check that isort has been run
-	isort --check-only -rc enterprise_access/
+	isort --check-only enterprise_access/
 
 isort: ## run isort to sort imports in all Python files
-	isort --recursive --atomic enterprise_access/
+	isort --atomic enterprise_access/
 
 style: ## run Python style checker
 	pycodestyle enterprise_access manage.py

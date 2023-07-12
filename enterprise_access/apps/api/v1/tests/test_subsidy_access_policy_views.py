@@ -138,9 +138,61 @@ class TestPolicyCRUDAuthNAndPermissionChecks(CRUDViewTestMixin, APITestWithMocks
         response = self.client.delete(detail_url)
         self.assertEqual(response.status_code, expected_response_code)
 
+    @ddt.data(
+        # A role that's not mapped to any feature perms will get you a 403.
+        (
+            {'system_wide_role': 'some-other-role', 'context': str(TEST_ENTERPRISE_UUID)},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A good admin role, but in a context/customer we're not aware of, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A good admin role, even with the correct context/customer, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A good learner role, but in a context/customer we're not aware of, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A good learner role, even with the correct context/customer, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # An operator role, but in a context/customer we're not aware of, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # No JWT based auth, no soup for you.
+        (
+            None,
+            status.HTTP_401_UNAUTHORIZED,
+        ),
+    )
+    @ddt.unpack
+    def test_policy_crud_write_views_unauthorized_forbidden(self, role_context_dict, expected_response_code):
+        """
+        Tests that we get expected 40x responses for all of the policy readonly views.
+        """
+        # Set the JWT-based auth that we'll use for every request
+        if role_context_dict:
+            self.set_jwt_cookie([role_context_dict])
+
+        request_kwargs = {'uuid': str(self.redeemable_policy.uuid)}
+
+        # Test the delete endpoint.
+        response = self.client.delete(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
+        self.assertEqual(response.status_code, expected_response_code)
+
 
 @ddt.ddt
-class TestAuthenticatedPolicyReadOnlyViews(CRUDViewTestMixin, APITestWithMocks):
+class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
     """
     Test the list and detail views for subsidy access policy records.
     """
@@ -236,6 +288,69 @@ class TestAuthenticatedPolicyReadOnlyViews(CRUDViewTestMixin, APITestWithMocks):
             sorted(expected_results, key=sort_key),
             sorted(response_json['results'], key=sort_key),
         )
+
+    @ddt.data(
+        {
+            'request_payload': {'reason': 'Peer Pressure.'},
+            'expected_change_reason': 'Peer Pressure.',
+        },
+        {
+            'request_payload': {'reason': ''},
+            'expected_change_reason': None,
+        },
+        {
+            'request_payload': {'reason': None},
+            'expected_change_reason': None,
+        },
+        {
+            'request_payload': {},
+            'expected_change_reason': None,
+        },
+    )
+    @ddt.unpack
+    def test_destroy_view(self, request_payload, expected_change_reason):
+        """
+        Test that the destroy view performs a soft-delete and returns an appropriate response with 200 status code and
+        the expected results of serialization.
+        """
+        # Set the JWT-based auth to an operator.
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        # Test the destroy endpoint
+        response = self.client.delete(
+            reverse('api:v1:subsidy-access-policies-detail', kwargs={'uuid': str(self.redeemable_policy.uuid)}),
+            request_payload,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected_response = {
+            'access_method': 'direct',
+            'active': False,
+            'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
+            'description': '',
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'per_learner_enrollment_limit': self.redeemable_policy.per_learner_enrollment_limit,
+            'per_learner_spend_limit': self.redeemable_policy.per_learner_spend_limit,
+            'policy_type': 'PerLearnerEnrollmentCreditAccessPolicy',
+            'spend_limit': 3,
+            'subsidy_uuid': str(self.redeemable_policy.subsidy_uuid),
+            'uuid': str(self.redeemable_policy.uuid),
+        }
+        self.assertEqual(expected_response, response.json())
+
+        # Check that the latest history record for this policy contains the change reason provided via the API.
+        self.redeemable_policy.refresh_from_db()
+        assert self.redeemable_policy.history.order_by('-history_date').first().history_change_reason \
+            == expected_change_reason
+
+        # Test idempotency of the destroy endpoint.
+        response = self.client.delete(
+            reverse('api:v1:subsidy-access-policies-detail', kwargs={'uuid': str(self.redeemable_policy.uuid)}),
+            request_payload,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(expected_response, response.json())
 
 
 @ddt.ddt

@@ -224,6 +224,21 @@ class SubsidyAccessPolicyCanRedeemRequestSerializer(serializers.Serializer):
     )
 
 
+# pylint: disable=abstract-method
+class SubsidyAccessPolicyDeleteRequestSerializer(serializers.Serializer):
+    """
+    Request Serializer for DELETE parameters to an API call to delete a subsidy access policy.
+
+    For view: SubsidyAccessPolicyViewSet.destroy
+    """
+    reason = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        help_text="Optional description (free form text) for why the subsidy access policy is being deleted.",
+    )
+
+
 class SubsidyAccessPolicyRedeemableResponseSerializer(serializers.ModelSerializer):
     """
     Response serializer to represent redeemable policies.

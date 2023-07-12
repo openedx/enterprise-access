@@ -529,6 +529,18 @@ class SubsidyAccessPolicy(TimeStampedModel):
         )
         return sorted_policies[0]
 
+    def delete(self, *args, **kwargs):
+        """
+        Perform a soft-delete, overriding the standard delete() method to prevent hard-deletes.
+
+        If this instance was already soft-deleted, invoking delete() is a no-op.
+        """
+        if self.active:
+            if 'reason' in kwargs and kwargs['reason']:
+                self._change_reason = kwargs['reason']  # pylint: disable=attribute-defined-outside-init
+            self.active = False
+            self.save()
+
 
 class CreditPolicyMixin:
     """
