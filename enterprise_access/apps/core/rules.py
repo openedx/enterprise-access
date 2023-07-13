@@ -45,6 +45,10 @@ def _has_explicit_access_to_role(user, enterprise_customer_uuid, feature_role):
     )
 
 
+########################
+# All rule predicates. #
+########################
+
 @rules.predicate
 def has_implicit_access_to_requests_admin(_, enterprise_customer_uuid):
     """
@@ -65,17 +69,6 @@ def has_explicit_access_to_requests_admin(user, enterprise_customer_uuid):
         boolean: whether the request user has access.
     """
     return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.REQUESTS_ADMIN_ROLE)
-
-
-# pylint: disable=unsupported-binary-operation
-has_subsidy_request_admin_access = (
-    has_implicit_access_to_requests_admin | has_explicit_access_to_requests_admin
-)
-
-rules.add_perm(
-    constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
-    has_subsidy_request_admin_access,
-)
 
 
 @rules.predicate
@@ -101,10 +94,87 @@ def has_explicit_access_to_requests_learner(user, enterprise_customer_uuid):
     return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.REQUESTS_LEARNER_ROLE)
 
 
+# Subsidy Access Policy rule predicates:
+@rules.predicate
+def has_implicit_access_to_policy_operator(_, enterprise_customer_uuid):
+    """
+    Check that if request user has implicit access to the given enterprise UUID for the
+    `SUBSIDY_ACCESS_POLICY_OPERATOR_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.SUBSIDY_ACCESS_POLICY_OPERATOR_ROLE)
+
+
+@rules.predicate
+def has_explicit_access_to_policy_operator(user, enterprise_customer_uuid):
+    """
+    Check that if request user has explicit access to `SUBSIDY_ACCESS_POLICY_OPERATOR_ROLE` feature role.
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.SUBSIDY_ACCESS_POLICY_OPERATOR_ROLE)
+
+
+@rules.predicate
+def has_implicit_access_to_policy_learner(_, enterprise_customer_uuid):
+    """
+    Check that if request user has implicit access to the given enterprise UUID for the
+    `SUBSIDY_ACCESS_POLICY_LEARNER_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.SUBSIDY_ACCESS_POLICY_LEARNER_ROLE)
+
+
+@rules.predicate
+def has_explicit_access_to_policy_learner(user, enterprise_customer_uuid):
+    """
+    Check that if request user has explicit access to `SUBSIDY_ACCESS_POLICY_LEARNER_ROLE` feature role.
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.SUBSIDY_ACCESS_POLICY_LEARNER_ROLE)
+
+
+######################################################
+# Consolidate implicit and explicit rule predicates. #
+######################################################
+
+# pylint: disable=unsupported-binary-operation
+has_subsidy_request_admin_access = (
+    has_implicit_access_to_requests_admin | has_explicit_access_to_requests_admin
+)
+
+
 # pylint: disable=unsupported-binary-operation
 has_subsidy_request_learner_access = (
     has_implicit_access_to_requests_learner | has_explicit_access_to_requests_learner
 )
+
+
+# pylint: disable=unsupported-binary-operation
+has_subsidy_access_policy_operator_access = (
+    has_implicit_access_to_policy_operator | has_explicit_access_to_policy_operator
+)
+
+
+# pylint: disable=unsupported-binary-operation
+has_subsidy_access_policy_learner_access = (
+    has_implicit_access_to_policy_learner | has_explicit_access_to_policy_learner
+)
+
+
+rules.add_perm(
+    constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+    has_subsidy_request_admin_access,
+)
+
+###############################################
+# Map permissions to consolidated predicates. #
+###############################################
 
 # Grants access permission if the user is a learner or admin
 rules.add_perm(
@@ -113,70 +183,22 @@ rules.add_perm(
 )
 
 
-# Subsidy Access Policy rules and permissions
-@rules.predicate
-def has_implicit_access_to_policy_admin(_, enterprise_customer_uuid):
-    """
-    Check that if request user has implicit access to the given enterprise UUID for the
-    `POLICY_ADMIN_ROLE` feature role.
-
-    Returns:
-        boolean: whether the request user has access.
-    """
-    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.POLICY_ADMIN_ROLE)
-
-
-@rules.predicate
-def has_explicit_access_to_policy_admin(user, enterprise_customer_uuid):
-    """
-    Check that if request user has explicit access to `POLICY_ADMIN_ROLE` feature role.
-    Returns:
-        boolean: whether the request user has access.
-    """
-    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.POLICY_ADMIN_ROLE)
-
-
-# pylint: disable=unsupported-binary-operation
-has_subsidy_access_policy_admin_access = (
-    has_implicit_access_to_policy_admin | has_explicit_access_to_policy_admin
-)
-
-
-@rules.predicate
-def has_implicit_access_to_policy_learner(_, enterprise_customer_uuid):
-    """
-    Check that if request user has implicit access to the given enterprise UUID for the
-    `POLICY_LEARNER_ROLE` feature role.
-
-    Returns:
-        boolean: whether the request user has access.
-    """
-    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.POLICY_LEARNER_ROLE)
-
-
-@rules.predicate
-def has_explicit_access_to_policy_learner(user, enterprise_customer_uuid):
-    """
-    Check that if request user has explicit access to `POLICY_LEARNER_ROLE` feature role.
-    Returns:
-        boolean: whether the request user has access.
-    """
-    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.POLICY_LEARNER_ROLE)
-
-
-# pylint: disable=unsupported-binary-operation
-has_subsidy_access_policy_learner_access = (
-    has_implicit_access_to_policy_learner | has_explicit_access_to_policy_learner
-)
-
 # Grants policy read permission if the user is a policy learner or admin
 rules.add_perm(
-    constants.POLICY_READ_PERMISSION,
-    has_subsidy_access_policy_admin_access | has_subsidy_access_policy_learner_access
+    constants.SUBSIDY_ACCESS_POLICY_READ_PERMISSION,
+    has_subsidy_access_policy_operator_access | has_subsidy_access_policy_learner_access
 )
+
+
+# Grants policy write permission if the user is a policy operator.
+rules.add_perm(
+    constants.SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION,
+    has_subsidy_access_policy_operator_access
+)
+
 
 # Grants policy redemption permission if the user is a policy learner or admin
 rules.add_perm(
-    constants.POLICY_REDEMPTION_PERMISSION,
-    has_subsidy_access_policy_admin_access | has_subsidy_access_policy_learner_access
+    constants.SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION,
+    has_subsidy_access_policy_operator_access | has_subsidy_access_policy_learner_access
 )

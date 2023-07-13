@@ -29,9 +29,9 @@ from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.mixins import UserDetailsFromJwtMixin
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.core.constants import (
-    POLICY_READ_PERMISSION,
-    POLICY_REDEMPTION_PERMISSION,
-    REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION
+    REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION,
+    SUBSIDY_ACCESS_POLICY_READ_PERMISSION,
+    SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION
 )
 from enterprise_access.apps.events.signals import ACCESS_POLICY_CREATED, ACCESS_POLICY_UPDATED, SUBSIDY_REDEEMED
 from enterprise_access.apps.events.utils import (
@@ -95,7 +95,7 @@ class SubsidyAccessPolicyReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
         tags=[SUBSIDY_ACCESS_POLICY_READ_ONLY_API_TAG],
         summary='Retrieve subsidy access policy by UUID.',
     )
-    @permission_required(POLICY_READ_PERMISSION, fn=policy_permission_retrieve_fn)
+    @permission_required(SUBSIDY_ACCESS_POLICY_READ_PERMISSION, fn=policy_permission_retrieve_fn)
     def retrieve(self, request, *args, uuid=None, **kwargs):
         """
         Retrieves a single `SubsidyAccessPolicy` record by uuid.
@@ -107,7 +107,7 @@ class SubsidyAccessPolicyReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
         summary='List subsidy access policies for an enterprise customer.',
     )
     @permission_required(
-        POLICY_READ_PERMISSION,
+        SUBSIDY_ACCESS_POLICY_READ_PERMISSION,
         fn=lambda request: request.query_params.get('enterprise_customer_uuid')
     )
     def list(self, request, *args, **kwargs):
@@ -130,8 +130,8 @@ class SubsidyAccessPolicyReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
 )
 class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelViewSet):
     """
-     DEPRECATED: Viewset for Subsidy Access Policy CRUD operations.
-     """
+    DEPRECATED: Viewset for Subsidy Access Policy CRUD operations.
+    """
 
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = serializers.SubsidyAccessPolicyCRUDSerializer
@@ -273,7 +273,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
     authentication_classes = [JwtAuthentication]
     permission_classes = [permissions.IsAuthenticated]
     lookup_url_kwarg = 'policy_uuid'
-    permission_required = POLICY_REDEMPTION_PERMISSION
+    permission_required = SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION
     http_method_names = ['get', 'post']
 
     @property
