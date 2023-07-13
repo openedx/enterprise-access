@@ -10,7 +10,6 @@ from django.core.cache import cache as django_cache
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from edx_django_utils.cache.utils import get_cache_key
-from simple_history.models import HistoricalRecords
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 
@@ -29,7 +28,7 @@ from .constants import (
 from .content_metadata_api import get_and_cache_catalog_contains_content, get_and_cache_content_metadata
 from .exceptions import ContentPriceNullException, SubsidyAccessPolicyLockAttemptFailed, SubsidyAPIHTTPError
 from .subsidy_api import get_and_cache_transactions_for_learner
-from .utils import create_idempotency_key_for_transaction, get_versioned_subsidy_client
+from .utils import ProxyAwareHistoricalRecords, create_idempotency_key_for_transaction, get_versioned_subsidy_client
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
 
@@ -136,7 +135,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
         ),
     )
 
-    history = HistoricalRecords()
+    # Customized version of HistoricalRecords to enable history tracking on child proxy models.  See
+    # ProxyAwareHistoricalRecords docstring for more info.
+    history = ProxyAwareHistoricalRecords(inherit=True)
 
     @property
     def subsidy_client(self):
