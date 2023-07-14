@@ -55,6 +55,7 @@ THIRD_PARTY_APPS = (
     'rest_framework',
     'rest_framework_swagger',
     'rules.apps.AutodiscoverRulesConfig',
+    'simple_history',
     'social_django',
     'waffle',
 )
@@ -95,6 +96,7 @@ MIDDLEWARE = (
     'edx_rest_framework_extensions.middleware.RequestMetricsMiddleware',
     # Ensures proper DRF permissions in support of JWTs
     'edx_rest_framework_extensions.auth.jwt.middleware.EnsureJWTAuthSettingsMiddleware',
+    # Track who made each change to a model using HistoryRequestMiddleware
     'simple_history.middleware.HistoryRequestMiddleware',
     # Used to get request inside serializers.
     'crum.CurrentRequestUserMiddleware',

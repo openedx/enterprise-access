@@ -10,6 +10,6 @@ from .browse_and_request import (
 )
 from .subsidy_access_policy import (
     SubsidyAccessPolicyCRUDViewset,
-    SubsidyAccessPolicyReadOnlyViewSet,
-    SubsidyAccessPolicyRedeemViewset
+    SubsidyAccessPolicyRedeemViewset,
+    SubsidyAccessPolicyViewSet
 )

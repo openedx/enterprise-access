@@ -17,7 +17,7 @@ from edx_rbac.mixins import PermissionRequiredMixin
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from rest_framework import authentication
 from rest_framework import filters as rest_filters
-from rest_framework import permissions
+from rest_framework import mixins, permissions
 from rest_framework import serializers as rest_serializers
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -31,7 +31,8 @@ from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.core.constants import (
     REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION,
     SUBSIDY_ACCESS_POLICY_READ_PERMISSION,
-    SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION
+    SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION,
+    SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION
 )
 from enterprise_access.apps.events.signals import ACCESS_POLICY_CREATED, ACCESS_POLICY_UPDATED, SUBSIDY_REDEEMED
 from enterprise_access.apps.events.utils import (
@@ -61,21 +62,29 @@ from .utils import PaginationWithPageCount
 
 logger = logging.getLogger(__name__)
 
+SUBSIDY_ACCESS_POLICY_CRUD_API_TAG_DEPRECATED = 'DEPRECATED: Subsidy Access Policy views'
+SUBSIDY_ACCESS_POLICY_CRUD_API_TAG = 'Subsidy Access Policies CRUD'
+SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG = 'Subsidy Access Policy Redemption'
 
-SUBSIDY_ACCESS_POLICY_CRUD_API_TAG = 'DEPRECATED: Subsidy Access Policy views'
-SUBSIDY_ACCESS_POLICY_READ_ONLY_API_TAG = 'subsidy-access-policies read-only'
 
-
-def policy_permission_retrieve_fn(request, *args, uuid=None):
+def policy_permission_detail_fn(request, *args, uuid=None):
     """
-    Helper to use with @permission_required when retrieving a policy record.
+    Helper to use with @permission_required on detail-type endpoints (retrieve, update, partial_update, destroy).
+
+    Args:
+        uuid (str): UUID representing a SubsidyAccessPolicy object.
     """
     return utils.get_policy_customer_uuid(uuid)
 
 
-class SubsidyAccessPolicyReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
+class SubsidyAccessPolicyViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
     """
-    Read-only viewset for listing or retrieving ``SubsidyAccessPolicy`` records.
+    Viewset supporting some CRUD operations on ``SubsidyAccessPolicy`` records.
     """
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = serializers.SubsidyAccessPolicyResponseSerializer
@@ -92,10 +101,10 @@ class SubsidyAccessPolicyReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
         return SubsidyAccessPolicy.objects.all()
 
     @extend_schema(
-        tags=[SUBSIDY_ACCESS_POLICY_READ_ONLY_API_TAG],
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
         summary='Retrieve subsidy access policy by UUID.',
     )
-    @permission_required(SUBSIDY_ACCESS_POLICY_READ_PERMISSION, fn=policy_permission_retrieve_fn)
+    @permission_required(SUBSIDY_ACCESS_POLICY_READ_PERMISSION, fn=policy_permission_detail_fn)
     def retrieve(self, request, *args, uuid=None, **kwargs):
         """
         Retrieves a single `SubsidyAccessPolicy` record by uuid.
@@ -103,7 +112,7 @@ class SubsidyAccessPolicyReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
         return super().retrieve(request, *args, uuid=uuid, **kwargs)
 
     @extend_schema(
-        tags=[SUBSIDY_ACCESS_POLICY_READ_ONLY_API_TAG],
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
         summary='List subsidy access policies for an enterprise customer.',
     )
     @permission_required(
@@ -117,14 +126,44 @@ class SubsidyAccessPolicyReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
         """
         return super().list(request, *args, **kwargs)
 
+    @extend_schema(
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
+        summary='Soft-delete subsidy access policy by UUID.',
+        request=serializers.SubsidyAccessPolicyDeleteRequestSerializer,
+        responses={
+            status.HTTP_200_OK: serializers.SubsidyAccessPolicyResponseSerializer,
+            status.HTTP_404_NOT_FOUND: None,
+        },
+    )
+    @permission_required(SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION, fn=policy_permission_detail_fn)
+    def destroy(self, request, *args, uuid=None, **kwargs):
+        """
+        Soft-delete a single `SubsidyAccessPolicy` record by uuid.
+        """
+        # Collect the "reason" query parameter from request body.
+        request_serializer = serializers.SubsidyAccessPolicyDeleteRequestSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        delete_reason = request_serializer.data.get('reason', None)
+
+        try:
+            policy_to_soft_delete = self.get_queryset().get(uuid=uuid)
+        except SubsidyAccessPolicy.DoesNotExist:
+            return Response(None, status=status.HTTP_404_NOT_FOUND)
+
+        # Custom delete() method should flip the active flag if it isn't already active=False.
+        policy_to_soft_delete.delete(reason=delete_reason)
+
+        response_serializer = serializers.SubsidyAccessPolicyResponseSerializer(policy_to_soft_delete)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
 
 @extend_schema_view(
     retrieve=extend_schema(
-        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG_DEPRECATED],
         summary='Retrieve subsidy access policy.',
     ),
     delete=extend_schema(
-        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG_DEPRECATED],
         summary='Delete subsidy access policy.',
     ),
 )
@@ -179,7 +218,7 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         return self.requested_enterprise_customer_uuid
 
     @extend_schema(
-        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG_DEPRECATED],
         summary='Create subsidy access policy.',
     )
     def create(self, request, *args, **kwargs):
@@ -200,7 +239,7 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @extend_schema(
-        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG_DEPRECATED],
         summary='Update subsidy access policy.',
     )
     def partial_update(self, request, *args, **kwargs):
@@ -222,7 +261,7 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
         return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
     @extend_schema(
-        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG_DEPRECATED],
         summary='List subsidy access policy.',
     )
     def list(self, request, *args, **kwargs):
@@ -362,7 +401,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         return policies
 
     @extend_schema(
-        tags=['Subsidy Access Policy Redemption'],
+        tags=[SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG],
         summary='List credits available.',
         parameters=[serializers.SubsidyAccessPolicyCreditsAvailableRequestSerializer],
         responses=serializers.SubsidyAccessPolicyCreditsAvailableResponseSerializer(many=True),
@@ -392,7 +431,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         )
 
     @extend_schema(
-        tags=['Subsidy Access Policy Redemption'],
+        tags=[SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG],
         summary='Redeem with a policy.',
         request=serializers.SubsidyAccessPolicyRedeemRequestSerializer,
     )
@@ -519,7 +558,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         return MISSING_SUBSIDY_ACCESS_POLICY_REASONS[reason_slug]
 
     @extend_schema(
-        tags=['Subsidy Access Policy Redemption'],
+        tags=[SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG],
         summary='Can redeem.',
         parameters=[serializers.SubsidyAccessPolicyCanRedeemRequestSerializer],
         responses={

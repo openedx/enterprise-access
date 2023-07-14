@@ -8,6 +8,7 @@ from .subsidy_access_policy import (
     SubsidyAccessPolicyCreditsAvailableRequestSerializer,
     SubsidyAccessPolicyCreditsAvailableResponseSerializer,
     SubsidyAccessPolicyCRUDSerializer,
+    SubsidyAccessPolicyDeleteRequestSerializer,
     SubsidyAccessPolicyListRequestSerializer,
     SubsidyAccessPolicyRedeemableResponseSerializer,
     SubsidyAccessPolicyRedeemRequestSerializer,
