@@ -138,7 +138,7 @@ distlib==0.3.6
     # via
     #   -r requirements/validation.txt
     #   virtualenv
-django==3.2.19
+django==3.2.20
     # via
     #   -r requirements/validation.txt
     #   django-celery-results
