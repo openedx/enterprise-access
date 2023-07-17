@@ -434,7 +434,12 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
         are correctly validated for existence/non-existence.
         """
         # Set the JWT-based auth that we'll use for every request
-        self.set_jwt_cookie([{'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}])
+        self.set_jwt_cookie([
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+                'context': str(TEST_ENTERPRISE_UUID),
+            },
+        ])
 
         # Test the retrieve endpoint
         create_url = SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT
@@ -478,7 +483,12 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
         Test the (deprecated) policy create view's idempotency.
         """
         # Set the JWT-based auth that we'll use for every request
-        self.set_jwt_cookie([{'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}])
+        self.set_jwt_cookie([
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+                'context': str(TEST_ENTERPRISE_UUID),
+            },
+        ])
 
         # Test the retrieve endpoint
         create_url = SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT

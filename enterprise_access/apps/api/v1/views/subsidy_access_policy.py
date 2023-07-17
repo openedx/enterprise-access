@@ -29,7 +29,6 @@ from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.mixins import UserDetailsFromJwtMixin
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.core.constants import (
-    REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION,
     SUBSIDY_ACCESS_POLICY_READ_PERMISSION,
     SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION,
     SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION
@@ -182,7 +181,7 @@ class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelView
     lookup_field = 'uuid'
     # TODO: Whoever refactors this viewset should make it possible for operators to create policies, and should make it
     # impossible for learners to create policies.
-    permission_required = REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION
+    permission_required = SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION
 
     def __init__(self, *args, **kwargs):
         self.extra_context = {}
