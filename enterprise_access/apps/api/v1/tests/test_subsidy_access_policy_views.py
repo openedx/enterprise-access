@@ -178,7 +178,7 @@ class TestPolicyCRUDAuthNAndPermissionChecks(CRUDViewTestMixin, APITestWithMocks
     @ddt.unpack
     def test_policy_crud_write_views_unauthorized_forbidden(self, role_context_dict, expected_response_code):
         """
-        Tests that we get expected 40x responses for all of the policy readonly views.
+        Tests that we get expected 40x responses for all of the policy write views.
         """
         # Set the JWT-based auth that we'll use for every request
         if role_context_dict:
@@ -188,6 +188,13 @@ class TestPolicyCRUDAuthNAndPermissionChecks(CRUDViewTestMixin, APITestWithMocks
 
         # Test the delete endpoint.
         response = self.client.delete(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
+        self.assertEqual(response.status_code, expected_response_code)
+
+        # Test the update and partial_update views.
+        response = self.client.put(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
+        self.assertEqual(response.status_code, expected_response_code)
+
+        response = self.client.patch(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
         self.assertEqual(response.status_code, expected_response_code)
 
 
@@ -351,6 +358,151 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(expected_response, response.json())
+
+    @ddt.data(True, False)
+    def test_update_views(self, is_patch):
+        """
+        Test that the update and partial_update views can modify certain
+        fields of a policy record.
+        """
+        # Set the JWT-based auth to an operator.
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        policy_for_edit = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            spend_limit=5,
+            active=False,
+        )
+
+        request_payload = {
+            'description': 'the new description',
+            'active': True,
+            'catalog_uuid': str(uuid4()),
+            'subsidy_uuid': str(uuid4()),
+            'access_method': AccessMethods.ASSIGNED,
+            'spend_limit': None,
+            'per_learner_spend_limit': 10000,
+        }
+
+        action = self.client.patch if is_patch else self.client.put
+        url = reverse(
+            'api:v1:subsidy-access-policies-detail',
+            kwargs={'uuid': str(policy_for_edit.uuid)}
+        )
+        response = action(url, data=request_payload)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response = {
+            'access_method': AccessMethods.ASSIGNED,
+            'active': True,
+            'catalog_uuid': request_payload['catalog_uuid'],
+            'description': request_payload['description'],
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'per_learner_enrollment_limit': None,
+            'per_learner_spend_limit': request_payload['per_learner_spend_limit'],
+            'policy_type': 'PerLearnerSpendCreditAccessPolicy',
+            'spend_limit': request_payload['spend_limit'],
+            'subsidy_uuid': request_payload['subsidy_uuid'],
+            'uuid': str(policy_for_edit.uuid),
+        }
+        self.assertEqual(expected_response, response.json())
+
+    @ddt.data(
+        {
+            'enterprise_customer_uuid': str(uuid4()),
+            'uuid': str(uuid4()),
+            'policy_type': 'PerLearnerEnrollmentCapCreditAccessPolicy',
+            'created': '1970-01-01 12:00:00Z',
+            'modified': '1970-01-01 12:00:00Z',
+            'nonsense_key': 'ship arriving too late to save a drowning witch',
+        },
+    )
+    def test_update_views_fields_disallowed_for_update(self, request_payload):
+        """
+        Test that the update and partial_update views can NOT modify fields
+        of a policy record that are not included in the update request serializer fields defintion.
+        """
+        # Set the JWT-based auth to an operator.
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        policy_for_edit = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            spend_limit=5,
+            active=False,
+        )
+        url = reverse(
+            'api:v1:subsidy-access-policies-detail',
+            kwargs={'uuid': str(policy_for_edit.uuid)}
+        )
+
+        expected_unknown_keys = ", ".join(sorted(request_payload.keys()))
+
+        # Test the PUT view
+        response = self.client.put(url, data=request_payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.json(),
+            {'non_field_errors': [f'Field(s) are not updatable: {expected_unknown_keys}']},
+        )
+
+        # Test the PATCH view
+        response = self.client.patch(url, data=request_payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.assertEqual(
+            response.json(),
+            {'non_field_errors': [f'Field(s) are not updatable: {expected_unknown_keys}']},
+        )
+
+    @ddt.data(
+        {
+            'policy_class': PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
+            'request_payload': {
+                'per_learner_enrollment_limit': 10,
+            },
+        },
+        {
+            'policy_class': PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
+            'request_payload': {
+                'per_learner_spend_limit': 1000,
+            },
+        },
+    )
+    @ddt.unpack
+    def test_update_view_validates_fields_vs_policy_type(self, policy_class, request_payload):
+        """
+        Test that the update view can NOT modify fields
+        of a policy record that are relevant only to a different
+        type of policy.
+        """
+        # Set the JWT-based auth to an operator.
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        policy_for_edit = policy_class(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            spend_limit=5,
+            active=False,
+        )
+        url = reverse(
+            'api:v1:subsidy-access-policies-detail',
+            kwargs={'uuid': str(policy_for_edit.uuid)}
+        )
+
+        response = self.client.put(url, data=request_payload)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        expected_error_message = (
+            f"Extraneous fields for {policy_for_edit.__class__.__name__} policy type: "
+            f"{list(request_payload)}."
+        )
+        self.assertEqual(response.json(), [expected_error_message])
 
 
 @ddt.ddt

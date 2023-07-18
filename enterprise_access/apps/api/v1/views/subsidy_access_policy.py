@@ -66,7 +66,7 @@ SUBSIDY_ACCESS_POLICY_CRUD_API_TAG = 'Subsidy Access Policies CRUD'
 SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG = 'Subsidy Access Policy Redemption'
 
 
-def policy_permission_detail_fn(request, *args, uuid=None):
+def policy_permission_detail_fn(request, *args, uuid=None, **kwargs):
     """
     Helper to use with @permission_required on detail-type endpoints (retrieve, update, partial_update, destroy).
 
@@ -79,6 +79,7 @@ def policy_permission_detail_fn(request, *args, uuid=None):
 class SubsidyAccessPolicyViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
@@ -98,6 +99,15 @@ class SubsidyAccessPolicyViewSet(
         A base queryset to list or retrieve `SubsidyAccessPolicy` records.
         """
         return SubsidyAccessPolicy.objects.all()
+
+    def get_serializer_class(self):
+        """
+        Overrides the default behavior to return different
+        serializers depending on the request action.
+        """
+        if self.action in ('update', 'partial_update'):
+            return serializers.SubsidyAccessPolicyUpdateRequestSerializer
+        return self.serializer_class
 
     @extend_schema(
         tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
@@ -124,6 +134,40 @@ class SubsidyAccessPolicyViewSet(
         given query parameters.
         """
         return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
+        summary='Partially update (with a PUT) a subsidy access policy by UUID.',
+        request=serializers.SubsidyAccessPolicyUpdateRequestSerializer,
+        responses={
+            status.HTTP_200_OK: serializers.SubsidyAccessPolicyResponseSerializer,
+            status.HTTP_404_NOT_FOUND: None,
+        },
+    )
+    @permission_required(SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION, fn=policy_permission_detail_fn)
+    def update(self, request, *args, uuid=None, **kwargs):
+        """
+        Updates a single `SubsidyAccessPolicy` record by uuid.  All fields for the update are optional
+        (which is different from a standard PUT request).
+        """
+        kwargs['partial'] = True
+        return super().update(request, *args, uuid=uuid, **kwargs)
+
+    @extend_schema(
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
+        summary='Partially update (with a PATCH) a subsidy access policy by UUID.',
+        request=serializers.SubsidyAccessPolicyUpdateRequestSerializer,
+        responses={
+            status.HTTP_200_OK: serializers.SubsidyAccessPolicyResponseSerializer,
+            status.HTTP_404_NOT_FOUND: None,
+        },
+    )
+    @permission_required(SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION, fn=policy_permission_detail_fn)
+    def partial_update(self, request, *args, uuid=None, **kwargs):
+        """
+        Updates a single `SubsidyAccessPolicy` record by uuid.  All fields for the update are optional.
+        """
+        return super().partial_update(request, *args, uuid=uuid, **kwargs)
 
     @extend_schema(
         tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
