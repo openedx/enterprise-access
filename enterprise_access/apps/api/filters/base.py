@@ -29,6 +29,6 @@ class NoFilterOnRetrieveBackend(drf_filters.DjangoFilterBackend):
         """
         Returns None if this is a retrieve() operation.
         """
-        if view.action == 'retrieve':
+        if view.action in ('retrieve', 'update', 'partial_update'):
             return None
         return super().get_filterset_class(view, queryset)

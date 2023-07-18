@@ -13,7 +13,8 @@ from .subsidy_access_policy import (
     SubsidyAccessPolicyRedeemableResponseSerializer,
     SubsidyAccessPolicyRedeemRequestSerializer,
     SubsidyAccessPolicyRedemptionRequestSerializer,
-    SubsidyAccessPolicyResponseSerializer
+    SubsidyAccessPolicyResponseSerializer,
+    SubsidyAccessPolicyUpdateRequestSerializer
 )
 from .subsidy_requests import (
     CouponCodeRequestSerializer,
