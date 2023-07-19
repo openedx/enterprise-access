@@ -77,6 +77,7 @@ def policy_permission_detail_fn(request, *args, uuid=None, **kwargs):
 
 
 class SubsidyAccessPolicyViewSet(
+    mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
@@ -84,15 +85,28 @@ class SubsidyAccessPolicyViewSet(
     viewsets.GenericViewSet,
 ):
     """
-    Viewset supporting some CRUD operations on ``SubsidyAccessPolicy`` records.
+    Viewset supporting all CRUD operations on ``SubsidyAccessPolicy`` records.
     """
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = serializers.SubsidyAccessPolicyResponseSerializer
     authentication_classes = (JwtAuthentication, authentication.SessionAuthentication)
-    filter_backends = (filters.NoFilterOnRetrieveBackend,)
+    filter_backends = (filters.NoFilterOnDetailBackend,)
     filterset_class = filters.SubsidyAccessPolicyFilter
     pagination_class = PaginationWithPageCount
     lookup_field = 'uuid'
+
+    def __init__(self, *args, **kwargs):
+        self.extra_context = {}
+        super().__init__(*args, **kwargs)
+
+    def set_policy_created(self, created):
+        """
+        Helper function, used from within a related serializer for creation,
+        to help understand in the context of this viewset whether
+        a policy was created, or if a policy with the requested parameters
+        already existed when creation was attempted.
+        """
+        self.extra_context['created'] = created
 
     def get_queryset(self):
         """
@@ -105,6 +119,8 @@ class SubsidyAccessPolicyViewSet(
         Overrides the default behavior to return different
         serializers depending on the request action.
         """
+        if self.action == 'create':
+            return serializers.SubsidyAccessPolicyCRUDSerializer
         if self.action in ('update', 'partial_update'):
             return serializers.SubsidyAccessPolicyUpdateRequestSerializer
         return self.serializer_class
@@ -134,6 +150,30 @@ class SubsidyAccessPolicyViewSet(
         given query parameters.
         """
         return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
+        summary='Create a new subsidy access policy.',
+        request=serializers.SubsidyAccessPolicyCRUDSerializer,
+        responses={
+            status.HTTP_200_OK: serializers.SubsidyAccessPolicyResponseSerializer,
+            status.HTTP_201_CREATED: serializers.SubsidyAccessPolicyResponseSerializer,
+        },
+    )
+    @permission_required(
+        SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION,
+        fn=lambda request: request.data.get('enterprise_customer_uuid')
+    )
+    def create(self, request, *args, **kwargs):
+        """
+        Creates a single `SubsidyAccessPolicy` record, or returns
+        an existing one if an **active** record with the requested (enterprise_customer_uuid,
+        subsidy_uuid, catalog_uuid, access_method) values already exists.
+        """
+        response = super().create(request, *args, **kwargs)
+        if not self.extra_context.get('created'):
+            response.status_code = status.HTTP_200_OK
+        return response
 
     @extend_schema(
         tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG],
