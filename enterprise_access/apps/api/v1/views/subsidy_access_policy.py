@@ -44,8 +44,9 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_LEARNER_MAX_SPEND_REACHED,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
-    REASON_POLICY_NOT_ACTIVE,
+    REASON_POLICY_EXPIRED,
     REASON_POLICY_SPEND_LIMIT_REACHED,
+    REASON_SUBSIDY_EXPIRED,
     MissingSubsidyAccessReasonUserMessages,
     TransactionStateChoices
 )
@@ -503,8 +504,21 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS_NO_ADMINS
         )
 
+        user_message_organization_fund_expired = (
+            MissingSubsidyAccessReasonUserMessages.ORGANIZATION_EXPIRED_FUNDS
+            if has_enterprise_admin_users
+            else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_EXPIRED_FUNDS_NO_ADMINS
+        )
+
+        user_message_organization_plan_expired = (
+            MissingSubsidyAccessReasonUserMessages.ORGANIZATION_EXPIRED_PLAN
+            if has_enterprise_admin_users
+            else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_EXPIRED_PLAN_NO_ADMINS
+        )
+
         MISSING_SUBSIDY_ACCESS_POLICY_REASONS = {
-            REASON_POLICY_NOT_ACTIVE: user_message_organization_no_funds,
+            REASON_POLICY_EXPIRED: user_message_organization_fund_expired,
+            REASON_SUBSIDY_EXPIRED: user_message_organization_plan_expired,
             REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY: user_message_organization_no_funds,
             REASON_POLICY_SPEND_LIMIT_REACHED: user_message_organization_no_funds,
             REASON_LEARNER_NOT_IN_ENTERPRISE: MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_IN_ENTERPRISE,

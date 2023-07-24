@@ -17,8 +17,9 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_LEARNER_MAX_SPEND_REACHED,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
-    REASON_POLICY_NOT_ACTIVE,
-    REASON_POLICY_SPEND_LIMIT_REACHED
+    REASON_POLICY_EXPIRED,
+    REASON_POLICY_SPEND_LIMIT_REACHED,
+    REASON_SUBSIDY_EXPIRED
 )
 from enterprise_access.apps.subsidy_access_policy.models import (
     PerLearnerEnrollmentCreditAccessPolicy,
@@ -159,7 +160,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': -100}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (True, None, []),
@@ -170,7 +171,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': False,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG, []),
@@ -181,7 +182,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': False,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE, []),
@@ -192,7 +193,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': False},
+            'subsidy_is_redeemable': {'can_redeem': False, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, []),
@@ -204,7 +205,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
                 'transactions': [{
                     'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID),
@@ -224,7 +225,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
                 'transactions': [{
                     'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID),
@@ -243,10 +244,21 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': False,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
-            'expected_policy_can_redeem': (False, REASON_POLICY_NOT_ACTIVE, []),
+            'expected_policy_can_redeem': (False, REASON_POLICY_EXPIRED, []),
+        },
+        {
+            # The subsidy is not active, every other check would succeed.
+            # Expected can_redeem result: False
+            'policy_is_active': True,
+            'catalog_contains_content': True,
+            'enterprise_contains_learner': True,
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': False},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
+            'expected_policy_can_redeem': (False, REASON_SUBSIDY_EXPIRED, []),
         },
     )
     @ddt.unpack
@@ -288,7 +300,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': -100}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (True, None, []),
@@ -299,7 +311,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': False,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG, []),
@@ -310,7 +322,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': False,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE, []),
@@ -321,7 +333,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': False},
+            'subsidy_is_redeemable': {'can_redeem': False, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, []),
@@ -333,7 +345,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
                 'transactions': [{
                     'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID),
@@ -353,7 +365,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
                 'transactions': [{
                     'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID),
@@ -372,10 +384,21 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': False,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
-            'expected_policy_can_redeem': (False, REASON_POLICY_NOT_ACTIVE, []),
+            'expected_policy_can_redeem': (False, REASON_POLICY_EXPIRED, []),
+        },
+        {
+            # The subsidy is not active, every other check would succeed.
+            # Expected can_redeem result: False
+            'policy_is_active': True,
+            'catalog_contains_content': True,
+            'enterprise_contains_learner': True,
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': False},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
+            'expected_policy_can_redeem': (False, REASON_SUBSIDY_EXPIRED, []),
         },
     )
     @ddt.unpack
