@@ -818,6 +818,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         subsidy_client = subsidy_client_patcher.start()
         subsidy_client.can_redeem.return_value = {
             'can_redeem': True,
+            'active': True,
             'content_price': 0,
             'unit': 'usd_cents',
             'all_transactions': [],
@@ -996,6 +997,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             existing_transactions.append(existing_transaction)
         self.redeemable_policy.subsidy_client.can_redeem.return_value = {
             'can_redeem': True,
+            'active': True,
             'content_price': 5000,
             'unit': 'usd_cents',
             'all_transactions': existing_transactions,
@@ -1107,6 +1109,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         subsidy_client = subsidy_client_patcher.start()
         subsidy_client.can_redeem.return_value = {
             'can_redeem': True,
+            'active': True,
             'content_price': 5000,
             'unit': 'usd_cents',
             'all_transactions': [],
@@ -1247,7 +1250,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         self, mock_lms_client, mock_transactions_cache_for_learner, has_admin_users
     ):
         """
-        Test that the can_redeem endpoint returns resons for why each non-redeemable policy failed.
+        Test that the can_redeem endpoint returns reasons for why each non-redeemable policy failed.
         """
         slug = 'sluggy'
         admin_email = 'edx@example.org'
@@ -1264,6 +1267,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         }
         self.redeemable_policy.subsidy_client.can_redeem.return_value = {
             'can_redeem': False,
+            'active': True,
             'content_price': 5000,  # value is ignored.
             'unit': 'usd_cents',
             'all_transactions': [],
@@ -1380,6 +1384,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
 
         self.redeemable_policy.subsidy_client.can_redeem.return_value = {
             'can_redeem': False,
+            'active': True,
         }
         self.mock_get_content_metadata.return_value = {'content_price': 19900}
 
@@ -1453,6 +1458,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
 
         self.redeemable_policy.subsidy_client.can_redeem.return_value = {
             'can_redeem': True,
+            'active': True,
         }
         self.mock_get_content_metadata.return_value = {'content_price': 19900}
 

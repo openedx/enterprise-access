@@ -20,8 +20,9 @@ from .constants import (
     REASON_LEARNER_MAX_SPEND_REACHED,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
-    REASON_POLICY_NOT_ACTIVE,
+    REASON_POLICY_EXPIRED,
     REASON_POLICY_SPEND_LIMIT_REACHED,
+    REASON_SUBSIDY_EXPIRED,
     AccessMethods,
     TransactionStateChoices
 )
@@ -312,6 +313,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         content_price = self.get_content_price(content_key, content_metadata=content_metadata)
         spent_amount = self.aggregates_for_policy().get('total_quantity') or 0
+
         return self.content_would_exceed_limit(spent_amount, self.spend_limit, content_price)
 
     def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
@@ -322,32 +324,44 @@ class SubsidyAccessPolicy(TimeStampedModel):
             3-tuple of (bool, str, list of dict):
                 * first element is true if the learner can redeem the content,
                 * second element contains a reason code if the content is not redeemable,
-                * third a list of any transactions represending existing redemptions (any state).
+                * third a list of any transactions representing existing redemptions (any state).
         """
-        if not self.active:
-            return (False, REASON_POLICY_NOT_ACTIVE, [])
-
-        if not skip_customer_user_check:
-            if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
-                return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
-
-        if not self.catalog_contains_content_key(content_key):
-            return (False, REASON_CONTENT_NOT_IN_CATALOG, [])
-
+        content_metadata = self.get_content_metadata(content_key)
         subsidy_can_redeem_payload = self.subsidy_client.can_redeem(
             self.subsidy_uuid,
             lms_user_id,
             content_key,
         )
+
+        active_subsidy = subsidy_can_redeem_payload.get('active', False)
         existing_transactions = subsidy_can_redeem_payload.get('all_transactions', [])
 
-        if not subsidy_can_redeem_payload.get('can_redeem', False):
-            return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, existing_transactions)
+        # inactive subsidy
+        if not active_subsidy:
+            return (False, REASON_SUBSIDY_EXPIRED, [])
 
-        content_metadata = self.get_content_metadata(content_key)
+        # inactive policy
+        if not self.active:
+            return (False, REASON_POLICY_EXPIRED, [])
+
+        # learner not associated to enterprise
+        if not skip_customer_user_check:
+            if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
+                return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
+
+        # no content key in catalog
+        if not self.catalog_contains_content_key(content_key):
+            return (False, REASON_CONTENT_NOT_IN_CATALOG, [])
+
+        # no content key in content metadata
         if not content_metadata:
             return (False, REASON_CONTENT_NOT_IN_CATALOG, existing_transactions)
 
+        # can_redeem false from subsidy
+        if not subsidy_can_redeem_payload.get('can_redeem', False):
+            return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, existing_transactions)
+
+        # not enough funds on policy
         if self.will_exceed_spend_limit(content_key, content_metadata=content_metadata):
             return (False, REASON_POLICY_SPEND_LIMIT_REACHED, existing_transactions)
 
