@@ -455,6 +455,10 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         for policy in all_policies_for_enterprise:
             try:
                 redeemable, reason, _ = policy.can_redeem(lms_user_id, content_key, skip_customer_user_check=True)
+                logger.info(
+                    f'[can_redeem] {policy} inputs: (lms_user_id={lms_user_id}, content_key={content_key}) results: '
+                    f'redeemable={redeemable}, reason={reason}.'
+                )
             except ContentPriceNullException as exc:
                 logger.warning(f'{exc} when checking can_redeem() for {enterprise_customer_uuid}')
                 raise RedemptionRequestException(

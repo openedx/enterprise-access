@@ -555,6 +555,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
             self.active = False
             self.save()
 
+    def __str__(self):
+        return f'<{self.__class__} uuid={self.uuid}>'
+
 
 class CreditPolicyMixin:
     """
@@ -641,8 +644,11 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         limits specified on the policy.
         """
         # perform generic access checks
-        should_attempt_redemption, reason, existing_redemptions = \
-            super().can_redeem(lms_user_id, content_key, skip_customer_user_check)
+        should_attempt_redemption, reason, existing_redemptions = super().can_redeem(
+            lms_user_id,
+            content_key,
+            skip_customer_user_check,
+        )
         if not should_attempt_redemption:
             return (False, reason, existing_redemptions)
 
