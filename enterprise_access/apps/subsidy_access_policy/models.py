@@ -318,6 +318,13 @@ class SubsidyAccessPolicy(TimeStampedModel):
     def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
         """
         Check that a given learner can redeem the given content.
+        The ordering of each conditional is intentional based on an expected
+        error message to be shown based on the learners state at the time of
+        accessing the CourseAbout page in FE-app-learner-portal focusing on the
+        user state, catalog state based on content key, then subsidy/policy state
+        based on whether they are active and have spend available for the requested
+        content.
+
 
         Returns:
             3-tuple of (bool, str, list of dict):
@@ -335,14 +342,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
         active_subsidy = subsidy_can_redeem_payload.get('active', False)
         existing_transactions = subsidy_can_redeem_payload.get('all_transactions', [])
 
-        # inactive subsidy
-        if not active_subsidy:
-            return (False, REASON_SUBSIDY_EXPIRED, [])
-
-        # inactive policy
-        if not self.active:
-            return (False, REASON_POLICY_EXPIRED, [])
-
         # learner not associated to enterprise
         if not skip_customer_user_check:
             if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
@@ -355,6 +354,16 @@ class SubsidyAccessPolicy(TimeStampedModel):
         # no content key in content metadata
         if not content_metadata:
             return (False, REASON_CONTENT_NOT_IN_CATALOG, existing_transactions)
+
+        # TODO: Add Course Upgrade/Registration Deadline Passed Error here
+
+        # inactive subsidy
+        if not active_subsidy:
+            return (False, REASON_SUBSIDY_EXPIRED, [])
+
+        # inactive policy
+        if not self.active:
+            return (False, REASON_POLICY_EXPIRED, [])
 
         # can_redeem false from subsidy
         if not subsidy_can_redeem_payload.get('can_redeem', False):
