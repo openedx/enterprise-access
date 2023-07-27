@@ -5,12 +5,10 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import ddt
-import factory
 import pytest
 from django.core.cache import cache as django_cache
 from django.test import TestCase
 
-from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
@@ -40,8 +38,8 @@ ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID = uuid4()
 class SubsidyAccessPolicyTests(TestCase):
     """ SubsidyAccessPolicy model tests. """
 
-    user = factory.SubFactory(UserFactory)
-    course_id = factory.LazyFunction(uuid4)
+    lms_user_id = 12345
+    course_id = 'course-v1:DemoX:2T2023'
 
     def setUp(self):
         """
@@ -175,6 +173,8 @@ class SubsidyAccessPolicyTests(TestCase):
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
         },
         {
             # Learner is not in the enterprise, every other check would succeed.
@@ -186,6 +186,8 @@ class SubsidyAccessPolicyTests(TestCase):
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
         },
         {
             # The subsidy is not redeemable, every other check would succeed.
@@ -248,6 +250,8 @@ class SubsidyAccessPolicyTests(TestCase):
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_POLICY_EXPIRED, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
         },
         {
             # The subsidy is not active, every other check would succeed.
@@ -271,6 +275,8 @@ class SubsidyAccessPolicyTests(TestCase):
         transactions_for_learner,
         transactions_for_policy,
         expected_policy_can_redeem,
+        expect_content_metadata_fetch=True,
+        expect_transaction_fetch=True,
     ):
         """
         Test the can_redeem method of PerLearnerEnrollmentCapLearnerCreditAccessPolicy model
@@ -288,9 +294,24 @@ class SubsidyAccessPolicyTests(TestCase):
         if policy_is_active:
             policy_record = self.per_learner_enroll_policy
 
-        can_redeem_result = policy_record.can_redeem(self.user, self.course_id)
+        can_redeem_result = policy_record.can_redeem(self.lms_user_id, self.course_id)
 
         self.assertEqual(can_redeem_result, expected_policy_can_redeem, [])
+
+        if expect_content_metadata_fetch:
+            # it's actually called twice
+            self.mock_get_content_metadata.assert_called_with(self.course_id)
+        else:
+            self.assertFalse(self.mock_get_content_metadata.called)
+
+        if expect_transaction_fetch:
+            self.mock_subsidy_client.can_redeem.assert_called_once_with(
+                policy_record.subsidy_uuid,
+                self.lms_user_id,
+                self.course_id,
+            )
+        else:
+            self.assertFalse(self.mock_subsidy_client.can_redeem.called)
 
     @ddt.data(
         {
@@ -315,6 +336,8 @@ class SubsidyAccessPolicyTests(TestCase):
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
         },
         {
             # Learner is not in the enterprise, every other check would succeed.
@@ -326,6 +349,8 @@ class SubsidyAccessPolicyTests(TestCase):
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
         },
         {
             # The subsidy is not redeemable, every other check would succeed.
@@ -388,6 +413,8 @@ class SubsidyAccessPolicyTests(TestCase):
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_POLICY_EXPIRED, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
         },
         {
             # The subsidy is not active, every other check would succeed.
@@ -411,6 +438,8 @@ class SubsidyAccessPolicyTests(TestCase):
         transactions_for_learner,
         transactions_for_policy,
         expected_policy_can_redeem,
+        expect_content_metadata_fetch=True,
+        expect_transaction_fetch=True,
     ):
         """
         Test the can_redeem method of PerLearnerSpendCapLearnerCreditAccessPolicy model
@@ -428,9 +457,24 @@ class SubsidyAccessPolicyTests(TestCase):
         if policy_is_active:
             policy_record = self.per_learner_spend_policy
 
-        can_redeem_result = policy_record.can_redeem(self.user, self.course_id)
+        can_redeem_result = policy_record.can_redeem(self.lms_user_id, self.course_id)
 
         self.assertEqual(can_redeem_result, expected_policy_can_redeem)
+
+        if expect_content_metadata_fetch:
+            # it's actually called twice
+            self.mock_get_content_metadata.assert_called_with(self.course_id)
+        else:
+            self.assertFalse(self.mock_get_content_metadata.called)
+
+        if expect_transaction_fetch:
+            self.mock_subsidy_client.can_redeem.assert_called_once_with(
+                policy_record.subsidy_uuid,
+                self.lms_user_id,
+                self.course_id,
+            )
+        else:
+            self.assertFalse(self.mock_subsidy_client.can_redeem.called)
 
     def test_acquire_lock_release_lock_no_kwargs(self):
         """
