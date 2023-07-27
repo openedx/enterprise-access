@@ -333,15 +333,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 * second element contains a reason code if the content is not redeemable,
                 * third a list of any transactions representing existing redemptions (any state).
         """
-        content_metadata = self.get_content_metadata(content_key)
-        subsidy_can_redeem_payload = self.subsidy_client.can_redeem(
-            self.subsidy_uuid,
-            lms_user_id,
-            content_key,
-        )
-
-        active_subsidy = subsidy_can_redeem_payload.get('active', False)
-        existing_transactions = subsidy_can_redeem_payload.get('all_transactions', [])
+        # inactive policy
+        if not self.active:
+            return (False, REASON_POLICY_EXPIRED, [])
 
         # learner not associated to enterprise
         if not skip_customer_user_check:
@@ -352,19 +346,32 @@ class SubsidyAccessPolicy(TimeStampedModel):
         if not self.catalog_contains_content_key(content_key):
             return (False, REASON_CONTENT_NOT_IN_CATALOG, [])
 
+        # Wait to fetch content metadata with a call to the enterprise-subsidy
+        # service until we *know* that we'll need it.
+        content_metadata = self.get_content_metadata(content_key)
+
         # no content key in content metadata
         if not content_metadata:
-            return (False, REASON_CONTENT_NOT_IN_CATALOG, existing_transactions)
+            return (False, REASON_CONTENT_NOT_IN_CATALOG, [])
 
         # TODO: Add Course Upgrade/Registration Deadline Passed Error here
 
-        # inactive subsidy
+        # We want to wait to do these checks that might require a call
+        # to the enterprise-subsidy service until we *know* we'll need the data.
+        subsidy_can_redeem_payload = self.subsidy_client.can_redeem(
+            self.subsidy_uuid,
+            lms_user_id,
+            content_key,
+        )
+
+        # Refers to a computed property of an EnterpriseSubsidy record
+        # that takes into account the start/expiration dates of the subsidy record.
+        active_subsidy = subsidy_can_redeem_payload.get('active', False)
+        existing_transactions = subsidy_can_redeem_payload.get('all_transactions', [])
+
+        # inactive subsidy?
         if not active_subsidy:
             return (False, REASON_SUBSIDY_EXPIRED, [])
-
-        # inactive policy
-        if not self.active:
-            return (False, REASON_POLICY_EXPIRED, [])
 
         # can_redeem false from subsidy
         if not subsidy_can_redeem_payload.get('can_redeem', False):
