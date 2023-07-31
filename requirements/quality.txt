@@ -49,7 +49,7 @@ celery==5.3.1
     #   -r requirements/test.txt
     #   django-celery-results
     #   edx-celeryutils
-certifi==2023.5.7
+certifi==2023.7.22
     # via
     #   -r requirements/test.txt
     #   requests
@@ -89,7 +89,7 @@ click-repl==0.3.0
     # via
     #   -r requirements/test.txt
     #   celery
-code-annotations==1.3.0
+code-annotations==1.5.0
     # via
     #   -r requirements/test.txt
     #   edx-lint
@@ -121,7 +121,7 @@ defusedxml==0.7.1
     #   -r requirements/test.txt
     #   python3-openid
     #   social-auth-core
-dill==0.3.6
+dill==0.3.7
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -140,6 +140,7 @@ django==3.2.20
     #   django-filter
     #   django-log-request-id
     #   django-model-utils
+    #   django-waffle
     #   djangorestframework
     #   drf-jwt
     #   drf-spectacular
@@ -183,7 +184,7 @@ django-simple-history==3.0.0
     # via
     #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/test.txt
-django-waffle==3.0.0
+django-waffle==4.0.0
     # via
     #   -r requirements/test.txt
     #   edx-django-utils
@@ -205,23 +206,23 @@ drf-jwt==1.19.2
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
-drf-spectacular==0.26.3
+drf-spectacular==0.26.4
     # via -r requirements/test.txt
 drf-yasg==1.21.7
     # via
     #   -r requirements/test.txt
     #   edx-api-doc-tools
-edx-api-doc-tools==1.6.0
+edx-api-doc-tools==1.7.0
     # via -r requirements/test.txt
 edx-auth-backends==4.1.0
     # via -r requirements/test.txt
 edx-braze-client==0.1.7
     # via -r requirements/test.txt
-edx-celeryutils==1.2.2
+edx-celeryutils==1.2.3
     # via -r requirements/test.txt
-edx-django-release-util==1.2.0
+edx-django-release-util==1.3.0
     # via -r requirements/test.txt
-edx-django-utils==5.5.0
+edx-django-utils==5.6.0
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
@@ -241,9 +242,9 @@ edx-opaque-keys[django]==2.3.0
     #   -r requirements/test.txt
     #   edx-drf-extensions
     #   openedx-events
-edx-rbac==1.7.0
+edx-rbac==1.8.0
     # via -r requirements/test.txt
-edx-rest-api-client==5.5.2
+edx-rest-api-client==5.6.0
     # via
     #   -r requirements/test.txt
     #   edx-enterprise-subsidy-client
@@ -349,11 +350,11 @@ monotonic==1.6
     # via
     #   -r requirements/test.txt
     #   analytics-python
-more-itertools==9.1.0
+more-itertools==10.0.0
     # via jaraco-classes
 mysqlclient==2.2.0
     # via -r requirements/test.txt
-newrelic==8.8.1
+newrelic==8.9.0
     # via
     #   -r requirements/test.txt
     #   edx-django-utils
@@ -384,7 +385,7 @@ pkgutil-resolve-name==1.3.10
     # via
     #   -r requirements/test.txt
     #   jsonschema
-platformdirs==3.9.1
+platformdirs==3.10.0
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -410,7 +411,7 @@ py==1.11.0
     # via
     #   -r requirements/test.txt
     #   tox
-pycodestyle==2.10.0
+pycodestyle==2.11.0
     # via -r requirements/quality.in
 pycparser==2.21
     # via
@@ -430,7 +431,7 @@ pyjwt[crypto]==2.8.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==2.17.4
+pylint==2.17.5
     # via
     #   -r requirements/test.txt
     #   edx-lint
@@ -526,7 +527,7 @@ requests-toolbelt==1.0.0
     # via twine
 rfc3986==2.0.0
     # via twine
-rich==13.4.2
+rich==13.5.1
     # via twine
 rpds-py==0.9.2
     # via
@@ -594,7 +595,7 @@ tomli==2.0.1
     #   pylint
     #   pytest
     #   tox
-tomlkit==0.11.8
+tomlkit==0.12.1
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -635,7 +636,7 @@ vine==5.0.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.24.1
+virtualenv==20.24.2
     # via
     #   -r requirements/test.txt
     #   tox
