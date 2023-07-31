@@ -28,10 +28,7 @@ def get_and_cache_content_metadata(enterprise_customer_uuid, content_key, timeou
     cache_key = versioned_cache_key('get_subsidy_content_metadata', enterprise_customer_uuid, content_key)
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
-        logger.info('[METADATA CACHE HIT] for key %s', cache_key)
         return cached_response.value
-
-    logger.info('[METADATA CACHE MISS] for key %s', cache_key)
 
     client = get_versioned_subsidy_client()
     try:
@@ -42,8 +39,12 @@ def get_and_cache_content_metadata(enterprise_customer_uuid, content_key, timeou
     except HTTPError as exc:
         raise exc
 
+    logger.info(
+        'Fetched content metadata for customer %s and content_key %s',
+        enterprise_customer_uuid,
+        content_key,
+    )
     TieredCache.set_all_tiers(cache_key, metadata, timeout or DEFAULT_CACHE_TIMEOUT)
-    logger.info('[METADATA CACHE SET] for key = %s, value = %s', cache_key, metadata)
     return metadata
 
 
@@ -56,10 +57,8 @@ def get_and_cache_catalog_contains_content(enterprise_catalog_uuid, content_key,
     cache_key = versioned_cache_key('contains_content_key', enterprise_catalog_uuid, content_key)
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
-        logger.info('[CATALOG INCLUSION CACHE HIT] for key %s', cache_key)
         return cached_response.value
 
-    logger.info('[CATALOG INCLUSION CACHE MISS] for key %s', cache_key)
     try:
         result = EnterpriseCatalogApiClient().contains_content_items(
             enterprise_catalog_uuid,
@@ -68,6 +67,11 @@ def get_and_cache_catalog_contains_content(enterprise_catalog_uuid, content_key,
     except HTTPError as exc:
         raise exc
 
+    logger.info(
+        'Fetched catalog inclusion for catalog %s and content_key %s. Result = %s',
+        enterprise_catalog_uuid,
+        content_key,
+        result,
+    )
     TieredCache.set_all_tiers(cache_key, result, timeout or DEFAULT_CACHE_TIMEOUT)
-    logger.info('[CATALOG INCLUSION CACHE SET] for key = %s, value = %s', cache_key, result)
     return result
