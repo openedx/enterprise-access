@@ -31,10 +31,8 @@ def get_and_cache_transactions_for_learner(subsidy_uuid, lms_user_id):
     cache_key = learner_transaction_cache_key(subsidy_uuid, lms_user_id)
     cached_response = request_cache().get_cached_response(cache_key)
     if cached_response.is_found:
-        logger.info('[LEARNER TRANSACTIONS CACHE HIT] for key %s', cache_key)
         return cached_response.value
 
-    logger.info('[LEARNER TRANSACTIONS CACHE MISS] for key %s', cache_key)
     client = get_versioned_subsidy_client()
     response_payload = client.list_subsidy_transactions(
         subsidy_uuid=subsidy_uuid,
@@ -54,7 +52,12 @@ def get_and_cache_transactions_for_learner(subsidy_uuid, lms_user_id):
         result['transactions'].extend(next_response['results'])
         next_page = next_response.get('next')
 
-    logger.info('[LEARNER TRANSACTIONS CACHE SET] for key %s', cache_key)
+    logger.info(
+        'Fetched transactions for subsidy %s and lms_user_id %s. Number transactions = %s',
+        subsidy_uuid,
+        lms_user_id,
+        len(result['transactions']),
+    )
     request_cache().set(cache_key, result)
     return result
 
