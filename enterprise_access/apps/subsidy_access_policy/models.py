@@ -10,7 +10,6 @@ from django.core.cache import cache as django_cache
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from edx_django_utils.cache.utils import get_cache_key
-from simple_history.models import HistoricalRecords
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 
@@ -21,15 +20,16 @@ from .constants import (
     REASON_LEARNER_MAX_SPEND_REACHED,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
-    REASON_POLICY_NOT_ACTIVE,
+    REASON_POLICY_EXPIRED,
     REASON_POLICY_SPEND_LIMIT_REACHED,
+    REASON_SUBSIDY_EXPIRED,
     AccessMethods,
     TransactionStateChoices
 )
 from .content_metadata_api import get_and_cache_catalog_contains_content, get_and_cache_content_metadata
 from .exceptions import ContentPriceNullException, SubsidyAccessPolicyLockAttemptFailed, SubsidyAPIHTTPError
 from .subsidy_api import get_and_cache_transactions_for_learner
-from .utils import create_idempotency_key_for_transaction, get_versioned_subsidy_client
+from .utils import ProxyAwareHistoricalRecords, create_idempotency_key_for_transaction, get_versioned_subsidy_client
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
 
@@ -136,7 +136,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
         ),
     )
 
-    history = HistoricalRecords()
+    # Customized version of HistoricalRecords to enable history tracking on child proxy models.  See
+    # ProxyAwareHistoricalRecords docstring for more info.
+    history = ProxyAwareHistoricalRecords(inherit=True)
 
     @property
     def subsidy_client(self):
@@ -311,42 +313,71 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         content_price = self.get_content_price(content_key, content_metadata=content_metadata)
         spent_amount = self.aggregates_for_policy().get('total_quantity') or 0
+
         return self.content_would_exceed_limit(spent_amount, self.spend_limit, content_price)
 
     def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
         """
         Check that a given learner can redeem the given content.
+        The ordering of each conditional is intentional based on an expected
+        error message to be shown based on the learners state at the time of
+        accessing the CourseAbout page in FE-app-learner-portal focusing on the
+        user state, catalog state based on content key, then subsidy/policy state
+        based on whether they are active and have spend available for the requested
+        content.
+
 
         Returns:
             3-tuple of (bool, str, list of dict):
                 * first element is true if the learner can redeem the content,
                 * second element contains a reason code if the content is not redeemable,
-                * third a list of any transactions represending existing redemptions (any state).
+                * third a list of any transactions representing existing redemptions (any state).
         """
+        # inactive policy
         if not self.active:
-            return (False, REASON_POLICY_NOT_ACTIVE, [])
+            return (False, REASON_POLICY_EXPIRED, [])
 
+        # learner not associated to enterprise
         if not skip_customer_user_check:
             if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
                 return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
 
+        # no content key in catalog
         if not self.catalog_contains_content_key(content_key):
             return (False, REASON_CONTENT_NOT_IN_CATALOG, [])
 
+        # Wait to fetch content metadata with a call to the enterprise-subsidy
+        # service until we *know* that we'll need it.
+        content_metadata = self.get_content_metadata(content_key)
+
+        # no content key in content metadata
+        if not content_metadata:
+            return (False, REASON_CONTENT_NOT_IN_CATALOG, [])
+
+        # TODO: Add Course Upgrade/Registration Deadline Passed Error here
+
+        # We want to wait to do these checks that might require a call
+        # to the enterprise-subsidy service until we *know* we'll need the data.
         subsidy_can_redeem_payload = self.subsidy_client.can_redeem(
             self.subsidy_uuid,
             lms_user_id,
             content_key,
         )
+
+        # Refers to a computed property of an EnterpriseSubsidy record
+        # that takes into account the start/expiration dates of the subsidy record.
+        active_subsidy = subsidy_can_redeem_payload.get('active', False)
         existing_transactions = subsidy_can_redeem_payload.get('all_transactions', [])
 
+        # inactive subsidy?
+        if not active_subsidy:
+            return (False, REASON_SUBSIDY_EXPIRED, [])
+
+        # can_redeem false from subsidy
         if not subsidy_can_redeem_payload.get('can_redeem', False):
             return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, existing_transactions)
 
-        content_metadata = self.get_content_metadata(content_key)
-        if not content_metadata:
-            return (False, REASON_CONTENT_NOT_IN_CATALOG, existing_transactions)
-
+        # not enough funds on policy
         if self.will_exceed_spend_limit(content_key, content_metadata=content_metadata):
             return (False, REASON_POLICY_SPEND_LIMIT_REACHED, existing_transactions)
 
@@ -528,6 +559,21 @@ class SubsidyAccessPolicy(TimeStampedModel):
         )
         return sorted_policies[0]
 
+    def delete(self, *args, **kwargs):
+        """
+        Perform a soft-delete, overriding the standard delete() method to prevent hard-deletes.
+
+        If this instance was already soft-deleted, invoking delete() is a no-op.
+        """
+        if self.active:
+            if 'reason' in kwargs and kwargs['reason']:
+                self._change_reason = kwargs['reason']  # pylint: disable=attribute-defined-outside-init
+            self.active = False
+            self.save()
+
+    def __str__(self):
+        return f'<{self.__class__} uuid={self.uuid}>'
+
 
 class CreditPolicyMixin:
     """
@@ -614,8 +660,11 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         limits specified on the policy.
         """
         # perform generic access checks
-        should_attempt_redemption, reason, existing_redemptions = \
-            super().can_redeem(lms_user_id, content_key, skip_customer_user_check)
+        should_attempt_redemption, reason, existing_redemptions = super().can_redeem(
+            lms_user_id,
+            content_key,
+            skip_customer_user_check,
+        )
         if not should_attempt_redemption:
             return (False, reason, existing_redemptions)
 

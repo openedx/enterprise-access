@@ -4,10 +4,10 @@ from os.path import abspath, dirname, join
 from corsheaders.defaults import default_headers as corsheaders_default_headers
 
 from enterprise_access.apps.core.constants import (
-    POLICY_ADMIN_ROLE,
-    POLICY_LEARNER_ROLE,
     REQUESTS_ADMIN_ROLE,
     REQUESTS_LEARNER_ROLE,
+    SUBSIDY_ACCESS_POLICY_LEARNER_ROLE,
+    SUBSIDY_ACCESS_POLICY_OPERATOR_ROLE,
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
@@ -55,6 +55,7 @@ THIRD_PARTY_APPS = (
     'rest_framework',
     'rest_framework_swagger',
     'rules.apps.AutodiscoverRulesConfig',
+    'simple_history',
     'social_django',
     'waffle',
 )
@@ -95,6 +96,7 @@ MIDDLEWARE = (
     'edx_rest_framework_extensions.middleware.RequestMetricsMiddleware',
     # Ensures proper DRF permissions in support of JWTs
     'edx_rest_framework_extensions.auth.jwt.middleware.EnsureJWTAuthSettingsMiddleware',
+    # Track who made each change to a model using HistoryRequestMiddleware
     'simple_history.middleware.HistoryRequestMiddleware',
     # Used to get request inside serializers.
     'crum.CurrentRequestUserMiddleware',
@@ -305,9 +307,18 @@ EDX_DRF_EXTENSIONS = {
 
 # Set up system-to-feature roles mapping for edx-rbac
 SYSTEM_TO_FEATURE_ROLE_MAPPING = {
-    SYSTEM_ENTERPRISE_OPERATOR_ROLE: [POLICY_ADMIN_ROLE, REQUESTS_ADMIN_ROLE],
-    SYSTEM_ENTERPRISE_ADMIN_ROLE: [POLICY_ADMIN_ROLE, REQUESTS_ADMIN_ROLE],
-    SYSTEM_ENTERPRISE_LEARNER_ROLE: [POLICY_LEARNER_ROLE, REQUESTS_LEARNER_ROLE],
+    SYSTEM_ENTERPRISE_OPERATOR_ROLE: [
+        SUBSIDY_ACCESS_POLICY_OPERATOR_ROLE,
+        REQUESTS_ADMIN_ROLE,
+    ],
+    SYSTEM_ENTERPRISE_ADMIN_ROLE: [
+        SUBSIDY_ACCESS_POLICY_LEARNER_ROLE,
+        REQUESTS_ADMIN_ROLE,
+    ],
+    SYSTEM_ENTERPRISE_LEARNER_ROLE: [
+        SUBSIDY_ACCESS_POLICY_LEARNER_ROLE,
+        REQUESTS_LEARNER_ROLE,
+    ],
 }
 
 # Request the user's permissions in the ID token

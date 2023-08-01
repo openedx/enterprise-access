@@ -20,15 +20,15 @@ class HelpfulFilterSet(drf_filters.FilterSet):
         return filter_obj
 
 
-class NoFilterOnRetrieveBackend(drf_filters.DjangoFilterBackend):
+class NoFilterOnDetailBackend(drf_filters.DjangoFilterBackend):
     """
     Customized filter backend that simply doesn't use a filterset_class
-    on retrieve() actions.
+    on any of the detail actions of a viewset.
     """
     def get_filterset_class(self, view, queryset=None):
         """
-        Returns None if this is a retrieve() operation.
+        Returns None if this is a detail operation.
         """
-        if view.action == 'retrieve':
+        if view.action in ('retrieve', 'create', 'update', 'partial_update', 'destroy'):
             return None
         return super().get_filterset_class(view, queryset)

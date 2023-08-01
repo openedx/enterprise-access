@@ -29,7 +29,8 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
 from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
 from test_utils import APITestWithMocks
 
-SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT = reverse('api:v1:admin-policy-list')
+SUBSIDY_ACCESS_POLICY_DEPR_LIST_ENDPOINT = reverse('api:v1:admin-policy-list')
+SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:subsidy-access-policies-list')
 
 TEST_ENTERPRISE_UUID = uuid4()
 
@@ -138,9 +139,75 @@ class TestPolicyCRUDAuthNAndPermissionChecks(CRUDViewTestMixin, APITestWithMocks
         response = self.client.delete(detail_url)
         self.assertEqual(response.status_code, expected_response_code)
 
+    @ddt.data(
+        # A role that's not mapped to any feature perms will get you a 403.
+        (
+            {'system_wide_role': 'some-other-role', 'context': str(TEST_ENTERPRISE_UUID)},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A good admin role, but in a context/customer we're not aware of, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A good admin role, even with the correct context/customer, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A good learner role, but in a context/customer we're not aware of, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A good learner role, even with the correct context/customer, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # An operator role, but in a context/customer we're not aware of, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # No JWT based auth, no soup for you.
+        (
+            None,
+            status.HTTP_401_UNAUTHORIZED,
+        ),
+    )
+    @ddt.unpack
+    def test_policy_crud_write_views_unauthorized_forbidden(self, role_context_dict, expected_response_code):
+        """
+        Tests that we get expected 40x responses for all of the policy write views.
+        """
+        # Set the JWT-based auth that we'll use for every request
+        if role_context_dict:
+            self.set_jwt_cookie([role_context_dict])
+
+        request_kwargs = {'uuid': str(self.redeemable_policy.uuid)}
+
+        # Test the create endpoint.
+        response = self.client.post(
+            SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT,
+            data={'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
+        )
+        self.assertEqual(response.status_code, expected_response_code)
+
+        # Test the delete endpoint.
+        response = self.client.delete(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
+        self.assertEqual(response.status_code, expected_response_code)
+
+        # Test the update and partial_update views.
+        response = self.client.put(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
+        self.assertEqual(response.status_code, expected_response_code)
+
+        response = self.client.patch(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
+        self.assertEqual(response.status_code, expected_response_code)
+
 
 @ddt.ddt
-class TestAuthenticatedPolicyReadOnlyViews(CRUDViewTestMixin, APITestWithMocks):
+class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
     """
     Test the list and detail views for subsidy access policy records.
     """
@@ -237,11 +304,221 @@ class TestAuthenticatedPolicyReadOnlyViews(CRUDViewTestMixin, APITestWithMocks):
             sorted(response_json['results'], key=sort_key),
         )
 
+    @ddt.data(
+        {
+            'request_payload': {'reason': 'Peer Pressure.'},
+            'expected_change_reason': 'Peer Pressure.',
+        },
+        {
+            'request_payload': {'reason': ''},
+            'expected_change_reason': None,
+        },
+        {
+            'request_payload': {'reason': None},
+            'expected_change_reason': None,
+        },
+        {
+            'request_payload': {},
+            'expected_change_reason': None,
+        },
+    )
+    @ddt.unpack
+    def test_destroy_view(self, request_payload, expected_change_reason):
+        """
+        Test that the destroy view performs a soft-delete and returns an appropriate response with 200 status code and
+        the expected results of serialization.
+        """
+        # Set the JWT-based auth to an operator.
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        # Test the destroy endpoint
+        response = self.client.delete(
+            reverse('api:v1:subsidy-access-policies-detail', kwargs={'uuid': str(self.redeemable_policy.uuid)}),
+            request_payload,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected_response = {
+            'access_method': 'direct',
+            'active': False,
+            'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
+            'description': '',
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'per_learner_enrollment_limit': self.redeemable_policy.per_learner_enrollment_limit,
+            'per_learner_spend_limit': self.redeemable_policy.per_learner_spend_limit,
+            'policy_type': 'PerLearnerEnrollmentCreditAccessPolicy',
+            'spend_limit': 3,
+            'subsidy_uuid': str(self.redeemable_policy.subsidy_uuid),
+            'uuid': str(self.redeemable_policy.uuid),
+        }
+        self.assertEqual(expected_response, response.json())
+
+        # Check that the latest history record for this policy contains the change reason provided via the API.
+        self.redeemable_policy.refresh_from_db()
+        assert self.redeemable_policy.history.order_by('-history_date').first().history_change_reason \
+            == expected_change_reason
+
+        # Test idempotency of the destroy endpoint.
+        response = self.client.delete(
+            reverse('api:v1:subsidy-access-policies-detail', kwargs={'uuid': str(self.redeemable_policy.uuid)}),
+            request_payload,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(expected_response, response.json())
+
+    @ddt.data(True, False)
+    def test_update_views(self, is_patch):
+        """
+        Test that the update and partial_update views can modify certain
+        fields of a policy record.
+        """
+        # Set the JWT-based auth to an operator.
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        policy_for_edit = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            spend_limit=5,
+            active=False,
+        )
+
+        request_payload = {
+            'description': 'the new description',
+            'active': True,
+            'catalog_uuid': str(uuid4()),
+            'subsidy_uuid': str(uuid4()),
+            'access_method': AccessMethods.ASSIGNED,
+            'spend_limit': None,
+            'per_learner_spend_limit': 10000,
+        }
+
+        action = self.client.patch if is_patch else self.client.put
+        url = reverse(
+            'api:v1:subsidy-access-policies-detail',
+            kwargs={'uuid': str(policy_for_edit.uuid)}
+        )
+        response = action(url, data=request_payload)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response = {
+            'access_method': AccessMethods.ASSIGNED,
+            'active': True,
+            'catalog_uuid': request_payload['catalog_uuid'],
+            'description': request_payload['description'],
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'per_learner_enrollment_limit': None,
+            'per_learner_spend_limit': request_payload['per_learner_spend_limit'],
+            'policy_type': 'PerLearnerSpendCreditAccessPolicy',
+            'spend_limit': request_payload['spend_limit'],
+            'subsidy_uuid': request_payload['subsidy_uuid'],
+            'uuid': str(policy_for_edit.uuid),
+        }
+        self.assertEqual(expected_response, response.json())
+
+    @ddt.data(
+        {
+            'enterprise_customer_uuid': str(uuid4()),
+            'uuid': str(uuid4()),
+            'policy_type': 'PerLearnerEnrollmentCapCreditAccessPolicy',
+            'created': '1970-01-01 12:00:00Z',
+            'modified': '1970-01-01 12:00:00Z',
+            'nonsense_key': 'ship arriving too late to save a drowning witch',
+        },
+    )
+    def test_update_views_fields_disallowed_for_update(self, request_payload):
+        """
+        Test that the update and partial_update views can NOT modify fields
+        of a policy record that are not included in the update request serializer fields defintion.
+        """
+        # Set the JWT-based auth to an operator.
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        policy_for_edit = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            spend_limit=5,
+            active=False,
+        )
+        url = reverse(
+            'api:v1:subsidy-access-policies-detail',
+            kwargs={'uuid': str(policy_for_edit.uuid)}
+        )
+
+        expected_unknown_keys = ", ".join(sorted(request_payload.keys()))
+
+        # Test the PUT view
+        response = self.client.put(url, data=request_payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.json(),
+            {'non_field_errors': [f'Field(s) are not updatable: {expected_unknown_keys}']},
+        )
+
+        # Test the PATCH view
+        response = self.client.patch(url, data=request_payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.assertEqual(
+            response.json(),
+            {'non_field_errors': [f'Field(s) are not updatable: {expected_unknown_keys}']},
+        )
+
+    @ddt.data(
+        {
+            'policy_class': PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
+            'request_payload': {
+                'per_learner_enrollment_limit': 10,
+            },
+        },
+        {
+            'policy_class': PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
+            'request_payload': {
+                'per_learner_spend_limit': 1000,
+            },
+        },
+    )
+    @ddt.unpack
+    def test_update_view_validates_fields_vs_policy_type(self, policy_class, request_payload):
+        """
+        Test that the update view can NOT modify fields
+        of a policy record that are relevant only to a different
+        type of policy.
+        """
+        # Set the JWT-based auth to an operator.
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        policy_for_edit = policy_class(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            spend_limit=5,
+            active=False,
+        )
+        url = reverse(
+            'api:v1:subsidy-access-policies-detail',
+            kwargs={'uuid': str(policy_for_edit.uuid)}
+        )
+
+        response = self.client.put(url, data=request_payload)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        expected_error_message = (
+            f"Extraneous fields for {policy_for_edit.__class__.__name__} policy type: "
+            f"{list(request_payload)}."
+        )
+        self.assertEqual(response.json(), [expected_error_message])
+
 
 @ddt.ddt
 class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
     """
     Test the create view for subsidy access policy records.
+    This tests both the deprecated viewset and the preferred
+    ``SubsidyAccessPolicyViewSet`` implementation.
     """
 
     @ddt.data(
@@ -319,34 +596,39 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
         are correctly validated for existence/non-existence.
         """
         # Set the JWT-based auth that we'll use for every request
-        self.set_jwt_cookie([{'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}])
+        self.set_jwt_cookie([
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+                'context': str(TEST_ENTERPRISE_UUID),
+            },
+        ])
 
         # Test the retrieve endpoint
-        create_url = SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT
-        payload = {
-            'policy_type': policy_type,
-            'description': 'test description',
-            'active': True,
-            'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
-            'catalog_uuid': str(uuid4()),
-            'subsidy_uuid': str(uuid4()),
-            'access_method': AccessMethods.DIRECT,
-            'spend_limit': None,
-        }
-        payload.update(extra_fields)
-        response = self.client.post(create_url, payload)
-        assert response.status_code == expected_response_code
+        for create_url in (SUBSIDY_ACCESS_POLICY_DEPR_LIST_ENDPOINT, SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT):
+            payload = {
+                'policy_type': policy_type,
+                'description': 'test description',
+                'active': True,
+                'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
+                'catalog_uuid': str(uuid4()),
+                'subsidy_uuid': str(uuid4()),
+                'access_method': AccessMethods.DIRECT,
+                'spend_limit': None,
+            }
+            payload.update(extra_fields)
+            response = self.client.post(create_url, payload)
+            assert response.status_code == expected_response_code
 
-        if expected_response_code == status.HTTP_201_CREATED:
-            response_json = response.json()
-            del response_json['uuid']
-            expected_response = payload.copy()
-            expected_response.setdefault("per_learner_enrollment_limit")
-            expected_response.setdefault("per_learner_spend_limit")
-            assert response_json == expected_response
-        elif expected_response_code == status.HTTP_400_BAD_REQUEST:
-            for expected_error_keyword in expected_error_keywords:
-                assert expected_error_keyword in response.content.decode("utf-8")
+            if expected_response_code == status.HTTP_201_CREATED:
+                response_json = response.json()
+                del response_json['uuid']
+                expected_response = payload.copy()
+                expected_response.setdefault("per_learner_enrollment_limit")
+                expected_response.setdefault("per_learner_spend_limit")
+                assert response_json == expected_response
+            elif expected_response_code == status.HTTP_400_BAD_REQUEST:
+                for expected_error_keyword in expected_error_keywords:
+                    assert expected_error_keyword in response.content.decode("utf-8")
 
     @ddt.data(
         {
@@ -363,48 +645,53 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
         Test the (deprecated) policy create view's idempotency.
         """
         # Set the JWT-based auth that we'll use for every request
-        self.set_jwt_cookie([{'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}])
+        self.set_jwt_cookie([
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+                'context': str(TEST_ENTERPRISE_UUID),
+            },
+        ])
 
         # Test the retrieve endpoint
-        create_url = SUBSIDY_ACCESS_POLICY_ADMIN_LIST_ENDPOINT
-        enterprise_customer_uuid = str(TEST_ENTERPRISE_UUID)
-        catalog_uuid = str(uuid4())
-        subsidy_uuid = str(uuid4())
-        payload = {
-            'policy_type': policy_type,
-            'description': 'test description',
-            'active': True,
-            'enterprise_customer_uuid': enterprise_customer_uuid,
-            'catalog_uuid': catalog_uuid,
-            'subsidy_uuid': subsidy_uuid,
-            'access_method': AccessMethods.DIRECT,
-            'spend_limit': None,
-        }
-        payload.update(extra_fields)
-        response = self.client.post(create_url, payload)
-        assert response.status_code == expected_response_code
+        for create_url in (SUBSIDY_ACCESS_POLICY_DEPR_LIST_ENDPOINT, SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT):
+            enterprise_customer_uuid = str(TEST_ENTERPRISE_UUID)
+            catalog_uuid = str(uuid4())
+            subsidy_uuid = str(uuid4())
+            payload = {
+                'policy_type': policy_type,
+                'description': 'test description',
+                'active': True,
+                'enterprise_customer_uuid': enterprise_customer_uuid,
+                'catalog_uuid': catalog_uuid,
+                'subsidy_uuid': subsidy_uuid,
+                'access_method': AccessMethods.DIRECT,
+                'spend_limit': None,
+            }
+            payload.update(extra_fields)
+            response = self.client.post(create_url, payload)
+            assert response.status_code == expected_response_code
 
-        if expected_response_code == status.HTTP_201_CREATED:
-            response_json = response.json()
-            del response_json['uuid']
-            expected_response = payload.copy()
-            expected_response.setdefault("per_learner_enrollment_limit")
-            expected_response.setdefault("per_learner_spend_limit")
-            assert response_json == expected_response
+            if expected_response_code == status.HTTP_201_CREATED:
+                response_json = response.json()
+                del response_json['uuid']
+                expected_response = payload.copy()
+                expected_response.setdefault("per_learner_enrollment_limit")
+                expected_response.setdefault("per_learner_spend_limit")
+                assert response_json == expected_response
 
-        # Test idempotency
-        response = self.client.post(create_url, payload)
-        duplicate_status_code = status.HTTP_200_OK
+            # Test idempotency
+            response = self.client.post(create_url, payload)
+            duplicate_status_code = status.HTTP_200_OK
 
-        assert response.status_code == duplicate_status_code
+            assert response.status_code == duplicate_status_code
 
-        if response.status_code == status.HTTP_200_OK:
-            response_json = response.json()
-            del response_json['uuid']
-            expected_response = payload.copy()
-            expected_response.setdefault("per_learner_enrollment_limit")
-            expected_response.setdefault("per_learner_spend_limit")
-            assert response_json == expected_response
+            if response.status_code == status.HTTP_200_OK:
+                response_json = response.json()
+                del response_json['uuid']
+                expected_response = payload.copy()
+                expected_response.setdefault("per_learner_enrollment_limit")
+                expected_response.setdefault("per_learner_spend_limit")
+                assert response_json == expected_response
 
 
 @ddt.ddt
@@ -531,6 +818,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         subsidy_client = subsidy_client_patcher.start()
         subsidy_client.can_redeem.return_value = {
             'can_redeem': True,
+            'active': True,
             'content_price': 0,
             'unit': 'usd_cents',
             'all_transactions': [],
@@ -709,6 +997,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             existing_transactions.append(existing_transaction)
         self.redeemable_policy.subsidy_client.can_redeem.return_value = {
             'can_redeem': True,
+            'active': True,
             'content_price': 5000,
             'unit': 'usd_cents',
             'all_transactions': existing_transactions,
@@ -820,6 +1109,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         subsidy_client = subsidy_client_patcher.start()
         subsidy_client.can_redeem.return_value = {
             'can_redeem': True,
+            'active': True,
             'content_price': 5000,
             'unit': 'usd_cents',
             'all_transactions': [],
@@ -960,7 +1250,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         self, mock_lms_client, mock_transactions_cache_for_learner, has_admin_users
     ):
         """
-        Test that the can_redeem endpoint returns resons for why each non-redeemable policy failed.
+        Test that the can_redeem endpoint returns reasons for why each non-redeemable policy failed.
         """
         slug = 'sluggy'
         admin_email = 'edx@example.org'
@@ -977,6 +1267,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         }
         self.redeemable_policy.subsidy_client.can_redeem.return_value = {
             'can_redeem': False,
+            'active': True,
             'content_price': 5000,  # value is ignored.
             'unit': 'usd_cents',
             'all_transactions': [],
@@ -1093,6 +1384,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
 
         self.redeemable_policy.subsidy_client.can_redeem.return_value = {
             'can_redeem': False,
+            'active': True,
         }
         self.mock_get_content_metadata.return_value = {'content_price': 19900}
 
@@ -1166,6 +1458,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
 
         self.redeemable_policy.subsidy_client.can_redeem.return_value = {
             'can_redeem': True,
+            'active': True,
         }
         self.mock_get_content_metadata.return_value = {'content_price': 19900}
 

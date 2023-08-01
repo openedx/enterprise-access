@@ -17,6 +17,23 @@ from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPol
 logger = logging.getLogger(__name__)
 
 
+def validate_no_extra_custom_fields_for_policy_class(policy_class, fields_and_values):
+    """
+    Validates that no fields are included in the serializer
+    data pertaining to one type of SubsidyAccessPolicy that are
+    only valid for *another* type of SubsidyAccessPolicy.
+    e.g. ``per_learner_spend_limit`` is not a valid field for creating
+    or updating a ``PerLearnerEnrollmentSubsidyAccessPolicy`` record.
+    """
+    unused_custom_fields = set(policy_class.ALL_CUSTOM_FIELDS) - set(policy_class.REQUIRED_CUSTOM_FIELDS)
+    if unused_custom_fields.intersection(fields_and_values.keys()):
+        return (
+            f"Extraneous fields for {policy_class.__name__} policy type: "
+            f"{list(unused_custom_fields)}."
+        )
+    return None
+
+
 class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
     """
     A read-only Serializer for responding to requests for ``SubsidyAccessPolicy`` records.
@@ -138,12 +155,12 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
             custom_policy_field_errors.append(
                 f"Missing fields for {policy_type} policy type: {policy_class.REQUIRED_CUSTOM_FIELDS}."
             )
-        # Here's the "no more" part:
-        unused_custom_fields = set(policy_class.ALL_CUSTOM_FIELDS) - set(policy_class.REQUIRED_CUSTOM_FIELDS)
-        if unused_custom_fields.intersection(attrs.keys()):
-            custom_policy_field_errors.append(
-                f"Extraneous fields for {policy_type} policy type: {list(unused_custom_fields)}."
-            )
+
+        # Here's the "no more" part
+        extra_field_error_msg = validate_no_extra_custom_fields_for_policy_class(policy_class, attrs)
+        if extra_field_error_msg:
+            custom_policy_field_errors.append(extra_field_error_msg)
+
         if custom_policy_field_errors:
             raise serializers.ValidationError(custom_policy_field_errors)
 
@@ -222,6 +239,116 @@ class SubsidyAccessPolicyCanRedeemRequestSerializer(serializers.Serializer):
         allow_empty=False,
         help_text='Content keys about which redeemability will be queried.',
     )
+
+
+# pylint: disable=abstract-method
+class SubsidyAccessPolicyDeleteRequestSerializer(serializers.Serializer):
+    """
+    Request Serializer for DELETE parameters to an API call to delete a subsidy access policy.
+
+    For view: SubsidyAccessPolicyViewSet.destroy
+    """
+    reason = serializers.CharField(
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        help_text="Optional description (free form text) for why the subsidy access policy is being deleted.",
+    )
+
+
+class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
+    """
+    Request Serializer for PUT or PATCH requests to update a subsidy access policy.
+
+    For views: SubsidyAccessPolicyViewSet.update and SubsidyAccessPolicyViewSet.partial_update.
+    """
+    class Meta:
+        model = SubsidyAccessPolicy
+        fields = (
+            'description',
+            'active',
+            'catalog_uuid',
+            'subsidy_uuid',
+            'access_method',
+            'spend_limit',
+            'per_learner_spend_limit',
+            'per_learner_enrollment_limit',
+        )
+        extra_kwargs = {
+            'description': {
+                'required': False,
+                'allow_blank': False,
+                'min_length': None,
+                'max_length': 200,
+                'trim_whitespace': True,
+            },
+            'active': {
+                'allow_null': False,
+                'required': False,
+            },
+            'catalog_uuid': {
+                'allow_null': False,
+                'required': False,
+            },
+            'subsidy_uuid': {
+                'allow_null': False,
+                'required': False,
+            },
+            'access_method': {
+                'allow_null': False,
+                'required': False,
+            },
+            'spend_limit': {
+                'allow_null': True,
+                'required': False,
+            },
+            'per_learner_enrollment_limit': {
+                'allow_null': True,
+                'required': False,
+            },
+            'per_learner_spend_limit': {
+                'allow_null': True,
+                'required': False,
+            },
+        }
+
+    def validate(self, attrs):
+        """
+        Raises a ValidationError if any field not explicitly declared
+        as a field in this serializer defintion is provided as input.
+        """
+        unknown = sorted(set(self.initial_data) - set(self.fields))
+        if unknown:
+            raise serializers.ValidationError("Field(s) are not updatable: {}".format(", ".join(unknown)))
+        return attrs
+
+    def update(self, instance, validated_data):
+        """
+        Overwrites the update() method to check that no fields
+        that are valid in a type of SubsidyAccessPolicy that is *different*
+        from the type of ``instance`` are present in ``validated_data``.
+
+        We have to do this validation here so that we have access
+        to a ``SubsidyAccessPolicy`` instance.  It's not required
+        for the caller of the policy update view to provide a policy type,
+        so we can't infer the desired type from the request payload.
+        """
+        extra_field_error_msg = validate_no_extra_custom_fields_for_policy_class(
+            instance.__class__,
+            validated_data,
+        )
+        if extra_field_error_msg:
+            raise serializers.ValidationError(extra_field_error_msg)
+
+        return super().update(instance, validated_data)
+
+    def to_representation(self, instance):
+        """
+        Once a SubsidyAccessPolicy has been updated, we want to serialize
+        more fields from the instance than are required in this, the input serializer.
+        """
+        read_serializer = SubsidyAccessPolicyResponseSerializer(instance)
+        return read_serializer.data
 
 
 class SubsidyAccessPolicyRedeemableResponseSerializer(serializers.ModelSerializer):

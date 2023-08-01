@@ -5,20 +5,19 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import ddt
-import factory
 import pytest
 from django.core.cache import cache as django_cache
 from django.test import TestCase
 
-from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
     REASON_LEARNER_MAX_SPEND_REACHED,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
-    REASON_POLICY_NOT_ACTIVE,
-    REASON_POLICY_SPEND_LIMIT_REACHED
+    REASON_POLICY_EXPIRED,
+    REASON_POLICY_SPEND_LIMIT_REACHED,
+    REASON_SUBSIDY_EXPIRED
 )
 from enterprise_access.apps.subsidy_access_policy.models import (
     PerLearnerEnrollmentCreditAccessPolicy,
@@ -39,8 +38,8 @@ ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID = uuid4()
 class SubsidyAccessPolicyTests(TestCase):
     """ SubsidyAccessPolicy model tests. """
 
-    user = factory.SubFactory(UserFactory)
-    course_id = factory.LazyFunction(uuid4)
+    lms_user_id = 12345
+    course_id = 'course-v1:DemoX:2T2023'
 
     def setUp(self):
         """
@@ -159,7 +158,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': -100}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (True, None, []),
@@ -170,10 +169,12 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': False,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
         },
         {
             # Learner is not in the enterprise, every other check would succeed.
@@ -181,10 +182,12 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': False,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
         },
         {
             # The subsidy is not redeemable, every other check would succeed.
@@ -192,7 +195,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': False},
+            'subsidy_is_redeemable': {'can_redeem': False, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, []),
@@ -204,7 +207,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
                 'transactions': [{
                     'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID),
@@ -224,7 +227,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
                 'transactions': [{
                     'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID),
@@ -243,10 +246,23 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': False,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
-            'expected_policy_can_redeem': (False, REASON_POLICY_NOT_ACTIVE, []),
+            'expected_policy_can_redeem': (False, REASON_POLICY_EXPIRED, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
+        },
+        {
+            # The subsidy is not active, every other check would succeed.
+            # Expected can_redeem result: False
+            'policy_is_active': True,
+            'catalog_contains_content': True,
+            'enterprise_contains_learner': True,
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': False},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
+            'expected_policy_can_redeem': (False, REASON_SUBSIDY_EXPIRED, []),
         },
     )
     @ddt.unpack
@@ -259,6 +275,8 @@ class SubsidyAccessPolicyTests(TestCase):
         transactions_for_learner,
         transactions_for_policy,
         expected_policy_can_redeem,
+        expect_content_metadata_fetch=True,
+        expect_transaction_fetch=True,
     ):
         """
         Test the can_redeem method of PerLearnerEnrollmentCapLearnerCreditAccessPolicy model
@@ -276,9 +294,24 @@ class SubsidyAccessPolicyTests(TestCase):
         if policy_is_active:
             policy_record = self.per_learner_enroll_policy
 
-        can_redeem_result = policy_record.can_redeem(self.user, self.course_id)
+        can_redeem_result = policy_record.can_redeem(self.lms_user_id, self.course_id)
 
         self.assertEqual(can_redeem_result, expected_policy_can_redeem, [])
+
+        if expect_content_metadata_fetch:
+            # it's actually called twice
+            self.mock_get_content_metadata.assert_called_with(self.course_id)
+        else:
+            self.assertFalse(self.mock_get_content_metadata.called)
+
+        if expect_transaction_fetch:
+            self.mock_subsidy_client.can_redeem.assert_called_once_with(
+                policy_record.subsidy_uuid,
+                self.lms_user_id,
+                self.course_id,
+            )
+        else:
+            self.assertFalse(self.mock_subsidy_client.can_redeem.called)
 
     @ddt.data(
         {
@@ -288,7 +321,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': -100}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (True, None, []),
@@ -299,10 +332,12 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': False,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_CONTENT_NOT_IN_CATALOG, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
         },
         {
             # Learner is not in the enterprise, every other check would succeed.
@@ -310,10 +345,12 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': False,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
         },
         {
             # The subsidy is not redeemable, every other check would succeed.
@@ -321,7 +358,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': False},
+            'subsidy_is_redeemable': {'can_redeem': False, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
             'expected_policy_can_redeem': (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, []),
@@ -333,7 +370,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
                 'transactions': [{
                     'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID),
@@ -353,7 +390,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': True,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
                 'transactions': [{
                     'subsidy_access_policy_uuid': str(ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID),
@@ -372,10 +409,23 @@ class SubsidyAccessPolicyTests(TestCase):
             'policy_is_active': False,
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
-            'subsidy_is_redeemable': {'can_redeem': True},
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
-            'expected_policy_can_redeem': (False, REASON_POLICY_NOT_ACTIVE, []),
+            'expected_policy_can_redeem': (False, REASON_POLICY_EXPIRED, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
+        },
+        {
+            # The subsidy is not active, every other check would succeed.
+            # Expected can_redeem result: False
+            'policy_is_active': True,
+            'catalog_contains_content': True,
+            'enterprise_contains_learner': True,
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': False},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
+            'expected_policy_can_redeem': (False, REASON_SUBSIDY_EXPIRED, []),
         },
     )
     @ddt.unpack
@@ -388,6 +438,8 @@ class SubsidyAccessPolicyTests(TestCase):
         transactions_for_learner,
         transactions_for_policy,
         expected_policy_can_redeem,
+        expect_content_metadata_fetch=True,
+        expect_transaction_fetch=True,
     ):
         """
         Test the can_redeem method of PerLearnerSpendCapLearnerCreditAccessPolicy model
@@ -405,9 +457,24 @@ class SubsidyAccessPolicyTests(TestCase):
         if policy_is_active:
             policy_record = self.per_learner_spend_policy
 
-        can_redeem_result = policy_record.can_redeem(self.user, self.course_id)
+        can_redeem_result = policy_record.can_redeem(self.lms_user_id, self.course_id)
 
         self.assertEqual(can_redeem_result, expected_policy_can_redeem)
+
+        if expect_content_metadata_fetch:
+            # it's actually called twice
+            self.mock_get_content_metadata.assert_called_with(self.course_id)
+        else:
+            self.assertFalse(self.mock_get_content_metadata.called)
+
+        if expect_transaction_fetch:
+            self.mock_subsidy_client.can_redeem.assert_called_once_with(
+                policy_record.subsidy_uuid,
+                self.lms_user_id,
+                self.course_id,
+            )
+        else:
+            self.assertFalse(self.mock_subsidy_client.can_redeem.called)
 
     def test_acquire_lock_release_lock_no_kwargs(self):
         """

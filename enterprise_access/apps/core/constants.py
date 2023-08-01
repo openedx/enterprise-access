@@ -11,10 +11,11 @@ SYSTEM_ENTERPRISE_OPERATOR_ROLE = 'enterprise_openedx_operator'
 REQUESTS_ADMIN_ACCESS_PERMISSION = 'requests.has_admin_access'
 REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION = 'requests.has_learner_or_admin_access'
 
-POLICY_ADMIN_ROLE = 'enterprise_access_subsidy_access_policy_admin'
-POLICY_LEARNER_ROLE = 'enterprise_access_subsidy_access_policy_learner'
-POLICY_READ_PERMISSION = 'policy.has_read_access'
-POLICY_REDEMPTION_PERMISSION = 'policy.has_redemption_access'
+SUBSIDY_ACCESS_POLICY_OPERATOR_ROLE = 'enterprise_access_subsidy_access_policy_operator'
+SUBSIDY_ACCESS_POLICY_LEARNER_ROLE = 'enterprise_access_subsidy_access_policy_learner'
+SUBSIDY_ACCESS_POLICY_READ_PERMISSION = 'subsidy_access_policy.has_read_access'
+SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION = 'subsidy_access_policy.has_write_access'
+SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION = 'subsidy_access_policy.has_redemption_access'
 
 ALL_ACCESS_CONTEXT = '*'
 

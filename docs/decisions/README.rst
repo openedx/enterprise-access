@@ -119,3 +119,9 @@ Accepted in May 2023, this ADR supercedes `<0003 Initial API Specification>`_:
 Accepted in May 2023, this ADR partially supercedes `<0003 Initial API Specification>`_:
 
   There are some unneeded and misnamed routes related to policy redemption which we want to fix.
+
+`<0011-subsidy-access-policy-crud-api-definition.rst>`_
+**************************************************************
+*Feature: Subsidy Access Policy (Learner Credit)*
+
+Accepted in August 2023, this ADR defines and describes the refactored access policy CRUD API.
