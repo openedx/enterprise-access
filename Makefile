@@ -204,8 +204,17 @@ dev.restore: dev.up
 app-shell: # Run the app shell as root
 	docker exec -u 0 -it enterprise_access.app bash
 
-db-shell: # Run the app shell as root, enter the app's database
+db-shell-57: # Run the mysql 5.7 shell as root, enter the app's database
 	docker exec -u 0 -it enterprise_access.db mysql -u root enterprise_access
+
+db-shell-8: # Run the mysql 8 shell as root, enter the app's database
+	docker exec -u 0 -it enterprise_access.mysql80 mysql -u root enterprise_access
+
+dev.dbcopy8: ## Copy data from old mysql 5.7 container into a new 8 db
+	mkdir -p .dev/
+	docker-compose exec db bash -c "mysqldump --databases enterprise_access" > .dev/enterprise_access.sql
+	docker-compose exec -T mysql80 bash -c "mysql" < .dev/enterprise_access.sql
+	rm .dev/enterprise_access.sql
 
 %-logs: # View the logs of the specified service container
 	docker-compose logs -f --tail=500 $*
