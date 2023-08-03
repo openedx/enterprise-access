@@ -88,9 +88,6 @@ class MissingSubsidyAccessReasonUserMessages:
     ORGANIZATION_EXPIRED_FUNDS = "You can't enroll right now because your funds expired."
     ORGANIZATION_EXPIRED_FUNDS_NO_ADMINS = "You can't enroll right now because your funds expired. " \
                                            "Contact your administrator for help."
-    ORGANIZATION_EXPIRED_PLAN = "You can't enroll right now because your organization's funds expired."
-    ORGANIZATION_EXPIRED_PLAN_NO_ADMINS = "You can't enroll right now because your organization's funds expired. " \
-                                          "Contact your administrator for help."
     LEARNER_LIMITS_REACHED = "You can't enroll right now because of limits set by your organization."
     CONTENT_NOT_IN_CATALOG = \
         "You can't enroll right now because this course is no longer available in your organization's catalog."

@@ -11,6 +11,20 @@ services:
     volumes:
       - enterprise_access_mysql57:/var/lib/mysql
 
+  mysql80:
+    command: mysqld --character-set-server=utf8 --collation-server=utf8_general_ci
+    container_name: enterprise_access.mysql80
+    environment:
+      MYSQL_ROOT_PASSWORD: ""
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    # Oracle-packaged version includes a `linux/arm64/v8` version, needed for
+    # machines with Apple Silicon CPUs (Mac M1, M2)
+    image: mysql:8.0.33-oracle
+    networks:
+      - devstack_default
+    volumes:
+      - enterprise_access_mysql80:/var/lib/mysql
+
   memcache:
     image: memcached:1.4.24
     container_name: enterprise_access.memcache
@@ -80,3 +94,4 @@ networks:
 
 volumes:
   enterprise_access_mysql57:
+  enterprise_access_mysql80:
