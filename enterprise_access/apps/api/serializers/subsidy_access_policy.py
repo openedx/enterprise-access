@@ -52,6 +52,9 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
             'per_learner_enrollment_limit',
             'per_learner_spend_limit',
             'spend_limit',
+            'subsidy_active_datetime',
+            'subsidy_expiration_datetime',
+            'is_subsidy_active',
         ]
         read_only_fields = fields
 
@@ -79,6 +82,9 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
             'per_learner_enrollment_limit',
             'per_learner_spend_limit',
             'spend_limit',
+            'subsidy_active_datetime',
+            'subsidy_expiration_datetime',
+            'is_subsidy_active',
         ]
         read_only_fields = ['uuid']
         extra_kwargs = {
@@ -111,6 +117,18 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
                 'required': False,
             },
             'per_learner_spend_limit': {
+                'allow_null': True,
+                'required': False,
+            },
+            'subsidy_active_datetime': {
+                'allow_null': True,
+                'required': False,
+            },
+            'subsidy_expiration_datetime': {
+                'allow_null': True,
+                'required': False,
+            },
+            'is_subsidy_active': {
                 'allow_null': True,
                 'required': False,
             },
@@ -273,6 +291,9 @@ class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
             'spend_limit',
             'per_learner_spend_limit',
             'per_learner_enrollment_limit',
+            'subsidy_active_datetime',
+            'subsidy_expiration_datetime',
+            'is_subsidy_active',
         )
         extra_kwargs = {
             'description': {
@@ -310,12 +331,24 @@ class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
                 'allow_null': True,
                 'required': False,
             },
+            'subsidy_active_datetime': {
+                'allow_null': True,
+                'required': False,
+            },
+            'subsidy_expiration_datetime': {
+                'allow_null': True,
+                'required': False,
+            },
+            'is_subsidy_active': {
+                'allow_null': True,
+                'required': False,
+            },
         }
 
     def validate(self, attrs):
         """
         Raises a ValidationError if any field not explicitly declared
-        as a field in this serializer defintion is provided as input.
+        as a field in this serializer definition is provided as input.
         """
         unknown = sorted(set(self.initial_data) - set(self.fields))
         if unknown:

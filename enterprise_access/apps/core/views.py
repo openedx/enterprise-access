@@ -34,7 +34,7 @@ def health(_):
         '{"overall_status": "OK", "detailed_status": {"database_status": "OK", "lms_status": "OK"}}'
     """
 
-    # Ignores health check in performance monitoring so as to not artifically inflate our response time metrics
+    # Ignores health check in performance monitoring so as to not artificially inflate our response time metrics
     ignore_transaction()
 
     try:

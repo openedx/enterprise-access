@@ -1,6 +1,7 @@
 """
 Tests for subsidy_access_policy models.
 """
+from datetime import datetime, timedelta
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -539,3 +540,34 @@ class SubsidyAccessPolicyTests(TestCase):
         """
         with self.assertRaisesRegex(Exception, 'Expected a sum of transaction quantities <= 0'):
             self.per_learner_enroll_policy.content_would_exceed_limit(10, 100, 15)
+
+    def test_mock_subsidy_datetimes(self):
+        yesterday = datetime.utcnow() - timedelta(days = 1)
+        future = datetime.utcnow() + timedelta(weeks = 4)
+        mock_subsidy = {
+            'id': 123455,
+            'active_datetime': yesterday,
+            'expiration_datetime': future,
+            'is_active': True
+        }
+        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+        policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
+        assert policy.subsidy_record() == mock_subsidy 
+
+
+    def test_mock_subsidy_datetimes(self):
+        yesterday = datetime.utcnow() - timedelta(days = 1)
+        future = datetime.utcnow() + timedelta(weeks = 4)
+        mock_subsidy = {
+            'id': 123455,
+            'active_datetime': yesterday,
+            'expiration_datetime': future,
+            'is_active': True,
+        }
+        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+        policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
+        assert policy.subsidy_record() == mock_subsidy 
+
+        assert policy.subsidy_active_datetime == mock_subsidy.get('active_datetime')
+        assert policy.subsidy_expiration_datetime == mock_subsidy.get('expiration_datetime')
+        assert policy.is_subsidy_active == mock_subsidy.get('is_active')
