@@ -554,7 +554,6 @@ class SubsidyAccessPolicyTests(TestCase):
         policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
         assert policy.subsidy_record() == mock_subsidy 
 
-
     def test_mock_subsidy_datetimes(self):
         yesterday = datetime.utcnow() - timedelta(days = 1)
         future = datetime.utcnow() + timedelta(weeks = 4)
