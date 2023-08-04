@@ -29,7 +29,6 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
 from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
 from test_utils import APITestWithMocks
 
-SUBSIDY_ACCESS_POLICY_DEPR_LIST_ENDPOINT = reverse('api:v1:admin-policy-list')
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:subsidy-access-policies-list')
 
 TEST_ENTERPRISE_UUID = uuid4()
@@ -107,35 +106,26 @@ class TestPolicyCRUDAuthNAndPermissionChecks(CRUDViewTestMixin, APITestWithMocks
 
         request_kwargs = {'uuid': str(self.redeemable_policy.uuid)}
 
+        detail_url = reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs)
+        list_url = reverse('api:v1:subsidy-access-policies-list')
+
         # Test the retrieve endpoint
-        response = self.client.get(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
-        self.assertEqual(response.status_code, expected_response_code)
-
-        # Test the list endpoint
-        response = self.client.get(reverse('api:v1:subsidy-access-policies-list'))
-        self.assertEqual(response.status_code, expected_response_code)
-
-        # Test all the deprecated viewset actions.
-        detail_url = reverse('api:v1:admin-policy-detail', kwargs=request_kwargs)
-        list_url = reverse('api:v1:admin-policy-list')
-
-        # Test the deprecated retrieve endpoint
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, expected_response_code)
 
-        # Test the deprecated list endpoint
+        # Test the list endpoint
         response = self.client.get(list_url)
         self.assertEqual(response.status_code, expected_response_code)
 
-        # Test the deprecated create action
+        # Test the create action
         response = self.client.post(list_url, data={'any': 'payload'})
         self.assertEqual(response.status_code, expected_response_code)
 
-        # Test the deprecated patch action
+        # Test the patch action
         response = self.client.patch(detail_url, data={'any': 'other payload'})
         self.assertEqual(response.status_code, expected_response_code)
 
-        # Test the deprecated destroy action
+        # Test the destroy action
         response = self.client.delete(detail_url)
         self.assertEqual(response.status_code, expected_response_code)
 
@@ -604,31 +594,30 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
         ])
 
         # Test the retrieve endpoint
-        for create_url in (SUBSIDY_ACCESS_POLICY_DEPR_LIST_ENDPOINT, SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT):
-            payload = {
-                'policy_type': policy_type,
-                'description': 'test description',
-                'active': True,
-                'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
-                'catalog_uuid': str(uuid4()),
-                'subsidy_uuid': str(uuid4()),
-                'access_method': AccessMethods.DIRECT,
-                'spend_limit': None,
-            }
-            payload.update(extra_fields)
-            response = self.client.post(create_url, payload)
-            assert response.status_code == expected_response_code
+        payload = {
+            'policy_type': policy_type,
+            'description': 'test description',
+            'active': True,
+            'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
+            'catalog_uuid': str(uuid4()),
+            'subsidy_uuid': str(uuid4()),
+            'access_method': AccessMethods.DIRECT,
+            'spend_limit': None,
+        }
+        payload.update(extra_fields)
+        response = self.client.post(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, payload)
+        assert response.status_code == expected_response_code
 
-            if expected_response_code == status.HTTP_201_CREATED:
-                response_json = response.json()
-                del response_json['uuid']
-                expected_response = payload.copy()
-                expected_response.setdefault("per_learner_enrollment_limit")
-                expected_response.setdefault("per_learner_spend_limit")
-                assert response_json == expected_response
-            elif expected_response_code == status.HTTP_400_BAD_REQUEST:
-                for expected_error_keyword in expected_error_keywords:
-                    assert expected_error_keyword in response.content.decode("utf-8")
+        if expected_response_code == status.HTTP_201_CREATED:
+            response_json = response.json()
+            del response_json['uuid']
+            expected_response = payload.copy()
+            expected_response.setdefault("per_learner_enrollment_limit")
+            expected_response.setdefault("per_learner_spend_limit")
+            assert response_json == expected_response
+        elif expected_response_code == status.HTTP_400_BAD_REQUEST:
+            for expected_error_keyword in expected_error_keywords:
+                assert expected_error_keyword in response.content.decode("utf-8")
 
     @ddt.data(
         {
@@ -653,45 +642,44 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
         ])
 
         # Test the retrieve endpoint
-        for create_url in (SUBSIDY_ACCESS_POLICY_DEPR_LIST_ENDPOINT, SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT):
-            enterprise_customer_uuid = str(TEST_ENTERPRISE_UUID)
-            catalog_uuid = str(uuid4())
-            subsidy_uuid = str(uuid4())
-            payload = {
-                'policy_type': policy_type,
-                'description': 'test description',
-                'active': True,
-                'enterprise_customer_uuid': enterprise_customer_uuid,
-                'catalog_uuid': catalog_uuid,
-                'subsidy_uuid': subsidy_uuid,
-                'access_method': AccessMethods.DIRECT,
-                'spend_limit': None,
-            }
-            payload.update(extra_fields)
-            response = self.client.post(create_url, payload)
-            assert response.status_code == expected_response_code
+        enterprise_customer_uuid = str(TEST_ENTERPRISE_UUID)
+        catalog_uuid = str(uuid4())
+        subsidy_uuid = str(uuid4())
+        payload = {
+            'policy_type': policy_type,
+            'description': 'test description',
+            'active': True,
+            'enterprise_customer_uuid': enterprise_customer_uuid,
+            'catalog_uuid': catalog_uuid,
+            'subsidy_uuid': subsidy_uuid,
+            'access_method': AccessMethods.DIRECT,
+            'spend_limit': None,
+        }
+        payload.update(extra_fields)
+        response = self.client.post(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, payload)
+        assert response.status_code == expected_response_code
 
-            if expected_response_code == status.HTTP_201_CREATED:
-                response_json = response.json()
-                del response_json['uuid']
-                expected_response = payload.copy()
-                expected_response.setdefault("per_learner_enrollment_limit")
-                expected_response.setdefault("per_learner_spend_limit")
-                assert response_json == expected_response
+        if expected_response_code == status.HTTP_201_CREATED:
+            response_json = response.json()
+            del response_json['uuid']
+            expected_response = payload.copy()
+            expected_response.setdefault("per_learner_enrollment_limit")
+            expected_response.setdefault("per_learner_spend_limit")
+            assert response_json == expected_response
 
-            # Test idempotency
-            response = self.client.post(create_url, payload)
-            duplicate_status_code = status.HTTP_200_OK
+        # Test idempotency
+        response = self.client.post(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, payload)
+        duplicate_status_code = status.HTTP_200_OK
 
-            assert response.status_code == duplicate_status_code
+        assert response.status_code == duplicate_status_code
 
-            if response.status_code == status.HTTP_200_OK:
-                response_json = response.json()
-                del response_json['uuid']
-                expected_response = payload.copy()
-                expected_response.setdefault("per_learner_enrollment_limit")
-                expected_response.setdefault("per_learner_spend_limit")
-                assert response_json == expected_response
+        if response.status_code == status.HTTP_200_OK:
+            response_json = response.json()
+            del response_json['uuid']
+            expected_response = payload.copy()
+            expected_response.setdefault("per_learner_enrollment_limit")
+            expected_response.setdefault("per_learner_spend_limit")
+            assert response_json == expected_response
 
 
 @ddt.ddt
