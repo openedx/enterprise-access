@@ -9,7 +9,6 @@ urlpatterns = []
 
 router = DefaultRouter()
 
-router.register("admin/policy", views.SubsidyAccessPolicyCRUDViewset, 'admin-policy')  # DEPRECATED viewset
 router.register("policy-redemption", views.SubsidyAccessPolicyRedeemViewset, 'policy-redemption')
 router.register("subsidy-access-policies", views.SubsidyAccessPolicyViewSet, 'subsidy-access-policies')
 router.register("license-requests", views.LicenseRequestViewSet, 'license-requests')
