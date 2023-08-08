@@ -548,19 +548,6 @@ class SubsidyAccessPolicyTests(TestCase):
             'id': 123455,
             'active_datetime': yesterday,
             'expiration_datetime': future,
-            'is_active': True
-        }
-        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
-        policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
-        assert policy.subsidy_record() == mock_subsidy 
-
-    def test_mock_subsidy_datetimes(self):
-        yesterday = datetime.utcnow() - timedelta(days = 1)
-        future = datetime.utcnow() + timedelta(weeks = 4)
-        mock_subsidy = {
-            'id': 123455,
-            'active_datetime': yesterday,
-            'expiration_datetime': future,
             'is_active': True,
         }
         self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy

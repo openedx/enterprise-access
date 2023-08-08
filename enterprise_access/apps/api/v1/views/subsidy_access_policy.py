@@ -8,18 +8,13 @@ from contextlib import suppress
 
 import requests
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from django.core.exceptions import ValidationError
+from drf_spectacular.utils import extend_schema
 from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient
 from edx_rbac.decorators import permission_required
 from edx_rbac.mixins import PermissionRequiredMixin
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
-from rest_framework import authentication
-from rest_framework import filters as rest_filters
-from rest_framework import mixins, permissions
-from rest_framework import serializers as rest_serializers
-from rest_framework import status, viewsets
+from rest_framework import authentication, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import APIException, NotFound
 from rest_framework.generics import get_object_or_404
@@ -33,11 +28,8 @@ from enterprise_access.apps.core.constants import (
     SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION,
     SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION
 )
-from enterprise_access.apps.events.signals import ACCESS_POLICY_CREATED, ACCESS_POLICY_UPDATED, SUBSIDY_REDEEMED
-from enterprise_access.apps.events.utils import (
-    send_access_policy_event_to_event_bus,
-    send_subsidy_redemption_event_to_event_bus
-)
+from enterprise_access.apps.events.signals import SUBSIDY_REDEEMED
+from enterprise_access.apps.events.utils import send_subsidy_redemption_event_to_event_bus
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
@@ -62,7 +54,6 @@ from .utils import PaginationWithPageCount
 
 logger = logging.getLogger(__name__)
 
-SUBSIDY_ACCESS_POLICY_CRUD_API_TAG_DEPRECATED = 'DEPRECATED: Subsidy Access Policy views'
 SUBSIDY_ACCESS_POLICY_CRUD_API_TAG = 'Subsidy Access Policies CRUD'
 SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG = 'Subsidy Access Policy Redemption'
 
@@ -241,132 +232,6 @@ class SubsidyAccessPolicyViewSet(
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
 
-@extend_schema_view(
-    retrieve=extend_schema(
-        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG_DEPRECATED],
-        summary='Retrieve subsidy access policy.',
-    ),
-    delete=extend_schema(
-        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG_DEPRECATED],
-        summary='Delete subsidy access policy.',
-    ),
-)
-class SubsidyAccessPolicyCRUDViewset(PermissionRequiredMixin, viewsets.ModelViewSet):
-    """
-    DEPRECATED: Viewset for Subsidy Access Policy CRUD operations.
-    """
-
-    permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = serializers.SubsidyAccessPolicyCRUDSerializer
-    authentication_classes = (JwtAuthentication,)
-    filter_backends = (rest_filters.OrderingFilter, DjangoFilterBackend,)
-    filterset_fields = ('enterprise_customer_uuid', 'policy_type',)
-    pagination_class = PaginationWithPageCount
-    http_method_names = ['get', 'post', 'patch', 'delete']
-    lookup_field = 'uuid'
-    # TODO: Whoever refactors this viewset should make it possible for operators to create policies, and should make it
-    # impossible for learners to create policies.
-    permission_required = SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION
-
-    def __init__(self, *args, **kwargs):
-        self.extra_context = {}
-        super().__init__(*args, **kwargs)
-
-    def set_policy_created(self, created):
-        self.extra_context['created'] = created
-
-    @property
-    def requested_enterprise_customer_uuid(self):
-        """
-        The enterprise_customer_uuid from request params or post body
-        """
-        enterprise_customer_uuid = None
-        if self.action in ('retrieve', 'partial_update', 'destroy'):
-            policy_uuid = self.kwargs.get('uuid')
-            if policy_uuid:
-                try:
-                    policy = SubsidyAccessPolicy.objects.get(uuid=policy_uuid)
-                    enterprise_customer_uuid = str(policy.enterprise_customer_uuid)
-                except ObjectDoesNotExist:
-                    enterprise_customer_uuid = None
-        elif self.action == 'create':
-            enterprise_customer_uuid = self.request.data.get('enterprise_customer_uuid')
-        else:
-            enterprise_customer_uuid = self.request.query_params.get('enterprise_customer_uuid', None)
-        return enterprise_customer_uuid
-
-    def get_permission_object(self):
-        """
-        Returns the enterprise_customer_uuid to verify that requesting user possess the enterprise admin role.
-        """
-        return self.requested_enterprise_customer_uuid
-
-    @extend_schema(
-        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG_DEPRECATED],
-        summary='Create subsidy access policy.',
-    )
-    def create(self, request, *args, **kwargs):
-        """
-        Create a SubsidyAccessPolicy.
-        """
-        policy_data = request.data
-        serializer = self.get_serializer(data=policy_data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        policy_created = self.extra_context.get('created')
-        send_access_policy_event_to_event_bus(
-            ACCESS_POLICY_CREATED.event_type,
-            serializer.data
-        )
-        if policy_created:
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    @extend_schema(
-        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG_DEPRECATED],
-        summary='Update subsidy access policy.',
-    )
-    def partial_update(self, request, *args, **kwargs):
-        """
-        Used for http patch method. Updates the policy data passed in request after validation.
-        """
-        policy_data_from_request = request.data
-        policy_uuid_from_url = self.kwargs.get('uuid')
-        if policy_data_from_request.get('uuid') != policy_uuid_from_url:
-            raise rest_serializers.ValidationError('"policy_uuid" cannot be changed')
-        policy = get_object_or_404(SubsidyAccessPolicy, pk=policy_uuid_from_url)
-        serializer = self.get_serializer(policy, data=policy_data_from_request, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        send_access_policy_event_to_event_bus(
-            ACCESS_POLICY_UPDATED.event_type,
-            serializer.data
-        )
-        return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
-
-    @extend_schema(
-        tags=[SUBSIDY_ACCESS_POLICY_CRUD_API_TAG_DEPRECATED],
-        summary='List subsidy access policy.',
-    )
-    def list(self, request, *args, **kwargs):
-        """
-        List action for SubsidyAccessPolicyCRUDViewset. Show all policies linked with the group uuid passed in request.
-        """
-        enterprise_customer_uuid = self.requested_enterprise_customer_uuid
-        if not enterprise_customer_uuid:
-            raise rest_serializers.ValidationError('"enterprise_customer_uuid" query param is required')
-        return super().list(request, *args, **kwargs)
-
-    def get_queryset(self):
-        """
-        Queryset for the SubsidyAccessPolicyCRUDViewset. The admins should only be able to perform CRUD operations
-        on the enterprise's policies they belong to.
-        """
-        queryset = SubsidyAccessPolicy.objects.order_by('-created')
-        enterprise_customer_uuid = self.requested_enterprise_customer_uuid
-        return queryset.filter(enterprise_customer_uuid=enterprise_customer_uuid)
-
-
 class RedemptionRequestException(APIException):
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     default_detail = 'Could not redeem'
@@ -532,8 +397,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
             400: There are missing or otherwise invalid input parameters.
             403: The requester has insufficient redeem permissions.
-            422: The subisdy access policy is not redeemable in a way that IS NOT retryable.
-            429: The subisdy access policy is not redeemable in a way that IS retryable (e.g. policy currently locked).
+            422: The subsidy access policy is not redeemable in a way that IS NOT retryable.
+            429: The subsidy access policy is not redeemable in a way that IS retryable (e.g. policy currently locked).
             200: The policy was successfully redeemed.  Response body is JSON with a serialized Transaction
                  containing the following keys (sample values):
                  {
@@ -636,15 +501,9 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_EXPIRED_FUNDS_NO_ADMINS
         )
 
-        user_message_organization_plan_expired = (
-            MissingSubsidyAccessReasonUserMessages.ORGANIZATION_EXPIRED_PLAN
-            if has_enterprise_admin_users
-            else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_EXPIRED_PLAN_NO_ADMINS
-        )
-
         MISSING_SUBSIDY_ACCESS_POLICY_REASONS = {
-            REASON_POLICY_EXPIRED: user_message_organization_fund_expired,
-            REASON_SUBSIDY_EXPIRED: user_message_organization_plan_expired,
+            REASON_POLICY_EXPIRED: user_message_organization_no_funds,
+            REASON_SUBSIDY_EXPIRED: user_message_organization_fund_expired,
             REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY: user_message_organization_no_funds,
             REASON_POLICY_SPEND_LIMIT_REACHED: user_message_organization_no_funds,
             REASON_LEARNER_NOT_IN_ENTERPRISE: MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_IN_ENTERPRISE,

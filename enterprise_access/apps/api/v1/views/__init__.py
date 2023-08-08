@@ -8,8 +8,4 @@ from .browse_and_request import (
     SubsidyRequestCustomerConfigurationViewSet,
     SubsidyRequestViewSet
 )
-from .subsidy_access_policy import (
-    SubsidyAccessPolicyCRUDViewset,
-    SubsidyAccessPolicyRedeemViewset,
-    SubsidyAccessPolicyViewSet
-)
+from .subsidy_access_policy import SubsidyAccessPolicyRedeemViewset, SubsidyAccessPolicyViewSet
