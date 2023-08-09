@@ -543,7 +543,7 @@ class SubsidyAccessPolicyTests(TestCase):
 
     def test_mock_subsidy_datetimes(self):
         yesterday = datetime.utcnow() - timedelta(days=1)
-        tomorrow = datetime.utcnow() + timedelta(weeks=4)
+        tomorrow = datetime.utcnow() + timedelta(days=1)
         mock_subsidy = {
             'id': 123455,
             'active_datetime': yesterday,

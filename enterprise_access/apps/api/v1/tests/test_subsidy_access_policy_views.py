@@ -64,6 +64,26 @@ class CRUDViewTestMixin:
         super().setUp()
         # Start in an unauthenticated state.
         self.client.logout()
+     
+    def setup_subsidy_mocks(self):
+        """
+        Setup mocks for subsidy.
+        """
+        self.yesterday = datetime.utcnow() - timedelta(days=1)
+        self.tomorrow = datetime.utcnow() + timedelta(days=1)
+        mock_subsidy = {
+            'id': 123455,
+            'active_datetime': self.yesterday,
+            'expiration_datetime': self.tomorrow,
+            'is_active': True,
+        }
+        subsidy_client_patcher = patch.object(
+            SubsidyAccessPolicy, 'subsidy_client'
+        )
+        self.mock_subsidy_client = subsidy_client_patcher.start()
+        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+
+        self.addCleanup(subsidy_client_patcher.stop)
 
 
 @ddt.ddt
@@ -207,27 +227,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
 
     def setUp(self):
         super().setUp()
-        self.setup_mocks()
-
-    def setup_mocks(self):
-        """
-        Setup mocks for subsidy.
-        """
-        self.yesterday = datetime.utcnow() - timedelta(days=1)
-        self.tomorrow = datetime.utcnow() + timedelta(weeks=4)
-        mock_subsidy = {
-            'id': 123455,
-            'active_datetime': self.yesterday,
-            'expiration_datetime': self.tomorrow,
-            'is_active': True,
-        }
-        subsidy_client_patcher = patch.object(
-            SubsidyAccessPolicy, 'subsidy_client'
-        )
-        self.mock_subsidy_client = subsidy_client_patcher.start()
-        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
-
-        self.addCleanup(subsidy_client_patcher.stop)
+        super().setup_subsidy_mocks()
 
     @ddt.data(
         # A good admin role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
@@ -249,7 +249,6 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         # Test the retrieve endpoint
         response = self.client.get(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        print(response.json())
         self.maxDiff = None
         self.assertEqual({
             'access_method': 'direct',
@@ -558,27 +557,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
 
     def setUp(self):
         super().setUp()
-        self.setup_mocks()
-
-    def setup_mocks(self):
-        """
-        Setup mocks for subsidy.
-        """
-        self.yesterday = datetime.utcnow() - timedelta(days=1)
-        self.tomorrow = datetime.utcnow() + timedelta(weeks=4)
-        mock_subsidy = {
-            'id': 123455,
-            'active_datetime': self.yesterday,
-            'expiration_datetime': self.tomorrow,
-            'is_active': True,
-        }
-        subsidy_client_patcher = patch.object(
-            SubsidyAccessPolicy, 'subsidy_client'
-        )
-        self.mock_subsidy_client = subsidy_client_patcher.start()
-        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
-
-        self.addCleanup(subsidy_client_patcher.stop)
+        super().setup_subsidy_mocks()
 
     @ddt.data(
         {
