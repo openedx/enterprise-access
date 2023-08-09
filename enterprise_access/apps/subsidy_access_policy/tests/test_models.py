@@ -542,17 +542,17 @@ class SubsidyAccessPolicyTests(TestCase):
             self.per_learner_enroll_policy.content_would_exceed_limit(10, 100, 15)
 
     def test_mock_subsidy_datetimes(self):
-        yesterday = datetime.utcnow() - timedelta(days = 1)
-        future = datetime.utcnow() + timedelta(weeks = 4)
+        yesterday = datetime.utcnow() - timedelta(days=1)
+        tomorrow = datetime.utcnow() + timedelta(weeks=4)
         mock_subsidy = {
             'id': 123455,
             'active_datetime': yesterday,
-            'expiration_datetime': future,
+            'expiration_datetime': tomorrow,
             'is_active': True,
         }
         self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
         policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
-        assert policy.subsidy_record() == mock_subsidy 
+        assert policy.subsidy_record() == mock_subsidy
 
         assert policy.subsidy_active_datetime == mock_subsidy.get('active_datetime')
         assert policy.subsidy_expiration_datetime == mock_subsidy.get('expiration_datetime')

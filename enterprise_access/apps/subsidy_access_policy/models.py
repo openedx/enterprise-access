@@ -143,18 +143,18 @@ class SubsidyAccessPolicy(TimeStampedModel):
     @property
     def subsidy_active_datetime(self):
         """
-        The datetime when this policy's associated subsidy is considered active. 
+        The datetime when this policy's associated subsidy is considered active.
         If null, this subsidy is considered active.
         """
-        return self.subsidy_record().get('active_datetime')
+        return self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid).get('active_datetime')
 
     @property
     def subsidy_expiration_datetime(self):
         """
-        The datetime when this policy's associated subsidy is considered expired. 
+        The datetime when this policy's associated subsidy is considered expired.
         If null, this subsidy is considered active.
         """
-        return self.subsidy_record().get('expiration_datetime')
+        return self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid).get('expiration_datetime')
 
     @property
     def is_subsidy_active(self):
@@ -162,7 +162,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Returns true if the localized current time is
         between ``subsidy_active_datetime`` and ``subsidy_expiration_datetime``.
         """
-        return self.subsidy_record().get('is_active')
+        return self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid).get('is_active')
 
     @property
     def subsidy_client(self):
