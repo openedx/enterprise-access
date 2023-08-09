@@ -64,7 +64,7 @@ class CRUDViewTestMixin:
         super().setUp()
         # Start in an unauthenticated state.
         self.client.logout()
-     
+
     def setup_subsidy_mocks(self):
         """
         Setup mocks for subsidy.
@@ -249,7 +249,6 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         # Test the retrieve endpoint
         response = self.client.get(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.maxDiff = None
         self.assertEqual({
             'access_method': 'direct',
             'active': True,
