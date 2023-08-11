@@ -26,7 +26,7 @@ http://localhost:18270/api/schema/redoc/#tag/Subsidy-Access-Policies-CRUD/operat
 
 A ``POST`` request to ``/api/v1/subsidy-access-policies/`` will create, idempotently, a policy record - if an equivalent
 record already exists, that record will be returned and no new policy is created.  Use this
-endpoint to create a new policy record, preferrably after the related subsidy and catalog
+endpoint to create a new policy record, preferably after the related subsidy and catalog
 records already exist.
 
 Policy Retrieval

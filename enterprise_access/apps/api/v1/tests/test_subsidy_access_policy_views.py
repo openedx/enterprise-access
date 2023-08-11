@@ -1,8 +1,10 @@
 """
 Tests for Enterprise Access Subsidy Access Policy app API v1 views.
 """
+from datetime import datetime, timedelta
 from operator import itemgetter
 from unittest import mock
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import ddt
@@ -22,6 +24,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     PolicyTypes,
     TransactionStateChoices
 )
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
@@ -61,6 +64,26 @@ class CRUDViewTestMixin:
         super().setUp()
         # Start in an unauthenticated state.
         self.client.logout()
+
+    def setup_subsidy_mocks(self):
+        """
+        Setup mocks for subsidy.
+        """
+        self.yesterday = datetime.utcnow() - timedelta(days=1)
+        self.tomorrow = datetime.utcnow() + timedelta(days=1)
+        mock_subsidy = {
+            'id': 123455,
+            'active_datetime': self.yesterday,
+            'expiration_datetime': self.tomorrow,
+            'is_active': True,
+        }
+        subsidy_client_patcher = patch.object(
+            SubsidyAccessPolicy, 'subsidy_client'
+        )
+        self.mock_subsidy_client = subsidy_client_patcher.start()
+        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+
+        self.addCleanup(subsidy_client_patcher.stop)
 
 
 @ddt.ddt
@@ -201,6 +224,11 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
     """
     Test the list and detail views for subsidy access policy records.
     """
+
+    def setUp(self):
+        super().setUp()
+        super().setup_subsidy_mocks()
+
     @ddt.data(
         # A good admin role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
         {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
@@ -233,6 +261,9 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'spend_limit': 3,
             'subsidy_uuid': str(self.redeemable_policy.subsidy_uuid),
             'uuid': str(self.redeemable_policy.uuid),
+            'subsidy_active_datetime': self.yesterday.isoformat(),
+            'subsidy_expiration_datetime': self.tomorrow.isoformat(),
+            'is_subsidy_active': True,
         }, response.json())
 
     @ddt.data(
@@ -272,6 +303,9 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'spend_limit': 0,
                 'subsidy_uuid': str(self.non_redeemable_policy.subsidy_uuid),
                 'uuid': str(self.non_redeemable_policy.uuid),
+                'subsidy_active_datetime': self.yesterday.isoformat(),
+                'subsidy_expiration_datetime': self.tomorrow.isoformat(),
+                'is_subsidy_active': True,
             },
             {
                 'access_method': 'direct',
@@ -285,6 +319,9 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'spend_limit': 3,
                 'subsidy_uuid': str(self.redeemable_policy.subsidy_uuid),
                 'uuid': str(self.redeemable_policy.uuid),
+                'subsidy_active_datetime': self.yesterday.isoformat(),
+                'subsidy_expiration_datetime': self.tomorrow.isoformat(),
+                'is_subsidy_active': True,
             },
         ]
 
@@ -341,6 +378,9 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'spend_limit': 3,
             'subsidy_uuid': str(self.redeemable_policy.subsidy_uuid),
             'uuid': str(self.redeemable_policy.uuid),
+            'subsidy_active_datetime': self.yesterday.isoformat(),
+            'subsidy_expiration_datetime': self.tomorrow.isoformat(),
+            'is_subsidy_active': True,
         }
         self.assertEqual(expected_response, response.json())
 
@@ -405,6 +445,9 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'spend_limit': request_payload['spend_limit'],
             'subsidy_uuid': request_payload['subsidy_uuid'],
             'uuid': str(policy_for_edit.uuid),
+            'subsidy_active_datetime': self.yesterday.isoformat(),
+            'subsidy_expiration_datetime': self.tomorrow.isoformat(),
+            'is_subsidy_active': True,
         }
         self.assertEqual(expected_response, response.json())
 
@@ -511,6 +554,10 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
     ``SubsidyAccessPolicyViewSet`` implementation.
     """
 
+    def setUp(self):
+        super().setUp()
+        super().setup_subsidy_mocks()
+
     @ddt.data(
         {
             'policy_type': PolicyTypes.PER_LEARNER_ENROLLMENT_CREDIT,
@@ -603,6 +650,9 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             'subsidy_uuid': str(uuid4()),
             'access_method': AccessMethods.DIRECT,
             'spend_limit': None,
+            'subsidy_active_datetime': self.yesterday.isoformat(),
+            'subsidy_expiration_datetime': self.tomorrow.isoformat(),
+            'is_subsidy_active': True,
         }
         payload.update(extra_fields)
         response = self.client.post(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, payload)
@@ -654,6 +704,9 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             'subsidy_uuid': subsidy_uuid,
             'access_method': AccessMethods.DIRECT,
             'spend_limit': None,
+            'subsidy_active_datetime': self.yesterday.isoformat(),
+            'subsidy_expiration_datetime': self.tomorrow.isoformat(),
+            'is_subsidy_active': True,
         }
         payload.update(extra_fields)
         response = self.client.post(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, payload)
@@ -1489,7 +1542,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
     def test_can_redeem_policy_no_price(self, mock_lms_client, mock_transactions_cache_for_learner):
         """
-        Test that the can_redeem endpoint successfuly serializes a response for content that has no price.
+        Test that the can_redeem endpoint successfully serializes a response for content that has no price.
         """
         test_content_key = "course-v1:demox+1234+2T2023"
         mock_lms_client.return_value.get_enterprise_customer_data.return_value = {

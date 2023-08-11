@@ -397,8 +397,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
             400: There are missing or otherwise invalid input parameters.
             403: The requester has insufficient redeem permissions.
-            422: The subisdy access policy is not redeemable in a way that IS NOT retryable.
-            429: The subisdy access policy is not redeemable in a way that IS retryable (e.g. policy currently locked).
+            422: The subsidy access policy is not redeemable in a way that IS NOT retryable.
+            429: The subsidy access policy is not redeemable in a way that IS retryable (e.g. policy currently locked).
             200: The policy was successfully redeemed.  Response body is JSON with a serialized Transaction
                  containing the following keys (sample values):
                  {
