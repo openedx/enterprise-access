@@ -210,6 +210,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         return self.subsidy_balance()
 
+    def subsidy_expiration_datetime(self):
+        """
+        Returns the expiration date for the associated subsidy ledger.
+        """
+        return self.subsidy_record().get('expiration_datetime')
+
     def catalog_contains_content_key(self, content_key):
         """
         Returns a boolean indicating if the given content_key

@@ -382,6 +382,7 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
     """
     remaining_balance_per_user = serializers.SerializerMethodField()
     remaining_balance = serializers.SerializerMethodField()
+    subsidy_end_date = serializers.SerializerMethodField()
 
     def get_remaining_balance_per_user(self, obj):
         lms_user_id = self.context.get('lms_user_id')
@@ -389,6 +390,9 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
 
     def get_remaining_balance(self, obj):
         return obj.remaining_balance()
+
+    def get_subsidy_end_date(self, obj):
+        return obj.subsidy_expiration_datetime()
 
 
 class SubsidyAccessPolicyCanRedeemReasonResponseSerializer(serializers.Serializer):
