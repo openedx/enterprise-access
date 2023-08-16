@@ -23,6 +23,25 @@ def learner_transaction_cache_key(subsidy_uuid, lms_user_id):
     return versioned_cache_key('get_transactions_for_learner', subsidy_uuid, lms_user_id)
 
 
+def subsidy_record_cache_key(subsidy_uuid):
+    return versioned_cache_key('get_subsidy_record', subsidy_uuid)
+
+
+def get_and_cache_subsidy_record(subsidy_uuid):
+    """
+    Get a subsidy record associated with a policy.
+    """
+    cache_key = subsidy_record_cache_key(subsidy_uuid)
+    cached_response = request_cache().get_cached_response(cache_key)
+    if cached_response.is_found:
+        return cached_response.value
+
+    client = get_versioned_subsidy_client()
+    response = client.retrieve_subsidy(subsidy_uuid=subsidy_uuid)
+    request_cache().set(cache_key, response)
+    return response
+
+
 def get_and_cache_transactions_for_learner(subsidy_uuid, lms_user_id):
     """
     Get all transactions for a learner in a given subsidy.  This can

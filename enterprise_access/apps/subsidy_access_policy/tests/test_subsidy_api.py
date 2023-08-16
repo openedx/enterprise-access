@@ -6,7 +6,11 @@ from unittest import mock
 
 from django.test import TestCase
 
-from ..subsidy_api import get_and_cache_transactions_for_learner, get_redemptions_by_content_and_policy_for_learner
+from ..subsidy_api import (
+    get_and_cache_subsidy_record,
+    get_and_cache_transactions_for_learner,
+    get_redemptions_by_content_and_policy_for_learner
+)
 from .factories import PerLearnerSpendCapLearnerCreditAccessPolicyFactory
 
 
@@ -149,3 +153,37 @@ class TransactionsForLearnerTests(TestCase):
             },
             result,
         )
+
+
+class SubsidyRecordForPolicyTests(TestCase):
+    """
+    Tests the ``get_and_cache_subsidy_record`` function.
+    """
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_versioned_subsidy_client')
+    def test_request_caching_works(self, mock_client_getter):
+        """
+        Test that we utilize the request cache.
+        """
+        subsidy_uuid = str(uuid.uuid4())
+        expected_response_payload = {
+            'uuid': subsidy_uuid,
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(subsidy_uuid),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': '1000',
+        }
+        mock_client = mock_client_getter.return_value
+        mock_client.retrieve_subsidy.return_value = expected_response_payload
+
+        result = get_and_cache_subsidy_record(subsidy_uuid)
+
+        self.assertEqual(result, expected_response_payload)
+
+        # call it again, should be using the cache this time
+        next_result = get_and_cache_subsidy_record(subsidy_uuid)
+
+        self.assertEqual(next_result, expected_response_payload)
+
+        # we should only have used the client in the first call
+        mock_client.retrieve_subsidy.assert_called_once_with(subsidy_uuid=subsidy_uuid)

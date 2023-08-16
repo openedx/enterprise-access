@@ -2,6 +2,7 @@
 Tests for subsidy_access_policy models.
 """
 from datetime import datetime, timedelta
+from unittest import mock
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -541,7 +542,8 @@ class SubsidyAccessPolicyTests(TestCase):
         with self.assertRaisesRegex(Exception, 'Expected a sum of transaction quantities <= 0'):
             self.per_learner_enroll_policy.content_would_exceed_limit(10, 100, 15)
 
-    def test_mock_subsidy_datetimes(self):
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_subsidy_record')
+    def test_mock_subsidy_datetimes(self, mock_subsidy_record):
         yesterday = datetime.utcnow() - timedelta(days=1)
         tomorrow = datetime.utcnow() + timedelta(days=1)
         mock_subsidy = {
@@ -550,7 +552,7 @@ class SubsidyAccessPolicyTests(TestCase):
             'expiration_datetime': tomorrow,
             'is_active': True,
         }
-        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+        mock_subsidy_record.return_value = mock_subsidy
         policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
         assert policy.subsidy_record() == mock_subsidy
 

@@ -77,13 +77,13 @@ class CRUDViewTestMixin:
             'expiration_datetime': self.tomorrow,
             'is_active': True,
         }
-        subsidy_client_patcher = patch.object(
-            SubsidyAccessPolicy, 'subsidy_client'
+        subsidy_record_patcher = patch.object(
+            SubsidyAccessPolicy, 'subsidy_record'
         )
-        self.mock_subsidy_client = subsidy_client_patcher.start()
-        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+        self.mock_subsidy_record = subsidy_record_patcher.start()
+        self.mock_subsidy_record.return_value = mock_subsidy
 
-        self.addCleanup(subsidy_client_patcher.stop)
+        self.addCleanup(subsidy_record_patcher.stop)
 
 
 @ddt.ddt
@@ -1067,10 +1067,20 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             assert new_idempotency_key_sent == baseline_idempotency_key
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
-    def test_credits_available_endpoint(self, mock_transactions_cache_for_learner):
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_subsidy_record')
+    def test_credits_available_endpoint(self, mock_subsidy_record, mock_transactions_cache_for_learner):
         """
         Verify that SubsidyAccessPolicyViewset credits_available returns credit based policies with redeemable credit.
         """
+        mock_subsidy_record.return_value = {
+            'uuid': str(uuid4()),
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': '1000',
+        }
+
         mock_transaction_record = {
             'uuid': str(uuid4()),
             'state': TransactionStateChoices.COMMITTED,

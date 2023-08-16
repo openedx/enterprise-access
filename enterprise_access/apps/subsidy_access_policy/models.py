@@ -28,7 +28,7 @@ from .constants import (
 )
 from .content_metadata_api import get_and_cache_catalog_contains_content, get_and_cache_content_metadata
 from .exceptions import ContentPriceNullException, SubsidyAccessPolicyLockAttemptFailed, SubsidyAPIHTTPError
-from .subsidy_api import get_and_cache_transactions_for_learner
+from .subsidy_api import get_and_cache_subsidy_record, get_and_cache_transactions_for_learner
 from .utils import ProxyAwareHistoricalRecords, create_idempotency_key_for_transaction, get_versioned_subsidy_client
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
@@ -220,7 +220,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             return super().__new__(proxy_class)  # pylint: disable=lost-exception
 
     def subsidy_record(self):
-        return self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
+        return get_and_cache_subsidy_record(subsidy_uuid=self.subsidy_uuid)
 
     def subsidy_balance(self):
         """
