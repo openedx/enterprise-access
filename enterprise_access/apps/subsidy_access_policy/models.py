@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from uuid import UUID, uuid4
 
 import requests
+from django.conf import settings
 from django.core.cache import cache as django_cache
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
@@ -29,7 +30,13 @@ from .constants import (
 from .content_metadata_api import get_and_cache_catalog_contains_content, get_and_cache_content_metadata
 from .exceptions import ContentPriceNullException, SubsidyAccessPolicyLockAttemptFailed, SubsidyAPIHTTPError
 from .subsidy_api import get_and_cache_transactions_for_learner
-from .utils import ProxyAwareHistoricalRecords, create_idempotency_key_for_transaction, get_versioned_subsidy_client
+from .utils import (
+    ProxyAwareHistoricalRecords,
+    create_idempotency_key_for_transaction,
+    get_versioned_subsidy_client,
+    request_cache,
+    versioned_cache_key
+)
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
 
@@ -220,7 +227,26 @@ class SubsidyAccessPolicy(TimeStampedModel):
             return super().__new__(proxy_class)  # pylint: disable=lost-exception
 
     def subsidy_record(self):
-        return self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
+        """
+        Retrieve this policy's corresponding subsidy record
+        """
+        # don't utilize the cache unless this experimental feature is enabled
+        if not getattr(settings, 'MULTI_POLICY_RESOLUTION_ENABLED', False):
+            return self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
+
+        cache_key = versioned_cache_key(
+            'get_subsidy_record',
+            self.enterprise_customer_uuid,
+            self.subsidy_uuid,
+        )
+        cached_response = request_cache().get_cached_response(cache_key)
+        if cached_response.is_found:
+            return cached_response.value
+
+        result = self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
+        request_cache().set(cache_key, result)
+
+        return result
 
     def subsidy_balance(self):
         """
@@ -573,13 +599,20 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Returns:
            SubsidyAccessPolicy: one policy selected from the input list.
         """
+        # gate for experimental functionality to resolve multiple policies
+        if not getattr(settings, 'MULTI_POLICY_RESOLUTION_ENABLED', False):
+            return redeemable_policies[0]
+
         if len(redeemable_policies) == 1:
             return redeemable_policies[0]
 
-        # For now, we inefficiently make one call per subsidy record.
+        # resolve policies by:
+        # - priority (of type)
+        # - expiration, sooner to expire first
+        # - balance, lower balance first
         sorted_policies = sorted(
             redeemable_policies,
-            key=lambda p: (p.priority, p.subsidy_balance()),
+            key=lambda p: (p.priority, p.subsidy_expiration_datetime, p.subsidy_balance()),
         )
         return sorted_policies[0]
 
