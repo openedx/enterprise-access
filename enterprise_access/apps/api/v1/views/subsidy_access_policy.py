@@ -613,9 +613,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                     non_redeemable_policies
                 ))
 
-            # TODO: Arbitrarily select one redeemable policy for now.
             if redeemable_policies:
-                resolved_policy = redeemable_policies[0]
+                resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
 
             if resolved_policy or has_successful_redemption:
                 list_price = self._get_list_price(enterprise_customer_uuid, content_key)
