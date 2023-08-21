@@ -1067,7 +1067,8 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             assert new_idempotency_key_sent == baseline_idempotency_key
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
-    def test_credits_available_endpoint(self, mock_transactions_cache_for_learner):
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_record')
+    def test_credits_available_endpoint(self, mock_subsidy_record, mock_transactions_cache_for_learner):
         """
         Verify that SubsidyAccessPolicyViewset credits_available returns credit based policies with redeemable credit.
         """
@@ -1086,6 +1087,14 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'aggregates': {
                 'total_quantity': 0,
             },
+        }
+        mock_subsidy_record.return_value = {
+            'uuid': str(uuid4()),
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': '1000',
         }
         enroll_cap_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
