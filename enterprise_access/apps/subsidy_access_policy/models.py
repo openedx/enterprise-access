@@ -1,6 +1,7 @@
 """
 Models for subsidy_access_policy
 """
+import logging
 import sys
 from contextlib import contextmanager
 from uuid import UUID, uuid4
@@ -39,6 +40,7 @@ from .utils import (
 )
 
 POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
+logger = logging.getLogger(__name__)
 
 
 class PolicyManager(models.Manager):
@@ -241,11 +243,21 @@ class SubsidyAccessPolicy(TimeStampedModel):
         )
         cached_response = request_cache().get_cached_response(cache_key)
         if cached_response.is_found:
+            logger.info(
+                'subsidy_record cache hit '
+                f'enterprise_customer_uuid={self.enterprise_customer_uuid}, '
+                f'subsidy_uuid={self.subsidy_uuid}'
+            )
             return cached_response.value
 
         result = self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
         request_cache().set(cache_key, result)
 
+        logger.info(
+            'subsidy_record cache miss '
+            f'enterprise_customer_uuid={self.enterprise_customer_uuid}, '
+            f'subsidy_uuid={self.subsidy_uuid}'
+        )
         return result
 
     def subsidy_balance(self):
@@ -583,12 +595,13 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Select one out of multiple policies which have already been deemed redeemable.
 
-        Prioritize learner credit policies, and then prioritize policies with subsidies that have smaller balances.  The
-        type priority is codified in ``*_POLICY_TYPE_PRIORITY`` variables in constants.py.
+        Prioritize learner credit policies, and then prioritize policies with a sooner expiration date,
+        and then subsidies that have smaller balances.  The type priority is codified in ``*_POLICY_TYPE_PRIORITY``
+        variables in constants.py.
 
         Deficiencies:
-        * If multiple policies with equal policy types and equal subsidy balances tie for first place, the result is
-          non-deterministic.
+        * If multiple policies with equal policy types, balances, and expiration dates tie for first place,
+          the result is non-deterministic.
 
         Original spec:
         https://2u-internal.atlassian.net/wiki/spaces/SOL/pages/229212214/Commission+Subsidy+Access+Policy+API#Policy-Resolver
@@ -614,6 +627,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             redeemable_policies,
             key=lambda p: (p.priority, p.subsidy_expiration_datetime, p.subsidy_balance()),
         )
+        logger.info('resolve_policy multiple policies resolved')
         return sorted_policies[0]
 
     def delete(self, *args, **kwargs):
