@@ -234,6 +234,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         # don't utilize the cache unless this experimental feature is enabled
         if not getattr(settings, 'MULTI_POLICY_RESOLUTION_ENABLED', False):
+            logger.info('subsidy_record MULTI_POLICY_RESOLUTION_ENABLED disabled')
             return self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
 
         cache_key = versioned_cache_key(
@@ -614,6 +615,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         # gate for experimental functionality to resolve multiple policies
         if not getattr(settings, 'MULTI_POLICY_RESOLUTION_ENABLED', False):
+            logger.info('resolve_policy MULTI_POLICY_RESOLUTION_ENABLED disabled')
             return redeemable_policies[0]
 
         if len(redeemable_policies) == 1:
