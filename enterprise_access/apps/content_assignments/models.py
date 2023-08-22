@@ -15,6 +15,8 @@ from .constants import LearnerContentAssignmentStateChoices
 class AssignmentPolicy(TimeStampedModel):
     """
     Manage the creation and lifecycle of LearnerContentAssignments according to configurable rules.
+
+    .. no_pii: This model has no PII
     """
     uuid = models.UUIDField(
         primary_key=True,
