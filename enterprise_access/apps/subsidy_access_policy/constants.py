@@ -1,4 +1,5 @@
 """ Constants for the subsidy_access_policy app. """
+import re
 
 
 class AccessMethods:
@@ -103,3 +104,57 @@ REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY = "not_enough_value_in_subsidy"
 REASON_LEARNER_MAX_SPEND_REACHED = "learner_max_spend_reached"
 REASON_POLICY_SPEND_LIMIT_REACHED = "policy_spend_limit_reached"
 REASON_LEARNER_MAX_ENROLLMENTS_REACHED = "learner_max_enrollments_reached"
+
+
+class SubsidyRedemptionErrorCodes:
+    """
+    Collection of error ``code`` values that the subsidy API's
+    redeem endpoint might return in an error response payload.
+    """
+    DEFAULT_ERROR = 'subsidy_redemption_error'
+    FULFILLMENT_ERROR = 'fulfillment_error'
+
+
+class SubsidyRedemptionErrorReasons:
+    """
+    Somewhat more generic collection of reasons that redemption may have
+    failed in ways that are *not* related to fulfillment.
+    """
+    DEFAULT_REASON = 'default_subsidy_redemption_error'
+
+    USER_MESSAGES_BY_REASON = {
+        DEFAULT_REASON: "Something went wrong during subsidy redemption",
+    }
+
+
+class SubsidyFulfillmentErrorReasons:
+    """
+    Codifies standard reasons that fulfillment may have failed,
+    along with a mapping of those reasons to user-friendly display messages.
+    """
+    DEFAULT_REASON = 'default_fulfillment_error'
+    DUPLICATE_FULFILLMENT = 'duplicate_fulfillment'
+
+    USER_MESSAGES_BY_REASON = {
+        DEFAULT_REASON: "Something went wrong during fulfillment",
+        DUPLICATE_FULFILLMENT: "A legacy fulfillment already exists for this content.",
+    }
+
+    CAUSES_REGEXP_BY_REASON = {
+        DUPLICATE_FULFILLMENT: re.compile(".*duplicate order.*"),
+    }
+
+    @classmethod
+    def get_cause_from_error_message(cls, message_string):
+        """
+        Helper to find the cause of a given error message string
+        by matching against the regexs mapped above.
+        """
+        if not message_string:
+            return None
+
+        for cause_of_message, regex in cls.CAUSES_REGEXP_BY_REASON.items():
+            if regex.match(message_string):
+                return cause_of_message
+
+        return None
