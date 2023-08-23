@@ -25,7 +25,7 @@ class BaseSubsidyAccessPolicyMixin(admin.ModelAdmin):
         'uuid',
         'modified',
         'active',
-        'short_description',
+        'display_name_or_short_description',
         'policy_spend_limit_dollars',
     )
     list_filter = (
@@ -40,8 +40,13 @@ class BaseSubsidyAccessPolicyMixin(admin.ModelAdmin):
         'policy_spend_limit_dollars',
     )
 
-    def short_description(self, obj):
+    def _short_description(self, obj):
         return Truncator(str(obj.description)).chars(255)
+
+    def display_name_or_short_description(self, obj):
+        if obj.display_name:
+            return obj.display_name
+        return self._short_description(obj)
 
     @admin.display(description='Policy-wide spend limit (dollars)')
     def policy_spend_limit_dollars(self, obj):
@@ -61,6 +66,7 @@ class PerLearnerEnrollmentCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcc
     )
     search_fields = (
         'uuid',
+        'display_name',
         'enterprise_customer_uuid',
         'catalog_uuid',
         'subsidy_uuid',
@@ -80,6 +86,7 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
     )
     search_fields = (
         'uuid',
+        'display_name',
         'enterprise_customer_uuid',
         'catalog_uuid',
         'subsidy_uuid',
@@ -91,6 +98,7 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
             {
                 'fields': [
                     'enterprise_customer_uuid',
+                    'display_name',
                     'description',
                     'active',
                     'catalog_uuid',
