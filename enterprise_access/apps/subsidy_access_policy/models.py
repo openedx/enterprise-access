@@ -82,6 +82,14 @@ class SubsidyAccessPolicy(TimeStampedModel):
             "The owning Enterprise Customer's UUID.  Cannot be blank or null."
         ),
     )
+    display_name = models.CharField(
+        max_length=512,
+        null=True,
+        blank=True,
+        default=None,
+        verbose_name='Display name',
+        help_text='User-facing display name for this policy record',
+    )
     description = models.TextField(help_text="Brief description about a specific policy.")
     active = models.BooleanField(
         default=False,
