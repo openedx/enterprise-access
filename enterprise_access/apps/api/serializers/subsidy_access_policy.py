@@ -43,6 +43,7 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
         fields = [
             'uuid',
             'policy_type',
+            'display_name',
             'description',
             'active',
             'enterprise_customer_uuid',
@@ -73,6 +74,7 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
         fields = [
             'uuid',
             'policy_type',
+            'display_name',
             'description',
             'active',
             'enterprise_customer_uuid',
@@ -89,6 +91,11 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
         read_only_fields = ['uuid']
         extra_kwargs = {
             'uuid': {'read_only': True},
+            'display_name': {
+                'min_length': None,
+                'max_length': 512,
+                'trim_whitespace': True,
+            },
             'description': {
                 'allow_blank': False,
                 'min_length': None,
@@ -283,6 +290,7 @@ class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubsidyAccessPolicy
         fields = (
+            'display_name',
             'description',
             'active',
             'catalog_uuid',
@@ -296,6 +304,11 @@ class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
             'is_subsidy_active',
         )
         extra_kwargs = {
+            'display_name': {
+                'min_length': None,
+                'max_length': 512,
+                'trim_whitespace': True,
+            },
             'description': {
                 'required': False,
                 'allow_blank': False,

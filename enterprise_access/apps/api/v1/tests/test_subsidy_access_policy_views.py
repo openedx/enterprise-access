@@ -50,11 +50,13 @@ class CRUDViewTestMixin:
         cls.enterprise_uuid = TEST_ENTERPRISE_UUID
 
         cls.redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            display_name='A redeemable policy',
             enterprise_customer_uuid=cls.enterprise_uuid,
             spend_limit=3,
             active=True,
         )
         cls.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            display_name='A non-redeemable policy',
             enterprise_customer_uuid=cls.enterprise_uuid,
             spend_limit=0,
             active=True,
@@ -253,6 +255,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'access_method': 'direct',
             'active': True,
             'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
+            'display_name': self.redeemable_policy.display_name,
             'description': '',
             'enterprise_customer_uuid': str(self.enterprise_uuid),
             'per_learner_enrollment_limit': self.redeemable_policy.per_learner_enrollment_limit,
@@ -295,6 +298,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'access_method': 'direct',
                 'active': True,
                 'catalog_uuid': str(self.non_redeemable_policy.catalog_uuid),
+                'display_name': self.non_redeemable_policy.display_name,
                 'description': '',
                 'enterprise_customer_uuid': str(self.enterprise_uuid),
                 'per_learner_enrollment_limit': self.non_redeemable_policy.per_learner_enrollment_limit,
@@ -311,6 +315,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'access_method': 'direct',
                 'active': True,
                 'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
+                'display_name': self.redeemable_policy.display_name,
                 'description': '',
                 'enterprise_customer_uuid': str(self.enterprise_uuid),
                 'per_learner_enrollment_limit': self.redeemable_policy.per_learner_enrollment_limit,
@@ -370,6 +375,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'access_method': 'direct',
             'active': False,
             'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
+            'display_name': self.redeemable_policy.display_name,
             'description': '',
             'enterprise_customer_uuid': str(self.enterprise_uuid),
             'per_learner_enrollment_limit': self.redeemable_policy.per_learner_enrollment_limit,
@@ -410,12 +416,14 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
 
         policy_for_edit = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
+            display_name='old display_name',
             spend_limit=5,
             active=False,
         )
 
         request_payload = {
             'description': 'the new description',
+            'display_name': 'new display_name',
             'active': True,
             'catalog_uuid': str(uuid4()),
             'subsidy_uuid': str(uuid4()),
@@ -437,6 +445,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'access_method': AccessMethods.ASSIGNED,
             'active': True,
             'catalog_uuid': request_payload['catalog_uuid'],
+            'display_name': request_payload['display_name'],
             'description': request_payload['description'],
             'enterprise_customer_uuid': str(self.enterprise_uuid),
             'per_learner_enrollment_limit': None,
@@ -643,6 +652,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
         # Test the retrieve endpoint
         payload = {
             'policy_type': policy_type,
+            'display_name': 'created policy',
             'description': 'test description',
             'active': True,
             'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
@@ -697,6 +707,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
         subsidy_uuid = str(uuid4())
         payload = {
             'policy_type': policy_type,
+            'display_name': 'new policy',
             'description': 'test description',
             'active': True,
             'enterprise_customer_uuid': enterprise_customer_uuid,
