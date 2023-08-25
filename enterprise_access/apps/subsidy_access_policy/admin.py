@@ -127,3 +127,44 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
         if obj.per_learner_spend_limit is None:
             return None
         return cents_to_usd_string(obj.per_learner_spend_limit)
+
+
+@admin.register(models.AssignedLearnerCreditAccessPolicy)
+class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPolicyMixin):
+    """
+    Admin configuration for AssignedLearnerCreditAccessPolicy.
+    """
+    search_fields = (
+        'uuid',
+        'display_name',
+        'enterprise_customer_uuid',
+        'catalog_uuid',
+        'subsidy_uuid',
+    )
+
+    fieldsets = [
+        (
+            'Base configuration',
+            {
+                'fields': [
+                    'enterprise_customer_uuid',
+                    'display_name',
+                    'description',
+                    'active',
+                    'catalog_uuid',
+                    'subsidy_uuid',
+                    'created',
+                    'modified',
+                ]
+            }
+        ),
+        (
+            'Spend limits',
+            {
+                'fields': [
+                    'spend_limit',
+                    'policy_spend_limit_dollars',
+                ]
+            }
+        ),
+    ]
