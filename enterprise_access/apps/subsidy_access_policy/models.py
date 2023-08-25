@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 import requests
 from django.conf import settings
 from django.core.cache import cache as django_cache
+from django.core.exceptions import ValidationError
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from edx_django_utils.cache.utils import get_cache_key
@@ -770,3 +771,41 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         """
         spent_amount = self.transactions_for_learner(lms_user_id)['aggregates'].get('total_quantity') or 0
         return self.per_learner_spend_limit - spent_amount
+
+
+class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
+    """
+    Policy based on LearnerContentAssignments, backed by a learner credit type of subsidy.
+
+    .. no_pii: This model has no PII
+    """
+    objects = PolicyManager()
+
+    class Meta:
+        """ Meta class for this policy type. """
+        proxy = True
+
+    def clean(self):
+        """
+        Policies of this type must have a defined spend_limit,
+        and they can *not* define either of the per-learner limits.
+        """
+        if self.spend_limit is None:
+            raise ValidationError(f'{self} must define a spend_limit.')
+        if self.per_learner_spend_limit is not None:
+            raise ValidationError(f'{self} must not define a per-learner spend limit.')
+        if self.per_learner_enrollment_limit is not None:
+            raise ValidationError(f'{self} must not define a per-learner enrollment limit.')
+
+    def save(self, *args, **kwargs):
+        """
+        This type of policy must always have an access_method of "assigned".
+        """
+        self.access_method = AccessMethods.ASSIGNED
+        super().save(*args, **kwargs)
+
+    def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
+        raise NotImplementedError
+
+    def redeem(self, lms_user_id, content_key, all_transactions, metadata=None):
+        raise NotImplementedError
