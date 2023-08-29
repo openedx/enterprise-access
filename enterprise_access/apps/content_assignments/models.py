@@ -7,8 +7,6 @@ from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
 
-from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
-
 from .constants import LearnerContentAssignmentStateChoices
 
 
@@ -25,7 +23,7 @@ class AssignmentPolicy(TimeStampedModel):
         unique=True,
     )
     subsidy_access_policy = models.ForeignKey(
-        SubsidyAccessPolicy,
+        'subsidy_access_policy.SubsidyAccessPolicy',
         related_name="assignment_policy",
         on_delete=models.CASCADE,
         db_index=True,

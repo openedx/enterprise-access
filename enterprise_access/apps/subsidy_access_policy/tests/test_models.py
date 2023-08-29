@@ -8,6 +8,7 @@ from uuid import uuid4
 import ddt
 import pytest
 from django.core.cache import cache as django_cache
+from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 
 from enterprise_access.apps.subsidy_access_policy.constants import (
@@ -21,27 +22,30 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_SUBSIDY_EXPIRED
 )
 from enterprise_access.apps.subsidy_access_policy.models import (
+    AssignedLearnerCreditAccessPolicy,
     PerLearnerEnrollmentCreditAccessPolicy,
     PerLearnerSpendCreditAccessPolicy,
     SubsidyAccessPolicy,
     SubsidyAccessPolicyLockAttemptFailed
 )
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
+    AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
 )
 
+from ..constants import AccessMethods
+
 ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID = uuid4()
 ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID = uuid4()
+ACTIVE_ASSIGNED_LEARNER_CREDIT_POLICY_UUID = uuid4()
 
 
-@ddt.ddt
-class SubsidyAccessPolicyTests(TestCase):
-    """ SubsidyAccessPolicy model tests. """
-
-    lms_user_id = 12345
-    course_id = 'course-v1:DemoX:2T2023'
-
+class MockPolicyDependenciesMixin:
+    """
+    Mixin to help mock out all access policy dependencies
+    on external services.
+    """
     def setUp(self):
         """
         Initialize mocked service clients.
@@ -78,6 +82,14 @@ class SubsidyAccessPolicyTests(TestCase):
         self.addCleanup(get_content_metadata_patcher.stop)
         self.addCleanup(lms_api_client_patcher.stop)
         self.addCleanup(django_cache.clear)  # clear any leftover policy locks.
+
+
+@ddt.ddt
+class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
+    """ SubsidyAccessPolicy model tests. """
+
+    lms_user_id = 12345
+    course_id = 'course-v1:DemoX:2T2023'
 
     @classmethod
     def setUpClass(cls):
@@ -678,3 +690,203 @@ class SubsidyAccessPolicyResolverTests(TestCase):
         with patch.object(PerLearnerSpendCreditAccessPolicy, 'priority', new_callable=PropertyMock) as mock:
             mock.return_value = 100
             assert SubsidyAccessPolicy.resolve_policy(policies) == self.policy_one
+
+
+@ddt.ddt
+class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
+    """ Tests specific to the assigned learner credit type of access policy. """
+
+    lms_user_id = 12345
+    content_key = 'course-v1:DemoX:2T2023'
+
+    def setUp(self):
+        """
+        Mocks out dependencies on other services, as well as dependencies
+        on the Assignments API module.
+        """
+        super().setUp()
+
+        assignments_api_patcher = patch(
+            'enterprise_access.apps.subsidy_access_policy.models.assignments_api',
+        )
+        self.mock_assignments_api = assignments_api_patcher.start()
+        self.addCleanup(assignments_api_patcher.stop)
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.active_policy = AssignedLearnerCreditAccessPolicyFactory(
+            uuid=ACTIVE_ASSIGNED_LEARNER_CREDIT_POLICY_UUID,
+            spend_limit=10000,
+        )
+        cls.inactive_policy = AssignedLearnerCreditAccessPolicyFactory(
+            active=False,
+            spend_limit=10000,
+        )
+
+    def test_clean(self):
+        """
+        Tests the model-level validation of this policy type.
+        """
+        with self.assertRaisesRegex(ValidationError, 'must define a spend_limit'):
+            AssignedLearnerCreditAccessPolicy(spend_limit=None).clean()
+        with self.assertRaisesRegex(ValidationError, 'must not define a per-learner spend limit'):
+            AssignedLearnerCreditAccessPolicy(spend_limit=1, per_learner_spend_limit=1).clean()
+        with self.assertRaisesRegex(ValidationError, 'must not define a per-learner enrollment limit'):
+            AssignedLearnerCreditAccessPolicy(spend_limit=1, per_learner_enrollment_limit=1).clean()
+
+    def test_save(self):
+        """
+        These types of policies should always get  saved with an
+        access_method of 'assigned'.
+        """
+        policy = AssignedLearnerCreditAccessPolicyFactory(
+            access_method=AccessMethods.DIRECT,
+        )
+        policy.save()
+
+        self.assertEqual(policy.access_method, AccessMethods.ASSIGNED)
+
+    def test_can_redeem(self):
+        """
+        Test stub for non-implemented method.
+        """
+        with self.assertRaises(NotImplementedError):
+            self.active_policy.can_redeem(123, 'abc')
+
+    def test_redeem(self):
+        """
+        Test stub for non-implemented method.
+        """
+        with self.assertRaises(NotImplementedError):
+            self.active_policy.redeem(123, 'abc', [])
+
+    def test_can_allocate_inactive_policy(self):
+        """
+        Tests that inactive policies can't be allocated against.
+        """
+        can_allocate, message = self.inactive_policy.can_allocate(10, self.content_key, 1000)
+
+        self.assertFalse(can_allocate)
+        self.assertEqual(message, REASON_POLICY_EXPIRED)
+
+    def test_can_allocate_content_not_in_catalog(self):
+        """
+        Tests that active policies can't be allocated against for content
+        that is not included in the related catalog.
+        """
+        self.mock_catalog_contains_content_key.return_value = False
+
+        can_allocate, message = self.active_policy.can_allocate(10, self.content_key, 1000)
+
+        self.assertFalse(can_allocate)
+        self.assertEqual(message, REASON_CONTENT_NOT_IN_CATALOG)
+        self.mock_catalog_contains_content_key.assert_called_once_with(self.content_key)
+
+    def test_can_allocate_subsidy_inactive(self):
+        """
+        Test that active policies of this type can't be allocated
+        against if the related subsidy is inactive.
+        """
+        self.mock_catalog_contains_content_key.return_value = True
+        mock_subsidy = {
+            'id': 12345,
+            'is_active': False,
+        }
+        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+
+        can_allocate, message = self.active_policy.can_allocate(10, self.content_key, 1000)
+
+        self.assertFalse(can_allocate)
+        self.assertEqual(message, REASON_SUBSIDY_EXPIRED)
+        self.mock_catalog_contains_content_key.assert_called_once_with(self.content_key)
+        self.mock_subsidy_client.retrieve_subsidy.assert_called_once_with(
+            subsidy_uuid=self.active_policy.subsidy_uuid,
+        )
+
+    def test_can_allocate_not_enough_subsidy_balance(self):
+        """
+        Test that active policies of this type can't be allocated
+        against if the related subsidy does not have enough remaining balance.
+        """
+        self.mock_catalog_contains_content_key.return_value = True
+        mock_subsidy = {
+            'id': 12345,
+            'is_active': True,
+            'current_balance': 7999,
+        }
+        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+        transactions_for_policy = {
+            'transactions': [],  # we don't actually use this
+            'aggregates': {
+                'total_quantity': -500,
+            },
+        }
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = transactions_for_policy
+        self.mock_assignments_api.get_allocated_quantity_for_policy.return_value = -500
+
+        # The balance of the subsidy is just a bit less
+        # than the amount to potentially allocated, e.g.
+        # ((7 * 1000) + 500 + 500) > 7999
+        can_allocate, message = self.active_policy.can_allocate(7, self.content_key, 1000)
+
+        self.assertFalse(can_allocate)
+        self.assertEqual(message, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
+
+    def test_can_allocate_spend_limit_exceeded(self):
+        """
+        Test that active policies of this type can't be allocated
+        against if it would exceed the policy spend_limit.
+        """
+        self.mock_catalog_contains_content_key.return_value = True
+        mock_subsidy = {
+            'id': 12345,
+            'is_active': True,
+            'current_balance': 15000,
+        }
+        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+        transactions_for_policy = {
+            'transactions': [],  # we don't actually use this
+            'aggregates': {
+                'total_quantity': -2000,
+            },
+        }
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = transactions_for_policy
+        self.mock_assignments_api.get_allocated_quantity_for_policy.return_value = -2000
+
+        # The balance of the subsidy is just a bit less
+        # than the amount to potentially allocated, e.g.
+        # ((7 * 1000) + 2000 + 2000) < 15000 (the subsidy balance) but,
+        # ((7 * 1000) + 2000 + 2000) > 10000 (the policy spend limit)
+        can_allocate, message = self.active_policy.can_allocate(7, self.content_key, 1000)
+
+        self.assertFalse(can_allocate)
+        self.assertEqual(message, REASON_POLICY_SPEND_LIMIT_REACHED)
+
+    def test_can_allocate_happy_path(self):
+        """
+        Test that active policies of this type can be allocated
+        against if there's enough remaining balance and the total
+        of (allocated + potentially allocated + spent) < spend_limit.
+        """
+        self.mock_catalog_contains_content_key.return_value = True
+        mock_subsidy = {
+            'id': 12345,
+            'is_active': True,
+            'current_balance': 10000,
+        }
+        self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+        transactions_for_policy = {
+            'transactions': [],  # we don't actually use this
+            'aggregates': {
+                'total_quantity': -1000,
+            },
+        }
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = transactions_for_policy
+        self.mock_assignments_api.get_allocated_quantity_for_policy.return_value = -1000
+
+        # the subidy remaining balance and the spend limit are both 10,000
+        # ((7 * 1000) + 1000 + 1000) < 10000
+        can_allocate, _ = self.active_policy.can_allocate(7, self.content_key, 1000)
+
+        self.assertTrue(can_allocate)
