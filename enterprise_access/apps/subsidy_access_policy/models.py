@@ -15,6 +15,7 @@ from django_extensions.db.models import TimeStampedModel
 from edx_django_utils.cache.utils import get_cache_key
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
+from enterprise_access.apps.content_assignments import api as assignments_api
 
 from ..content_assignments.models import AssignmentConfiguration
 from .constants import (
@@ -822,3 +823,55 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
 
     def redeem(self, lms_user_id, content_key, all_transactions, metadata=None):
         raise NotImplementedError
+
+    def can_allocate(self, number_of_learners, content_key, content_price_cents):
+        """
+        Takes allocated LearnerContentAssignment records related to this policy
+        into account to determine if ``number_of_learners`` new assignment
+        records can be allocated in this policy for the given ``content_key``
+        and it's current ``content_price_cents``.
+        """
+        # inactive policy
+        if not self.active:
+            return (False, REASON_POLICY_EXPIRED)
+
+        # no content key in catalog
+        if not self.catalog_contains_content_key(content_key):
+            return (False, REASON_CONTENT_NOT_IN_CATALOG)
+
+        if not self.is_subsidy_active:
+            return (False, REASON_SUBSIDY_EXPIRED)
+
+        # Determine total cost, in cents, of content to potentially allocated
+        total_price_cents = number_of_learners * content_price_cents
+
+        # Determine total amount, in cents, already transacted via this policy.
+        # This is a number <= 0
+        spent_amount_cents = self.aggregates_for_policy().get('total_quantity') or 0
+
+        # Determine total amount, in cents, of assignments already
+        # allocated via this policy. This is a number <= 0
+        total_allocated_assignments_cents = assignments_api.get_allocated_quantity_for_configuration(
+            self.assignment_configuration,
+        )
+        total_allocated_and_spent_cents = spent_amount_cents + total_allocated_assignments_cents
+
+        # Use all of these pieces to ensure that the assignments to potentially
+        # allocate won't exceed the remaining balance of the related subsidy.
+        if self.content_would_exceed_limit(
+            total_allocated_and_spent_cents,
+            self.subsidy_balance(),
+            total_price_cents,
+        ):
+            return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
+
+        # Lastly, use all of these pieces to ensure that the assignments to potentially
+        # allocate won't exceed the spend limit of this policy
+        if self.content_would_exceed_limit(
+            total_allocated_and_spent_cents,
+            self.spend_limit,
+            total_price_cents,
+        ):
+            return (False, REASON_POLICY_SPEND_LIMIT_REACHED)
+
+        return (True, None)

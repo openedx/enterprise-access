@@ -9,6 +9,7 @@ from faker import Faker
 
 from enterprise_access.apps.subsidy_access_policy.constants import AccessMethods
 from enterprise_access.apps.subsidy_access_policy.models import (
+    AssignedLearnerCreditAccessPolicy,
     PerLearnerEnrollmentCreditAccessPolicy,
     PerLearnerSpendCreditAccessPolicy
 )
@@ -47,3 +48,16 @@ class PerLearnerSpendCapLearnerCreditAccessPolicyFactory(SubsidyAccessPolicyFact
 
     class Meta:
         model = PerLearnerSpendCreditAccessPolicy
+
+
+class AssignedLearnerCreditAccessPolicyFactory(SubsidyAccessPolicyFactory):
+    """
+    Test factory for the `AssignedLearnerCreditAccessPolicy` model.
+    """
+
+    class Meta:
+        model = AssignedLearnerCreditAccessPolicy
+
+    access_method = AccessMethods.ASSIGNED
+    per_learner_spend_limit = None
+    per_learner_enrollment_limit = None
