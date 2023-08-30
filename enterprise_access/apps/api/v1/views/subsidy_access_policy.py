@@ -464,7 +464,16 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         for the given learner, filtered to only those transactions associated with **subsidies**
         to which any of the given **policies** are associated.
         """
-        redemptions_map = get_redemptions_by_content_and_policy_for_learner(policies, lms_user_id)
+        try:
+            redemptions_map = get_redemptions_by_content_and_policy_for_learner(policies, lms_user_id)
+        except SubsidyAPIHTTPError as exc:
+            logger.exception(f'{exc} when fetching redemptions from subsidy API')
+            error_payload = exc.error_payload()
+            error_payload['detail'] = f"Subsidy Transaction API error: {error_payload['detail']}"
+            raise RedemptionRequestException(
+                detail=error_payload,
+            ) from exc
+
         for content_key, transactions_by_policy in redemptions_map.items():
             for _, redemptions in transactions_by_policy.items():
                 for redemption in redemptions:
