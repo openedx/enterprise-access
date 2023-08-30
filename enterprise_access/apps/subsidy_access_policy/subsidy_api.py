@@ -6,6 +6,9 @@ from the enterprise-subsidy service.
 import logging
 from collections import defaultdict
 
+import requests
+
+from .exceptions import SubsidyAPIHTTPError
 from .utils import get_versioned_subsidy_client, request_cache, versioned_cache_key
 
 logger = logging.getLogger(__name__)
@@ -34,11 +37,14 @@ def get_and_cache_transactions_for_learner(subsidy_uuid, lms_user_id):
         return cached_response.value
 
     client = get_versioned_subsidy_client()
-    response_payload = client.list_subsidy_transactions(
-        subsidy_uuid=subsidy_uuid,
-        lms_user_id=lms_user_id,
-        include_aggregates=False,
-    )
+    try:
+        response_payload = client.list_subsidy_transactions(
+            subsidy_uuid=subsidy_uuid,
+            lms_user_id=lms_user_id,
+            include_aggregates=False,
+        )
+    except requests.exceptions.HTTPError as exc:
+        raise SubsidyAPIHTTPError('HTTPError occurred in Subsidy API request.') from exc
 
     result = {
         'transactions': response_payload['results'],

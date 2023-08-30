@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 import ddt
 from django.conf import settings
+from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
 
@@ -1598,4 +1599,24 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         assert response.json() == {
             'detail': f'Could not determine price for content_key: {test_content_key}',
+        }
+
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_versioned_subsidy_client')
+    def test_can_redeem_subsidy_client_http_error(self, mock_get_client):
+        """
+        Test that the can_redeem endpoint raises
+        an expected, specific exception when the subsidy REST API raises
+        an HTTPError.
+        """
+        test_content_key = "course-v1:demox+1234+2T2023"
+        query_params = {'content_key': test_content_key}
+
+        mock_client = mock_get_client.return_value
+        mock_client.list_subsidy_transactions.side_effect = HTTPError
+
+        response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.json() == {
+            'detail': 'Subsidy Transaction API error: HTTPError occurred in Subsidy API request.',
         }

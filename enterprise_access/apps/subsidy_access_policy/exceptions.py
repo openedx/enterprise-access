@@ -45,4 +45,8 @@ class SubsidyAPIHTTPError(requests.exceptions.HTTPError):
         return self.__cause__.response  # pylint: disable=no-member
 
     def error_payload(self):
-        return self.error_response.json()
+        if self.error_response:
+            return self.error_response.json()
+        return {
+            'detail': str(self),
+        }
