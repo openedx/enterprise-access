@@ -73,7 +73,9 @@ class TransactionsForLearnerTests(TestCase):
         }
         mock_client = mock_client_getter.return_value
         mock_client.list_subsidy_transactions.return_value = first_response_payload
-        mock_client.client.get.return_value = second_response_payload
+        mock_second_response = mock.Mock()
+        mock_second_response.json.return_value = second_response_payload
+        mock_client.client.get.return_value = mock_second_response
 
         subsidy_uuid = uuid.uuid4()
         lms_user_id = 42
