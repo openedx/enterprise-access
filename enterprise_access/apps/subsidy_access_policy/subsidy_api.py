@@ -55,8 +55,9 @@ def get_and_cache_transactions_for_learner(subsidy_uuid, lms_user_id):
     next_page = response_payload.get('next')
     while next_page:
         next_response = client.client.get(next_page)
-        result['transactions'].extend(next_response['results'])
-        next_page = next_response.get('next')
+        next_payload = next_response.json()
+        result['transactions'].extend(next_payload['results'])
+        next_page = next_payload.get('next')
 
     logger.info(
         'Fetched transactions for subsidy %s and lms_user_id %s. Number transactions = %s',
