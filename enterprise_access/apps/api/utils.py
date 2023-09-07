@@ -6,6 +6,7 @@ from uuid import UUID
 
 from rest_framework.exceptions import ParseError
 
+from enterprise_access.apps.content_assignments.api import get_assignment_configuration
 from enterprise_access.apps.subsidy_access_policy.api import get_subsidy_access_policy
 
 
@@ -59,4 +60,15 @@ def get_policy_customer_uuid(policy_uuid):
     policy = get_subsidy_access_policy(policy_uuid)
     if policy:
         return str(policy.enterprise_customer_uuid)
+    return None
+
+
+def get_assignment_config_customer_uuid(assignment_configuration_uuid):
+    """
+    Given an AssignmentConfiguration uuid, returns the corresponding, string-ified customer uuid associated with that
+    policy, if found.
+    """
+    assignment_config = get_assignment_configuration(assignment_configuration_uuid)
+    if assignment_config:
+        return str(assignment_config.enterprise_customer_uuid)
     return None

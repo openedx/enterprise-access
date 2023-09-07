@@ -7,7 +7,7 @@ from uuid import uuid4
 import factory
 from faker import Faker
 
-from ..models import LearnerContentAssignment
+from ..models import AssignmentConfiguration, LearnerContentAssignment
 
 FAKER = Faker()
 
@@ -21,6 +21,18 @@ def random_content_key():
         for _ in range(3)
     ]
     return 'course-v1:{}+{}+{}'.format(*fake_words)
+
+
+class AssignmentConfigurationFactory(factory.django.DjangoModelFactory):
+    """
+    Base Test factory for the ``AssignmentConfiguration`` model.
+    """
+    class Meta:
+        model = AssignmentConfiguration
+
+    uuid = factory.LazyFunction(uuid4)
+    enterprise_customer_uuid = factory.LazyFunction(uuid4)
+    active = True
 
 
 class LearnerContentAssignmentFactory(factory.django.DjangoModelFactory):

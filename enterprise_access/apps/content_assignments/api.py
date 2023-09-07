@@ -5,7 +5,18 @@ records and business logic.
 from django.db.models import Sum
 
 from .constants import LearnerContentAssignmentStateChoices
-from .models import LearnerContentAssignment
+from .models import AssignmentConfiguration, LearnerContentAssignment
+
+
+def get_assignment_configuration(uuid):
+    """
+    Returns an `AssignmentConfiguration` record with the given uuid,
+    or null if no such record exists.
+    """
+    try:
+        return AssignmentConfiguration.objects.get(uuid=uuid)
+    except AssignmentConfiguration.DoesNotExist:
+        return None
 
 
 def get_assignments_for_configuration(

@@ -1,7 +1,7 @@
 """
 Models for content_assignments
 """
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
@@ -22,7 +22,40 @@ class AssignmentConfiguration(TimeStampedModel):
         editable=False,
         unique=True,
     )
+    enterprise_customer_uuid = models.UUIDField(
+        db_index=True,
+        null=False,
+        blank=False,
+        # This field should, in practice, never be null.
+        # However, specifying a default quells makemigrations and helps prevent migrate from failing on existing
+        # populated databases.
+        default=UUID('0' * 32),
+        help_text="The owning Enterprise Customer's UUID. Cannot be blank or null.",
+    )
+    active = models.BooleanField(
+        db_index=True,
+        default=True,
+        help_text='Whether this assignment configuration is active. Defaults to True.',
+    )
+    # TODO: Below this line add fields to support rules that control the creation and lifecycle of assignments.
+    #
+    # Possibilities include:
+    #   - `max_assignments` to limit the total allowed assignments.
+    #   - `max_age` to control the amount of time before an allocated assignment is auto-expired.
+
     history = HistoricalRecords()
+
+    def delete(self, *args, **kwargs):
+        """
+        Perform a soft-delete, overriding the standard delete() method to prevent hard-deletes.
+
+        If this instance was already soft-deleted, invoking delete() is a no-op.
+        """
+        if self.active:
+            if 'reason' in kwargs and kwargs['reason']:
+                self._change_reason = kwargs['reason']  # pylint: disable=attribute-defined-outside-init
+            self.active = False
+            self.save()
 
 
 class LearnerContentAssignment(TimeStampedModel):

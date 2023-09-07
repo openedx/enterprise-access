@@ -128,8 +128,21 @@ class SubsidyAccessPolicy(TimeStampedModel):
             'Defaults to null, which means that no such maximum exists.'
         ),
     )
+    assignment_configuration = models.OneToOneField(
+        AssignmentConfiguration,
+        related_name='subsidy_access_policy',
+        on_delete=models.SET_NULL,
+        db_index=True,
+        null=True,
+    )
 
-    # Update this list to match the following "custom" fields, which are ones only used by sub-classes.
+    #################
+    # CUSTOM FIELDS #
+    #################
+    # Fields and properties below pertain to custom features for different policy types defined by sub-classes of
+    # SubsidyAccessPolicy.
+
+    # Update this list to match all the "custom" fields below:
     ALL_CUSTOM_FIELDS = [
         'per_learner_enrollment_limit',
         'per_learner_spend_limit',
@@ -159,13 +172,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
             'Null value means no limit is set, which disables this feature. '
             'Required if policy_type = "PerLearnerSpendCreditAccessPolicy".'
         ),
-    )
-    assignment_configuration = models.OneToOneField(
-        AssignmentConfiguration,
-        related_name='subsidy_access_policy',
-        on_delete=models.SET_NULL,
-        db_index=True,
-        null=True,
     )
 
     # Customized version of HistoricalRecords to enable history tracking on child proxy models.  See

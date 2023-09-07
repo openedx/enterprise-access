@@ -1,6 +1,12 @@
 """
 API serializers module.
 """
+from .assignment_configuration import (
+    AssignmentConfigurationCreateRequestSerializer,
+    AssignmentConfigurationDeleteRequestSerializer,
+    AssignmentConfigurationResponseSerializer,
+    AssignmentConfigurationUpdateRequestSerializer
+)
 from .subsidy_access_policy import (
     SubsidyAccessPolicyCanRedeemElementResponseSerializer,
     SubsidyAccessPolicyCanRedeemReasonResponseSerializer,
