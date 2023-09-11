@@ -58,6 +58,11 @@ class SubsidyAccessPolicy(TimeStampedModel):
     .. no_pii: This model has no PII
     """
 
+    class Meta:
+        unique_together = [
+            ('active', 'assignment_configuration'),
+        ]
+
     POLICY_FIELD_NAME = 'policy_type'
     policy_type = models.CharField(
         max_length=64,
@@ -159,7 +164,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
         related_name='subsidy_access_policy',
         on_delete=models.SET_NULL,
         db_index=True,
-        unique=True,
         null=True,
     )
 
