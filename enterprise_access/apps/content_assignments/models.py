@@ -7,12 +7,10 @@ from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
 
-from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
-
 from .constants import LearnerContentAssignmentStateChoices
 
 
-class AssignmentPolicy(TimeStampedModel):
+class AssignmentConfiguration(TimeStampedModel):
     """
     Manage the creation and lifecycle of LearnerContentAssignments according to configurable rules.
 
@@ -24,16 +22,6 @@ class AssignmentPolicy(TimeStampedModel):
         editable=False,
         unique=True,
     )
-    subsidy_access_policy = models.ForeignKey(
-        SubsidyAccessPolicy,
-        related_name="assignment_policy",
-        on_delete=models.CASCADE,
-        db_index=True,
-        unique=True,
-    )
-    # TODO: Add fields representing different configurable rules below.
-
-    history = HistoricalRecords()
 
 
 class LearnerContentAssignment(TimeStampedModel):
@@ -50,12 +38,13 @@ class LearnerContentAssignment(TimeStampedModel):
         editable=False,
         unique=True,
     )
-    assignment_policy = models.ForeignKey(
-        AssignmentPolicy,
+    assignment_configuration = models.ForeignKey(
+        AssignmentConfiguration,
         related_name="assignments",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         db_index=True,
-        help_text="AssignmentPolicy defining the lifecycle rules of this assignment.",
+        null=True,
+        help_text="AssignmentConfiguration defining the lifecycle rules of this assignment.",
     )
     learner_email = models.EmailField(
         null=False,

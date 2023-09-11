@@ -16,6 +16,7 @@ from edx_django_utils.cache.utils import get_cache_key
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 
+from ..content_assignments.models import AssignmentConfiguration
 from .constants import (
     CREDIT_POLICY_TYPE_PRIORITY,
     REASON_CONTENT_NOT_IN_CATALOG,
@@ -152,6 +153,14 @@ class SubsidyAccessPolicy(TimeStampedModel):
             'Null value means no limit is set, which disables this feature. '
             'Required if policy_type = "PerLearnerSpendCreditAccessPolicy".'
         ),
+    )
+    assignment_configuration = models.OneToOneField(
+        AssignmentConfiguration,
+        related_name='subsidy_access_policy',
+        on_delete=models.SET_NULL,
+        db_index=True,
+        unique=True,
+        null=True,
     )
 
     # Customized version of HistoricalRecords to enable history tracking on child proxy models.  See
