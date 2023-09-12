@@ -49,7 +49,7 @@ subsidy_request.HistoricalSubsidyRequestCustomerConfiguration:
   ".. no_pii:": "This model has no PII"
 subsidy_access_policy.HistoricalSubsidyAccessPolicy:
   ".. no_pii:": "This model has no PII"
-content_assignments.HistoricalAssignmentPolicy:
+content_assignments.HistoricalAssignmentConfiguration:
   ".. no_pii:": "This model has no PII"
 content_assignments.HistoricalLearnerContentAssignment:
   ".. pii:": The learner_email field stores PII, which is to be scrubbed after 90 days via management command.
