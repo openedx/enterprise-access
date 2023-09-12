@@ -22,6 +22,7 @@ class AssignmentConfiguration(TimeStampedModel):
         editable=False,
         unique=True,
     )
+    history = HistoricalRecords()
 
 
 class LearnerContentAssignment(TimeStampedModel):
