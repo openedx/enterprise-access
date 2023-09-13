@@ -721,14 +721,18 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
         return (True, None, existing_redemptions)
 
     def credit_available(self, lms_user_id=None):
-        if self.remaining_balance_per_user(lms_user_id) > 0:
-            return True
-        return False
+        remaining_balance_per_user = self.remaining_balance_per_user(lms_user_id)
+        return (remaining_balance_per_user is not None) and remaining_balance_per_user > 0
 
     def remaining_balance_per_user(self, lms_user_id=None):
         """
         Returns the remaining redeemable credit for the user.
+        Returns None if `per_learner_enrollment_limit` is not set.
         """
+        if self.per_learner_enrollment_limit is None:
+            return None
+        if self.per_learner_enrollment_limit <= 0:
+            return 0
         existing_transaction_count = len(self.transactions_for_learner(lms_user_id)['transactions'])
         return self.per_learner_enrollment_limit - existing_transaction_count
 
@@ -777,12 +781,18 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         return (True, None, existing_redemptions)
 
     def credit_available(self, lms_user_id=None):
-        return self.remaining_balance_per_user(lms_user_id) > 0
+        remaining_balance_per_user = self.remaining_balance_per_user(lms_user_id)
+        return (remaining_balance_per_user is not None) and remaining_balance_per_user > 0
 
     def remaining_balance_per_user(self, lms_user_id=None):
         """
         Returns the remaining redeemable credit for the user.
+        Returns None if `per_learner_spend_limit` is not set.
         """
+        if self.per_learner_spend_limit is None:
+            return None
+        if self.per_learner_spend_limit <= 0:
+            return 0
         spent_amount = self.transactions_for_learner(lms_user_id)['aggregates'].get('total_quantity') or 0
         return self.per_learner_spend_limit - spent_amount
 
