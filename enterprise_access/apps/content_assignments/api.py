@@ -46,3 +46,7 @@ def get_allocated_quantity_for_configuration(assignment_configuration):
         total_quantity=Sum('content_quantity'),
     )
     return aggregate['total_quantity']
+
+
+def create_allocated_assignments(assignment_configuration, learner_emails, content_key, content_price_cents):
+    pass

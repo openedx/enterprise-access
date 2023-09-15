@@ -881,3 +881,21 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             return (False, REASON_POLICY_SPEND_LIMIT_REACHED)
 
         return (True, None)
+
+    def allocate(self, learner_emails, content_key, content_price_cents):
+        """
+        Creates allocated ``LearnerContentAssignment`` records.
+        """
+        # move this to the view
+        allocation_allowed, error_reason = self.can_allocate(
+            len(learner_emails),
+            content_key,
+            content_price_cents,
+        )
+
+        return assignments_api.create_allocated_assignments(
+            self.assignment_configuration,
+            learner_emails,
+            content_key,
+            content_price_cents,
+        )

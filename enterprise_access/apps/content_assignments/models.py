@@ -6,8 +6,12 @@ from uuid import UUID, uuid4
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
+from simple_history.utils import bulk_create_with_history
 
 from .constants import LearnerContentAssignmentStateChoices
+
+
+BULK_OPERATION_BATCH_SIZE = 50
 
 
 class AssignmentConfiguration(TimeStampedModel):
@@ -138,3 +142,35 @@ class LearnerContentAssignment(TimeStampedModel):
         ),
     )
     history = HistoricalRecords()
+
+    @classmethod
+    def bulk_create(
+        cls,
+        assignment_configuration,
+        learner_emails,
+        content_key,
+        content_quantity,
+        state=LearnerContentAssignmentStateChoices.ALLOCATED,
+    ):
+        """
+        Creates new ``LearnerContentAssignment`` records in bulk, one
+        for each provided ``learner_email``.
+        Uses the simple_history utility for creating records in bulk
+        while saving their history:
+        https://django-simple-history.readthedocs.io/en/latest/common_issues.html#bulk-creating-a-model-with-history
+        """
+        assignments = [
+            cls(
+                assignment_configuration=assignment_configuration,
+                learner_email=learner_email,
+                content_key=content_key,
+                content_quantity=content_quantity,
+                state=state,
+            )
+            for learner_email in learner_emails
+        ]
+        return bulk_create_with_history(
+            assignments,
+            cls,
+            batch_size=BULK_OPERATION_BATCH_SIZE,
+        )
