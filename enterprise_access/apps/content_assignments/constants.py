@@ -17,3 +17,5 @@ class LearnerContentAssignmentStateChoices:
         (CANCELLED, 'Cancelled'),
         (ERRORED, 'Errored'),
     )
+
+    REALLOCATE_STATES = (CANCELLED, ERRORED)

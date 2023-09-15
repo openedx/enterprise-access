@@ -5,10 +5,14 @@ from uuid import UUID, uuid4
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
+from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
+from simple_history.utils import bulk_create_with_history, bulk_update_with_history
 
 from .constants import LearnerContentAssignmentStateChoices
+
+BULK_OPERATION_BATCH_SIZE = 50
 
 
 class AssignmentConfiguration(TimeStampedModel):
@@ -45,6 +49,9 @@ class AssignmentConfiguration(TimeStampedModel):
     #   - `max_age` to control the amount of time before an allocated assignment is auto-expired.
 
     history = HistoricalRecords()
+
+    def __str__(self):
+        return f'uuid={self.uuid}, customer={self.enterprise_customer_uuid}'
 
     def delete(self, *args, **kwargs):
         """
@@ -160,3 +167,44 @@ class LearnerContentAssignment(TimeStampedModel):
         ),
     )
     history = HistoricalRecords()
+
+    def __str__(self):
+        return (
+            f'uuid={self.uuid}, state={self.state}, learner_email={self.learner_email}, content_key={self.content_key}'
+        )
+
+    @classmethod
+    def bulk_create(cls, assignment_records):
+        """
+        Creates new ``LearnerContentAssignment`` records in bulk,
+        while saving their history:
+        https://django-simple-history.readthedocs.io/en/latest/common_issues.html#bulk-creating-a-model-with-history
+        """
+        return bulk_create_with_history(
+            assignment_records,
+            cls,
+            batch_size=BULK_OPERATION_BATCH_SIZE,
+        )
+
+    @classmethod
+    def bulk_update(cls, assignment_records, updated_field_names):
+        """
+        Updates and saves the given ``assignment_records`` in bulk,
+        while saving their history:
+        https://django-simple-history.readthedocs.io/en/latest/common_issues.html#bulk-updating-a-model-with-history-new
+
+        Note that the simple-history utility function uses Django's bulk_update() under the hood:
+        https://docs.djangoproject.com/en/3.2/ref/models/querysets/#bulk-update
+
+        which does *not* call save(), so we have to manually update the `modified` field
+        during this bulk operation in order for that field's value to be updated.
+        """
+        for record in assignment_records:
+            record.modified = timezone.now()
+
+        return bulk_update_with_history(
+            assignment_records,
+            cls,
+            updated_field_names + ['modified'],
+            batch_size=BULK_OPERATION_BATCH_SIZE,
+        )
