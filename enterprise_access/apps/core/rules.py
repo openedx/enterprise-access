@@ -139,6 +139,53 @@ def has_explicit_access_to_policy_learner(user, enterprise_customer_uuid):
     return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.SUBSIDY_ACCESS_POLICY_LEARNER_ROLE)
 
 
+# Content Assignment rule predicates:
+@rules.predicate
+def has_implicit_access_to_content_assignment_operator(_, enterprise_customer_uuid):
+    """
+    Check that if request user has implicit access to the given enterprise UUID for the
+    `CONTENT_ASSIGNMENTS_OPERATOR_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.CONTENT_ASSIGNMENTS_OPERATOR_ROLE)
+
+
+@rules.predicate
+def has_explicit_access_to_content_assignment_operator(user, enterprise_customer_uuid):
+    """
+    Check that if request user has explicit access to `CONTENT_ASSIGNMENTS_OPERATOR_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.CONTENT_ASSIGNMENTS_OPERATOR_ROLE)
+
+
+@rules.predicate
+def has_implicit_access_to_content_assignment_admin(_, enterprise_customer_uuid):
+    """
+    Check that if request user has implicit access to the given enterprise UUID for the
+    `CONTENT_ASSIGNMENTS_ADMIN_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.CONTENT_ASSIGNMENTS_ADMIN_ROLE)
+
+
+@rules.predicate
+def has_explicit_access_to_content_assignment_admin(user, enterprise_customer_uuid):
+    """
+    Check that if request user has explicit access to `CONTENT_ASSIGNMENTS_ADMIN_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.CONTENT_ASSIGNMENTS_ADMIN_ROLE)
+
+
 ######################################################
 # Consolidate implicit and explicit rule predicates. #
 ######################################################
@@ -164,6 +211,18 @@ has_subsidy_access_policy_operator_access = (
 # pylint: disable=unsupported-binary-operation
 has_subsidy_access_policy_learner_access = (
     has_implicit_access_to_policy_learner | has_explicit_access_to_policy_learner
+)
+
+
+# pylint: disable=unsupported-binary-operation
+has_content_assignment_operator_access = (
+    has_implicit_access_to_content_assignment_operator | has_explicit_access_to_content_assignment_operator
+)
+
+
+# pylint: disable=unsupported-binary-operation
+has_content_assignment_admin_access = (
+    has_implicit_access_to_content_assignment_admin | has_explicit_access_to_content_assignment_admin
 )
 
 
@@ -201,4 +260,18 @@ rules.add_perm(
 rules.add_perm(
     constants.SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION,
     has_subsidy_access_policy_operator_access | has_subsidy_access_policy_learner_access
+)
+
+
+# Grants content assignment configuration read permission if the user is a content assignment configuration admin.
+rules.add_perm(
+    constants.CONTENT_ASSIGNMENTS_CONFIGURATION_READ_PERMISSION,
+    has_content_assignment_operator_access | has_content_assignment_admin_access,
+)
+
+
+# Grants content assignment configuration write permission if the user is a content assignment configuration operator.
+rules.add_perm(
+    constants.CONTENT_ASSIGNMENTS_CONFIGURATION_WRITE_PERMISSION,
+    has_content_assignment_operator_access,
 )

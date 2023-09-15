@@ -17,6 +17,11 @@ SUBSIDY_ACCESS_POLICY_READ_PERMISSION = 'subsidy_access_policy.has_read_access'
 SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION = 'subsidy_access_policy.has_write_access'
 SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION = 'subsidy_access_policy.has_redemption_access'
 
+CONTENT_ASSIGNMENTS_OPERATOR_ROLE = 'enterprise_access_content_assignment_operator'
+CONTENT_ASSIGNMENTS_ADMIN_ROLE = 'enterprise_access_content_assignment_admin'
+CONTENT_ASSIGNMENTS_CONFIGURATION_READ_PERMISSION = 'content_assignment_configuration.has_read_access'
+CONTENT_ASSIGNMENTS_CONFIGURATION_WRITE_PERMISSION = 'content_assignment_configuration.has_write_access'
+
 ALL_ACCESS_CONTEXT = '*'
 
 

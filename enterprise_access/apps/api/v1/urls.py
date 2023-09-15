@@ -14,5 +14,6 @@ router.register("subsidy-access-policies", views.SubsidyAccessPolicyViewSet, 'su
 router.register("license-requests", views.LicenseRequestViewSet, 'license-requests')
 router.register("coupon-code-requests", views.CouponCodeRequestViewSet, 'coupon-code-requests')
 router.register("customer-configurations", views.SubsidyRequestCustomerConfigurationViewSet, 'customer-configurations')
+router.register("assignment-configurations", views.AssignmentConfigurationViewSet, 'assignment-configurations')
 
 urlpatterns += router.urls
