@@ -125,3 +125,16 @@ Accepted in May 2023, this ADR partially supercedes `<0003 Initial API Specifica
 *Feature: Subsidy Access Policy (Learner Credit)*
 
 Accepted in August 2023, this ADR defines and describes the refactored access policy CRUD API.
+
+`<0012-assignment-based-policies.rst>`_
+*******************************************
+*Feature: Assigned Learner Credit*
+
+Accepted September 2023, this ADR defines:
+
+- The addition of the ``content_assignments`` djangoapp, which persists
+  data representing the assignment of content to specific learners within an enterprise.
+- The introduction of an assignment-based ``SubsidyAccessPolicy``, which
+  depends on the models and business-logic of the ``content_assignments`` app.
+- The general structure and strategy of the REST API views that interface with
+  the first two points.
