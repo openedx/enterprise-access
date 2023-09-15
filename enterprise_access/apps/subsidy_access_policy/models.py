@@ -905,3 +905,11 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             return (False, REASON_POLICY_SPEND_LIMIT_REACHED)
 
         return (True, None)
+
+    def allocate(self, learner_emails, content_key, content_price_cents):
+        """
+        Creates allocated ``LearnerContentAssignment`` records.
+        """
+        # this will eventually lean on assignments_api.allocate_assignments()
+        # to do the heavy lifting.
+        raise NotImplementedError

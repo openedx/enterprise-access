@@ -3,7 +3,7 @@ Tests for the ``api.py`` module of the content_assignments app.
 """
 from django.test import TestCase
 
-from ..api import get_allocated_quantity_for_configuration, get_assignments_for_configuration
+from ..api import allocate_assignments, get_allocated_quantity_for_configuration, get_assignments_for_configuration
 from ..constants import LearnerContentAssignmentStateChoices
 from ..models import AssignmentConfiguration
 from .factories import LearnerContentAssignmentFactory
@@ -65,7 +65,10 @@ class TestContentAssignmentApi(TestCase):
         ):
             with self.assertNumQueries(1):
                 actual_assignments = list(
-                    get_assignments_for_configuration(self.assignment_configuration, filter_state)
+                    get_assignments_for_configuration(
+                        self.assignment_configuration,
+                        state=filter_state
+                    )
                 )
 
             self.assertEqual(
@@ -87,3 +90,84 @@ class TestContentAssignmentApi(TestCase):
         with self.assertNumQueries(1):
             actual_amount = get_allocated_quantity_for_configuration(self.assignment_configuration)
             self.assertEqual(actual_amount, 6000)
+
+    def test_allocate_assignments_happy_path(self):
+        """
+        Tests the allocation of new assignments against a given configuration.
+        """
+        content_key = 'demoX'
+        content_price_cents = 100
+        learners_to_assign = [
+            f'{name}@foo.com' for name in ('alice', 'bob', 'carol', 'david', 'eugene')
+        ]
+
+        allocated_assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='alice@foo.com',
+            content_key=content_key,
+            content_quantity=content_price_cents,
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+        )
+        accepted_assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='bob@foo.com',
+            content_key=content_key,
+            content_quantity=content_price_cents,
+            state=LearnerContentAssignmentStateChoices.ACCEPTED,
+        )
+        cancelled_assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='carol@foo.com',
+            content_key=content_key,
+            content_quantity=200,
+            state=LearnerContentAssignmentStateChoices.CANCELLED,
+        )
+        errored_assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='david@foo.com',
+            content_key=content_key,
+            content_quantity=200,
+            state=LearnerContentAssignmentStateChoices.ERRORED,
+        )
+
+        allocation_results = allocate_assignments(
+            self.assignment_configuration,
+            learners_to_assign,
+            content_key,
+            content_price_cents,
+        )
+
+        # Refresh from db to get any updates reflected in the python objects.
+        for record in (allocated_assignment, accepted_assignment, cancelled_assignment, errored_assignment):
+            record.refresh_from_db()
+
+        # The errored and cancelled assignments should be the only things updated
+        self.assertEqual(
+            {record.uuid for record in allocation_results['updated']},
+            {cancelled_assignment.uuid, errored_assignment.uuid},
+        )
+        for record in (cancelled_assignment, errored_assignment):
+            self.assertEqual(len(record.history.all()), 2)
+
+        # The allocated and accepted assignments should be the only things with no change
+        self.assertEqual(
+            {record.uuid for record in allocation_results['no_change']},
+            {allocated_assignment.uuid, accepted_assignment.uuid},
+        )
+        for record in (allocated_assignment, accepted_assignment):
+            self.assertEqual(len(record.history.all()), 1)
+
+        # The existing assignments should be 'allocated' now, except for the already accepted one
+        self.assertEqual(cancelled_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertEqual(errored_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertEqual(allocated_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertEqual(accepted_assignment.state, LearnerContentAssignmentStateChoices.ACCEPTED)
+
+        # We should have created only one new, allocated assignment for eugene@foo.com
+        self.assertEqual(len(allocation_results['created']), 1)
+        created_assignment = allocation_results['created'][0]
+        self.assertEqual(created_assignment.assignment_configuration, self.assignment_configuration)
+        self.assertEqual(created_assignment.learner_email, 'eugene@foo.com')
+        self.assertEqual(created_assignment.content_key, content_key)
+        self.assertEqual(created_assignment.content_quantity, content_price_cents)
+        self.assertEqual(created_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
