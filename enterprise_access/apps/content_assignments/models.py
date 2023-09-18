@@ -70,6 +70,11 @@ class LearnerContentAssignment(TimeStampedModel):
     .. pii_types: email_address
     .. pii_retirement: local_api
     """
+    class Meta:
+        unique_together = [
+            ('assignment_configuration', 'learner_email', 'content_key'),
+            ('assignment_configuration', 'lms_user_id', 'content_key'),
+        ]
     uuid = models.UUIDField(
         primary_key=True,
         default=uuid4,
