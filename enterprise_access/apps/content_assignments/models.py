@@ -61,11 +61,24 @@ class AssignmentConfiguration(TimeStampedModel):
 class LearnerContentAssignment(TimeStampedModel):
     """
     Represent an assignment of a piece of content to a learner.
+    This model is unique on (assignment_configuration, learner identifier, content identifier).
+    This means that only one combination of (learner, content) can exist in a given
+    assignment configuration.  So in the lifecycle of a given assignment,
+    state transitions such as:
+      `allocated` -> `cancelled` -> `allocated` -> `accepted`
+    are allowed, and we can use the history table of this model to ascertain
+    when/why such state transitions occurred.
 
     .. pii: The learner_email field stores PII, which is to be scrubbed after 90 days via management command.
     .. pii_types: email_address
     .. pii_retirement: local_api
     """
+    class Meta:
+        unique_together = [
+            ('assignment_configuration', 'learner_email', 'content_key'),
+            ('assignment_configuration', 'lms_user_id', 'content_key'),
+        ]
+
     uuid = models.UUIDField(
         primary_key=True,
         default=uuid4,
@@ -76,7 +89,6 @@ class LearnerContentAssignment(TimeStampedModel):
         AssignmentConfiguration,
         related_name="assignments",
         on_delete=models.SET_NULL,
-        db_index=True,
         null=True,
         help_text="AssignmentConfiguration defining the lifecycle rules of this assignment.",
     )
