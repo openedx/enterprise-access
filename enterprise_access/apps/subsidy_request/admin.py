@@ -50,6 +50,9 @@ class BaseSubsidyRequestAdmin(DjangoQLSearchMixin):
         'state',
     )
 
+    @admin.display(
+        description='Course partners'
+    )
     def get_course_partners(self, obj):
         """
         Formats JSON list of course partners as human-readable partner names.
@@ -58,7 +61,6 @@ class BaseSubsidyRequestAdmin(DjangoQLSearchMixin):
             return '-'
         partner_names = [partner['name'] for partner in obj.course_partners]
         return ', '.join(partner_names)
-    get_course_partners.short_description = 'Course partners'
 
 
 @admin.register(models.LicenseRequest)
