@@ -19,9 +19,8 @@ import os
 
 from auth_backends.urls import oauth2_urlpatterns
 from django.conf import settings
-from django.urls import include, path, re_path
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from edx_api_doc_tools import make_api_info, make_docs_urls
 
