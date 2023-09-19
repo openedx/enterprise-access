@@ -26,6 +26,8 @@ class UtilsTests(TestCase):
 
         # Create request with session
         request = HttpRequest()
+        # need to set default response
+        # https://django.readthedocs.io/en/stable/topics/http/middleware.html
         middleware = SessionMiddleware(mock.Mock())
         middleware.process_request(request)
         request.session['_auth_user_id'] = test_user.id
