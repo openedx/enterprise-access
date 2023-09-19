@@ -26,7 +26,7 @@ class UtilsTests(TestCase):
 
         # Create request with session
         request = HttpRequest()
-        middleware = SessionMiddleware()
+        middleware = SessionMiddleware(mock.Mock())
         middleware.process_request(request)
         request.session['_auth_user_id'] = test_user.id
         request.session.save()
