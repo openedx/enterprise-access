@@ -126,6 +126,7 @@ class LearnerContentAssignment(TimeStampedModel):
         max_length=255,
         blank=False,
         null=False,
+        db_index=True,
         choices=LearnerContentAssignmentStateChoices.CHOICES,
         default=LearnerContentAssignmentStateChoices.ALLOCATED,
         help_text=(

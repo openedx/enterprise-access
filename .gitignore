@@ -140,6 +140,7 @@ dmypy.json
 
 # emacs
 *~
+.projectile
 
 # VSCode
 .vscode
