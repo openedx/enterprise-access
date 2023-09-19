@@ -22,7 +22,12 @@ jobs:
     - name: Install requirements
       run: make requirements
     - name: Upgrade packages
-      run: pip install -U pip wheel
+      run: |
+        pip install -U pip wheel codecov
+        if [[ "${{ matrix.django-version }}" != "pinned" ]]; then
+          pip install "django~=${{ matrix.django-version }}.0"
+          pip check # fail if this test-reqs/Django combination is broken
+        fi
     - name: Validate translations
       run: make validate_translations
     - name: Run tests and style checks
