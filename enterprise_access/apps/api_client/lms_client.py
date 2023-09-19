@@ -18,6 +18,7 @@ class LmsApiClient(BaseOAuthClient):
     enterprise_api_base_url = settings.LMS_URL + '/enterprise/api/v1/'
     enterprise_learner_endpoint = enterprise_api_base_url + 'enterprise-learner/'
     enterprise_customer_endpoint = enterprise_api_base_url + 'enterprise-customer/'
+    pending_enterprise_learner_endpoint = enterprise_api_base_url + 'pending-enterprise-learner/'
 
     def get_enterprise_customer_data(self, enterprise_customer_uuid):
         """
@@ -142,3 +143,43 @@ class LmsApiClient(BaseOAuthClient):
             logger.exception('Incorrect data received from LMS. [%s]', url)
 
         return result
+
+    def create_pending_enterprise_users(self, enterprise_customer_uuid, user_emails):
+        """
+        Creates a pending enterprise user in the given ``enterprise_customer_uuid`` for each of the
+        specified ``user_emails`` provided.
+
+        Args:
+            enterprise_customer_uuid (UUID): UUID of the enterprise customer in which pending user records are created.
+            user_emails (list(str)): The emails for which pending enterprise users will be created.
+
+        Returns:
+            A ``requests.Response`` object representing the pending-enterprise-learner endpoint response.
+
+        Raises:
+            ``requests.exceptions.HTTPError`` on any response with an unsuccessful status code.
+        """
+        data = [
+            {
+                'enterprise_customer': str(enterprise_customer_uuid),
+                'user_email': user_email,
+            }
+            for user_email in user_emails
+        ]
+        response = self.client.post(self.pending_enterprise_learner_endpoint, json=data)
+        try:
+            response.raise_for_status()
+            logger.info(
+                'Successfully created %r PendingEnterpriseCustomerUser records for customer %r',
+                len(data),
+                enterprise_customer_uuid,
+            )
+            return response
+        except requests.exceptions.HTTPError as exc:
+            logger.error(
+                'Failed to create %r PendingEnterpriseCustomerUser records for customer %r because %r',
+                len(data),
+                enterprise_customer_uuid,
+                response.text,
+            )
+            raise exc

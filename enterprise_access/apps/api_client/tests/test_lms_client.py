@@ -5,13 +5,16 @@ Tests for License Manager client.
 from unittest import mock
 from uuid import uuid4
 
+import ddt
+import requests
 from django.conf import settings
 from django.test import TestCase
-from requests import Response
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
+from enterprise_access.apps.api_client.tests.test_utils import MockResponse
 
 
+@ddt.ddt
 class TestLmsApiClient(TestCase):
     """
     Test LMS Api client.
@@ -73,7 +76,7 @@ class TestLmsApiClient(TestCase):
         Verify client hits the right URL for entepriseCustomerUser data.
         """
         mock_json.return_value = self.enterprise_learner_list_view_response
-        mock_oauth_client.return_value.get.return_value = Response()
+        mock_oauth_client.return_value.get.return_value = requests.Response()
         mock_oauth_client.return_value.get.return_value.status_code = 200
 
         client = LmsApiClient()
@@ -105,7 +108,7 @@ class TestLmsApiClient(TestCase):
             'uuid': 'some-uuid',
             'slug': 'some-test-slug',
         }
-        mock_oauth_client.return_value.get.return_value = Response()
+        mock_oauth_client.return_value.get.return_value = requests.Response()
         mock_oauth_client.return_value.get.return_value.status_code = 200
 
         client = LmsApiClient()
@@ -133,7 +136,7 @@ class TestLmsApiClient(TestCase):
 
         mock_enterprise_uuid = uuid4()
         mock_user_emails = ['abc@email.com', 'efg@email.com']
-        mock_oauth_client.return_value.get.return_value = Response()
+        mock_oauth_client.return_value.get.return_value = requests.Response()
         mock_oauth_client.return_value.get.return_value.status_code = 200
 
         client = LmsApiClient()
@@ -163,7 +166,7 @@ class TestLmsApiClient(TestCase):
         """
         mock_enterprise_uuid = str(uuid4())
         user_id = 1234
-        mock_oauth_client.return_value.get.return_value = Response()
+        mock_oauth_client.return_value.get.return_value = requests.Response()
         mock_oauth_client.return_value.get.return_value.status_code = 200
 
         mock_json.return_value = {
@@ -188,4 +191,45 @@ class TestLmsApiClient(TestCase):
             'http://edx-platform.example.com/enterprise/api/v1/enterprise-learner/',
             params=query_params,
             timeout=settings.LMS_CLIENT_TIMEOUT
+        )
+
+    @ddt.data(
+        {'mock_response_status': 201, 'mock_response_json': {'detail': 'Good Request'}},
+        {'mock_response_status': 400, 'mock_response_json': {'detail': 'Bad Request'}},
+    )
+    @ddt.unpack
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_create_pending_enterprise_users(self, mock_oauth_client, mock_response_status, mock_response_json):
+        """
+        Test the ``create_pending_enterprise_users`` method.
+        """
+        # Mock the response from the enterprise API.
+        mock_oauth_client.return_value.post.return_value = MockResponse(
+            mock_response_json,
+            mock_response_status,
+        )
+
+        user_emails = [
+            'larry@stooges.com',
+            'moe@stooges.com',
+            'curly@stooges.com',
+        ]
+        mock_enterprise_uuid = str(uuid4())
+
+        client = LmsApiClient()
+
+        if mock_response_status >= 400:
+            with self.assertRaises(requests.exceptions.HTTPError):
+                response = client.create_pending_enterprise_users(mock_enterprise_uuid, user_emails)
+        else:
+            response = client.create_pending_enterprise_users(mock_enterprise_uuid, user_emails)
+            assert response.status_code == 201
+            assert response.json() == {'detail': 'Good Request'}
+
+        mock_oauth_client.return_value.post.assert_called_once_with(
+            client.pending_enterprise_learner_endpoint,
+            json=[
+                {'enterprise_customer': str(mock_enterprise_uuid), 'user_email': user_email}
+                for user_email in user_emails
+            ],
         )
