@@ -16,6 +16,7 @@ from edx_django_utils.cache.utils import get_cache_key
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
+from enterprise_access.utils import is_none, is_not_none
 
 from ..content_assignments.models import AssignmentConfiguration
 from .constants import (
@@ -64,7 +65,21 @@ class SubsidyAccessPolicy(TimeStampedModel):
             ('active', 'assignment_configuration'),
         ]
 
+    # Helps support model-level validation, along with serializer-level validation,
+    # in a way that makes it possible to validate data *before changing
+    # the state of a model instance in-memory* in a serializer.
+    # Keyed by field name, and valued by a constraint function and error message:
+    # {
+    #   field name: (
+    #    constraint function that returns false if constraint is broken,
+    #    error message on broken constraint
+    #   )
+    # }
+    # Used in conjunction with clean() below.
+    FIELD_CONSTRAINTS = {}
+
     POLICY_FIELD_NAME = 'policy_type'
+
     policy_type = models.CharField(
         max_length=64,
         editable=False,
@@ -134,22 +149,8 @@ class SubsidyAccessPolicy(TimeStampedModel):
         on_delete=models.SET_NULL,
         db_index=True,
         null=True,
+        blank=True,
     )
-
-    #################
-    # CUSTOM FIELDS #
-    #################
-    # Fields and properties below pertain to custom features for different policy types defined by sub-classes of
-    # SubsidyAccessPolicy.
-
-    # Update this list to match all the "custom" fields below:
-    ALL_CUSTOM_FIELDS = [
-        'per_learner_enrollment_limit',
-        'per_learner_spend_limit',
-    ]
-    # Sub-classes should override this class variable to declare which custom fields to use.
-    REQUIRED_CUSTOM_FIELDS = []
-    # Begin definitions of custom fields:
     per_learner_enrollment_limit = models.IntegerField(
         null=True,
         blank=True,
@@ -226,6 +227,15 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 return policy_class
         return None
 
+    def clean(self):
+        """
+        Used to help validate field values before saving this model instance.
+        """
+        for field_name, (constraint_function, error_message) in self.FIELD_CONSTRAINTS.items():
+            field = getattr(self, field_name)
+            if not constraint_function(field):
+                raise ValidationError(f'{self} {error_message}')
+
     def save(self, *args, **kwargs):
         """
         Override to persist policy type.
@@ -236,6 +246,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             raise TypeError("Can not create object of class SubsidyAccessPolicy")
 
         self.policy_type = type(self).__name__
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def __new__(cls, *args, **kwargs):
@@ -674,7 +685,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             self.save()
 
     def __str__(self):
-        return f'<{self.__class__} uuid={self.uuid}>'
+        return f'<{self.__class__.__name__} uuid={self.uuid}>'
 
 
 class CreditPolicyMixin:
@@ -693,10 +704,13 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
 
     .. no_pii: This model has no PII
     """
-
-    REQUIRED_CUSTOM_FIELDS = ['per_learner_enrollment_limit']
-
     objects = PolicyManager()
+
+    # Policies of this type *must not* define a per-learner spend limit or an assignment configuration
+    FIELD_CONSTRAINTS = {
+        'per_learner_spend_limit': (is_none, 'must not define a per-learner spend limit.'),
+        'assignment_configuration': (is_none, 'must not relate to an AssignmentConfiguration.'),
+    }
 
     class Meta:
         """
@@ -749,10 +763,13 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
 
     .. no_pii: This model has no PII
     """
-
-    REQUIRED_CUSTOM_FIELDS = ['per_learner_spend_limit']
-
     objects = PolicyManager()
+
+    # Policies of this type *must not* define a per-learner enrollment limit or an assignment configuration
+    FIELD_CONSTRAINTS = {
+        'assignment_configuration': (is_none, 'must not relate to an AssignmentConfiguration.'),
+        'per_learner_enrollment_limit': (is_none, 'must not define a per-learner enrollment limit.'),
+    }
 
     class Meta:
         """
@@ -811,21 +828,18 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
     """
     objects = PolicyManager()
 
+    # Policies of this type *must* define a spend_limit and assignment_configuration.
+    # Policies of this type *must not* define either of the per-learner limits.
+    FIELD_CONSTRAINTS = {
+        'spend_limit': (is_not_none, 'must define a spend_limit.'),
+        'assignment_configuration': (is_not_none, 'must relate to an AssignmentConfiguration.'),
+        'per_learner_spend_limit': (is_none, 'must not define a per-learner spend limit.'),
+        'per_learner_enrollment_limit': (is_none, 'must not define a per-learner enrollment limit.'),
+    }
+
     class Meta:
         """ Meta class for this policy type. """
         proxy = True
-
-    def clean(self):
-        """
-        Policies of this type must have a defined spend_limit,
-        and they can *not* define either of the per-learner limits.
-        """
-        if self.spend_limit is None:
-            raise ValidationError(f'{self} must define a spend_limit.')
-        if self.per_learner_spend_limit is not None:
-            raise ValidationError(f'{self} must not define a per-learner spend limit.')
-        if self.per_learner_enrollment_limit is not None:
-            raise ValidationError(f'{self} must not define a per-learner enrollment limit.')
 
     def save(self, *args, **kwargs):
         """

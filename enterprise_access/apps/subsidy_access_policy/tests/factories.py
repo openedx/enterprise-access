@@ -27,6 +27,7 @@ class SubsidyAccessPolicyFactory(factory.django.DjangoModelFactory):
     catalog_uuid = factory.LazyFunction(uuid4)
     subsidy_uuid = factory.LazyFunction(uuid4)
     access_method = AccessMethods.DIRECT
+    description = 'A generic description'
     active = True
 
 

@@ -22,3 +22,11 @@ def get_subsidy_model(subsidy_type):
     if subsidy_type == SubsidyTypeChoices.LICENSE:
         subsidy_model = apps.get_model('subsidy_request.LicenseRequest')
     return subsidy_model
+
+
+def is_not_none(thing):
+    return thing is not None
+
+
+def is_none(thing):
+    return thing is None

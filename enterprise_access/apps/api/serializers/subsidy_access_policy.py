@@ -17,21 +17,25 @@ from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPol
 logger = logging.getLogger(__name__)
 
 
-def validate_no_extra_custom_fields_for_policy_class(policy_class, fields_and_values):
+def policy_pre_write_validation(policy_instance_or_class, field_values_by_name):
     """
-    Validates that no fields are included in the serializer
-    data pertaining to one type of SubsidyAccessPolicy that are
-    only valid for *another* type of SubsidyAccessPolicy.
-    e.g. ``per_learner_spend_limit`` is not a valid field for creating
-    or updating a ``PerLearnerEnrollmentSubsidyAccessPolicy`` record.
+    Validates via a policy instance or class that the given fields and values
+    don't violate any constraints defined by the policy class' FIELD_CONSTRAINTS.
+    If a constraint occurs, raises a `ValidationError`.
     """
-    unused_custom_fields = set(policy_class.ALL_CUSTOM_FIELDS) - set(policy_class.REQUIRED_CUSTOM_FIELDS)
-    if unused_custom_fields.intersection(fields_and_values.keys()):
-        return (
-            f"Extraneous fields for {policy_class.__name__} policy type: "
-            f"{list(unused_custom_fields)}."
+    violations = []
+    constraints = policy_instance_or_class.FIELD_CONSTRAINTS
+
+    for field_name, new_value in field_values_by_name.items():
+        if field_name in constraints:
+            constraint_function, error_message = constraints[field_name]
+            if not constraint_function(new_value):
+                violations.append(error_message)
+
+    if violations:
+        raise serializers.ValidationError(
+            f'{policy_instance_or_class} has the following field violations: {violations}'
         )
-    return None
 
 
 class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
@@ -166,29 +170,8 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
         return policy
 
     def validate(self, attrs):
-        super().validate(attrs)
-
-        # Get the policy subclass.
-        # super().validate() already checked that attrs contains a "policy_type" key and valid value.
-        policy_type = attrs['policy_type']
-        policy_class = SubsidyAccessPolicy.get_policy_class_by_type(policy_type)
-
-        # Must specify exactly the required custom fields as declared by the policy subclass, no more no less.
-        custom_policy_field_errors = []
-        # Here's the "no less" part:
-        if not set(policy_class.REQUIRED_CUSTOM_FIELDS).issubset(attrs.keys()):
-            custom_policy_field_errors.append(
-                f"Missing fields for {policy_type} policy type: {policy_class.REQUIRED_CUSTOM_FIELDS}."
-            )
-
-        # Here's the "no more" part
-        extra_field_error_msg = validate_no_extra_custom_fields_for_policy_class(policy_class, attrs)
-        if extra_field_error_msg:
-            custom_policy_field_errors.append(extra_field_error_msg)
-
-        if custom_policy_field_errors:
-            raise serializers.ValidationError(custom_policy_field_errors)
-
+        policy_class = SubsidyAccessPolicy.get_policy_class_by_type(attrs['policy_type'])
+        policy_pre_write_validation(policy_class, attrs)
         return attrs
 
 
@@ -379,13 +362,7 @@ class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
         for the caller of the policy update view to provide a policy type,
         so we can't infer the desired type from the request payload.
         """
-        extra_field_error_msg = validate_no_extra_custom_fields_for_policy_class(
-            instance.__class__,
-            validated_data,
-        )
-        if extra_field_error_msg:
-            raise serializers.ValidationError(extra_field_error_msg)
-
+        policy_pre_write_validation(instance, validated_data)
         return super().update(instance, validated_data)
 
     def to_representation(self, instance):
