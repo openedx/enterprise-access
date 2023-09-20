@@ -136,11 +136,15 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
 
         PerLearnerSpendCreditAccessPolicy.objects.create(
             catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08ca2',
-            subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3'
+            subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3',
+            per_learner_spend_limit=100,
+            description='anything',
         )
         PerLearnerEnrollmentCreditAccessPolicy.objects.create(
             catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3',
-            subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca4'
+            subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca4',
+            per_learner_enrollment_limit=100,
+            description='anything',
         )
 
         created_policy_types = set()
@@ -159,7 +163,9 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         policy = SubsidyAccessPolicy.objects.create(
             catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08ca2',
             subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3',
-            policy_type=expected_policy_type
+            policy_type=expected_policy_type,
+            description='anything',
+            per_learner_spend_limit=500,
         )
 
         self.assertEqual(policy.__class__.__name__, expected_policy_type)
@@ -717,15 +723,16 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        assignment_configuration = AssignmentConfiguration.objects.create()
+        cls.assignment_configuration = AssignmentConfiguration.objects.create()
         cls.active_policy = AssignedLearnerCreditAccessPolicyFactory(
             uuid=ACTIVE_ASSIGNED_LEARNER_CREDIT_POLICY_UUID,
             spend_limit=10000,
-            assignment_configuration=assignment_configuration,
+            assignment_configuration=cls.assignment_configuration,
         )
         cls.inactive_policy = AssignedLearnerCreditAccessPolicyFactory(
             active=False,
             spend_limit=10000,
+            assignment_configuration=AssignmentConfiguration.objects.create(),
         )
 
     def test_clean(self):
@@ -733,19 +740,36 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         Tests the model-level validation of this policy type.
         """
         with self.assertRaisesRegex(ValidationError, 'must define a spend_limit'):
-            AssignedLearnerCreditAccessPolicy(spend_limit=None).clean()
+            AssignedLearnerCreditAccessPolicy(
+                spend_limit=None,
+                assignment_configuration=self.assignment_configuration,
+            ).clean()
+        with self.assertRaisesRegex(ValidationError, 'must relate to an AssignmentConfiguration'):
+            AssignedLearnerCreditAccessPolicy(
+                spend_limit=100,
+            ).clean()
         with self.assertRaisesRegex(ValidationError, 'must not define a per-learner spend limit'):
-            AssignedLearnerCreditAccessPolicy(spend_limit=1, per_learner_spend_limit=1).clean()
+            AssignedLearnerCreditAccessPolicy(
+                spend_limit=1,
+                assignment_configuration=self.assignment_configuration,
+                per_learner_spend_limit=1,
+            ).clean()
         with self.assertRaisesRegex(ValidationError, 'must not define a per-learner enrollment limit'):
-            AssignedLearnerCreditAccessPolicy(spend_limit=1, per_learner_enrollment_limit=1).clean()
+            AssignedLearnerCreditAccessPolicy(
+                spend_limit=1,
+                assignment_configuration=self.assignment_configuration,
+                per_learner_enrollment_limit=1,
+            ).clean()
 
     def test_save(self):
         """
-        These types of policies should always get  saved with an
+        These types of policies should always get saved with an
         access_method of 'assigned'.
         """
         policy = AssignedLearnerCreditAccessPolicyFactory(
             access_method=AccessMethods.DIRECT,
+            spend_limit=100,
+            assignment_configuration=AssignmentConfiguration.objects.create(),
         )
         policy.save()
 

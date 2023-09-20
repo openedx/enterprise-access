@@ -257,7 +257,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'active': True,
             'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
             'display_name': self.redeemable_policy.display_name,
-            'description': '',
+            'description': 'A generic description',
             'enterprise_customer_uuid': str(self.enterprise_uuid),
             'per_learner_enrollment_limit': self.redeemable_policy.per_learner_enrollment_limit,
             'per_learner_spend_limit': self.redeemable_policy.per_learner_spend_limit,
@@ -300,7 +300,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'active': True,
                 'catalog_uuid': str(self.non_redeemable_policy.catalog_uuid),
                 'display_name': self.non_redeemable_policy.display_name,
-                'description': '',
+                'description': 'A generic description',
                 'enterprise_customer_uuid': str(self.enterprise_uuid),
                 'per_learner_enrollment_limit': self.non_redeemable_policy.per_learner_enrollment_limit,
                 'per_learner_spend_limit': self.non_redeemable_policy.per_learner_spend_limit,
@@ -317,7 +317,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'active': True,
                 'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
                 'display_name': self.redeemable_policy.display_name,
-                'description': '',
+                'description': 'A generic description',
                 'enterprise_customer_uuid': str(self.enterprise_uuid),
                 'per_learner_enrollment_limit': self.redeemable_policy.per_learner_enrollment_limit,
                 'per_learner_spend_limit': self.redeemable_policy.per_learner_spend_limit,
@@ -377,7 +377,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'active': False,
             'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
             'display_name': self.redeemable_policy.display_name,
-            'description': '',
+            'description': 'A generic description',
             'enterprise_customer_uuid': str(self.enterprise_uuid),
             'per_learner_enrollment_limit': self.redeemable_policy.per_learner_enrollment_limit,
             'per_learner_spend_limit': self.redeemable_policy.per_learner_spend_limit,
@@ -516,16 +516,18 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'request_payload': {
                 'per_learner_enrollment_limit': 10,
             },
+            'expected_error_message': 'must not define a per-learner enrollment limit',
         },
         {
             'policy_class': PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
             'request_payload': {
                 'per_learner_spend_limit': 1000,
             },
+            'expected_error_message': 'must not define a per-learner spend limit',
         },
     )
     @ddt.unpack
-    def test_update_view_validates_fields_vs_policy_type(self, policy_class, request_payload):
+    def test_update_view_validates_fields_vs_policy_type(self, policy_class, request_payload, expected_error_message):
         """
         Test that the update view can NOT modify fields
         of a policy record that are relevant only to a different
@@ -536,6 +538,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
         ])
 
+        self.maxDiff = None
         policy_for_edit = policy_class(
             enterprise_customer_uuid=self.enterprise_uuid,
             spend_limit=5,
@@ -549,11 +552,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         response = self.client.put(url, data=request_payload)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        expected_error_message = (
-            f"Extraneous fields for {policy_for_edit.__class__.__name__} policy type: "
-            f"{list(request_payload)}."
-        )
-        self.assertEqual(response.json(), [expected_error_message])
+        self.assertIn(expected_error_message, response.json()[0])
 
 
 @ddt.ddt
@@ -607,7 +606,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
                 'per_learner_spend_limit': 30000,
             },
             'expected_response_code': status.HTTP_400_BAD_REQUEST,
-            'expected_error_keywords': ['Missing fields', 'Extraneous fields'],
+            'expected_error_keywords': ['must not define a per-learner spend limit'],
         },
         {
             'policy_type': PolicyTypes.PER_LEARNER_ENROLLMENT_CREDIT,
@@ -616,7 +615,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
                 'per_learner_enrollment_limit': 10,
             },
             'expected_response_code': status.HTTP_400_BAD_REQUEST,
-            'expected_error_keywords': ['Extraneous fields'],
+            'expected_error_keywords': ['must not define a per-learner spend limit'],
         },
         {
             'policy_type': PolicyTypes.PER_LEARNER_SPEND_CREDIT,
@@ -624,7 +623,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
                 'per_learner_enrollment_limit': 10,
             },
             'expected_response_code': status.HTTP_400_BAD_REQUEST,
-            'expected_error_keywords': ['Missing fields', 'Extraneous fields'],
+            'expected_error_keywords': ['must not define a per-learner enrollment limit'],
         },
         {
             'policy_type': PolicyTypes.PER_LEARNER_SPEND_CREDIT,
@@ -633,7 +632,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
                 'per_learner_spend_limit': 30000,
             },
             'expected_response_code': status.HTTP_400_BAD_REQUEST,
-            'expected_error_keywords': ['Extraneous fields'],
+            'expected_error_keywords': ['must not define a per-learner enrollment limit'],
         },
     )
     @ddt.unpack

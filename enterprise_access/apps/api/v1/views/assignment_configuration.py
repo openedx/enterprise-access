@@ -28,8 +28,7 @@ def assignment_config_permission_create_fn(request):
     """
     Helper to use with @permission_required on create endpoint.
     """
-    policy_uuid_from_query_params = request.data.get('subsidy_access_policy')
-    return utils.get_policy_customer_uuid(policy_uuid_from_query_params)
+    return request.data.get('enterprise_customer_uuid')
 
 
 def assignment_config_permission_detail_fn(request, *args, uuid=None, **kwargs):
@@ -60,20 +59,6 @@ class AssignmentConfigurationViewSet(
     filterset_class = filters.AssignmentConfigurationFilter
     pagination_class = PaginationWithPageCount
     lookup_field = 'uuid'
-
-    def __init__(self, *args, **kwargs):
-        self.extra_context = {}
-        super().__init__(*args, **kwargs)
-
-    def set_assignment_config_created(self, created):
-        """
-        Helper function, used from within a related serializer for creation, to help understand in the context of this
-        viewset whether an AssignmentConfiguration was created, or if an AssignmentConfiguration with the requested
-        SubsidyAccessPolicy already existed when creation was attempted.
-
-        This code pattern supports idempotency of the create endpoint.
-        """
-        self.extra_context['created'] = created
 
     @property
     def requested_enterprise_customer_uuid(self):
@@ -165,13 +150,9 @@ class AssignmentConfigurationViewSet(
     )
     def create(self, request, *args, **kwargs):
         """
-        Creates a single ``AssignmentConfiguration`` record, or returns an existing one if one already exists for the
-        given ``SubsidyAccessPolicy`` uuid.
+        Creates a single ``AssignmentConfiguration`` record.
         """
-        response = super().create(request, *args, **kwargs)
-        if not self.extra_context.get('created'):
-            response.status_code = status.HTTP_200_OK
-        return response
+        return super().create(request, *args, **kwargs)
 
     @extend_schema(
         tags=[CONTENT_ASSIGNMENTS_CONFIGURATION_CRUD_API_TAG],
@@ -239,15 +220,6 @@ class AssignmentConfigurationViewSet(
 
         # Custom delete() method should set the active flag to False.
         assignment_config_to_soft_delete.delete(reason=delete_reason)
-
-        # Manually unlink this soft-deleted AssignmentConfig from the associated policy.
-        try:
-            associated_policy = assignment_config_to_soft_delete.subsidy_access_policy
-            associated_policy.assignment_configuration = None
-            associated_policy.save()
-        except AssignmentConfiguration.subsidy_access_policy.RelatedObjectDoesNotExist:  # pylint: disable=no-member
-            # There just isn't any linked SubsidyAccessPolicy.  That is okay.
-            pass
 
         response_serializer = serializers.AssignmentConfigurationResponseSerializer(assignment_config_to_soft_delete)
         return Response(response_serializer.data, status=status.HTTP_200_OK)

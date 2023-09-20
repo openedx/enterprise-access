@@ -7,6 +7,7 @@ import ddt
 from rest_framework import status
 from rest_framework.reverse import reverse
 
+from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 from enterprise_access.apps.content_assignments.tests.factories import AssignmentConfigurationFactory
 from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -31,7 +32,7 @@ class CRUDViewTestMixin:
         super().setUpTestData()
 
         cls.enterprise_uuid = TEST_ENTERPRISE_UUID
-        other_enterprise_uuid = uuid4()
+        cls.other_enterprise_uuid = uuid4()
 
         # Create a pair of AssignmentConfiguration + SubsidyAccessPolicy for the main test customer.
         cls.assignment_configuration_existing = AssignmentConfigurationFactory(
@@ -42,26 +43,20 @@ class CRUDViewTestMixin:
             enterprise_customer_uuid=cls.enterprise_uuid,
             active=True,
             assignment_configuration=cls.assignment_configuration_existing,
+            spend_limit=1000000,
         )
 
         # Create a pair of AssignmentConfiguration + SubsidyAccessPolicy for the "other" customer.
         # This is useful for testing that enterprise admins cannot read each other's models.
         cls.assignment_configuration_other_customer = AssignmentConfigurationFactory(
-            enterprise_customer_uuid=other_enterprise_uuid,
+            enterprise_customer_uuid=cls.other_enterprise_uuid,
         )
         cls.assigned_learner_credit_policy_other_customer = AssignedLearnerCreditAccessPolicyFactory(
             display_name='An assigned learner credit policy, for a different customer.',
-            enterprise_customer_uuid=other_enterprise_uuid,
+            enterprise_customer_uuid=cls.other_enterprise_uuid,
             active=True,
             assignment_configuration=cls.assignment_configuration_other_customer,
-        )
-
-        # Create a standalone policy that is ripe for having an associated AssignmentConfiguration created.
-        cls.assigned_learner_credit_policy_standalone = AssignedLearnerCreditAccessPolicyFactory(
-            display_name='A standalone assigned learner credit policy that really wants an AssignmentConfiguration.',
-            enterprise_customer_uuid=cls.enterprise_uuid,
-            active=True,
-            assignment_configuration=None,
+            spend_limit=1000000,
         )
 
     def setUp(self):
@@ -130,7 +125,7 @@ class TestAssignmentConfigurationUnauthorizedCRUD(CRUDViewTestMixin, APITest):
         # Test views that need CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION:
 
         # POST/create endpoint:
-        create_payload = {'subsidy_access_policy': str(self.assigned_learner_credit_policy_standalone.uuid)}
+        create_payload = {'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)}
         response = self.client.post(list_url, data=create_payload)
         assert response.status_code == expected_response_code
 
@@ -170,7 +165,7 @@ class TestAssignmentConfigurationUnauthorizedCRUD(CRUDViewTestMixin, APITest):
         # Test views that need CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION:
 
         # POST/create endpoint:
-        create_payload = {'subsidy_access_policy': str(self.assigned_learner_credit_policy_standalone.uuid)}
+        create_payload = {'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)}
         response = self.client.post(list_url, data=create_payload)
         assert response.status_code == expected_response_code
 
@@ -288,7 +283,7 @@ class TestAssignmentConfigurationAuthorizedCRUD(CRUDViewTestMixin, APITest):
             'uuid': str(self.assignment_configuration_existing.uuid),
             'active': False,
             'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
-            'subsidy_access_policy': None,
+            'subsidy_access_policy': str(self.assigned_learner_credit_policy.uuid),
         }
         assert response.json() == expected_response
 
@@ -297,10 +292,6 @@ class TestAssignmentConfigurationAuthorizedCRUD(CRUDViewTestMixin, APITest):
         self.assignment_configuration_existing.refresh_from_db()
         latest_history_entry = self.assignment_configuration_existing.history.order_by('-history_date').first()
         assert latest_history_entry.history_change_reason == expected_change_reason
-
-        # Check that the AssignmentConfiguration is unlinked from the associated policy.
-        self.assigned_learner_credit_policy.refresh_from_db()
-        assert self.assigned_learner_credit_policy.assignment_configuration is None
 
         # Test idempotency of the destroy endpoint.
         response = self.client.delete(detail_url, request_payload)
@@ -374,46 +365,27 @@ class TestAssignmentConfigurationAuthorizedCRUD(CRUDViewTestMixin, APITest):
         """
         Test that create view happy path.  A net-new AsssignmentConfiguration should be created.
         """
+        yet_another_enterprise_uuid = str(uuid4())
         # Set the JWT-based auth to an operator.
         self.set_jwt_cookie([
-            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': yet_another_enterprise_uuid}
         ])
 
         # Send a create request which should create a net-new AssignmentConfiguration.
-        # Also check that it is linked to the appropriate SubsidyAccessPolicy.
+        # It's possible to create these without linking directly to a policy record.
         list_url = reverse('api:v1:assignment-configurations-list')
-        post_payload = {'subsidy_access_policy': str(self.assigned_learner_credit_policy_standalone.uuid)}
+        post_payload = {'enterprise_customer_uuid': yet_another_enterprise_uuid}
+
         response = self.client.post(list_url, post_payload)
+
         assert response.status_code == status.HTTP_201_CREATED
-        self.assigned_learner_credit_policy_standalone.refresh_from_db()
-        assert response.json() == {
-            'uuid': str(self.assigned_learner_credit_policy_standalone.assignment_configuration.uuid),
-            'active': True,
-            'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
-            'subsidy_access_policy': str(self.assigned_learner_credit_policy_standalone.uuid),
-        }
 
-    def test_create_idempotent(self):
-        """
-        Test that the create view idempotently returns an existing AsssignmentConfiguration when the requested policy
-        already has a linked one.
-        """
-        # Set the JWT-based auth to an operator.
-        self.set_jwt_cookie([
-            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
-        ])
-
-        # Send a create request which should return a pre-existing AssignmentConfiguration.
-        list_url = reverse('api:v1:assignment-configurations-list')
-        post_payload = {'subsidy_access_policy': str(self.assigned_learner_credit_policy.uuid)}
-        response = self.client.post(list_url, post_payload)
-        assert response.status_code == status.HTTP_200_OK
-        assert response.json() == {
-            'uuid': str(self.assignment_configuration_existing.uuid),
-            'active': True,
-            'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
-            'subsidy_access_policy': str(self.assigned_learner_credit_policy.uuid),
-        }
+        response_payload = response.json()
+        config_from_db = AssignmentConfiguration.objects.get(uuid=response_payload['uuid'])
+        self.assertEqual(str(config_from_db.uuid), response_payload['uuid'])
+        self.assertEqual(config_from_db.active, True)
+        self.assertEqual(str(config_from_db.enterprise_customer_uuid), yet_another_enterprise_uuid)
+        self.assertIsNone(config_from_db.policy)
 
     def test_create_unauthorized_other_customer(self):
         """
@@ -426,6 +398,8 @@ class TestAssignmentConfigurationAuthorizedCRUD(CRUDViewTestMixin, APITest):
 
         # Send a create request for a policy belonging to a different customer.  This should not be allowed!
         list_url = reverse('api:v1:assignment-configurations-list')
-        post_payload = {'subsidy_access_policy': str(self.assigned_learner_credit_policy_other_customer.uuid)}
+        post_payload = {'enterprise_customer_uuid': str(self.other_enterprise_uuid)}
+
         response = self.client.post(list_url, post_payload)
+
         assert response.status_code == status.HTTP_403_FORBIDDEN

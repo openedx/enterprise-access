@@ -3,6 +3,7 @@ Models for content_assignments
 """
 from uuid import UUID, uuid4
 
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
@@ -56,6 +57,14 @@ class AssignmentConfiguration(TimeStampedModel):
                 self._change_reason = kwargs['reason']  # pylint: disable=attribute-defined-outside-init
             self.active = False
             self.save()
+
+    @property
+    def policy(self):
+        """ Helper to safely fetch the related policy object or None. """
+        try:
+            return self.subsidy_access_policy  # pylint: disable=no-member
+        except ObjectDoesNotExist:
+            return None
 
 
 class LearnerContentAssignment(TimeStampedModel):
