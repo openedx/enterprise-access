@@ -465,3 +465,6 @@ BRAZE_APP_ID = os.environ.get('BRAZE_APP_ID', '')
 
 # Enterprise Subsidy API Client settings
 ENTERPRISE_SUBSIDY_API_CLIENT_VERSION = 2
+
+# Allows broader modification of access policy records from django admin
+DJANGO_ADMIN_POLICY_SUPER_ADMIN = False

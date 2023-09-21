@@ -147,3 +147,6 @@ dmypy.json
 
 # Generated docs not useful
 docs/generated/
+
+# private django settings
+enterprise_access/settings/private.py
