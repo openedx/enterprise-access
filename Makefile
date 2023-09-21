@@ -8,6 +8,11 @@
         push_translations start-devstack open-devstack  pkg-devstack \
         detect_changed_source_translations validate_translations check_keywords
 
+COMMON_CONSTRAINTS_TXT=requirements/common_constraints.txt
+.PHONY: $(COMMON_CONSTRAINTS_TXT)
+$(COMMON_CONSTRAINTS_TXT):
+	wget -O "$(@)" https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt || touch "$(@)"
+
 define BROWSER_PYSCRIPT
 import os, webbrowser, sys
 try:
@@ -101,8 +106,9 @@ subsidy_client_local:  # re-install edx-enterprise-subsidy-client from local cod
 	pip uninstall -y edx-enterprise-subsidy-client && pip install -e /edx/src/edx-enterprise-subsidy-client/ && pip freeze | grep subsidy-client
 
 upgrade: export CUSTOM_COMPILE_COMMAND=make upgrade
-upgrade: piptools ## update the requirements/*.txt files with the latest packages satisfying requirements/*.in
+upgrade: piptools $(COMMON_CONSTRAINTS_TXT) ## update the requirements/*.txt files with the latest packages satisfying requirements/*.in
 	# Make sure to compile files after any other files they include!
+	sed -i.tmp 's/Django<4.0//g' requirements/common_constraints.txt
 	pip-compile --allow-unsafe --rebuild --upgrade -o requirements/pip.txt requirements/pip.in
 	pip-compile --upgrade -o requirements/pip-tools.txt requirements/pip-tools.in
 	pip install -qr requirements/pip.txt
