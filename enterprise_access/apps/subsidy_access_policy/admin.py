@@ -1,10 +1,23 @@
 """ Admin configuration for subsidy_access_policy models. """
 
+from django.conf import settings
 from django.contrib import admin
 from django.utils.text import Truncator  # for shortening a text
 from djangoql.admin import DjangoQLSearchMixin
 
 from enterprise_access.apps.subsidy_access_policy import constants, models
+
+EVERY_SPEND_LIMIT_FIELD = [
+    'spend_limit',
+    'policy_spend_limit_dollars',
+    'per_learner_spend_limit',
+    'per_learner_spend_limit_dollars',
+    'per_learner_enrollment_limit',
+]
+
+
+def super_admin_enabled():
+    return getattr(settings, 'DJANGO_ADMIN_POLICY_SUPER_ADMIN', False)
 
 
 def cents_to_usd_string(cents):
@@ -72,6 +85,34 @@ class PerLearnerEnrollmentCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcc
         'subsidy_uuid',
     )
 
+    fieldsets = [
+        (
+            'Base configuration',
+            {
+                'fields': [
+                    'enterprise_customer_uuid',
+                    'display_name',
+                    'description',
+                    'active',
+                    'catalog_uuid',
+                    'subsidy_uuid',
+                    'created',
+                    'modified',
+                ]
+            }
+        ),
+        (
+            'Spend limits',
+            {
+                'fields': [
+                    'spend_limit',
+                    'policy_spend_limit_dollars',
+                    'per_learner_enrollment_limit',
+                ] if not super_admin_enabled() else EVERY_SPEND_LIMIT_FIELD
+            }
+        ),
+    ]
+
 
 @admin.register(models.PerLearnerSpendCreditAccessPolicy)
 class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPolicyMixin):
@@ -116,7 +157,7 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
                     'policy_spend_limit_dollars',
                     'per_learner_spend_limit',
                     'per_learner_spend_limit_dollars',
-                ]
+                ] if not super_admin_enabled() else EVERY_SPEND_LIMIT_FIELD
             }
         ),
     ]
@@ -164,7 +205,7 @@ class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcces
                 'fields': [
                     'spend_limit',
                     'policy_spend_limit_dollars',
-                ]
+                ] if not super_admin_enabled() else EVERY_SPEND_LIMIT_FIELD
             }
         ),
     ]
