@@ -46,6 +46,7 @@ backports-zoneinfo[tzdata]==0.2.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   celery
+    #   django
     #   kombu
 billiard==4.1.0
     # via
@@ -136,7 +137,6 @@ cryptography==41.0.4
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pyjwt
-    #   secretstorage
     #   social-auth-core
 ddt==1.6.0
     # via
@@ -158,7 +158,7 @@ distlib==0.3.7
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   virtualenv
-django==3.2.21
+django==4.2.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -388,11 +388,6 @@ jaraco-classes==3.3.0
     # via
     #   -r requirements/quality.txt
     #   keyring
-jeepney==0.8.0
-    # via
-    #   -r requirements/quality.txt
-    #   keyring
-    #   secretstorage
 jinja2==3.1.2
     # via
     #   -r requirements/quality.txt
@@ -636,7 +631,6 @@ pytz==2023.3.post1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-    #   django
     #   djangorestframework
     #   drf-yasg
 pyyaml==6.0.1
@@ -701,10 +695,6 @@ rules==3.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-secretstorage==3.3.3
-    # via
-    #   -r requirements/quality.txt
-    #   keyring
 semantic-version==2.10.0
     # via
     #   -r requirements/quality.txt

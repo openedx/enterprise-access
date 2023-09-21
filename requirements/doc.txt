@@ -45,6 +45,7 @@ backports-zoneinfo[tzdata]==0.2.1
     # via
     #   -r requirements/test.txt
     #   celery
+    #   django
     #   kombu
 beautifulsoup4==4.12.2
     # via pydata-sphinx-theme
@@ -136,9 +137,8 @@ distlib==0.3.7
     # via
     #   -r requirements/test.txt
     #   virtualenv
-django==3.2.21
+django==4.2.5
     # via
-    #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/test.txt
     #   django-celery-results
     #   django-cors-headers
@@ -189,7 +189,7 @@ django-rest-swagger==2.2.0
     # via -r requirements/test.txt
 django-simple-history==3.0.0
     # via
-    #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
+    #   -c requirements/common_constraints.txt
     #   -r requirements/test.txt
 django-waffle==4.0.0
     # via
@@ -488,7 +488,6 @@ pytz==2023.3.post1
     # via
     #   -r requirements/test.txt
     #   babel
-    #   django
     #   djangorestframework
     #   drf-yasg
 pyyaml==6.0.1
@@ -614,7 +613,7 @@ tomlkit==0.12.1
     #   pylint
 tox==3.28.0
     # via
-    #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
+    #   -c requirements/common_constraints.txt
     #   -r requirements/test.txt
 typing-extensions==4.8.0
     # via
