@@ -5,6 +5,7 @@ import logging
 
 import requests
 from django.conf import settings
+from rest_framework import status
 
 from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
 
@@ -147,17 +148,20 @@ class LmsApiClient(BaseOAuthClient):
     def create_pending_enterprise_users(self, enterprise_customer_uuid, user_emails):
         """
         Creates a pending enterprise user in the given ``enterprise_customer_uuid`` for each of the
-        specified ``user_emails`` provided.
+        specified ``user_emails``.
 
         Args:
             enterprise_customer_uuid (UUID): UUID of the enterprise customer in which pending user records are created.
             user_emails (list(str)): The emails for which pending enterprise users will be created.
 
         Returns:
-            A ``requests.Response`` object representing the pending-enterprise-learner endpoint response.
+            A ``requests.Response`` object representing the pending-enterprise-learner endpoint response. HTTP status
+            codes include:
+                * 201 CREATED: Any pending enterprise users were created.
+                * 204 NO CONTENT: No pending enterprise users were created (they ALL existed already).
 
         Raises:
-            ``requests.exceptions.HTTPError`` on any response with an unsuccessful status code.
+            ``requests.exceptions.HTTPError`` on any endpoint response with an unsuccessful status code.
         """
         data = [
             {
@@ -169,11 +173,16 @@ class LmsApiClient(BaseOAuthClient):
         response = self.client.post(self.pending_enterprise_learner_endpoint, json=data)
         try:
             response.raise_for_status()
-            logger.info(
-                'Successfully created %r PendingEnterpriseCustomerUser records for customer %r',
-                len(data),
-                enterprise_customer_uuid,
-            )
+            if response.status_code == status.HTTP_201_CREATED:
+                logger.info(
+                    'Successfully created PendingEnterpriseCustomerUser records for customer %r',
+                    enterprise_customer_uuid,
+                )
+            else:
+                logger.info(
+                    'Found existing PendingEnterpriseCustomerUser records for customer %r',
+                    enterprise_customer_uuid,
+                )
             return response
         except requests.exceptions.HTTPError as exc:
             logger.error(

@@ -9,9 +9,17 @@ import ddt
 import requests
 from django.conf import settings
 from django.test import TestCase
+from rest_framework import status
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
+
+TEST_ENTERPRISE_UUID = uuid4()
+TEST_USER_EMAILS = [
+    'larry@stooges.com',
+    'moe@stooges.com',
+    'curly@stooges.com',
+]
 
 
 @ddt.ddt
@@ -194,8 +202,22 @@ class TestLmsApiClient(TestCase):
         )
 
     @ddt.data(
-        {'mock_response_status': 201, 'mock_response_json': {'detail': 'Good Request'}},
-        {'mock_response_status': 400, 'mock_response_json': {'detail': 'Bad Request'}},
+        {
+            'mock_response_status': status.HTTP_204_NO_CONTENT,
+            'mock_response_json': [],
+        },
+        {
+            'mock_response_status': status.HTTP_201_CREATED,
+            'mock_response_json': [
+                {'enterprise_customer': str(TEST_ENTERPRISE_UUID), 'user_email': TEST_USER_EMAILS[0]},
+                {'enterprise_customer': str(TEST_ENTERPRISE_UUID), 'user_email': TEST_USER_EMAILS[1]},
+                {'enterprise_customer': str(TEST_ENTERPRISE_UUID), 'user_email': TEST_USER_EMAILS[2]},
+            ],
+        },
+        {
+            'mock_response_status': status.HTTP_400_BAD_REQUEST,
+            'mock_response_json': {'detail': 'Bad Request'},
+        },
     )
     @ddt.unpack
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
@@ -209,27 +231,21 @@ class TestLmsApiClient(TestCase):
             mock_response_status,
         )
 
-        user_emails = [
-            'larry@stooges.com',
-            'moe@stooges.com',
-            'curly@stooges.com',
-        ]
-        mock_enterprise_uuid = str(uuid4())
-
         client = LmsApiClient()
 
         if mock_response_status >= 400:
             with self.assertRaises(requests.exceptions.HTTPError):
-                response = client.create_pending_enterprise_users(mock_enterprise_uuid, user_emails)
+                response = client.create_pending_enterprise_users(str(TEST_ENTERPRISE_UUID), TEST_USER_EMAILS)
         else:
-            response = client.create_pending_enterprise_users(mock_enterprise_uuid, user_emails)
-            assert response.status_code == 201
-            assert response.json() == {'detail': 'Good Request'}
+            response = client.create_pending_enterprise_users(str(TEST_ENTERPRISE_UUID), TEST_USER_EMAILS)
+            assert response.status_code == mock_response_status
+            assert response.json() == mock_response_json
 
         mock_oauth_client.return_value.post.assert_called_once_with(
             client.pending_enterprise_learner_endpoint,
             json=[
-                {'enterprise_customer': str(mock_enterprise_uuid), 'user_email': user_email}
-                for user_email in user_emails
+                {'enterprise_customer': str(TEST_ENTERPRISE_UUID), 'user_email': TEST_USER_EMAILS[0]},
+                {'enterprise_customer': str(TEST_ENTERPRISE_UUID), 'user_email': TEST_USER_EMAILS[1]},
+                {'enterprise_customer': str(TEST_ENTERPRISE_UUID), 'user_email': TEST_USER_EMAILS[2]},
             ],
         )
