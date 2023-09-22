@@ -11,7 +11,6 @@ EVERY_SPEND_LIMIT_FIELD = [
     'spend_limit',
     'policy_spend_limit_dollars',
     'per_learner_spend_limit',
-    'per_learner_spend_limit_dollars',
     'per_learner_enrollment_limit',
 ]
 
@@ -194,6 +193,7 @@ class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcces
                     'active',
                     'catalog_uuid',
                     'subsidy_uuid',
+                    'assignment_configuration',
                     'created',
                     'modified',
                 ]
