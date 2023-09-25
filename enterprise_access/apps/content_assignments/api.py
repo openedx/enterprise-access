@@ -8,6 +8,12 @@ from .constants import LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
 
 
+class AllocationException(Exception):
+    """
+    Exception class specific to allocation commands and queries.
+    """
+
+
 def get_assignment_configuration(uuid):
     """
     Returns an `AssignmentConfiguration` record with the given uuid,
@@ -66,7 +72,7 @@ def get_allocated_quantity_for_configuration(assignment_configuration):
     aggregate = assignments_queryset.aggregate(
         total_quantity=Sum('content_quantity'),
     )
-    return aggregate['total_quantity']
+    return aggregate['total_quantity'] or 0
 
 
 def allocate_assignments(assignment_configuration, learner_emails, content_key, content_price_cents):
@@ -84,7 +90,8 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
       - ``assignment_configuration``: The AssignmentConfiguration record under which assignments should be allocated.
       - ``learner_emails``: A list of learner email addresses to whom assignments should be allocated.
       - ``content_key``: Typically a *course* key to which the learner is assigned.
-      - ``content_price_cents``: The cost of redeeming the content, in USD cents, at the time of allocation.
+      - ``content_price_cents``: The cost of redeeming the content, in USD cents, at the time of allocation. Should
+        always be an integer <= 0.
 
     Returns: A dictionary of updated, created, and unchanged assignment records. e.g.
       ```
@@ -98,6 +105,9 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
       ```
 
     """
+    if content_price_cents > 0:
+        raise AllocationException('Allocation price must be <= 0')
+
     # Fetch any existing assignments for all pairs of (learner, content) in this assignment config.
     existing_assignments = get_assignments_by_learner_email_and_content(
         assignment_configuration,

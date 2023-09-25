@@ -275,3 +275,14 @@ rules.add_perm(
     constants.CONTENT_ASSIGNMENTS_CONFIGURATION_WRITE_PERMISSION,
     has_content_assignment_operator_access,
 )
+
+
+# Grants permission to allocate assignments from a policy if the user is a content assignment configuration admin.
+rules.add_perm(
+    constants.SUBSIDY_ACCESS_POLICY_ALLOCATION_PERMISSION,
+    (
+        has_content_assignment_operator_access |
+        has_content_assignment_admin_access |
+        has_subsidy_access_policy_operator_access
+    ),
+)

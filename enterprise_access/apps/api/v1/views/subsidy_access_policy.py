@@ -9,6 +9,8 @@ from contextlib import suppress
 import requests
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.utils.functional import cached_property
 from drf_spectacular.utils import extend_schema
 from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient
 from edx_rbac.decorators import permission_required
@@ -23,7 +25,9 @@ from rest_framework.response import Response
 from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.mixins import UserDetailsFromJwtMixin
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
+from enterprise_access.apps.content_assignments.api import AllocationException
 from enterprise_access.apps.core.constants import (
+    SUBSIDY_ACCESS_POLICY_ALLOCATION_PERMISSION,
     SUBSIDY_ACCESS_POLICY_READ_PERMISSION,
     SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION,
     SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION
@@ -56,6 +60,7 @@ logger = logging.getLogger(__name__)
 
 SUBSIDY_ACCESS_POLICY_CRUD_API_TAG = 'Subsidy Access Policies CRUD'
 SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG = 'Subsidy Access Policy Redemption'
+SUBSIDY_ACCESS_POLICY_ALLOCATION_API_TAG = 'Subsidy Access Policy Allocation'
 
 
 def policy_permission_detail_fn(request, *args, uuid=None, **kwargs):
@@ -252,6 +257,11 @@ class SubsidyAccessPolicyLockedException(APIException):
     """
     status_code = status.HTTP_429_TOO_MANY_REQUESTS
     default_detail = 'Enrollment currently locked for this subsidy access policy.'
+
+
+class AllocationRequestException(APIException):
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    default_detail = 'Could not allocate'
 
 
 class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequiredMixin, viewsets.GenericViewSet):
@@ -694,3 +704,98 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             "usd": list_price_decimal_dollars,
             "usd_cents": list_price_integer_cents,
         }
+
+
+class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequiredMixin, viewsets.GenericViewSet):
+    """
+    Viewset for Subsidy Access Policy Allocation actions.
+    """
+    authentication_classes = [JwtAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_url_kwarg = 'policy_uuid'
+    permission_required = SUBSIDY_ACCESS_POLICY_ALLOCATION_PERMISSION
+    http_method_names = ['post']
+
+    @cached_property
+    def enterprise_customer_uuid(self):
+        """Returns the enterprise customer uuid from query params or request data based on action type. """
+        enterprise_uuid = ''
+
+        if self.action == 'allocate':
+            policy_uuid = self.kwargs.get('policy_uuid')
+            with suppress(ValidationError):  # Ignore if `policy_uuid` is not a valid uuid
+                policy = SubsidyAccessPolicy.objects.filter(uuid=policy_uuid).first()
+                if policy:
+                    enterprise_uuid = policy.enterprise_customer_uuid
+
+        return enterprise_uuid
+
+    def get_permission_object(self):
+        """
+        Returns the enterprise uuid to verify that requesting user possess the enterprise learner or admin role.
+        """
+        return str(self.enterprise_customer_uuid)
+
+    def get_queryset(self):
+        """
+        Default base queryset for this viewset.
+        """
+        return SubsidyAccessPolicy.objects.none()
+
+    @extend_schema(
+        tags=[SUBSIDY_ACCESS_POLICY_ALLOCATION_API_TAG],
+        summary='Allocate assignments',
+        parameters=[serializers.SubsidyAccessPolicyAllocateRequestSerializer],
+        responses={
+            status.HTTP_202_ACCEPTED: serializers.SubsidyAccessPolicyAllocationResponseSerializer,
+        },
+    )
+    @action(
+        detail=True,
+        methods=['post'],
+    )
+    def allocate(self, request, *args, **kwargs):
+        """
+        Idempotently creates or updates allocated ``LearnerContentAssignment``
+        records for a requested list of user email addresses, in the requested
+        ``content_key`` and at the requested price of ``content_price_cents``.
+        These assignments are related to the ``AssignmentConfiguration`` of the
+        requested ``AssignedLearnerCreditAccessPolicy`` record.
+        """
+        policy = get_object_or_404(SubsidyAccessPolicy, pk=kwargs.get('policy_uuid'))
+
+        serializer = serializers.SubsidyAccessPolicyAllocateRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        learner_emails = serializer.data['learner_emails']
+        content_key = serializer.data['content_key']
+        content_price_cents = serializer.data['content_price_cents']
+
+        try:
+            with policy.lock(), transaction.atomic():
+                can_allocate, reason = policy.can_allocate(
+                    len(learner_emails),
+                    content_key,
+                    content_price_cents,
+                )
+                if can_allocate:
+                    allocation_result = policy.allocate(
+                        learner_emails,
+                        content_key,
+                        content_price_cents,
+                    )
+                    response_serializer = serializers.SubsidyAccessPolicyAllocationResponseSerializer(
+                        allocation_result,
+                    )
+                    return Response(response_serializer.data, status=status.HTTP_202_ACCEPTED)
+                else:
+                    raise AllocationRequestException(detail=reason)
+        except SubsidyAccessPolicyLockAttemptFailed as exc:
+            logger.exception(exc)
+            raise SubsidyAccessPolicyLockedException() from exc
+        except AllocationException as exc:
+            logger.exception(exc)
+            raise AllocationRequestException(detail=str(exc)) from exc
+        # TODO: there's a whole separate set of exceptions to raise if `can_allocate` is false
+        # which will be covered by ENT-7689
+        # https://2u-internal.atlassian.net/browse/ENT-7689
