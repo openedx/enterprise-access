@@ -3,7 +3,12 @@ Tests for the ``api.py`` module of the content_assignments app.
 """
 from django.test import TestCase
 
-from ..api import allocate_assignments, get_allocated_quantity_for_configuration, get_assignments_for_configuration
+from ..api import (
+    AllocationException,
+    allocate_assignments,
+    get_allocated_quantity_for_configuration,
+    get_assignments_for_configuration
+)
 from ..constants import LearnerContentAssignmentStateChoices
 from ..models import AssignmentConfiguration
 from .factories import LearnerContentAssignmentFactory
@@ -81,7 +86,7 @@ class TestContentAssignmentApi(TestCase):
         Tests to verify that we can fetch the total allocated quantity across a set of assignments
         related to some configuration.
         """
-        for amount in (1000, 2000, 3000):
+        for amount in (-1000, -2000, -3000):
             LearnerContentAssignmentFactory.create(
                 assignment_configuration=self.assignment_configuration,
                 content_quantity=amount,
@@ -89,14 +94,44 @@ class TestContentAssignmentApi(TestCase):
 
         with self.assertNumQueries(1):
             actual_amount = get_allocated_quantity_for_configuration(self.assignment_configuration)
-            self.assertEqual(actual_amount, 6000)
+            self.assertEqual(actual_amount, -6000)
+
+    def test_get_allocated_quantity_zero(self):
+        """
+        Tests to verify that the total allocation amount is zero for a given
+        configuration if no assignments relate to it.
+        """
+        other_config = AssignmentConfiguration.objects.create()
+
+        with self.assertNumQueries(1):
+            actual_amount = get_allocated_quantity_for_configuration(other_config)
+            self.assertEqual(actual_amount, 0)
+
+    def test_allocate_assignments_positive_quantity(self):
+        """
+        Tests the allocation of new assignments for a price > 0
+        raises an exception.
+        """
+        content_key = 'demoX'
+        content_price_cents = 1
+        learners_to_assign = [
+            f'{name}@foo.com' for name in ('alice', 'bob', 'carol', 'david', 'eugene')
+        ]
+
+        with self.assertRaisesRegex(AllocationException, 'price must be <= 0'):
+            allocate_assignments(
+                self.assignment_configuration,
+                learners_to_assign,
+                content_key,
+                content_price_cents,
+            )
 
     def test_allocate_assignments_happy_path(self):
         """
         Tests the allocation of new assignments against a given configuration.
         """
         content_key = 'demoX'
-        content_price_cents = 100
+        content_price_cents = -100
         learners_to_assign = [
             f'{name}@foo.com' for name in ('alice', 'bob', 'carol', 'david', 'eugene')
         ]
@@ -119,14 +154,14 @@ class TestContentAssignmentApi(TestCase):
             assignment_configuration=self.assignment_configuration,
             learner_email='carol@foo.com',
             content_key=content_key,
-            content_quantity=200,
+            content_quantity=-200,
             state=LearnerContentAssignmentStateChoices.CANCELLED,
         )
         errored_assignment = LearnerContentAssignmentFactory.create(
             assignment_configuration=self.assignment_configuration,
             learner_email='david@foo.com',
             content_key=content_key,
-            content_quantity=200,
+            content_quantity=-200,
             state=LearnerContentAssignmentStateChoices.ERRORED,
         )
 

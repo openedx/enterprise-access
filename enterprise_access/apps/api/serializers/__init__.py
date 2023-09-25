@@ -7,7 +7,10 @@ from .assignment_configuration import (
     AssignmentConfigurationResponseSerializer,
     AssignmentConfigurationUpdateRequestSerializer
 )
+from .content_assignments import LearnerContentAssignmentResponseSerializer
 from .subsidy_access_policy import (
+    SubsidyAccessPolicyAllocateRequestSerializer,
+    SubsidyAccessPolicyAllocationResponseSerializer,
     SubsidyAccessPolicyCanRedeemElementResponseSerializer,
     SubsidyAccessPolicyCanRedeemReasonResponseSerializer,
     SubsidyAccessPolicyCanRedeemRequestSerializer,

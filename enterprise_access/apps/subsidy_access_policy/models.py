@@ -910,6 +910,9 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         """
         Creates allocated ``LearnerContentAssignment`` records.
         """
-        # this will eventually lean on assignments_api.allocate_assignments()
-        # to do the heavy lifting.
-        raise NotImplementedError
+        return assignments_api.allocate_assignments(
+            self.assignment_configuration,
+            learner_emails,
+            content_key,
+            content_price_cents,
+        )

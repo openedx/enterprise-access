@@ -14,6 +14,8 @@ from rest_framework import serializers
 from enterprise_access.apps.subsidy_access_policy.constants import PolicyTypes
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 
+from .content_assignments import LearnerContentAssignmentResponseSerializer
+
 logger = logging.getLogger(__name__)
 
 
@@ -474,4 +476,48 @@ class SubsidyAccessPolicyCanRedeemElementResponseSerializer(serializers.Serializ
         help_text=(
             "List of reasons why each of the enterprise's subsidy access policies are not redeemable, grouped by reason"
         )
+    )
+
+
+# pylint: disable=abstract-method
+class SubsidyAccessPolicyAllocateRequestSerializer(serializers.Serializer):
+    """
+    Request Serializer to validate policy ``allocate`` endpoint POST data.
+
+    For view: SubsidyAccessPolicyRedeemViewset.allocate
+    """
+    learner_emails = serializers.ListField(
+        child=serializers.EmailField(required=True),
+        allow_empty=False,
+        help_text='Learner emails to whom LearnerContentAssignments should be allocated.',
+    )
+    content_key = ContentKeyField(
+        required=True,
+        help_text='Course content_key to which these learners are assigned.',
+    )
+    content_price_cents = serializers.IntegerField(
+        required=True,
+        help_text='The price, in USD cents, of this content at the time of allocation. Must be <= 0.',
+        max_value=0,
+    )
+
+
+class SubsidyAccessPolicyAllocationResponseSerializer(serializers.Serializer):
+    """
+    A read-only serializer for responding to request to allocate ``LearnerCotentAssignment`` records.
+    """
+    updated = LearnerContentAssignmentResponseSerializer(
+        many=True,
+        help_text='Assignment records whose state was transitioned to "allocated" as a result of this action.',
+    )
+    created = LearnerContentAssignmentResponseSerializer(
+        many=True,
+        help_text='New Assignment records that were created as a result of this action.',
+    )
+    no_change = LearnerContentAssignmentResponseSerializer(
+        many=True,
+        help_text=(
+            'Already-allocated Assignment records related to the requested policy, '
+            'learner email(s), and content for this action.'
+        ),
     )

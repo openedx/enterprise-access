@@ -10,6 +10,7 @@ urlpatterns = []
 router = DefaultRouter()
 
 router.register("policy-redemption", views.SubsidyAccessPolicyRedeemViewset, 'policy-redemption')
+router.register("policy-allocation", views.SubsidyAccessPolicyAllocateViewset, 'policy-allocation')
 router.register("subsidy-access-policies", views.SubsidyAccessPolicyViewSet, 'subsidy-access-policies')
 router.register("license-requests", views.LicenseRequestViewSet, 'license-requests')
 router.register("coupon-code-requests", views.CouponCodeRequestViewSet, 'coupon-code-requests')
