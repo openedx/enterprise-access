@@ -18,7 +18,7 @@ asgiref==3.7.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django
-astroid==2.15.6
+astroid==2.15.8
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -131,7 +131,7 @@ coverage[toml]==7.3.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pytest-cov
-cryptography==41.0.3
+cryptography==41.0.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -199,7 +199,7 @@ django-crum==0.7.9
     #   -r requirements/test.txt
     #   edx-django-utils
     #   edx-rbac
-django-dynamic-fixture==4.0.0
+django-dynamic-fixture==4.0.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -207,7 +207,7 @@ django-extensions==3.2.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-django-filter==23.2
+django-filter==23.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -258,7 +258,7 @@ drf-jwt==1.19.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-drf-extensions
-drf-spectacular==0.26.4
+drf-spectacular==0.26.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -293,7 +293,7 @@ edx-django-utils==5.7.0
     #   -r requirements/test.txt
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.9.3
+edx-drf-extensions==8.10.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -306,7 +306,7 @@ edx-lint==5.3.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-edx-opaque-keys[django]==2.5.0
+edx-opaque-keys[django]==2.5.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -330,7 +330,7 @@ factory-boy==3.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==19.6.1
+faker==19.6.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -356,7 +356,7 @@ importlib-metadata==6.8.0
     #   -r requirements/quality.txt
     #   keyring
     #   twine
-importlib-resources==6.0.1
+importlib-resources==6.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -408,7 +408,7 @@ jsonfield2==4.0.0.post0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-jsonschema==4.19.0
+jsonschema==4.19.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -463,7 +463,7 @@ mysqlclient==2.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-newrelic==9.0.0
+newrelic==9.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -563,7 +563,7 @@ pyjwt[crypto]==2.8.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==2.17.5
+pylint==2.17.6
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -651,7 +651,7 @@ readme-renderer==42.0
     # via
     #   -r requirements/quality.txt
     #   twine
-redis==5.0.0
+redis==5.0.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -687,7 +687,7 @@ rfc3986==2.0.0
     # via
     #   -r requirements/quality.txt
     #   twine
-rich==13.5.2
+rich==13.5.3
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -782,7 +782,7 @@ tox==3.28.0
     #   -r requirements/test.txt
 twine==4.0.2
     # via -r requirements/quality.txt
-typing-extensions==4.7.1
+typing-extensions==4.8.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -806,7 +806,7 @@ uritemplate==4.1.1
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.0.4
+urllib3==2.0.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -834,7 +834,7 @@ wrapt==1.15.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   astroid
-zipp==3.16.2
+zipp==3.17.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
