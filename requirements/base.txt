@@ -59,7 +59,7 @@ coreapi==2.3.3
     #   openapi-codec
 coreschema==0.0.4
     # via coreapi
-cryptography==41.0.3
+cryptography==41.0.4
     # via
     #   pyjwt
     #   social-auth-core
@@ -105,7 +105,7 @@ django-crum==0.7.9
     #   edx-rbac
 django-extensions==3.2.3
     # via -r requirements/base.in
-django-filter==23.2
+django-filter==23.3
     # via -r requirements/base.in
 django-log-request-id==2.1.0
     # via -r requirements/base.in
@@ -137,7 +137,7 @@ djangorestframework==3.14.0
     #   edx-drf-extensions
 drf-jwt==1.19.2
     # via edx-drf-extensions
-drf-spectacular==0.26.4
+drf-spectacular==0.26.5
     # via -r requirements/base.in
 drf-yasg==1.21.7
     # via edx-api-doc-tools
@@ -156,13 +156,13 @@ edx-django-utils==5.7.0
     #   -r requirements/base.in
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.9.3
+edx-drf-extensions==8.10.0
     # via
     #   -r requirements/base.in
     #   edx-rbac
 edx-enterprise-subsidy-client==0.3.7
     # via -r requirements/base.in
-edx-opaque-keys[django]==2.5.0
+edx-opaque-keys[django]==2.5.1
     # via
     #   edx-drf-extensions
     #   openedx-events
@@ -178,7 +178,7 @@ fastavro==1.8.3
     #   openedx-events
 idna==3.4
     # via requests
-importlib-resources==6.0.1
+importlib-resources==6.1.0
     # via
     #   jsonschema
     #   jsonschema-specifications
@@ -194,7 +194,7 @@ jsonfield==3.1.0
     # via edx-celeryutils
 jsonfield2==4.0.0.post0
     # via -r requirements/base.in
-jsonschema==4.19.0
+jsonschema==4.19.1
     # via drf-spectacular
 jsonschema-specifications==2023.7.1
     # via jsonschema
@@ -206,7 +206,7 @@ monotonic==1.6
     # via analytics-python
 mysqlclient==2.2.0
     # via -r requirements/base.in
-newrelic==9.0.0
+newrelic==9.1.0
     # via edx-django-utils
 oauthlib==3.2.2
     # via
@@ -260,7 +260,7 @@ pyyaml==6.0.1
     #   drf-spectacular
     #   drf-yasg
     #   edx-django-release-util
-redis==5.0.0
+redis==5.0.1
     # via -r requirements/base.in
 referencing==0.30.2
     # via
@@ -308,7 +308,7 @@ stevedore==5.1.0
     # via
     #   edx-django-utils
     #   edx-opaque-keys
-typing-extensions==4.7.1
+typing-extensions==4.8.0
     # via
     #   asgiref
     #   edx-opaque-keys
@@ -322,7 +322,7 @@ uritemplate==4.1.1
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.0.4
+urllib3==2.0.5
     # via requests
 vine==5.0.0
     # via
@@ -331,5 +331,5 @@ vine==5.0.0
     #   kombu
 wcwidth==0.2.6
     # via prompt-toolkit
-zipp==3.16.2
+zipp==3.17.0
     # via importlib-resources
