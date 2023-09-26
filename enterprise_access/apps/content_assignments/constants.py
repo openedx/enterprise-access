@@ -18,4 +18,8 @@ class LearnerContentAssignmentStateChoices:
         (ERRORED, 'Errored'),
     )
 
+    # States which allow reallocation by an admin.
     REALLOCATE_STATES = (CANCELLED, ERRORED)
+
+    # States which allow cancellation by an admin.
+    CANCELABLE_STATES = (ALLOCATED, ERRORED)

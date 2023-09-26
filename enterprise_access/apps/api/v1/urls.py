@@ -16,5 +16,15 @@ router.register("license-requests", views.LicenseRequestViewSet, 'license-reques
 router.register("coupon-code-requests", views.CouponCodeRequestViewSet, 'coupon-code-requests')
 router.register("customer-configurations", views.SubsidyRequestCustomerConfigurationViewSet, 'customer-configurations')
 router.register("assignment-configurations", views.AssignmentConfigurationViewSet, 'assignment-configurations')
+router.register(
+    r'assignment-configurations/(?P<assignment_configuration_uuid>[\S]+)/admin/assignments',
+    views.LearnerContentAssignmentAdminViewSet,
+    'admin-assignments',
+)
+router.register(
+    r'assignment-configurations/(?P<assignment_configuration_uuid>[\S]+)/assignments',
+    views.LearnerContentAssignmentViewSet,
+    'assignments',
+)
 
 urlpatterns += router.urls
