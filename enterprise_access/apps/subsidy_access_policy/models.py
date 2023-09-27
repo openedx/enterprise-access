@@ -904,7 +904,10 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         if self.per_learner_spend_limit <= 0:
             return 0
         spent_amount = self.transactions_for_learner(lms_user_id)['aggregates'].get('total_quantity') or 0
-        return self.per_learner_spend_limit - spent_amount
+        if spent_amount > 0:
+            raise Exception('[remaining_balance_per_user] Expected a sum of transaction quantities <= 0')
+        positive_spent_amount = spent_amount * -1
+        return self.per_learner_spend_limit - positive_spent_amount
 
 
 class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
