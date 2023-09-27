@@ -516,27 +516,37 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         # inactive policy
         if not self.active:
+            logger.info('[credit_available] policy %s inactive', self.uuid)
             return False
 
-        # learner not associated to enterprise
+        # learner not linked to enterprise
         if not skip_customer_user_check:
             if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
+                logger.info(
+                    '[credit_available] learner %s not linked to enterprise %s',
+                    lms_user_id,
+                    self.enterprise_customer_uuid
+                )
                 return False
 
         # verify associated subsidy is current (non-expired)
         try:
             if not self.is_subsidy_active:
+                logger.info('[credit_available] SubsidyAccessPolicy.subsidy_record() returned inactive subsidy')
                 return False
-        except requests.exceptions.HTTPError:
-            # when associated subsidy is soft-deleted, the subsidy API raises an exception.
+        except requests.exceptions.HTTPError as exc:
+            # when associated subsidy is soft-deleted, the subsidy retrieve API raises an exception.
+            logger.info('[credit_available] SubsidyAccessPolicy.subsidy_record() raised HTTPError: %s', exc)
             return False
 
         # verify associated subsidy has remaining balance
         if self.remaining_balance() <= 0:
+            logger.info('[credit_available] SubsidyAccessPolicy.subsidy_record() returned empty balance')
             return False
 
         # verify spend against policy and configured spend limit
         if not self.has_credit_available_with_spend_limit():
+            logger.info('[credit_available] policy %s has exceeded spend limit', self.uuid)
             return False
 
         return True
@@ -797,7 +807,7 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
 
     def credit_available(self, lms_user_id, skip_customer_user_check=False):
         """
-        TODO
+        Determine whether a learner credit available for the subsidy access policy.
         """
         is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
 
@@ -872,7 +882,7 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
 
     def credit_available(self, lms_user_id, skip_customer_user_check=False):
         """
-        TODO
+        Determine whether a learner credit available for the subsidy access policy.
         """
         is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
 
