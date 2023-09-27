@@ -810,7 +810,6 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
         Determine whether a learner credit available for the subsidy access policy.
         """
         is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
-
         if not is_credit_available:
             return False
 
@@ -885,7 +884,6 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         Determine whether a learner credit available for the subsidy access policy.
         """
         is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
-
         if not is_credit_available:
             return False
 

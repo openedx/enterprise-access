@@ -892,8 +892,8 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         lms_client_patcher = mock.patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
         lms_client = lms_client_patcher.start()
-        lms_client_instance = lms_client.return_value
-        lms_client_instance.enterprise_contains_learner.return_value = True
+        self.lms_client_instance = lms_client.return_value
+        self.lms_client_instance.enterprise_contains_learner.return_value = True
 
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
@@ -1083,18 +1083,27 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         {
             'is_subsidy_active': True,
             'has_subsidy_balance_remaining': True,
+            'is_learned_linked': True,
+        },
+        {
+            'is_subsidy_active': True,
+            'has_subsidy_balance_remaining': True,
+            'is_learned_linked': False,
         },
         {
             'is_subsidy_active': False,
             'has_subsidy_balance_remaining': True,
+            'is_learned_linked': True,
         },
         {
             'is_subsidy_active': True,
             'has_subsidy_balance_remaining': False,
+            'is_learned_linked': True,
         },
         {
             'is_subsidy_active': False,
             'has_subsidy_balance_remaining': False,
+            'is_learned_linked': True,
         },
     )
     @ddt.unpack
@@ -1104,6 +1113,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         mock_transactions_cache_for_learner,
         is_subsidy_active,
         has_subsidy_balance_remaining,
+        is_learned_linked,
     ):
         """
         Verify that SubsidyAccessPolicyViewset credits_available returns credit based policies with redeemable credit.
@@ -1137,6 +1147,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'current_balance': '1000' if has_subsidy_balance_remaining else '0',
             'is_active': is_subsidy_active,
         }
+        self.lms_client_instance.enterprise_contains_learner.return_value = is_learned_linked
 
         # The following policy should never be returned as it's inactive.
         PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
@@ -1168,7 +1179,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         response_json = response.json()
 
-        if is_subsidy_active and has_subsidy_balance_remaining:
+        if is_subsidy_active and has_subsidy_balance_remaining and is_learned_linked:
             # self.redeemable_policy, along with the 2 instances created from factories above,
             # should give us a total of 3 policy records with credits available. The inactive policy
             # created above should not be returned. The policy with a spend limit that's been exceeded
