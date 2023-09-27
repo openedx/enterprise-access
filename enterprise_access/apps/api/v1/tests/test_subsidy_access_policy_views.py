@@ -1153,7 +1153,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         # Create redeemable policies
         enroll_cap_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
-            per_learner_enrollment_limit=5
+            per_learner_enrollment_limit=5,
         )
         spend_cap_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
@@ -1180,7 +1180,6 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         else:
             # with an inactive (i.e., expired, not yet started) subsidy, we should get no records back.
             assert len(response_json) == 0
-
 
 
 @ddt.ddt
