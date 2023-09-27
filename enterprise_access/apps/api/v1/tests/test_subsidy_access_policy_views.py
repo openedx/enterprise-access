@@ -867,16 +867,16 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client'
         )
         subsidy_client_patcher = mock.patch(subsidy_client_path)
-        subsidy_client = subsidy_client_patcher.start()
-        subsidy_client.can_redeem.return_value = {
+        self.subsidy_client = subsidy_client_patcher.start()
+        self.subsidy_client.can_redeem.return_value = {
             'can_redeem': True,
             'active': True,
             'content_price': 0,
             'unit': 'usd_cents',
             'all_transactions': [],
         }
-        subsidy_client.list_subsidy_transactions.return_value = {"results": [], "aggregates": {}}
-        subsidy_client.create_subsidy_transaction.side_effect = (
+        self.subsidy_client.list_subsidy_transactions.return_value = {"results": [], "aggregates": {}}
+        self.subsidy_client.create_subsidy_transaction.side_effect = (
             NotImplementedError("unit test must override create_subsidy_transaction to use.")
         )
 
@@ -892,8 +892,8 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         lms_client_patcher = mock.patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
         lms_client = lms_client_patcher.start()
-        lms_client_instance = lms_client.return_value
-        lms_client_instance.enterprise_contains_learner.return_value = True
+        self.lms_client_instance = lms_client.return_value
+        self.lms_client_instance.enterprise_contains_learner.return_value = True
 
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
@@ -1079,25 +1079,115 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_record')
-    def test_credits_available_endpoint(self, mock_subsidy_record, mock_transactions_cache_for_learner):
+    @ddt.data(
+        {
+            'is_subsidy_active': True,
+            'has_subsidy_balance_remaining': True,
+            'is_learned_linked': True,
+            'has_learner_exceed_spend_cap': False,
+        },
+        {
+            'is_subsidy_active': True,
+            'has_subsidy_balance_remaining': True,
+            'is_learned_linked': False,
+            'has_learner_exceed_spend_cap': False,
+        },
+        {
+            'is_subsidy_active': True,
+            'has_subsidy_balance_remaining': True,
+            'is_learned_linked': True,
+            'has_learner_exceed_spend_cap': True,
+        },
+        {
+            'is_subsidy_active': False,
+            'has_subsidy_balance_remaining': True,
+            'is_learned_linked': True,
+            'has_learner_exceed_spend_cap': False,
+        },
+        {
+            'is_subsidy_active': True,
+            'has_subsidy_balance_remaining': False,
+            'is_learned_linked': True,
+            'has_learner_exceed_spend_cap': False,
+        },
+        {
+            'is_subsidy_active': False,
+            'has_subsidy_balance_remaining': False,
+            'is_learned_linked': True,
+            'has_learner_exceed_spend_cap': False,
+        },
+    )
+    @ddt.unpack
+    def test_credits_available_endpoint(
+        self,
+        mock_subsidy_record,
+        mock_transactions_cache_for_learner,
+        is_subsidy_active,
+        has_subsidy_balance_remaining,
+        is_learned_linked,
+        has_learner_exceed_spend_cap,
+    ):
         """
         Verify that SubsidyAccessPolicyViewset credits_available returns credit based policies with redeemable credit.
         """
+        # The following policy should never be returned as it's inactive.
+        PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            active=False,
+        )
+        # The following policy should never be returned as it's had more spend than the `spend_limit`.
+        PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            per_learner_spend_limit=5,
+            spend_limit=100,
+        )
+
+        # Create redeemable policies
+        enroll_cap_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            per_learner_enrollment_limit=5,
+        )
+        spend_cap_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            per_learner_spend_limit=(5 if has_learner_exceed_spend_cap else 1000),
+        )
+
         mock_transaction_record = {
             'uuid': str(uuid4()),
             'state': TransactionStateChoices.COMMITTED,
             'content_key': 'something',
             'subsidy_access_policy_uuid': str(self.redeemable_policy.uuid),
-            'quantity': 200,
+            'quantity': -200,
             'other': True,
         }
+        mock_transaction_record_second_policy = {
+            'uuid': str(uuid4()),
+            'state': TransactionStateChoices.COMMITTED,
+            'content_key': 'something',
+            'subsidy_access_policy_uuid': str(spend_cap_policy.uuid),
+            'quantity': -200,
+            'other': True,
+        }
+        mock_total_quantity_transactions = mock_transaction_record['quantity'] + \
+            mock_transaction_record_second_policy['quantity']
+
         mock_transactions_cache_for_learner.return_value = {
             'transactions': [
-                mock_transaction_record
+                mock_transaction_record,
+                mock_transaction_record_second_policy,
             ],
             'aggregates': {
-                'total_quantity': 0,
+                'total_quantity': mock_total_quantity_transactions,
             },
+        }
+        self.subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [
+                mock_transaction_record,
+                mock_transaction_record_second_policy,
+            ],
+            'aggregates': {
+                'total_quantity': mock_total_quantity_transactions,
+            }
         }
         mock_subsidy_record.return_value = {
             'uuid': str(uuid4()),
@@ -1105,16 +1195,10 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'enterprise_customer_uuid': str(self.enterprise_uuid),
             'expiration_datetime': '2030-01-01 12:00:00Z',
             'active_datetime': '2020-01-01 12:00:00Z',
-            'current_balance': '1000',
+            'current_balance': '5000' if has_subsidy_balance_remaining else '0',
+            'is_active': is_subsidy_active,
         }
-        enroll_cap_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
-            enterprise_customer_uuid=self.enterprise_uuid,
-            per_learner_enrollment_limit=5
-        )
-        spend_cap_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
-            enterprise_customer_uuid=self.enterprise_uuid,
-            per_learner_spend_limit=5
-        )
+        self.lms_client_instance.enterprise_contains_learner.return_value = is_learned_linked
 
         query_params = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),
@@ -1123,12 +1207,28 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         response = self.client.get(self.subsidy_access_policy_credits_available_endpoint, query_params)
 
         response_json = response.json()
-        # self.redeemable_policy, along with the 2 instances created from factories above,
-        # should give us a total of 3 policy records with credits available.
-        assert len(response_json) == 3
-        redeemable_policy_uuids = {self.redeemable_policy.uuid, enroll_cap_policy.uuid, spend_cap_policy.uuid}
-        actual_uuids = {UUID(policy['uuid']) for policy in response_json}
-        self.assertEqual(redeemable_policy_uuids, actual_uuids)
+
+        if is_subsidy_active and has_subsidy_balance_remaining and is_learned_linked:
+            # the above generic checks passed, now verify the specific policy-type specific checks.
+            if has_learner_exceed_spend_cap:
+                # The spend cap policy should not be returned as the learner has exceeded the spend cap.
+                assert len(response_json) == 2
+                redeemable_policy_uuids = {self.redeemable_policy.uuid, enroll_cap_policy.uuid}
+                actual_uuids = {UUID(policy['uuid']) for policy in response_json}
+                self.assertEqual(redeemable_policy_uuids, actual_uuids)
+            else:
+                # All policy-specific checks are complete/passing, assert that all 3 expected
+                # policies are returned. self.redeemable_policy, along with the 2 instances created
+                # from factories above, should give us a total of 3 policy records with credits
+                # available. The inactive policy created above should not be returned. The policy with
+                # a spend limit that's been exceeded should not be returned.
+                assert len(response_json) == 3
+                redeemable_policy_uuids = {self.redeemable_policy.uuid, enroll_cap_policy.uuid, spend_cap_policy.uuid}
+                actual_uuids = {UUID(policy['uuid']) for policy in response_json}
+                self.assertEqual(redeemable_policy_uuids, actual_uuids)
+        else:
+            # with an inactive (i.e., expired, not yet started) subsidy, we should get no records back.
+            assert len(response_json) == 0
 
 
 @ddt.ddt

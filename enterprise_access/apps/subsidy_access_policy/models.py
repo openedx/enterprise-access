@@ -429,7 +429,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
         based on whether they are active and have spend available for the requested
         content.
 
-
         Returns:
             3-tuple of (bool, str, list of dict):
                 * first element is true if the learner can redeem the content,
@@ -485,6 +484,72 @@ class SubsidyAccessPolicy(TimeStampedModel):
             return (False, REASON_POLICY_SPEND_LIMIT_REACHED, existing_transactions)
 
         return (True, None, existing_transactions)
+
+    def has_credit_available_with_spend_limit(self):
+        """
+        Determines whether a subsidy access policy has yet exceeded its configured
+        `spend_limit` based on the total value of transactions redeemed against the policy.
+        """
+        # No policy-wide spend_limit set, so credit is available.
+        if self.spend_limit is None:
+            return True
+
+        # Verify that spend against the policy has not exceeded the spend limit.
+        spent_amount = self.aggregates_for_policy().get('total_quantity') or 0
+        if spent_amount > 0:
+            raise Exception('[SubsidyAccessPolicy.credit_available] Expected a sum of transaction quantities <= 0')
+        positive_spent_amount = spent_amount * -1
+        if positive_spent_amount >= self.spend_limit:
+            return False
+
+        return True
+
+    def credit_available(self, lms_user_id, skip_customer_user_check=False):
+        """
+        Perform generic checks to determine if a learner has credit available for a given
+        subsidy access policy. The generic checks performed include:
+            * Whether the policy is active.
+            * Whether the learner is associated to the enterprise.
+            * Whether the subsidy is active (non-expired).
+            * Whether the subsidy has remaining balance.
+            * Whether the transactions associated with policy have exceeded the policy-wide spend limit.
+        """
+        # inactive policy
+        if not self.active:
+            logger.info('[credit_available] policy %s inactive', self.uuid)
+            return False
+
+        # learner not linked to enterprise
+        if not skip_customer_user_check:
+            if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
+                logger.info(
+                    '[credit_available] learner %s not linked to enterprise %s',
+                    lms_user_id,
+                    self.enterprise_customer_uuid
+                )
+                return False
+
+        # verify associated subsidy is current (non-expired)
+        try:
+            if not self.is_subsidy_active:
+                logger.info('[credit_available] SubsidyAccessPolicy.subsidy_record() returned inactive subsidy')
+                return False
+        except requests.exceptions.HTTPError as exc:
+            # when associated subsidy is soft-deleted, the subsidy retrieve API raises an exception.
+            logger.info('[credit_available] SubsidyAccessPolicy.subsidy_record() raised HTTPError: %s', exc)
+            return False
+
+        # verify associated subsidy has remaining balance
+        if self.remaining_balance() <= 0:
+            logger.info('[credit_available] SubsidyAccessPolicy.subsidy_record() returned empty balance')
+            return False
+
+        # verify spend against policy and configured spend limit
+        if not self.has_credit_available_with_spend_limit():
+            logger.info('[credit_available] policy %s has exceeded spend limit', self.uuid)
+            return False
+
+        return True
 
     def _redemptions_for_idempotency_key(self, all_transactions):
         """
@@ -740,11 +805,22 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
         # learner can redeem the subsidy access policy
         return (True, None, existing_redemptions)
 
-    def credit_available(self, lms_user_id=None):
+    def credit_available(self, lms_user_id, skip_customer_user_check=False):
+        """
+        Determine whether a learner has credit available for the subsidy access policy.
+        """
+        is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
+        if not is_credit_available:
+            return False
+
+        if self.per_learner_enrollment_limit is None:
+            return True
+
+        # Validate whether learner has enough remaining balance (enrollments) for this policy.
         remaining_balance_per_user = self.remaining_balance_per_user(lms_user_id)
         return (remaining_balance_per_user is not None) and remaining_balance_per_user > 0
 
-    def remaining_balance_per_user(self, lms_user_id=None):
+    def remaining_balance_per_user(self, lms_user_id):
         """
         Returns the remaining redeemable credit for the user.
         Returns None if `per_learner_enrollment_limit` is not set.
@@ -803,7 +879,18 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         # learner can redeem the subsidy access policy
         return (True, None, existing_redemptions)
 
-    def credit_available(self, lms_user_id=None):
+    def credit_available(self, lms_user_id, skip_customer_user_check=False):
+        """
+        Determine whether a learner has credit available for the subsidy access policy.
+        """
+        is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
+        if not is_credit_available:
+            return False
+
+        if self.per_learner_spend_limit is None:
+            return True
+
+        # Validate whether learner has enough remaining balance (spend) for this policy.
         remaining_balance_per_user = self.remaining_balance_per_user(lms_user_id)
         return (remaining_balance_per_user is not None) and remaining_balance_per_user > 0
 
@@ -817,7 +904,10 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         if self.per_learner_spend_limit <= 0:
             return 0
         spent_amount = self.transactions_for_learner(lms_user_id)['aggregates'].get('total_quantity') or 0
-        return self.per_learner_spend_limit - spent_amount
+        if spent_amount > 0:
+            raise Exception('[remaining_balance_per_user] Expected a sum of transaction quantities <= 0')
+        positive_spent_amount = spent_amount * -1
+        return self.per_learner_spend_limit - positive_spent_amount
 
 
 class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):

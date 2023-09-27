@@ -353,8 +353,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         Return policies with credit availble, associated with the given customer, and redeemable by the given learner.
         """
         policies = []
-        # TODO: maybe we should use self.get_queryset()?
-        all_policies_for_enterprise = SubsidyAccessPolicy.objects.filter(
+        all_policies_for_enterprise = self.get_queryset().filter(
             enterprise_customer_uuid=enterprise_customer_uuid
         )
         for policy in all_policies_for_enterprise:
