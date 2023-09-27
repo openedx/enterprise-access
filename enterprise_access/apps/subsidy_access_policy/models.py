@@ -807,7 +807,7 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
 
     def credit_available(self, lms_user_id, skip_customer_user_check=False):
         """
-        Determine whether a learner credit available for the subsidy access policy.
+        Determine whether a learner has credit available for the subsidy access policy.
         """
         is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
         if not is_credit_available:
@@ -881,7 +881,7 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
 
     def credit_available(self, lms_user_id, skip_customer_user_check=False):
         """
-        Determine whether a learner credit available for the subsidy access policy.
+        Determine whether a learner has credit available for the subsidy access policy.
         """
         is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
         if not is_credit_available:
