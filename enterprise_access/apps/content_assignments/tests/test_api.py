@@ -6,6 +6,7 @@ from django.test import TestCase
 from ..api import (
     AllocationException,
     allocate_assignments,
+    cancel_assignments,
     get_allocated_quantity_for_configuration,
     get_assignments_for_configuration
 )
@@ -206,3 +207,66 @@ class TestContentAssignmentApi(TestCase):
         self.assertEqual(created_assignment.content_key, content_key)
         self.assertEqual(created_assignment.content_quantity, content_price_cents)
         self.assertEqual(created_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+
+    def test_cancel_assignments_happy_path(self):
+        """
+        Tests the allocation of new assignments against a given configuration.
+        """
+        allocated_assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='alice@foo.com',
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+        )
+        accepted_assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='bob@foo.com',
+            state=LearnerContentAssignmentStateChoices.ACCEPTED,
+        )
+        cancelled_assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='carol@foo.com',
+            state=LearnerContentAssignmentStateChoices.CANCELLED,
+        )
+        errored_assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='david@foo.com',
+            state=LearnerContentAssignmentStateChoices.ERRORED,
+        )
+
+        # Cancel all the test assignments we just created.
+        assignments_to_cancel = [
+            allocated_assignment,
+            accepted_assignment,
+            cancelled_assignment,
+            errored_assignment,
+        ]
+        cancellation_info = cancel_assignments(assignments_to_cancel)
+
+        # Refresh from db to get any updates reflected in the python objects.
+        for record in (allocated_assignment, accepted_assignment, cancelled_assignment, errored_assignment):
+            record.refresh_from_db()
+
+        # The two updated assignments PLUS the already cancelled assignment should be considered "cancelled" in the
+        # return value.
+        assert set(cancellation_info['cancelled']) == set([
+            allocated_assignment,
+            cancelled_assignment,
+            errored_assignment,
+        ])
+        assert set(cancellation_info['non_cancelable']) == set([
+            accepted_assignment,
+        ])
+
+        # The allocated and errored assignments should be the only things updated.
+        for record in (allocated_assignment, errored_assignment):
+            assert len(record.history.all()) == 2
+
+        # The accepted and canceled assignments should be the only things with no change.
+        for record in (accepted_assignment, cancelled_assignment):
+            assert len(record.history.all()) == 1
+
+        # All but the accepted assignment should be 'canceled' now.
+        self.assertEqual(allocated_assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
+        self.assertEqual(accepted_assignment.state, LearnerContentAssignmentStateChoices.ACCEPTED)
+        self.assertEqual(cancelled_assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
+        self.assertEqual(errored_assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)

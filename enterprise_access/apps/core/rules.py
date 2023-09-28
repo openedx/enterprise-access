@@ -141,7 +141,7 @@ def has_explicit_access_to_policy_learner(user, enterprise_customer_uuid):
 
 # Content Assignment rule predicates:
 @rules.predicate
-def has_implicit_access_to_content_assignment_operator(_, enterprise_customer_uuid):
+def has_implicit_access_to_content_assignments_operator(_, enterprise_customer_uuid):
     """
     Check that if request user has implicit access to the given enterprise UUID for the
     `CONTENT_ASSIGNMENTS_OPERATOR_ROLE` feature role.
@@ -153,7 +153,7 @@ def has_implicit_access_to_content_assignment_operator(_, enterprise_customer_uu
 
 
 @rules.predicate
-def has_explicit_access_to_content_assignment_operator(user, enterprise_customer_uuid):
+def has_explicit_access_to_content_assignments_operator(user, enterprise_customer_uuid):
     """
     Check that if request user has explicit access to `CONTENT_ASSIGNMENTS_OPERATOR_ROLE` feature role.
 
@@ -164,7 +164,7 @@ def has_explicit_access_to_content_assignment_operator(user, enterprise_customer
 
 
 @rules.predicate
-def has_implicit_access_to_content_assignment_admin(_, enterprise_customer_uuid):
+def has_implicit_access_to_content_assignments_admin(_, enterprise_customer_uuid):
     """
     Check that if request user has implicit access to the given enterprise UUID for the
     `CONTENT_ASSIGNMENTS_ADMIN_ROLE` feature role.
@@ -176,7 +176,7 @@ def has_implicit_access_to_content_assignment_admin(_, enterprise_customer_uuid)
 
 
 @rules.predicate
-def has_explicit_access_to_content_assignment_admin(user, enterprise_customer_uuid):
+def has_explicit_access_to_content_assignments_admin(user, enterprise_customer_uuid):
     """
     Check that if request user has explicit access to `CONTENT_ASSIGNMENTS_ADMIN_ROLE` feature role.
 
@@ -184,6 +184,29 @@ def has_explicit_access_to_content_assignment_admin(user, enterprise_customer_uu
         boolean: whether the request user has access.
     """
     return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.CONTENT_ASSIGNMENTS_ADMIN_ROLE)
+
+
+@rules.predicate
+def has_implicit_access_to_content_assignments_learner(_, enterprise_customer_uuid):
+    """
+    Check that if request user has implicit access to the given enterprise UUID for the
+    `CONTENT_ASSIGNMENTS_LEARNER_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.CONTENT_ASSIGNMENTS_LEARNER_ROLE)
+
+
+@rules.predicate
+def has_explicit_access_to_content_assignments_learner(user, enterprise_customer_uuid):
+    """
+    Check that if request user has explicit access to `CONTENT_ASSIGNMENTS_LEARNER_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.CONTENT_ASSIGNMENTS_LEARNER_ROLE)
 
 
 ######################################################
@@ -215,25 +238,31 @@ has_subsidy_access_policy_learner_access = (
 
 
 # pylint: disable=unsupported-binary-operation
-has_content_assignment_operator_access = (
-    has_implicit_access_to_content_assignment_operator | has_explicit_access_to_content_assignment_operator
+has_content_assignments_operator_access = (
+    has_implicit_access_to_content_assignments_operator | has_explicit_access_to_content_assignments_operator
 )
 
 
 # pylint: disable=unsupported-binary-operation
-has_content_assignment_admin_access = (
-    has_implicit_access_to_content_assignment_admin | has_explicit_access_to_content_assignment_admin
+has_content_assignments_admin_access = (
+    has_implicit_access_to_content_assignments_admin | has_explicit_access_to_content_assignments_admin
 )
 
+
+# pylint: disable=unsupported-binary-operation
+has_content_assignments_learner_access = (
+    has_implicit_access_to_content_assignments_learner | has_explicit_access_to_content_assignments_learner
+)
+
+
+###############################################
+# Map permissions to consolidated predicates. #
+###############################################
 
 rules.add_perm(
     constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
     has_subsidy_request_admin_access,
 )
-
-###############################################
-# Map permissions to consolidated predicates. #
-###############################################
 
 # Grants access permission if the user is a learner or admin
 rules.add_perm(
@@ -263,17 +292,42 @@ rules.add_perm(
 )
 
 
-# Grants content assignment configuration read permission if the user is a content assignment configuration admin.
+# Grants content assignment configuration read permission to content assignment admins+operators.
 rules.add_perm(
-    constants.CONTENT_ASSIGNMENTS_CONFIGURATION_READ_PERMISSION,
-    has_content_assignment_operator_access | has_content_assignment_admin_access,
+    constants.CONTENT_ASSIGNMENT_CONFIGURATION_READ_PERMISSION,
+    has_content_assignments_operator_access | has_content_assignments_admin_access,
 )
 
 
-# Grants content assignment configuration write permission if the user is a content assignment configuration operator.
+# Grants content assignment configuration write permission to content assignment operators.
 rules.add_perm(
-    constants.CONTENT_ASSIGNMENTS_CONFIGURATION_WRITE_PERMISSION,
-    has_content_assignment_operator_access,
+    constants.CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION,
+    has_content_assignments_operator_access,
+)
+
+
+# Grants content assignment admin read permission to content assignment admins+operators.
+rules.add_perm(
+    constants.CONTENT_ASSIGNMENT_ADMIN_READ_PERMISSION,
+    has_content_assignments_operator_access | has_content_assignments_admin_access,
+)
+
+
+# Grants content assignment admin write permission to enterprise admins+operators.
+rules.add_perm(
+    constants.CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION,
+    has_content_assignments_operator_access | has_content_assignments_admin_access,
+)
+
+
+# Grants content assignment learner read permission to practically everybody.
+rules.add_perm(
+    constants.CONTENT_ASSIGNMENT_LEARNER_READ_PERMISSION,
+    (
+        has_content_assignments_operator_access |
+        has_content_assignments_admin_access |
+        has_content_assignments_learner_access
+    ),
 )
 
 
@@ -281,8 +335,8 @@ rules.add_perm(
 rules.add_perm(
     constants.SUBSIDY_ACCESS_POLICY_ALLOCATION_PERMISSION,
     (
-        has_content_assignment_operator_access |
-        has_content_assignment_admin_access |
+        has_content_assignments_operator_access |
+        has_content_assignments_admin_access |
         has_subsidy_access_policy_operator_access
     ),
 )

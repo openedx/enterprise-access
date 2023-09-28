@@ -14,7 +14,7 @@ from rest_framework import serializers
 from enterprise_access.apps.subsidy_access_policy.constants import PolicyTypes
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 
-from .content_assignments import LearnerContentAssignmentResponseSerializer
+from .content_assignments.assignment import LearnerContentAssignmentResponseSerializer
 
 logger = logging.getLogger(__name__)
 

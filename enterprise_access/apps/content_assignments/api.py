@@ -2,10 +2,17 @@
 Primary Python API for interacting with Assignment
 records and business logic.
 """
+from __future__ import annotations  # needed for using QuerySet in type hinting.
+
+import logging
+from typing import Iterable
+
 from django.db.models import Sum
 
 from .constants import LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
+
+logger = logging.getLogger(__name__)
 
 
 class AllocationException(Exception):
@@ -189,3 +196,44 @@ def _create_new_assignments(assignment_configuration, learner_emails, content_ke
 
     # Do the bulk creation to save these records
     return LearnerContentAssignment.bulk_create(assignments_to_create)
+
+
+def cancel_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
+    """
+    Bulk cancel assignments.
+
+    This is a no-op for assignments in the following non-cancelable states: [accepted, cancelled].  Cancelled and
+    already-cancelled assignments are bundled in the response because this function is meant to be idempotent.
+
+    Args:
+        assignments (list(LearnerContentAssignment)): One or more assignments to cancel.
+
+    Returns:
+        A dict representing cancelled and non-cancelable assignments:
+        {
+            'cancelled': <list of 0 or more cancelled or already-cancelled assignments>,
+            'non-cancelable': <list of 0 or more non-cancelable assignments, e.g. already accepted assignments>,
+        }
+    """
+    cancelable_assignments = set(
+        assignment for assignment in assignments
+        if assignment.state in LearnerContentAssignmentStateChoices.CANCELABLE_STATES
+    )
+    already_cancelled_assignments = set(
+        assignment for assignment in assignments
+        if assignment.state == LearnerContentAssignmentStateChoices.CANCELLED
+    )
+    non_cancelable_assignments = set(assignments) - cancelable_assignments - already_cancelled_assignments
+
+    logger.info(f'Skipping {len(non_cancelable_assignments)} non-cancelable assignments.')
+    logger.info(f'Skipping {len(already_cancelled_assignments)} already cancelled assignments.')
+    logger.info(f'Canceling {len(cancelable_assignments)} assignments.')
+
+    for assignment_to_cancel in cancelable_assignments:
+        assignment_to_cancel.state = LearnerContentAssignmentStateChoices.CANCELLED
+
+    cancelled_assignments = _update_and_refresh_assignments(cancelable_assignments, ['state'])
+    return {
+        'cancelled': list(set(cancelled_assignments) | already_cancelled_assignments),
+        'non_cancelable': list(non_cancelable_assignments),
+    }

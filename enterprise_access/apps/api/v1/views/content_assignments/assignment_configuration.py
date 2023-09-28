@@ -11,13 +11,12 @@ from rest_framework import authentication, mixins, permissions, status, viewsets
 from rest_framework.response import Response
 
 from enterprise_access.apps.api import filters, serializers, utils
+from enterprise_access.apps.api.v1.views.utils import PaginationWithPageCount
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 from enterprise_access.apps.core.constants import (
-    CONTENT_ASSIGNMENTS_CONFIGURATION_READ_PERMISSION,
-    CONTENT_ASSIGNMENTS_CONFIGURATION_WRITE_PERMISSION
+    CONTENT_ASSIGNMENT_CONFIGURATION_READ_PERMISSION,
+    CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION
 )
-
-from .utils import PaginationWithPageCount
 
 logger = logging.getLogger(__name__)
 
@@ -97,16 +96,15 @@ class AssignmentConfigurationViewSet(
         summary='Retrieve content assignment configuration by UUID.',
         responses={
             status.HTTP_200_OK: serializers.AssignmentConfigurationResponseSerializer,
-            status.HTTP_404_NOT_FOUND: None,  # TODO: test that this actually returns 404 instead of 403 on RBAC error.
+            status.HTTP_403_FORBIDDEN: None,
         },
     )
-    @permission_required(CONTENT_ASSIGNMENTS_CONFIGURATION_READ_PERMISSION, fn=assignment_config_permission_detail_fn)
+    @permission_required(CONTENT_ASSIGNMENT_CONFIGURATION_READ_PERMISSION, fn=assignment_config_permission_detail_fn)
     def retrieve(self, request, *args, uuid=None, **kwargs):
         """
         Retrieves a single ``AssignmentConfiguration`` record by uuid.
         """
         return super().retrieve(request, *args, uuid=uuid, **kwargs)
-        # TODO: implement an ``/assignments`` sub-list endpoint to list all contained assignments.
 
     @extend_schema(
         tags=[CONTENT_ASSIGNMENTS_CONFIGURATION_CRUD_API_TAG],
@@ -124,7 +122,7 @@ class AssignmentConfigurationViewSet(
         ],
     )
     @permission_required(
-        CONTENT_ASSIGNMENTS_CONFIGURATION_READ_PERMISSION,
+        CONTENT_ASSIGNMENT_CONFIGURATION_READ_PERMISSION,
         fn=lambda request: request.query_params.get('enterprise_customer_uuid')
     )
     def list(self, request, *args, **kwargs):
@@ -142,10 +140,11 @@ class AssignmentConfigurationViewSet(
         responses={
             status.HTTP_200_OK: serializers.AssignmentConfigurationResponseSerializer,
             status.HTTP_201_CREATED: serializers.AssignmentConfigurationResponseSerializer,
+            status.HTTP_403_FORBIDDEN: None,
         },
     )
     @permission_required(
-        CONTENT_ASSIGNMENTS_CONFIGURATION_WRITE_PERMISSION,
+        CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION,
         fn=assignment_config_permission_create_fn,
     )
     def create(self, request, *args, **kwargs):
@@ -160,10 +159,10 @@ class AssignmentConfigurationViewSet(
         request=serializers.AssignmentConfigurationUpdateRequestSerializer,
         responses={
             status.HTTP_200_OK: serializers.AssignmentConfigurationResponseSerializer,
-            status.HTTP_404_NOT_FOUND: None,
+            status.HTTP_403_FORBIDDEN: None,
         },
     )
-    @permission_required(CONTENT_ASSIGNMENTS_CONFIGURATION_WRITE_PERMISSION, fn=assignment_config_permission_detail_fn)
+    @permission_required(CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION, fn=assignment_config_permission_detail_fn)
     def update(self, request, *args, uuid=None, **kwargs):
         """
         Updates a single ``AssignmentConfiguration`` record by uuid.  All fields for the update are optional (which is
@@ -178,10 +177,10 @@ class AssignmentConfigurationViewSet(
         request=serializers.AssignmentConfigurationUpdateRequestSerializer,
         responses={
             status.HTTP_200_OK: serializers.AssignmentConfigurationResponseSerializer,
-            status.HTTP_404_NOT_FOUND: None,
+            status.HTTP_403_FORBIDDEN: None,
         },
     )
-    @permission_required(CONTENT_ASSIGNMENTS_CONFIGURATION_WRITE_PERMISSION, fn=assignment_config_permission_detail_fn)
+    @permission_required(CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION, fn=assignment_config_permission_detail_fn)
     def partial_update(self, request, *args, uuid=None, **kwargs):
         """
         Updates a single ``AssignmentConfiguration`` record by uuid.  All fields for the update are optional.
@@ -194,10 +193,10 @@ class AssignmentConfigurationViewSet(
         request=serializers.AssignmentConfigurationDeleteRequestSerializer,
         responses={
             status.HTTP_200_OK: serializers.AssignmentConfigurationResponseSerializer,
-            status.HTTP_404_NOT_FOUND: None,
+            status.HTTP_403_FORBIDDEN: None,
         },
     )
-    @permission_required(CONTENT_ASSIGNMENTS_CONFIGURATION_WRITE_PERMISSION, fn=assignment_config_permission_detail_fn)
+    @permission_required(CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION, fn=assignment_config_permission_detail_fn)
     def destroy(self, request, *args, uuid=None, **kwargs):
         """
         Soft-delete a single ``AssignmentConfiguration`` record by uuid, and unlink from the associated policy.

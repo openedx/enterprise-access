@@ -1,13 +1,13 @@
 """
 API serializers module.
 """
-from .assignment_configuration import (
+from .content_assignments.assignment import LearnerContentAssignmentResponseSerializer
+from .content_assignments.assignment_configuration import (
     AssignmentConfigurationCreateRequestSerializer,
     AssignmentConfigurationDeleteRequestSerializer,
     AssignmentConfigurationResponseSerializer,
     AssignmentConfigurationUpdateRequestSerializer
 )
-from .content_assignments import LearnerContentAssignmentResponseSerializer
 from .subsidy_access_policy import (
     SubsidyAccessPolicyAllocateRequestSerializer,
     SubsidyAccessPolicyAllocationResponseSerializer,

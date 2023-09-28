@@ -5,6 +5,7 @@ from corsheaders.defaults import default_headers as corsheaders_default_headers
 
 from enterprise_access.apps.core.constants import (
     CONTENT_ASSIGNMENTS_ADMIN_ROLE,
+    CONTENT_ASSIGNMENTS_LEARNER_ROLE,
     CONTENT_ASSIGNMENTS_OPERATOR_ROLE,
     REQUESTS_ADMIN_ROLE,
     REQUESTS_LEARNER_ROLE,
@@ -316,12 +317,15 @@ SYSTEM_TO_FEATURE_ROLE_MAPPING = {
         REQUESTS_ADMIN_ROLE,
     ],
     SYSTEM_ENTERPRISE_ADMIN_ROLE: [
+        # enterprise admins only need learner-level access to Subsidy Access Policy APIs since they aren't responsible
+        # for managing them.
         SUBSIDY_ACCESS_POLICY_LEARNER_ROLE,
         CONTENT_ASSIGNMENTS_ADMIN_ROLE,
         REQUESTS_ADMIN_ROLE,
     ],
     SYSTEM_ENTERPRISE_LEARNER_ROLE: [
         SUBSIDY_ACCESS_POLICY_LEARNER_ROLE,
+        CONTENT_ASSIGNMENTS_LEARNER_ROLE,
         REQUESTS_LEARNER_ROLE,
     ],
 }
