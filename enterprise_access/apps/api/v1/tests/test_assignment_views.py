@@ -232,6 +232,60 @@ class TestAdminAssignmentsUnauthorizedCRUD(CRUDViewTestMixin, APITest):
 
 
 @ddt.ddt
+class TestAssignmentsUnauthorizedCRUD(CRUDViewTestMixin, APITest):
+    """
+    Tests Authentication and Permission checking for Learner-facing LearnerContentAssignment CRUD views.
+    """
+    @ddt.data(
+        # A role that's not mapped to any feature perms will get you a 403.
+        (
+            {'system_wide_role': 'some-other-role', 'context': str(TEST_ENTERPRISE_UUID)},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A good learner role, but in a context/customer we're not aware of, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(uuid4())},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # A good learner role, AND a real context/customer but just the wrong one, gets you a 403.
+        (
+            {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(TEST_OTHER_ENTERPRISE_UUID)},
+            status.HTTP_403_FORBIDDEN,
+        ),
+        # No JWT based auth, no soup for you.
+        (
+            None,
+            status.HTTP_401_UNAUTHORIZED,
+        ),
+    )
+    @ddt.unpack
+    def test_assignment_views_unauthorized_forbidden(self, role_context_dict, expected_response_code):
+        """
+        Tests that we get expected 40x responses for all of the learner-facing views.
+        """
+        # Set the JWT-based auth that we'll use for every request
+        if role_context_dict:
+            self.set_jwt_cookie([role_context_dict])
+
+        detail_kwargs = {
+            'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID),
+            'uuid': str(self.requester_assignment_accepted.uuid),
+        }
+        detail_url = reverse('api:v1:assignments-detail', kwargs=detail_kwargs)
+
+        # Test views that need CONTENT_ASSIGNMENT_READ_PERMISSION:
+
+        # GET/retrieve endpoint:
+        response = self.client.get(detail_url)
+        assert response.status_code == expected_response_code
+
+        # GET/list endpoint:
+        request_params = {'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)}
+        response = self.client.get(ADMIN_ASSIGNMENTS_LIST_ENDPOINT, request_params)
+        assert response.status_code == expected_response_code
+
+
+@ddt.ddt
 class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
     """
     Test the Admin-facing Assignment API views while successfully authenticated/authorized.
@@ -281,14 +335,13 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         Test that the list view returns a 200 response code and the expected (list) results of serialization.  It should
         also allow system-wide admins and operators.
 
-        This also tests that only AssignmentConfigs of the requested customer are returned.
+        This also tests that only Assignment in the requested AssignmentConfiguration are returned.
         """
         # Set the JWT-based auth that we'll use for every request.
         self.set_jwt_cookie([role_context_dict])
 
         # Send a list request for all Assignments for the main test customer.
-        request_params = {'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)}
-        response = self.client.get(ADMIN_ASSIGNMENTS_LIST_ENDPOINT, request_params)
+        response = self.client.get(ADMIN_ASSIGNMENTS_LIST_ENDPOINT)
 
         # Only the Assignments for the main customer is returned, and not that of the other customer.
         expected_assignments_for_enterprise_customer = LearnerContentAssignment.objects.filter(
@@ -355,3 +408,96 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # Check that the assignment state was NOT updated, and the state is still accepted.
         self.assignment_allocated_post_link.refresh_from_db()
         assert self.assignment_accepted.state == LearnerContentAssignmentStateChoices.ACCEPTED
+
+
+@ddt.ddt
+class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
+    """
+    Test the Learner-facing Assignment API views while successfully authenticated/authorized.
+    """
+    @ddt.data(
+        # A good learner role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good admin role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good operator role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+    )
+    def test_retrieve(self, role_context_dict):
+        """
+        Test that the retrieve view returns a 200 response code and the expected results of serialization.
+        """
+        # Set the JWT-based auth that we'll use for every request.
+        self.set_jwt_cookie([role_context_dict])
+
+        # Setup and call the retrieve endpoint.
+        detail_kwargs = {
+            'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID),
+            'uuid': str(self.requester_assignment_accepted.uuid),
+        }
+        detail_url = reverse('api:v1:assignments-detail', kwargs=detail_kwargs)
+        response = self.client.get(detail_url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json() == {
+            'uuid': str(self.requester_assignment_accepted.uuid),
+            'assignment_configuration': str(self.requester_assignment_accepted.assignment_configuration.uuid),
+            'content_key': self.requester_assignment_accepted.content_key,
+            'content_quantity': self.requester_assignment_accepted.content_quantity,
+            'last_notification_at': None,
+            'learner_email': self.requester_assignment_accepted.learner_email,
+            'lms_user_id': self.requester_assignment_accepted.lms_user_id,
+            'state': LearnerContentAssignmentStateChoices.ACCEPTED,
+            'transaction_uuid': str(self.requester_assignment_accepted.transaction_uuid),
+        }
+
+    def test_retrieve_other_assignment_not_found(self):
+        """
+        Tests that we get expected 40x responses when learner A attempts to retrieve learner B's assignment.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(TEST_ENTERPRISE_UUID)
+        }])
+
+        detail_kwargs = {
+            'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID),
+            'uuid': str(self.assignment_accepted.uuid),
+        }
+        detail_url = reverse('api:v1:assignments-detail', kwargs=detail_kwargs)
+
+        # GET/retrieve endpoint:
+        response = self.client.get(detail_url)
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    @ddt.data(
+        # A good learner role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good admin role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good operator role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+    )
+    def test_list(self, role_context_dict):
+        """
+        Test that the list view returns a 200 response code and the expected (list) results of serialization..
+
+        This also tests that only Assignments for the requesting user are returned.
+        """
+        # Set the JWT-based auth that we'll use for every request.
+        self.set_jwt_cookie([role_context_dict])
+
+        # Send a list request for all Assignments for the requesting user.
+        response = self.client.get(ASSIGNMENTS_LIST_ENDPOINT)
+
+        # Only Assignments that match the following qualifications are returned:
+        # 1. Assignment is for the requesting user.
+        # 2. Assignment is in the requested AssignementConfiguration.
+        expected_assignments_for_requester = [
+            self.requester_assignment_accepted,
+            self.requester_assignment_cancelled,
+            self.requester_assignment_errored,
+        ]
+        expected_assignment_uuids = {assignment.uuid for assignment in expected_assignments_for_requester}
+        actual_assignment_uuids = {UUID(assignment['uuid']) for assignment in response.json()['results']}
+        assert actual_assignment_uuids == expected_assignment_uuids
