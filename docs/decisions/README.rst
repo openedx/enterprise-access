@@ -138,3 +138,10 @@ Accepted September 2023, this ADR defines:
   depends on the models and business-logic of the ``content_assignments`` app.
 - The general structure and strategy of the REST API views that interface with
   the first two points.
+
+`<0013-assignment-actions-model.rst>`_
+*******************************************
+*Feature: Assigned Learner Credit*
+
+Accepted October 2023, this ADR describes an approach to persisting data about
+certain actions related to a ``LearnerContentAssignment`` record in a distinct model.
