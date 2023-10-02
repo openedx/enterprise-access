@@ -10,7 +10,7 @@ from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_create_with_history, bulk_update_with_history
 
-from .constants import LearnerContentAssignmentStateChoices
+from .constants import AssignmentActionErrors, AssignmentActions, LearnerContentAssignmentStateChoices
 
 BULK_OPERATION_BATCH_SIZE = 50
 
@@ -207,4 +207,129 @@ class LearnerContentAssignment(TimeStampedModel):
             cls,
             updated_field_names + ['modified'],
             batch_size=BULK_OPERATION_BATCH_SIZE,
+        )
+
+    def get_successful_linked_action(self):
+        """
+        Returns the first successful "linked" LearnerContentAssignmentActions for this assignment,
+        or None if no such record exists.
+        """
+        return self.actions.filter(
+            action_type=AssignmentActions.LEARNER_LINKED,
+            error_reason=None,
+        ).first()
+
+    def add_successful_linked_action(self):
+        """
+        Adds a successful "linked" LearnerContentAssignmentAction for this assignment record.
+        If a successful linked action already exists for this assignment, returns
+        that linked action record instead.
+        """
+        record, was_created = self.actions.get_or_create(
+            action_type=AssignmentActions.LEARNER_LINKED,
+            error_reason=None,
+            defaults={
+                'completed_at': timezone.now(),
+            },
+        )
+        return record, was_created
+
+    def get_successful_notified_action(self):
+        """
+        Returns the first successful "notified" LearnerContentAssignmentActions for this assignment,
+        or None if no such record exists.
+        """
+        return self.actions.filter(
+            action_type=AssignmentActions.NOTIFIED,
+            error_reason=None,
+        ).first()
+
+    def add_successful_notified_action(self):
+        """
+        Adds a successful "notified" LearnerContentAssignmentAction for this assignment record.
+        If a successful notified action already exists for this assignment, returns
+        that linked action record instead.
+        """
+        record, was_created = self.actions.get_or_create(
+            action_type=AssignmentActions.NOTIFIED,
+            error_reason=None,
+            defaults={
+                'completed_at': timezone.now(),
+            },
+        )
+        return record, was_created
+
+    def get_last_successful_reminded_action(self):
+        """
+        Returns all successful "reminded" LearnerContentAssignmentActions for this assignment,
+        or None if no such record exists.
+        """
+        return self.actions.filter(
+            action_type=AssignmentActions.REMINDED,
+            error_reason=None,
+        ).order_by('-completed_at').first()
+
+    def add_successful_reminded_action(self):
+        """
+        Adds a successful "reminded" LearnerContentAssignmentAction for this assignment record.
+        """
+        return self.actions.create(
+            action_type=AssignmentActions.REMINDED,
+            completed_at=timezone.now(),
+        )
+
+
+class LearnerContentAssignmentAction(TimeStampedModel):
+    """
+    A model that persists information regarding certain non-lifecycle actions
+    on ``LearnerContentAssignment`` records.
+
+    .. no_pii: This model has no PII
+    """
+    uuid = models.UUIDField(
+        primary_key=True,
+        default=uuid4,
+        editable=False,
+        unique=True,
+    )
+    assignment = models.ForeignKey(
+        LearnerContentAssignment,
+        related_name="actions",
+        on_delete=models.SET_NULL,
+        null=True,
+        help_text="The LearnerContentAssignment on which this action was performed.",
+    )
+    action_type = models.CharField(
+        max_length=255,
+        blank=False,
+        null=False,
+        db_index=True,
+        choices=AssignmentActions.CHOICES,
+        help_text="The type of action take on the related assignment record.",
+    )
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="The time at which the action was successfully completed.",
+    )
+    error_reason = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        db_index=True,
+        choices=AssignmentActionErrors.CHOICES,
+        help_text="The type of error that occurred during the action, if any.",
+    )
+    traceback = models.TextField(
+        blank=True,
+        null=True,
+        editable=False,
+        help_text="Any traceback we recorded when an error was encountered.",
+    )
+
+    history = HistoricalRecords()
+
+    def __str__(self):
+        return (
+            f'uuid={self.uuid}, action_type={self.action_type}, error_reason={self.error_reason}'
         )
