@@ -3,7 +3,7 @@ Models for content_assignments
 """
 from uuid import UUID, uuid4
 
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
@@ -172,6 +172,13 @@ class LearnerContentAssignment(TimeStampedModel):
         return (
             f'uuid={self.uuid}, state={self.state}, learner_email={self.learner_email}, content_key={self.content_key}'
         )
+
+    def clean(self):
+        """
+        Validates that content_quantity <= 0.
+        """
+        if self.content_quantity and self.content_quantity > 0:
+            raise ValidationError(f'{self} cannot have a positive content quantity.')
 
     @classmethod
     def bulk_create(cls, assignment_records):

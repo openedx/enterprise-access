@@ -73,6 +73,77 @@ def policy_permission_detail_fn(request, *args, uuid=None, **kwargs):
     return utils.get_policy_customer_uuid(uuid)
 
 
+def _get_reasons_for_no_redeemable_policies(enterprise_customer_uuid, non_redeemable_policies_by_reason):
+    """
+    Serialize a reason for non-redeemability, and fetch enterprise admin user that learner can contact,
+    for each non-redeemable policy.
+
+    Params:
+      enterprise_customer_uuid: The customer UUID related to the non-redeemable policies.  Used
+        for fetching customer admin users via the LMS API client.
+      non_redeemable_policies_by_reason: Mapping of unredeemable/unallocatable policy reasons
+        to lists of policy records for which that reason holds.
+
+    Returns:
+      A list of dictionaries, one per reason, that contains the reason constant, a user-facing
+      message, and a list of policy UUIDs for which that reason holds.
+    """
+    reasons = []
+    lms_client = LmsApiClient()
+    enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
+    enterprise_admin_users = enterprise_customer_data.get('admin_users')
+
+    for reason, policies in non_redeemable_policies_by_reason.items():
+        reasons.append({
+            "reason": reason,
+            "user_message": _get_user_message_for_reason(reason, enterprise_admin_users),
+            "metadata": {
+                "enterprise_administrators": enterprise_admin_users,
+            },
+            "policy_uuids": [policy.uuid for policy in policies],
+        })
+
+    return reasons
+
+
+def _get_user_message_for_reason(reason_slug, enterprise_admin_users):
+    """
+    Return the user-facing message for a given reason slug.
+    """
+    if not reason_slug:
+        return None
+
+    has_enterprise_admin_users = len(enterprise_admin_users) > 0
+
+    user_message_organization_no_funds = (
+        MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS
+        if has_enterprise_admin_users
+        else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS_NO_ADMINS
+    )
+
+    user_message_organization_fund_expired = (
+        MissingSubsidyAccessReasonUserMessages.ORGANIZATION_EXPIRED_FUNDS
+        if has_enterprise_admin_users
+        else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_EXPIRED_FUNDS_NO_ADMINS
+    )
+
+    MISSING_SUBSIDY_ACCESS_POLICY_REASONS = {
+        REASON_POLICY_EXPIRED: user_message_organization_no_funds,
+        REASON_SUBSIDY_EXPIRED: user_message_organization_fund_expired,
+        REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY: user_message_organization_no_funds,
+        REASON_POLICY_SPEND_LIMIT_REACHED: user_message_organization_no_funds,
+        REASON_LEARNER_NOT_IN_ENTERPRISE: MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_IN_ENTERPRISE,
+        REASON_LEARNER_MAX_SPEND_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
+        REASON_LEARNER_MAX_ENROLLMENTS_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
+        REASON_CONTENT_NOT_IN_CATALOG: MissingSubsidyAccessReasonUserMessages.CONTENT_NOT_IN_CATALOG,
+    }
+
+    if reason_slug not in MISSING_SUBSIDY_ACCESS_POLICY_REASONS:
+        return None
+
+    return MISSING_SUBSIDY_ACCESS_POLICY_REASONS[reason_slug]
+
+
 class SubsidyAccessPolicyViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
@@ -451,7 +522,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                     return Response(redemption_result, status=status.HTTP_200_OK)
                 else:
                     raise RedemptionRequestException(
-                        detail=self._get_reasons_for_no_redeemable_policies(
+                        detail=_get_reasons_for_no_redeemable_policies(
                             policy.enterprise_customer_uuid,
                             {reason: [policy]}
                         )
@@ -497,43 +568,6 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                     )
 
         return redemptions_map
-
-    def _get_user_message_for_reason(self, reason_slug, enterprise_admin_users):
-        """
-        Return the user-facing message for a given reason slug.
-        """
-        if not reason_slug:
-            return None
-
-        has_enterprise_admin_users = len(enterprise_admin_users) > 0
-
-        user_message_organization_no_funds = (
-            MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS
-            if has_enterprise_admin_users
-            else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS_NO_ADMINS
-        )
-
-        user_message_organization_fund_expired = (
-            MissingSubsidyAccessReasonUserMessages.ORGANIZATION_EXPIRED_FUNDS
-            if has_enterprise_admin_users
-            else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_EXPIRED_FUNDS_NO_ADMINS
-        )
-
-        MISSING_SUBSIDY_ACCESS_POLICY_REASONS = {
-            REASON_POLICY_EXPIRED: user_message_organization_no_funds,
-            REASON_SUBSIDY_EXPIRED: user_message_organization_fund_expired,
-            REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY: user_message_organization_no_funds,
-            REASON_POLICY_SPEND_LIMIT_REACHED: user_message_organization_no_funds,
-            REASON_LEARNER_NOT_IN_ENTERPRISE: MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_IN_ENTERPRISE,
-            REASON_LEARNER_MAX_SPEND_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
-            REASON_LEARNER_MAX_ENROLLMENTS_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
-            REASON_CONTENT_NOT_IN_CATALOG: MissingSubsidyAccessReasonUserMessages.CONTENT_NOT_IN_CATALOG,
-        }
-
-        if reason_slug not in MISSING_SUBSIDY_ACCESS_POLICY_REASONS:
-            return None
-
-        return MISSING_SUBSIDY_ACCESS_POLICY_REASONS[reason_slug]
 
     @extend_schema(
         tags=[SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG],
@@ -626,7 +660,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 )
 
             if not redemptions and not redeemable_policies:
-                reasons.extend(self._get_reasons_for_no_redeemable_policies(
+                reasons.extend(_get_reasons_for_no_redeemable_policies(
                     enterprise_customer_uuid,
                     non_redeemable_policies
                 ))
@@ -657,28 +691,6 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             many=True,
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
-
-    def _get_reasons_for_no_redeemable_policies(self, enterprise_customer_uuid, non_redeemable_policies):
-        """
-        Serialize a reason for non-redeemability, and fetch enterprise admin user that learner can contact,
-        for each non-redeemable policy.
-        """
-        reasons = []
-        lms_client = LmsApiClient()
-        enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-        enterprise_admin_users = enterprise_customer_data.get('admin_users')
-
-        for reason, policies in non_redeemable_policies.items():
-            reasons.append({
-                "reason": reason,
-                "user_message": self._get_user_message_for_reason(reason, enterprise_admin_users),
-                "metadata": {
-                    "enterprise_administrators": enterprise_admin_users,
-                },
-                "policy_uuids": [policy.uuid for policy in policies],
-            })
-
-        return reasons
 
     def _get_list_price(self, enterprise_customer_uuid, content_key):
         """
@@ -788,13 +800,14 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
                     )
                     return Response(response_serializer.data, status=status.HTTP_202_ACCEPTED)
                 else:
-                    raise AllocationRequestException(detail=reason)
+                    non_allocatable_reason_list = _get_reasons_for_no_redeemable_policies(
+                        policy.enterprise_customer_uuid,
+                        {reason: [policy]}
+                    )
+                    raise AllocationRequestException(detail=non_allocatable_reason_list)
         except SubsidyAccessPolicyLockAttemptFailed as exc:
             logger.exception(exc)
             raise SubsidyAccessPolicyLockedException() from exc
-        except AllocationException as exc:
+        except (AllocationException, ValidationError) as exc:
             logger.exception(exc)
             raise AllocationRequestException(detail=str(exc)) from exc
-        # TODO: there's a whole separate set of exceptions to raise if `can_allocate` is false
-        # which will be covered by ENT-7689
-        # https://2u-internal.atlassian.net/browse/ENT-7689

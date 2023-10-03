@@ -927,3 +927,13 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         self.mock_assignments_api.get_allocated_quantity_for_configuration.assert_called_once_with(
             self.active_policy.assignment_configuration,
         )
+
+    def test_can_allocate_negative_quantity(self):
+        """
+        Test that attempting to allocate a negative quantity
+        results in a ValidationError.  The cost of the content should
+        be negated just prior to storing the ``content_quantity`` of
+        an assignment record.
+        """
+        with self.assertRaisesRegex(ValidationError, 'non-negative'):
+            self.active_policy.can_allocate(1, self.content_key, -1)
