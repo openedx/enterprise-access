@@ -497,8 +497,10 @@ class SubsidyAccessPolicyAllocateRequestSerializer(serializers.Serializer):
     )
     content_price_cents = serializers.IntegerField(
         required=True,
-        help_text='The price, in USD cents, of this content at the time of allocation. Must be <= 0.',
-        max_value=0,
+        help_text=(
+            'The price, in USD cents, of this content at the time of allocation. Must be >= 0.'
+        ),
+        min_value=0,
     )
 
 

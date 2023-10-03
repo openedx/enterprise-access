@@ -108,18 +108,18 @@ class TestContentAssignmentApi(TestCase):
             actual_amount = get_allocated_quantity_for_configuration(other_config)
             self.assertEqual(actual_amount, 0)
 
-    def test_allocate_assignments_positive_quantity(self):
+    def test_allocate_assignments_negative_quantity(self):
         """
-        Tests the allocation of new assignments for a price > 0
+        Tests the allocation of new assignments for a price < 0
         raises an exception.
         """
         content_key = 'demoX'
-        content_price_cents = 1
+        content_price_cents = -1
         learners_to_assign = [
             f'{name}@foo.com' for name in ('alice', 'bob', 'carol', 'david', 'eugene')
         ]
 
-        with self.assertRaisesRegex(AllocationException, 'price must be <= 0'):
+        with self.assertRaisesRegex(AllocationException, 'price must be >= 0'):
             allocate_assignments(
                 self.assignment_configuration,
                 learners_to_assign,
@@ -132,7 +132,7 @@ class TestContentAssignmentApi(TestCase):
         Tests the allocation of new assignments against a given configuration.
         """
         content_key = 'demoX'
-        content_price_cents = -100
+        content_price_cents = 100
         learners_to_assign = [
             f'{name}@foo.com' for name in ('alice', 'bob', 'carol', 'david', 'eugene')
         ]
@@ -141,14 +141,14 @@ class TestContentAssignmentApi(TestCase):
             assignment_configuration=self.assignment_configuration,
             learner_email='alice@foo.com',
             content_key=content_key,
-            content_quantity=content_price_cents,
+            content_quantity=-content_price_cents,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )
         accepted_assignment = LearnerContentAssignmentFactory.create(
             assignment_configuration=self.assignment_configuration,
             learner_email='bob@foo.com',
             content_key=content_key,
-            content_quantity=content_price_cents,
+            content_quantity=-content_price_cents,
             state=LearnerContentAssignmentStateChoices.ACCEPTED,
         )
         cancelled_assignment = LearnerContentAssignmentFactory.create(
@@ -205,7 +205,7 @@ class TestContentAssignmentApi(TestCase):
         self.assertEqual(created_assignment.assignment_configuration, self.assignment_configuration)
         self.assertEqual(created_assignment.learner_email, 'eugene@foo.com')
         self.assertEqual(created_assignment.content_key, content_key)
-        self.assertEqual(created_assignment.content_quantity, content_price_cents)
+        self.assertEqual(created_assignment.content_quantity, -1 * content_price_cents)
         self.assertEqual(created_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
 
     def test_cancel_assignments_happy_path(self):

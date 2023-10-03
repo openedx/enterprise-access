@@ -398,7 +398,8 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Returns true if redeeming for this content price would exceed
         the given ``limit_to_check`` after taking into account the amount already
-        spent.  ``spent_amount`` is assumed to be an integer <= 0.
+        spent.  ``spent_amount`` is assumed to be an integer <= 0 and ``content_price``
+        is assumed to be an integer >= 0.
         """
         if spent_amount > 0:
             raise Exception('Expected a sum of transaction quantities <= 0')
@@ -950,7 +951,15 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         into account to determine if ``number_of_learners`` new assignment
         records can be allocated in this policy for the given ``content_key``
         and it's current ``content_price_cents``.
+
+        Params:
+          number_of_learners: Non-negative integer indicating the number of learners to allocate this content to.
+          content_key: Typically a course key (although theoretically could be *any* content identifier).
+          content_price_cents: A **non-negative** integer reflecting the current price of the content in USD cents.
         """
+        if content_price_cents < 0:
+            raise ValidationError('Can only allocate non-negative content_price_cents')
+
         # inactive policy
         if not self.active:
             return (False, REASON_POLICY_EXPIRED)
@@ -962,8 +971,11 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         if not self.is_subsidy_active:
             return (False, REASON_SUBSIDY_EXPIRED)
 
+        # TODO ENT-7793: validate that the provided price
+        # matches what we have in our content metadata source-of-truth
+
         # Determine total cost, in cents, of content to potentially allocated
-        total_price_cents = number_of_learners * content_price_cents
+        positive_total_price_cents = number_of_learners * content_price_cents
 
         # Determine total amount, in cents, already transacted via this policy.
         # This is a number <= 0
@@ -981,7 +993,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         if self.content_would_exceed_limit(
             total_allocated_and_spent_cents,
             self.subsidy_balance(),
-            total_price_cents,
+            positive_total_price_cents,
         ):
             return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
 
@@ -990,7 +1002,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         if self.content_would_exceed_limit(
             total_allocated_and_spent_cents,
             self.spend_limit,
-            total_price_cents,
+            positive_total_price_cents,
         ):
             return (False, REASON_POLICY_SPEND_LIMIT_REACHED)
 
@@ -999,6 +1011,11 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
     def allocate(self, learner_emails, content_key, content_price_cents):
         """
         Creates allocated ``LearnerContentAssignment`` records.
+
+        Params:
+          learner_emails: A list of learner emails for whom content should be allocated.
+          content_key: Typically a course key (although theoretically could be *any* content identifier).
+          content_price_cents: A *negative* integer reflecting the current price of the content in USD cents.
         """
         return assignments_api.allocate_assignments(
             self.assignment_configuration,

@@ -98,7 +98,7 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
       - ``learner_emails``: A list of learner email addresses to whom assignments should be allocated.
       - ``content_key``: Typically a *course* key to which the learner is assigned.
       - ``content_price_cents``: The cost of redeeming the content, in USD cents, at the time of allocation. Should
-        always be an integer <= 0.
+        always be an integer >= 0.
 
     Returns: A dictionary of updated, created, and unchanged assignment records. e.g.
       ```
@@ -112,8 +112,13 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
       ```
 
     """
-    if content_price_cents > 0:
-        raise AllocationException('Allocation price must be <= 0')
+    if content_price_cents < 0:
+        raise AllocationException('Allocation price must be >= 0')
+
+    # We store the allocated quantity as a (future) debit
+    # against a store of value, so we negate the provided non-negative
+    # content_price_cents, and then persist that in the assignment records.
+    content_quantity = content_price_cents * -1
 
     # Fetch any existing assignments for all pairs of (learner, content) in this assignment config.
     existing_assignments = get_assignments_by_learner_email_and_content(
@@ -134,8 +139,9 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     for assignment in existing_assignments:
         learner_emails_with_existing_assignments.add(assignment.learner_email)
         if assignment.state in LearnerContentAssignmentStateChoices.REALLOCATE_STATES:
-            assignment.content_quantity = content_price_cents
+            assignment.content_quantity = content_quantity
             assignment.state = LearnerContentAssignmentStateChoices.ALLOCATED
+            assignment.full_clean()
             cancelled_or_errored_to_update.append(assignment)
         else:
             already_allocated_or_accepted.append(assignment)
@@ -154,7 +160,7 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
         assignment_configuration,
         learner_emails_for_assignment_creation,
         content_key,
-        content_price_cents,
+        content_quantity,
     )
 
     # Return a mapping of the action we took to lists of relevant assignment records.
@@ -179,20 +185,21 @@ def _update_and_refresh_assignments(assignment_records, fields_changed):
     )
 
 
-def _create_new_assignments(assignment_configuration, learner_emails, content_key, content_price_cents):
+def _create_new_assignments(assignment_configuration, learner_emails, content_key, content_quantity):
     """
     Helper to bulk save new LearnerContentAssignment instances.
     """
-    assignments_to_create = [
-        LearnerContentAssignment(
+    assignments_to_create = []
+    for learner_email in learner_emails:
+        assignment = LearnerContentAssignment(
             assignment_configuration=assignment_configuration,
             learner_email=learner_email,
             content_key=content_key,
-            content_quantity=content_price_cents,
+            content_quantity=content_quantity,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )
-        for learner_email in learner_emails
-    ]
+        assignment.full_clean()
+        assignments_to_create.append(assignment)
 
     # Do the bulk creation to save these records
     return LearnerContentAssignment.bulk_create(assignments_to_create)
