@@ -2,12 +2,13 @@
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from djangoql.admin import DjangoQLSearchMixin
 
 from enterprise_access.apps.core.models import User
 
 
+@admin.register(User)
 class CustomUserAdmin(DjangoQLSearchMixin, UserAdmin):
     """ Admin configuration for the custom User model. """
     list_display = ('username', 'email', 'full_name', 'first_name', 'last_name', 'is_staff', 'lms_user_id')
@@ -19,6 +20,3 @@ class CustomUserAdmin(DjangoQLSearchMixin, UserAdmin):
         (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
     )
     readonly_fields = ('lms_user_id',)
-
-
-admin.site.register(User, CustomUserAdmin)

@@ -19,9 +19,8 @@ import os
 
 from auth_backends.urls import oauth2_urlpatterns
 from django.conf import settings
-from django.conf.urls import include, url
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from edx_api_doc_tools import make_api_info, make_docs_urls
 
@@ -44,12 +43,12 @@ spec_redoc_view = SpectacularRedocView(
 )
 
 urlpatterns = oauth2_urlpatterns + make_docs_urls(api_info) + [
-    url(r'^admin/', admin.site.urls),
-    url(r'^api/', include(api_urls)),
-    url(r'^api-docs/', spec_swagger_view.as_view(), name='swagger-ui'),
-    url(r'^auto_auth/$', core_views.AutoAuth.as_view(), name='auto_auth'),
-    url(r'', include('csrf.urls')),  # Include csrf urls from edx-drf-extensions
-    url(r'^health/$', core_views.health, name='health'),
+    re_path(r'^admin/', admin.site.urls),
+    path('api/', include(api_urls)),
+    re_path(r'^api-docs/', spec_swagger_view.as_view(), name='swagger-ui'),
+    path('auto_auth/', core_views.AutoAuth.as_view(), name='auto_auth'),
+    path('', include('csrf.urls')),  # Include csrf urls from edx-drf-extensions
+    path('health/', core_views.health, name='health'),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/schema/redoc/', spec_redoc_view.as_view(url_name='schema'), name='redoc'),
 ]
@@ -58,4 +57,4 @@ if settings.DEBUG and os.environ.get('ENABLE_DJANGO_TOOLBAR', False):  # pragma:
     # Disable pylint import error because we don't install django-debug-toolbar
     # for CI build
     import debug_toolbar
-    urlpatterns.append(url(r'^__debug__/', include(debug_toolbar.urls)))
+    urlpatterns.append(path('__debug__/', include(debug_toolbar.urls)))
