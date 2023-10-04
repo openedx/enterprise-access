@@ -52,12 +52,12 @@ certifi==2023.7.22
     # via
     #   -r requirements/test.txt
     #   requests
-cffi==1.15.1
+cffi==1.16.0
     # via
     #   -r requirements/test.txt
     #   cryptography
     #   pynacl
-charset-normalizer==3.2.0
+charset-normalizer==3.3.0
     # via
     #   -r requirements/test.txt
     #   requests
@@ -103,7 +103,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/test.txt
     #   coreapi
-coverage[toml]==7.3.1
+coverage[toml]==7.3.2
     # via
     #   -r requirements/test.txt
     #   pytest-cov
@@ -111,10 +111,11 @@ cryptography==41.0.4
     # via
     #   -r requirements/test.txt
     #   pyjwt
+    #   secretstorage
     #   social-auth-core
 ddt==1.6.0
     # via -r requirements/test.txt
-defusedxml==0.7.1
+defusedxml==0.8.0rc2
     # via
     #   -r requirements/test.txt
     #   python3-openid
@@ -127,7 +128,7 @@ distlib==0.3.7
     # via
     #   -r requirements/test.txt
     #   virtualenv
-django==4.2.5
+django==4.2.6
     # via
     #   -r requirements/test.txt
     #   django-celery-results
@@ -255,7 +256,7 @@ faker==19.6.2
     # via
     #   -r requirements/test.txt
     #   factory-boy
-fastavro==1.8.3
+fastavro==1.8.4
     # via
     #   -r requirements/test.txt
     #   openedx-events
@@ -298,6 +299,10 @@ itypes==1.2.0
     #   coreapi
 jaraco-classes==3.3.0
     # via keyring
+jeepney==0.8.0
+    # via
+    #   keyring
+    #   secretstorage
 jinja2==3.1.2
     # via
     #   -r requirements/test.txt
@@ -362,9 +367,9 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==8.6.0
+openedx-events==8.8.0
     # via -r requirements/test.txt
-packaging==23.1
+packaging==23.2
     # via
     #   -r requirements/test.txt
     #   drf-yasg
@@ -380,7 +385,7 @@ pkgutil-resolve-name==1.3.10
     # via
     #   -r requirements/test.txt
     #   jsonschema
-platformdirs==3.10.0
+platformdirs==3.11.0
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -426,7 +431,7 @@ pyjwt[crypto]==2.8.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==2.17.6
+pylint==2.17.7
     # via
     #   -r requirements/test.txt
     #   edx-lint
@@ -520,7 +525,7 @@ requests-toolbelt==1.0.0
     # via twine
 rfc3986==2.0.0
     # via twine
-rich==13.5.3
+rich==13.6.0
     # via twine
 rpds-py==0.10.3
     # via
@@ -529,6 +534,8 @@ rpds-py==0.10.3
     #   referencing
 rules==3.3
     # via -r requirements/test.txt
+secretstorage==3.3.3
+    # via keyring
 semantic-version==2.10.0
     # via
     #   -r requirements/test.txt
@@ -614,7 +621,7 @@ uritemplate==4.1.1
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.0.5
+urllib3==2.0.6
     # via
     #   -r requirements/test.txt
     #   requests
@@ -629,7 +636,7 @@ virtualenv==20.24.5
     # via
     #   -r requirements/test.txt
     #   tox
-wcwidth==0.2.6
+wcwidth==0.2.8
     # via
     #   -r requirements/test.txt
     #   prompt-toolkit

@@ -51,12 +51,12 @@ certifi==2023.7.22
     # via
     #   -r requirements/base.txt
     #   requests
-cffi==1.15.1
+cffi==1.16.0
     # via
     #   -r requirements/base.txt
     #   cryptography
     #   pynacl
-charset-normalizer==3.2.0
+charset-normalizer==3.3.0
     # via
     #   -r requirements/base.txt
     #   requests
@@ -100,7 +100,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/base.txt
     #   coreapi
-coverage[toml]==7.3.1
+coverage[toml]==7.3.2
     # via
     #   -r requirements/test.in
     #   pytest-cov
@@ -111,7 +111,7 @@ cryptography==41.0.4
     #   social-auth-core
 ddt==1.6.0
     # via -r requirements/test.in
-defusedxml==0.7.1
+defusedxml==0.8.0rc2
     # via
     #   -r requirements/base.txt
     #   python3-openid
@@ -239,7 +239,7 @@ factory-boy==3.3.0
     # via -r requirements/test.in
 faker==19.6.2
     # via factory-boy
-fastavro==1.8.3
+fastavro==1.8.4
     # via
     #   -r requirements/base.txt
     #   openedx-events
@@ -319,9 +319,9 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
-openedx-events==8.6.0
+openedx-events==8.8.0
     # via -r requirements/base.txt
-packaging==23.1
+packaging==23.2
     # via
     #   -r requirements/base.txt
     #   drf-yasg
@@ -335,7 +335,7 @@ pkgutil-resolve-name==1.3.10
     # via
     #   -r requirements/base.txt
     #   jsonschema
-platformdirs==3.10.0
+platformdirs==3.11.0
     # via
     #   pylint
     #   virtualenv
@@ -369,7 +369,7 @@ pyjwt[crypto]==2.8.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==2.17.6
+pylint==2.17.7
     # via
     #   edx-lint
     #   pylint-celery
@@ -528,7 +528,7 @@ uritemplate==4.1.1
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.0.5
+urllib3==2.0.6
     # via
     #   -r requirements/base.txt
     #   requests
@@ -540,7 +540,7 @@ vine==5.0.0
     #   kombu
 virtualenv==20.24.5
     # via tox
-wcwidth==0.2.6
+wcwidth==0.2.8
     # via
     #   -r requirements/base.txt
     #   prompt-toolkit
