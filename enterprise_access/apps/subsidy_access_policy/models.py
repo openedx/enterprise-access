@@ -275,7 +275,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
         # don't utilize the cache unless this experimental feature is enabled
         if not getattr(settings, 'MULTI_POLICY_RESOLUTION_ENABLED', False):
             logger.info('subsidy_record MULTI_POLICY_RESOLUTION_ENABLED disabled')
-            return self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
+            try:
+                return self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
+            except requests.exceptions.HTTPError as exc:
+                # when associated subsidy is soft-deleted, the subsidy retrieve API raises an exception.
+                logger.warning('SubsidyAccessPolicy.subsidy_record() raised HTTPError: %s', exc)
+                return {}
 
         cache_key = versioned_cache_key(
             'get_subsidy_record',
@@ -291,7 +296,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
             )
             return cached_response.value
 
-        result = self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
+        try:
+            result = self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
+        except requests.exceptions.HTTPError as exc:
+            logger.warning('SubsidyAccessPolicy.subsidy_record() raised HTTPError: %s', exc)
+            result = {}
+
         request_cache().set(cache_key, result)
 
         logger.info(
@@ -305,7 +315,8 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Returns total remaining balance for the associated subsidy ledger.
         """
-        return int(self.subsidy_record().get('current_balance'))
+        current_balance = self.subsidy_record().get('current_balance') or 0
+        return int(current_balance)
 
     def remaining_balance(self):
         """
