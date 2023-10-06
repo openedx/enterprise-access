@@ -78,6 +78,7 @@ class CRUDViewTestMixin:
             'id': 123455,
             'active_datetime': self.yesterday,
             'expiration_datetime': self.tomorrow,
+            'current_balance': 4,
             'is_active': True,
         }
         subsidy_client_patcher = patch.object(
@@ -229,8 +230,13 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
     """
 
     def setUp(self):
+        self.maxDiff = None
         super().setUp()
         super().setup_subsidy_mocks()
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            "results": [{"quantity": -1}],
+            "aggregates": {"total_quantity": -1},
+        }
 
     @ddt.data(
         # A good admin role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
@@ -268,6 +274,14 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'subsidy_active_datetime': self.yesterday.isoformat(),
             'subsidy_expiration_datetime': self.tomorrow.isoformat(),
             'is_subsidy_active': True,
+            'aggregates': {
+                'amount_redeemed_usd_cents': 1,
+                'amount_redeemed_usd': 0.01,
+                'amount_allocated_usd_cents': 0,
+                'amount_allocated_usd': 0.00,
+                'spend_available_usd_cents': 2,
+                'spend_available_usd': 0.02,
+            }
         }, response.json())
 
     @ddt.data(
@@ -311,6 +325,14 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'subsidy_active_datetime': self.yesterday.isoformat(),
                 'subsidy_expiration_datetime': self.tomorrow.isoformat(),
                 'is_subsidy_active': True,
+                'aggregates': {
+                    'amount_redeemed_usd_cents': 1,
+                    'amount_redeemed_usd': 0.01,
+                    'amount_allocated_usd_cents': 0,
+                    'amount_allocated_usd': 0.00,
+                    'spend_available_usd_cents': 4,
+                    'spend_available_usd': 0.04,
+                }
             },
             {
                 'access_method': 'direct',
@@ -328,6 +350,14 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'subsidy_active_datetime': self.yesterday.isoformat(),
                 'subsidy_expiration_datetime': self.tomorrow.isoformat(),
                 'is_subsidy_active': True,
+                'aggregates': {
+                    'amount_redeemed_usd_cents': 1,
+                    'amount_redeemed_usd': 0.01,
+                    'amount_allocated_usd_cents': 0,
+                    'amount_allocated_usd': 0.00,
+                    'spend_available_usd_cents': 2,
+                    'spend_available_usd': 0.02,
+                }
             },
         ]
 
@@ -388,6 +418,14 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'subsidy_active_datetime': self.yesterday.isoformat(),
             'subsidy_expiration_datetime': self.tomorrow.isoformat(),
             'is_subsidy_active': True,
+            'aggregates': {
+                'amount_redeemed_usd_cents': 1,
+                'amount_redeemed_usd': 0.01,
+                'amount_allocated_usd_cents': 0,
+                'amount_allocated_usd': 0.00,
+                'spend_available_usd_cents': 2,
+                'spend_available_usd': 0.02,
+            }
         }
         self.assertEqual(expected_response, response.json())
 
@@ -458,6 +496,14 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'subsidy_active_datetime': self.yesterday.isoformat(),
             'subsidy_expiration_datetime': self.tomorrow.isoformat(),
             'is_subsidy_active': True,
+            'aggregates': {
+                'amount_redeemed_usd_cents': 1,
+                'amount_redeemed_usd': 0.01,
+                'amount_allocated_usd_cents': 0,
+                'amount_allocated_usd': 0.00,
+                'spend_available_usd_cents': 4,
+                'spend_available_usd': 0.04,
+            }
         }
         self.assertEqual(expected_response, response.json())
 

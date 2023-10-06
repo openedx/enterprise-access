@@ -7,11 +7,12 @@ from urllib.parse import urljoin
 from django.apps import apps
 from django.conf import settings
 from django.urls import reverse
+from drf_spectacular.utils import extend_schema_field
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from rest_framework import serializers
 
-from enterprise_access.apps.subsidy_access_policy.constants import PolicyTypes
+from enterprise_access.apps.subsidy_access_policy.constants import CENTS_PER_DOLLAR, PolicyTypes
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 
 from .content_assignments.assignment import LearnerContentAssignmentResponseSerializer
@@ -40,10 +41,73 @@ def policy_pre_write_validation(policy_instance_or_class, field_values_by_name):
         )
 
 
+# pylint: disable=abstract-method
+class SubsidyAccessPolicyAggregatesSerializer(serializers.Serializer):
+    """
+    Response serializer representing aggregates about the policy and related objects.
+    """
+    amount_redeemed_usd_cents = serializers.SerializerMethodField(
+        help_text="Total Amount redeemed for policy, in positive USD cents.",
+    )
+    amount_redeemed_usd = serializers.SerializerMethodField(
+        help_text="Total Amount redeemed for policy, in USD.",
+    )
+    amount_allocated_usd_cents = serializers.SerializerMethodField(
+        help_text=(
+            f"Total amount allocated for policies of type {PolicyTypes.ASSIGNED_LEARNER_CREDIT} (0 otherwise), in "
+            "positive USD cents."
+        ),
+    )
+    amount_allocated_usd = serializers.SerializerMethodField(
+        help_text=(
+            f"Total amount allocated for policies of type {PolicyTypes.ASSIGNED_LEARNER_CREDIT} (0 otherwise), in USD.",
+        ),
+    )
+    spend_available_usd_cents = serializers.IntegerField(
+        help_text="Total Amount of available spend for policy, in positive USD cents.",
+        source="spend_available",
+    )
+    spend_available_usd = serializers.SerializerMethodField(
+        help_text="Total Amount of available spend for policy, in USD.",
+    )
+
+    @extend_schema_field(serializers.IntegerField)
+    def get_amount_redeemed_usd_cents(self, policy):
+        """
+        Make amount a positive number.
+        """
+        return policy.total_redeemed * -1
+
+    @extend_schema_field(serializers.IntegerField)
+    def get_amount_allocated_usd_cents(self, policy):
+        """
+        Make amount a positive number.
+        """
+        return policy.total_allocated * -1
+
+    @extend_schema_field(serializers.FloatField)
+    def get_amount_redeemed_usd(self, policy):
+        return float(policy.total_redeemed * -1) / CENTS_PER_DOLLAR
+
+    @extend_schema_field(serializers.FloatField)
+    def get_amount_allocated_usd(self, policy):
+        return float(policy.total_allocated * -1) / CENTS_PER_DOLLAR
+
+    @extend_schema_field(serializers.FloatField)
+    def get_spend_available_usd(self, policy):
+        return float(policy.spend_available) / CENTS_PER_DOLLAR
+
+
 class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
     """
     A read-only Serializer for responding to requests for ``SubsidyAccessPolicy`` records.
     """
+    aggregates = SubsidyAccessPolicyAggregatesSerializer(
+        help_text='Aggregates about the policy and related objects.',
+        # This causes the entire unserialized model to be passed into the nested serializer.
+        source='*',
+    )
+
     class Meta:
         model = SubsidyAccessPolicy
         fields = [
@@ -62,6 +126,7 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
             'subsidy_active_datetime',
             'subsidy_expiration_datetime',
             'is_subsidy_active',
+            'aggregates',
         ]
         read_only_fields = fields
 
@@ -405,19 +470,25 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
 
     For view: SubsidyAccessPolicyRedeemViewset.credits_available
     """
-    remaining_balance_per_user = serializers.SerializerMethodField()
-    remaining_balance = serializers.SerializerMethodField()
-    subsidy_expiration_date = serializers.SerializerMethodField()
+    remaining_balance_per_user = serializers.SerializerMethodField(
+        help_text='Remaining balance for the requesting user, in USD cents.',
+    )
+    remaining_balance = serializers.SerializerMethodField(
+        help_text='Remaining balance on the entire subsidy, in USD cents.',
+    )
+    subsidy_expiration_date = serializers.DateTimeField(
+        help_text='',
+        source='subsidy_expiration_datetime',
+    )
 
+    @extend_schema_field(serializers.IntegerField)
     def get_remaining_balance_per_user(self, obj):
         lms_user_id = self.context.get('lms_user_id')
         return obj.remaining_balance_per_user(lms_user_id=lms_user_id)
 
+    @extend_schema_field(serializers.IntegerField)
     def get_remaining_balance(self, obj):
-        return obj.remaining_balance()
-
-    def get_subsidy_expiration_date(self, obj):
-        return obj.subsidy_expiration_datetime
+        return obj.subsidy_balance()
 
 
 class SubsidyAccessPolicyCanRedeemReasonResponseSerializer(serializers.Serializer):
