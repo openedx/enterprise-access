@@ -490,7 +490,7 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # Send a list request for all Assignments for the requesting user.
         response = self.client.get(ASSIGNMENTS_LIST_ENDPOINT)
 
-        # Only Assignments that match the following qualifications are returned:
+        # Only Assignments that match the following qualifications are returned in paginated response:
         # 1. Assignment is for the requesting user.
         # 2. Assignment is in the requested AssignementConfiguration.
         expected_assignments_for_requester = [
@@ -500,4 +500,28 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         ]
         expected_assignment_uuids = {assignment.uuid for assignment in expected_assignments_for_requester}
         actual_assignment_uuids = {UUID(assignment['uuid']) for assignment in response.json()['results']}
+        assert actual_assignment_uuids == expected_assignment_uuids
+
+    @ddt.data('1', 'true', 'True')
+    def test_list_without_pagination(self, no_page_query_param):
+        """
+        Test that the list view adheres to a `?no_page` query parameter to return unpaginated results.
+        """
+        role_context_dict = {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        self.set_jwt_cookie([role_context_dict])
+
+        # Send a list request for all Assignments for the requesting user.
+        query_params = {
+            'no_page': no_page_query_param,
+        }
+        response = self.client.get(ASSIGNMENTS_LIST_ENDPOINT, query_params)
+
+        # All assignments for the requesting user are returned in top-level list.
+        expected_assignments_for_requester = [
+            self.requester_assignment_accepted,
+            self.requester_assignment_cancelled,
+            self.requester_assignment_errored,
+        ]
+        expected_assignment_uuids = {assignment.uuid for assignment in expected_assignments_for_requester}
+        actual_assignment_uuids = {UUID(assignment['uuid']) for assignment in response.json()}
         assert actual_assignment_uuids == expected_assignment_uuids
