@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import ddt
 import pytest
+import requests
 from django.core.cache import cache as django_cache
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
@@ -576,6 +577,15 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         assert policy.subsidy_active_datetime == mock_subsidy.get('active_datetime')
         assert policy.subsidy_expiration_datetime == mock_subsidy.get('expiration_datetime')
         assert policy.is_subsidy_active == mock_subsidy.get('is_active')
+
+    def test_subsidy_record_http_error(self):
+        self.mock_subsidy_client.retrieve_subsidy.side_effect = requests.exceptions.HTTPError
+        policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
+        self.assertEqual(policy.subsidy_record(), {})
+        self.assertIsNone(policy.subsidy_active_datetime)
+        self.assertIsNone(policy.subsidy_expiration_datetime)
+        self.assertIsNone(policy.is_subsidy_active)
+        self.assertEqual(policy.subsidy_balance(), 0)
 
 
 class SubsidyAccessPolicyResolverTests(TestCase):
