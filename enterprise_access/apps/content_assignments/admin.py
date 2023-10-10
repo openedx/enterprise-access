@@ -13,8 +13,8 @@ class AssignmentConfigurationAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
     Admin configuration for AssignmentConfigurations.
     """
     list_display = (
-        'enterprise_customer_uuid',
         'uuid',
+        'enterprise_customer_uuid',
         'active',
         'modified',
     )

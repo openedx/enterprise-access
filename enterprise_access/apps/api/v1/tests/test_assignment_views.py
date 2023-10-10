@@ -490,7 +490,7 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # Send a list request for all Assignments for the requesting user.
         response = self.client.get(ASSIGNMENTS_LIST_ENDPOINT)
 
-        # Only Assignments that match the following qualifications are returned:
+        # Only Assignments that match the following qualifications are returned in paginated response:
         # 1. Assignment is for the requesting user.
         # 2. Assignment is in the requested AssignementConfiguration.
         expected_assignments_for_requester = [
