@@ -1,20 +1,124 @@
 """
 Tests for the serializers in the API.
 """
+from datetime import datetime, timedelta
 from unittest import mock
 from uuid import uuid4
 
+import ddt
 from django.conf import settings
 from django.test import TestCase
 from django.urls import reverse
 
 from enterprise_access.apps.api.serializers.subsidy_access_policy import (
+    SubsidyAccessPolicyAggregatesSerializer,
     SubsidyAccessPolicyCreditsAvailableResponseSerializer,
     SubsidyAccessPolicyRedeemableResponseSerializer
 )
+from enterprise_access.apps.content_assignments.tests.factories import (
+    AssignmentConfigurationFactory,
+    LearnerContentAssignmentFactory
+)
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
+    AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory
 )
+
+
+@ddt.ddt
+class TestSubsidyAccessPolicyResponseSerializer(TestCase):
+    """
+    Tests for the SubsidyAccessPolicyResponseSerializer.
+    """
+    @ddt.data(
+        # Test environment: An oddball zero value subsidy, no redemptions, and no allocations.
+        {'starting_balance': 0, 'spend_limit': 1, 'redeemed': 0, 'allocated': 0, 'available': 0},  # 000
+
+        # Test environment: 9 cent subsidy, oddball 0 cent policy.
+        # 4 possible cases, should always indicate no available spend.
+        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 0, 'allocated': 0, 'available': 0},  # 000
+        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 0, 'allocated': 1, 'available': 0},  # 010
+        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 1, 'allocated': 0, 'available': 0},  # 100
+        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 1, 'allocated': 1, 'available': 0},  # 110
+
+        # Test environment: 9 cent subsidy, unlimited policy.
+        # 7 possible cases, the sum of redeemed+allocated+available should always equal 9.
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 0, 'allocated': 0, 'available': 9},  # 001
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 0, 'allocated': 9, 'available': 0},  # 010
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 0, 'allocated': 5, 'available': 4},  # 011
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 9, 'allocated': 0, 'available': 0},  # 100
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 8, 'allocated': 0, 'available': 1},  # 101
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 5, 'allocated': 4, 'available': 0},  # 110
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 3, 'allocated': 3, 'available': 3},  # 111
+
+        # Test environment: 9 cent subsidy, 8 cent policy.
+        # 7 possible cases, the sum of redeemed+allocated+available should always equal 8.
+        {'starting_balance': 9, 'spend_limit': 8, 'redeemed': 0, 'allocated': 0, 'available': 8},  # 001
+        {'starting_balance': 9, 'spend_limit': 8, 'redeemed': 0, 'allocated': 8, 'available': 0},  # 010
+        {'starting_balance': 9, 'spend_limit': 8, 'redeemed': 0, 'allocated': 3, 'available': 5},  # 011
+        {'starting_balance': 9, 'spend_limit': 8, 'redeemed': 8, 'allocated': 0, 'available': 0},  # 100
+        {'starting_balance': 9, 'spend_limit': 8, 'redeemed': 7, 'allocated': 0, 'available': 1},  # 101
+        {'starting_balance': 9, 'spend_limit': 8, 'redeemed': 4, 'allocated': 4, 'available': 0},  # 110
+        {'starting_balance': 9, 'spend_limit': 8, 'redeemed': 3, 'allocated': 3, 'available': 2},  # 111
+    )
+    @ddt.unpack
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
+    def test_aggregates(
+        self,
+        mock_subsidy_client,
+        starting_balance,
+        spend_limit,
+        redeemed,
+        allocated,
+        available,
+    ):
+        """
+        Test that the policy aggregates serializer returns the correct aggregate values.
+        """
+        test_enterprise_uuid = uuid4()
+
+        # Synthesize subsidy with the current_balance derived from ``starting_balance`` and ``redeemed``.
+        test_subsidy_uuid = uuid4()
+        mock_subsidy_client.retrieve_subsidy.return_value = {
+            'uuid': str(test_subsidy_uuid),
+            'enterprise_customer_uuid': str(test_enterprise_uuid),
+            'active_datetime': datetime.utcnow() - timedelta(days=1),
+            'expiration_datetime': datetime.utcnow() + timedelta(days=1),
+            'current_balance': starting_balance - redeemed,
+            'is_active': True,
+        }
+
+        # Create a test policy with a limit set to ``policy_spend_limit``.  Reminder: a value of 0 means no limit.
+        assignment_configuration = AssignmentConfigurationFactory(
+            enterprise_customer_uuid=test_enterprise_uuid,
+        )
+        policy = AssignedLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=test_enterprise_uuid,
+            subsidy_uuid=test_subsidy_uuid,
+            spend_limit=spend_limit,
+            assignment_configuration=assignment_configuration,
+            active=True,
+        )
+
+        # Synthesize a number of 1 cent transactions equal to ``redeemed``.
+        mock_subsidy_client.list_subsidy_transactions.return_value = {
+            "results": [{"quantity": -1} for _ in range(redeemed)],
+            "aggregates": {"total_quantity": redeemed * -1},
+        }
+
+        # Synthesize a number of 1 cent assignments equal to ``allocated``.
+        for _ in range(allocated):
+            LearnerContentAssignmentFactory(
+                assignment_configuration=assignment_configuration,
+                content_quantity=-1,
+            )
+
+        serializer = SubsidyAccessPolicyAggregatesSerializer(policy)
+        data = serializer.data
+
+        assert data["amount_redeemed_usd_cents"] == redeemed
+        assert data["amount_allocated_usd_cents"] == allocated
+        assert data["spend_available_usd_cents"] == available
 
 
 class TestSubsidyAccessPolicyRedeemableResponseSerializer(TestCase):

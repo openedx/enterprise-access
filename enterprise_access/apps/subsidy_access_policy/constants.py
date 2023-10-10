@@ -43,10 +43,12 @@ class PolicyTypes:
 
     PER_LEARNER_ENROLLMENT_CREDIT = 'PerLearnerEnrollmentCreditAccessPolicy'
     PER_LEARNER_SPEND_CREDIT = 'PerLearnerSpendCreditAccessPolicy'
+    ASSIGNED_LEARNER_CREDIT = 'AssignedLearnerCreditAccessPolicy'
 
     CHOICES = (
         (PER_LEARNER_ENROLLMENT_CREDIT, PER_LEARNER_ENROLLMENT_CREDIT),
         (PER_LEARNER_SPEND_CREDIT, PER_LEARNER_SPEND_CREDIT),
+        (ASSIGNED_LEARNER_CREDIT, ASSIGNED_LEARNER_CREDIT),
     )
 
 

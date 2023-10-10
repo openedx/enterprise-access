@@ -318,11 +318,48 @@ class SubsidyAccessPolicy(TimeStampedModel):
         current_balance = self.subsidy_record().get('current_balance') or 0
         return int(current_balance)
 
-    def remaining_balance(self):
+    @property
+    def spend_available(self):
         """
-        Synonym for subsidy_balance().
+        Policy-wide spend available.  This takes only policy-wide limits into account (no per-learner or other
+        custom parameters) and is used in the enterprise admin dashboard to help summarize the high-level status of a
+        policy.
+
+        Returns:
+            int: quantity >= 0 of USD Cents representing the policy-wide spend available.
         """
-        return self.subsidy_balance()
+        # This is how much available spend the policy limit would allow, ignoring the subsidy balance.
+        if self.spend_limit is not None:
+            # total_redeemed is negative
+            policy_limit_balance = max(0, self.spend_limit + self.total_redeemed)
+            # Finally, take both the policy-wide limit and the subsidy balance into account:
+            return min(policy_limit_balance, self.subsidy_balance())
+        else:
+            # Take ONLY the subsidy balance into account:
+            return self.subsidy_balance()
+
+    @property
+    def total_redeemed(self):
+        """
+        Total amount already transacted via this policy.
+
+        Returns:
+            int: quantity <= 0 of USD Cents.
+        """
+        return self.aggregates_for_policy().get('total_quantity') or 0
+
+    @property
+    def total_allocated(self):
+        """
+        Total amount of assignments currently allocated via this policy.
+
+        Override this in sub-classess that use assignments.  Empty definition needed here in order to make serializer
+        happy.
+
+        Returns:
+            int: negative USD cents representing the total amount of currently allocated assignments.
+        """
+        return 0
 
     def catalog_contains_content_key(self, content_key):
         """
@@ -427,9 +464,8 @@ class SubsidyAccessPolicy(TimeStampedModel):
             return False
 
         content_price = self.get_content_price(content_key, content_metadata=content_metadata)
-        spent_amount = self.aggregates_for_policy().get('total_quantity') or 0
 
-        return self.content_would_exceed_limit(spent_amount, self.spend_limit, content_price)
+        return self.content_would_exceed_limit(self.total_redeemed, self.spend_limit, content_price)
 
     def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
         """
@@ -552,7 +588,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             return False
 
         # verify associated subsidy has remaining balance
-        if self.remaining_balance() <= 0:
+        if self.subsidy_balance() <= 0:
             logger.info('[credit_available] SubsidyAccessPolicy.subsidy_record() returned empty balance')
             return False
 
@@ -949,6 +985,30 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         """
         self.access_method = AccessMethods.ASSIGNED
         super().save(*args, **kwargs)
+
+    @property
+    def total_allocated(self):
+        """
+        Total amount of assignments currently allocated via this policy.
+
+        Returns:
+            int: Negative USD cents representing the total amount of currently allocated assignments.
+        """
+        return assignments_api.get_allocated_quantity_for_configuration(
+            self.assignment_configuration,
+        )
+
+    @property
+    def spend_available(self):
+        """
+        Policy-wide spend available.  This sub-class definition additionally takes assignments into account.
+
+        Returns:
+            int: quantity >= 0 of USD Cents representing the policy-wide spend available.
+        """
+        # super().spend_available is POSITIVE USD Cents representing available spend ignoring assignments.
+        # self.total_allocated is NEGATIVE USD Cents representing currently allocated assignments.
+        return max(0, super().spend_available + self.total_allocated)
 
     def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
         raise NotImplementedError
