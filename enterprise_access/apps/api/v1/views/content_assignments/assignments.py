@@ -9,7 +9,7 @@ from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthenticat
 from rest_framework import authentication, mixins, permissions, status, viewsets
 
 from enterprise_access.apps.api import filters, serializers, utils
-from enterprise_access.apps.api.v1.views.utils import OptionalPaginationWithPageCount
+from enterprise_access.apps.api.v1.views.utils import PaginationWithPageCount
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
 from enterprise_access.apps.core.constants import CONTENT_ASSIGNMENT_LEARNER_READ_PERMISSION
 
@@ -40,7 +40,7 @@ class LearnerContentAssignmentViewSet(
     serializer_class = serializers.LearnerContentAssignmentResponseSerializer
     authentication_classes = (JwtAuthentication, authentication.SessionAuthentication)
     filter_backends = (filters.NoFilterOnDetailBackend,)
-    pagination_class = OptionalPaginationWithPageCount
+    pagination_class = PaginationWithPageCount
     lookup_field = 'uuid'
 
     @property
