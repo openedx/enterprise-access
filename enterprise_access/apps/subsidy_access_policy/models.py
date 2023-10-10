@@ -329,7 +329,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             int: quantity >= 0 of USD Cents representing the policy-wide spend available.
         """
         # This is how much available spend the policy limit would allow, ignoring the subsidy balance.
-        if self.spend_limit:
+        if self.spend_limit is not None:
             # total_redeemed is negative
             policy_limit_balance = max(0, self.spend_limit + self.total_redeemed)
             # Finally, take both the policy-wide limit and the subsidy balance into account:

@@ -330,8 +330,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                     'amount_redeemed_usd': 0.01,
                     'amount_allocated_usd_cents': 0,
                     'amount_allocated_usd': 0.00,
-                    'spend_available_usd_cents': 4,
-                    'spend_available_usd': 0.04,
+                    'spend_available_usd_cents': 0,
+                    'spend_available_usd': 0.00,
                 }
             },
             {

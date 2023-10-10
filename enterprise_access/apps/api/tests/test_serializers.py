@@ -32,18 +32,27 @@ class TestSubsidyAccessPolicyResponseSerializer(TestCase):
     """
     @ddt.data(
         # Test environment: An oddball zero value subsidy, no redemptions, and no allocations.
-        {'starting_balance': 0, 'spend_limit': 0, 'redeemed': 0, 'allocated': 0, 'available': 0},
+        {'starting_balance': 0, 'spend_limit': 1, 'redeemed': 0, 'allocated': 0, 'available': 0},  # 000
+
+        # Test environment: 9 cent subsidy, oddball 0 cent policy.
+        # 4 possible cases, should always indicate no available spend.
+        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 0, 'allocated': 0, 'available': 0},  # 000
+        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 0, 'allocated': 1, 'available': 0},  # 010
+        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 1, 'allocated': 0, 'available': 0},  # 100
+        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 1, 'allocated': 1, 'available': 0},  # 110
 
         # Test environment: 9 cent subsidy, unlimited policy.
-        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 0, 'allocated': 0, 'available': 9},  # 001
-        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 0, 'allocated': 9, 'available': 0},  # 010
-        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 0, 'allocated': 5, 'available': 4},  # 011
-        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 9, 'allocated': 0, 'available': 0},  # 100
-        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 8, 'allocated': 0, 'available': 1},  # 101
-        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 5, 'allocated': 4, 'available': 0},  # 110
-        {'starting_balance': 9, 'spend_limit': 0, 'redeemed': 3, 'allocated': 3, 'available': 3},  # 111
+        # 7 possible cases, the sum of redeemed+allocated+available should always equal 9.
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 0, 'allocated': 0, 'available': 9},  # 001
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 0, 'allocated': 9, 'available': 0},  # 010
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 0, 'allocated': 5, 'available': 4},  # 011
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 9, 'allocated': 0, 'available': 0},  # 100
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 8, 'allocated': 0, 'available': 1},  # 101
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 5, 'allocated': 4, 'available': 0},  # 110
+        {'starting_balance': 9, 'spend_limit': 999, 'redeemed': 3, 'allocated': 3, 'available': 3},  # 111
 
         # Test environment: 9 cent subsidy, 8 cent policy.
+        # 7 possible cases, the sum of redeemed+allocated+available should always equal 8.
         {'starting_balance': 9, 'spend_limit': 8, 'redeemed': 0, 'allocated': 0, 'available': 8},  # 001
         {'starting_balance': 9, 'spend_limit': 8, 'redeemed': 0, 'allocated': 8, 'available': 0},  # 010
         {'starting_balance': 9, 'spend_limit': 8, 'redeemed': 0, 'allocated': 3, 'available': 5},  # 011
