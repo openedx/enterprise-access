@@ -1,11 +1,21 @@
 """ Admin configuration for subsidy_access_policy models. """
+import json
+import logging
 
 from django.conf import settings
 from django.contrib import admin
+from django.utils.safestring import mark_safe
 from django.utils.text import Truncator  # for shortening a text
 from djangoql.admin import DjangoQLSearchMixin
+from pygments import highlight
+from pygments.formatters import HtmlFormatter  # pylint: disable=no-name-in-module
+from pygments.lexers import JsonLexer  # pylint: disable=no-name-in-module
 
+from enterprise_access.apps.api.serializers.subsidy_access_policy import SubsidyAccessPolicyResponseSerializer
 from enterprise_access.apps.subsidy_access_policy import constants, models
+
+logger = logging.getLogger(__name__)
+
 
 EVERY_SPEND_LIMIT_FIELD = [
     'spend_limit',
@@ -50,7 +60,31 @@ class BaseSubsidyAccessPolicyMixin(admin.ModelAdmin):
         'created',
         'modified',
         'policy_spend_limit_dollars',
+        'api_serialized_repr',
     )
+
+    @admin.display(description='REST API serialization')
+    def api_serialized_repr(self, obj):
+        """
+        Convenience method to see what the policy details REST API
+        response is.  Thanks to:
+        https://daniel.feldroy.com/posts/pretty-formatting-json-django-admin
+        for this styling idea.
+        """
+        data = SubsidyAccessPolicyResponseSerializer(obj).data
+        json_string = json.dumps(data, indent=4, sort_keys=True)
+
+        # Get the Pygments formatter
+        formatter = HtmlFormatter(style='default')
+
+        # Highlight the data
+        response = highlight(json_string, JsonLexer(), formatter)
+
+        # Get the stylesheet
+        style = "<style>" + formatter.get_style_defs() + "</style><br>"
+
+        # Safe the output
+        return mark_safe(style + response)
 
     def _short_description(self, obj):
         return Truncator(str(obj.description)).chars(255)
@@ -110,6 +144,12 @@ class PerLearnerEnrollmentCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcc
                 ] if not super_admin_enabled() else EVERY_SPEND_LIMIT_FIELD
             }
         ),
+        (
+            'Extra',
+            {
+                'fields': ['api_serialized_repr'],
+            },
+        ),
     ]
 
 
@@ -159,6 +199,12 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
                 ] if not super_admin_enabled() else EVERY_SPEND_LIMIT_FIELD
             }
         ),
+        (
+            'Extra',
+            {
+                'fields': ['api_serialized_repr'],
+            },
+        ),
     ]
 
     @admin.display(description='Per-learner spend limit (dollars)')
@@ -207,5 +253,11 @@ class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcces
                     'policy_spend_limit_dollars',
                 ] if not super_admin_enabled() else EVERY_SPEND_LIMIT_FIELD
             }
+        ),
+        (
+            'Extra',
+            {
+                'fields': ['api_serialized_repr'],
+            },
         ),
     ]
