@@ -3,11 +3,50 @@ Serializers for the `LearnerContentAssignment` model.
 """
 import logging
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
+from enterprise_access.apps.content_assignments.constants import (
+    AssignmentActions,
+    AssignmentLearnerStates,
+    AssignmentRecentActionTypes,
+    LearnerContentAssignmentStateChoices
+)
+from enterprise_access.apps.content_assignments.models import LearnerContentAssignment, LearnerContentAssignmentAction
 
 logger = logging.getLogger(__name__)
+
+
+class LearnerContentAssignmentActionSerializer(serializers.ModelSerializer):
+    """
+    A read-only Serializer for responding to requests for ``LearnerContentAssignmentAction`` records.
+    """
+    class Meta:
+        model = LearnerContentAssignmentAction
+        fields = [
+            'uuid',
+            'action_type',
+            'completed_at',
+            'error_reason',
+
+            # Intentionally hide traceback from response, since this is primarily for developers/on-call and could
+            # over-communicate secrets.
+            # 'traceback',
+        ]
+        read_only_fields = fields
+
+
+class LearnerContentAssignmentRecentActionSerializer(serializers.Serializer):
+    """
+    Structured data about the most recent action, meant to power a frontend table column.
+    """
+    action_type = serializers.ChoiceField(
+        help_text='Type of the recent action.',
+        choices=AssignmentRecentActionTypes.CHOICES,
+    )
+    timestamp = serializers.DateTimeField(
+        help_text='Date and time when the action was taken.',
+    )
 
 
 class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
@@ -16,6 +55,23 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
     """
     # This causes the related AssignmentConfiguration to be serialized as a UUID (in the response).
     assignment_configuration = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    actions = LearnerContentAssignmentActionSerializer(
+        help_text='All actions associated with this assignment.',
+        many=True,
+    )
+    recent_action = LearnerContentAssignmentRecentActionSerializer(
+        help_text='Structured data about the most recent action. Meant to power a frontend table column.',
+        source='get_recent_action_data',
+    )
+    learner_state = serializers.ChoiceField(
+        help_text=(
+            'learner_state is an admin-facing dynamic state, not to be confused with `state`. Meant to power a '
+            'frontend table column.'
+        ),
+        choices=AssignmentLearnerStates.CHOICES,
+        source='get_learner_state',
+    )
 
     class Meta:
         model = LearnerContentAssignment
@@ -29,5 +85,8 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
             'state',
             'transaction_uuid',
             'last_notification_at',
+            'actions',
+            'recent_action',
+            'learner_state',
         ]
         read_only_fields = fields

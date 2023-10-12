@@ -11,6 +11,7 @@ class LearnerContentAssignmentStateChoices:
     ACCEPTED = 'accepted'
     CANCELLED = 'cancelled'
     ERRORED = 'errored'
+
     CHOICES = (
         (ALLOCATED, 'Allocated'),
         (ACCEPTED, 'Accepted'),
@@ -51,4 +52,35 @@ class AssignmentActionErrors:
     CHOICES = (
         (EMAIL_ERROR, 'Email error'),
         (INTERNAL_API_ERROR, 'Internal API error'),
+    )
+
+
+class AssignmentRecentActionTypes:
+    """
+    Types for dynamic field: assignment.recent_action.
+    """
+    ASSIGNED = 'assigned'
+    REMINDED = 'reminded'
+    CHOICES = (
+        (ASSIGNED, 'Learner assigned content.'),
+        (REMINDED, 'Learner sent reminder message.'),
+    )
+
+
+class AssignmentLearnerStates:
+    """
+    States for dynamic field: assignment.learner_state.
+    """
+    NOTIFYING = 'notifying'
+    WAITING = 'waiting'
+    FAILED = 'failed'
+    CHOICES = (
+        (NOTIFYING, 'Sending assignment notification message to learner.'),
+        (WAITING, 'Waiting on learner to accept assignment.'),
+        (FAILED, 'Assignment unexpectedly failed creation or acceptance.'),
+    )
+    SORT_ORDER = (
+        NOTIFYING,
+        WAITING,
+        FAILED,
     )

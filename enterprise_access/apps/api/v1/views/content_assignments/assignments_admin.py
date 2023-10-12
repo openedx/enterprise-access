@@ -9,12 +9,14 @@ from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from rest_framework import authentication, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 
 from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.v1.views.utils import PaginationWithPageCount
 from enterprise_access.apps.content_assignments import api as assignments_api
-from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
+from enterprise_access.apps.content_assignments.constants import AssignmentActions, LearnerContentAssignmentStateChoices
+from enterprise_access.apps.content_assignments.models import LearnerContentAssignment, LearnerContentAssignmentAction
 from enterprise_access.apps.core.constants import (
     CONTENT_ASSIGNMENT_ADMIN_READ_PERMISSION,
     CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION
@@ -46,10 +48,16 @@ class LearnerContentAssignmentAdminViewSet(
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = serializers.LearnerContentAssignmentResponseSerializer
     authentication_classes = (JwtAuthentication, authentication.SessionAuthentication)
-    filter_backends = (filters.NoFilterOnDetailBackend,)
+    filter_backends = (filters.NoFilterOnDetailBackend, OrderingFilter)
     filterset_class = filters.LearnerContentAssignmentAdminFilter
     pagination_class = PaginationWithPageCount
     lookup_field = 'uuid'
+
+    # Settings that control list ordering, powered by OrderingFilter.
+    # Fields in `ordering_fields` are what we allow to be passed to the "?ordering=" query param.
+    ordering_fields = ['recent_action_time', 'learner_state_sort_order']
+    # `ordering` defines the default order.
+    ordering = ['-recent_action_time']
 
     @property
     def requested_assignment_configuration_uuid(self):
@@ -62,14 +70,25 @@ class LearnerContentAssignmentAdminViewSet(
         """
         A base queryset to list or retrieve ``LearnerContentAssignment`` records.
         """
+        queryset = LearnerContentAssignment.objects.all()
         if self.action == 'list':
-            return LearnerContentAssignment.objects.filter(
+            # Limit results based on the requested assignment configuration.
+            queryset = queryset.filter(
                 assignment_configuration__uuid=self.requested_assignment_configuration_uuid
             )
+        else:
+            # For all other actions, RBAC controls enterprise-customer-based access, so returning all objects here is
+            # safe (and more performant).
+            pass
 
-        # For all other actions, RBAC controls enterprise-customer-based access, so returning all objects here is safe
-        # (and more performant).
-        return LearnerContentAssignment.objects.all()
+        # Annotate extra dynamic fields used by this viewset for DRF-supported ordering and filtering:
+        # * learner_state
+        # * learner_state_sort_order
+        # * recent_action
+        # * recent_action_time
+        queryset = LearnerContentAssignment.annotate_dynamic_fields_onto_queryset(queryset)
+
+        return queryset
 
     @extend_schema(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
@@ -124,9 +143,14 @@ class LearnerContentAssignmentAdminViewSet(
         # if the assignment is not cancelable, this is a no-op.
         cancellation_info = assignments_api.cancel_assignments([assignment_to_cancel])
 
-        if len(cancellation_info['cancelled']) == 1:
-            cancelled_assignment = cancellation_info['cancelled'][0]
-            response_serializer = serializers.LearnerContentAssignmentResponseSerializer(cancelled_assignment)
+        # If the response contains one element in the `cancelled` list, that is the one we sent, indicating succcess.
+        cancellation_succeeded = len(cancellation_info['cancelled']) == 1
+
+        if cancellation_succeeded:
+            # Serialize the assignment object obtained via get_queryset() instead of the one from the assignments_api.
+            # Only the former has the additional dynamic fields annotated, and those are required for serialization.
+            assignment_to_cancel.refresh_from_db()
+            response_serializer = serializers.LearnerContentAssignmentResponseSerializer(assignment_to_cancel)
             return Response(response_serializer.data, status=status.HTTP_200_OK)
         else:
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)

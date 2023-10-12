@@ -9,7 +9,11 @@ from django.core.cache import cache as django_cache
 from rest_framework import status
 from rest_framework.reverse import reverse
 
-from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.content_assignments.constants import (
+    AssignmentLearnerStates,
+    AssignmentRecentActionTypes,
+    LearnerContentAssignmentStateChoices
+)
 from enterprise_access.apps.content_assignments.tests.factories import (
     AssignmentConfigurationFactory,
     LearnerContentAssignmentFactory
@@ -142,6 +146,12 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'state': LearnerContentAssignmentStateChoices.ERRORED,
                     'transaction_uuid': None,
                     'uuid': str(self.alice_assignment.uuid),
+                    'actions': [],
+                    'recent_action': {
+                        'action_type': AssignmentRecentActionTypes.ASSIGNED,
+                        'timestamp': self.alice_assignment.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    },
+                    'learner_state': None,
                 },
             ],
             'created': [
@@ -155,6 +165,12 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
                     'transaction_uuid': None,
                     'uuid': str(self.bob_assignment.uuid),
+                    'actions': [],
+                    'recent_action': {
+                        'action_type': AssignmentRecentActionTypes.ASSIGNED,
+                        'timestamp': self.bob_assignment.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    },
+                    'learner_state': AssignmentLearnerStates.NOTIFYING,
                 },
             ],
             'no_change': [
@@ -168,6 +184,12 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
                     'transaction_uuid': None,
                     'uuid': str(self.carol_assignment.uuid),
+                    'actions': [],
+                    'recent_action': {
+                        'action_type': AssignmentRecentActionTypes.ASSIGNED,
+                        'timestamp': self.carol_assignment.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    },
+                    'learner_state': AssignmentLearnerStates.NOTIFYING,
                 },
             ],
         }
@@ -323,6 +345,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
 
     def setUp(self):
         super().setUp()
+        self.maxDiff = None
 
         self.enterprise_uuid = OTHER_TEST_ENTERPRISE_UUID
 
@@ -396,6 +419,12 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
                     'transaction_uuid': None,
                     'uuid': str(new_allocation.uuid),
+                    'actions': [],
+                    'recent_action': {
+                        'action_type': AssignmentRecentActionTypes.ASSIGNED,
+                        'timestamp': new_allocation.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    },
+                    'learner_state': AssignmentLearnerStates.NOTIFYING,
                 },
             ],
             'no_change': [],
