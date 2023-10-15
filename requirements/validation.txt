@@ -190,7 +190,7 @@ django-celery-results==2.5.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-django-cors-headers==4.2.0
+django-cors-headers==4.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -276,7 +276,7 @@ edx-auth-backends==4.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-edx-braze-client==0.1.7
+edx-braze-client==0.1.8
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -294,7 +294,7 @@ edx-django-utils==5.7.0
     #   -r requirements/test.txt
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.10.0
+edx-drf-extensions==8.11.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -317,7 +317,7 @@ edx-rbac==1.8.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-edx-rest-api-client==5.6.0
+edx-rest-api-client==5.6.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -331,7 +331,7 @@ factory-boy==3.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==19.6.2
+faker==19.10.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -484,7 +484,7 @@ openapi-codec==1.3.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==8.8.0
+openedx-events==9.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -541,7 +541,7 @@ py==1.11.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   tox
-pycodestyle==2.11.0
+pycodestyle==2.11.1
     # via -r requirements/quality.txt
 pycparser==2.21
     # via
@@ -691,7 +691,7 @@ rich==13.6.0
     # via
     #   -r requirements/quality.txt
     #   twine
-rpds-py==0.10.3
+rpds-py==0.10.6
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -710,7 +710,7 @@ semantic-version==2.10.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-drf-extensions
-simplejson==3.19.1
+simplejson==3.19.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
