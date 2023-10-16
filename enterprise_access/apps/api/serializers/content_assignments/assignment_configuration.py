@@ -14,8 +14,9 @@ class AssignmentConfigurationResponseSerializer(serializers.ModelSerializer):
     """
     A read-only Serializer for responding to requests for ``AssignmentConfiguration`` records.
     """
-    # This causes the related SubsidyAccessPolicy to be serialized as a UUID (in the response).
-    subsidy_access_policy = serializers.PrimaryKeyRelatedField(read_only=True)
+    subsidy_access_policy = serializers.SerializerMethodField(
+        help_text="The Assignment-based access policy related to this assignment configuration, if any.",
+    )
 
     class Meta:
         model = AssignmentConfiguration
@@ -26,6 +27,14 @@ class AssignmentConfigurationResponseSerializer(serializers.ModelSerializer):
             'active',
         ]
         read_only_fields = fields
+
+    def get_subsidy_access_policy(self, obj):
+        """
+        Returns a string-ified policy UUID for this assignment configuration, if one exists.
+        """
+        if policy := obj.policy:
+            return str(policy.uuid)
+        return None
 
 
 class AssignmentConfigurationCreateRequestSerializer(serializers.ModelSerializer):

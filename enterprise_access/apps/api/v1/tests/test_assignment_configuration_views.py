@@ -206,12 +206,13 @@ class TestAssignmentConfigurationAuthorizedCRUD(CRUDViewTestMixin, APITest):
         response = self.client.get(detail_url)
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.json() == {
+        expected_config_response = {
             'uuid': str(self.assignment_configuration_existing.uuid),
             'active': True,
             'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
             'subsidy_access_policy': str(self.assigned_learner_credit_policy.uuid),
         }
+        assert response.json() == expected_config_response
 
     @ddt.data(
         # A good admin role, and with a context matching the main testing customer.

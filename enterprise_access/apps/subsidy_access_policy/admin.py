@@ -101,6 +101,19 @@ class BaseSubsidyAccessPolicyMixin(admin.ModelAdmin):
             return None
         return cents_to_usd_string(obj.spend_limit)
 
+    def get_fieldsets(self, request, obj=None):
+        """
+        Render the API serialization only when we're not
+        adding a new policy record.
+        """
+        fieldsets = super().get_fieldsets(request, obj=obj)
+        if obj and not obj._state.adding:  # pylint: disable=protected-access
+            try:
+                return fieldsets + [('Extra', {'fields': ['api_serialized_repr']})]
+            except Exception:  # pylint: disable=broad-except
+                return fieldsets
+        return fieldsets
+
 
 @admin.register(models.PerLearnerEnrollmentCreditAccessPolicy)
 class PerLearnerEnrollmentCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPolicyMixin):
@@ -143,12 +156,6 @@ class PerLearnerEnrollmentCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcc
                     'per_learner_enrollment_limit',
                 ] if not super_admin_enabled() else EVERY_SPEND_LIMIT_FIELD
             }
-        ),
-        (
-            'Extra',
-            {
-                'fields': ['api_serialized_repr'],
-            },
         ),
     ]
 
@@ -199,12 +206,6 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
                 ] if not super_admin_enabled() else EVERY_SPEND_LIMIT_FIELD
             }
         ),
-        (
-            'Extra',
-            {
-                'fields': ['api_serialized_repr'],
-            },
-        ),
     ]
 
     @admin.display(description='Per-learner spend limit (dollars)')
@@ -253,11 +254,5 @@ class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcces
                     'policy_spend_limit_dollars',
                 ] if not super_admin_enabled() else EVERY_SPEND_LIMIT_FIELD
             }
-        ),
-        (
-            'Extra',
-            {
-                'fields': ['api_serialized_repr'],
-            },
         ),
     ]

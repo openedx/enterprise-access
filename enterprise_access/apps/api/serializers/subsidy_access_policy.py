@@ -16,6 +16,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import CENTS_PER_DOL
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 
 from .content_assignments.assignment import LearnerContentAssignmentResponseSerializer
+from .content_assignments.assignment_configuration import AssignmentConfigurationResponseSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,9 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
         # This causes the entire unserialized model to be passed into the nested serializer.
         source='*',
     )
+    assignment_configuration = AssignmentConfigurationResponseSerializer(
+        help_text='AssignmentConfiguration object for this policy.',
+    )
 
     class Meta:
         model = SubsidyAccessPolicy
@@ -127,6 +131,7 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
             'subsidy_expiration_datetime',
             'is_subsidy_active',
             'aggregates',
+            'assignment_configuration',
         ]
         read_only_fields = fields
 
