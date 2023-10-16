@@ -13,6 +13,7 @@ from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
 
+from enterprise_access.apps.content_assignments.tests.factories import AssignmentConfigurationFactory
 from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
@@ -27,6 +28,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
 )
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
+    AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
 )
@@ -281,8 +283,47 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'amount_allocated_usd': 0.00,
                 'spend_available_usd_cents': 2,
                 'spend_available_usd': 0.02,
-            }
+            },
+            'assignment_configuration': None,
         }, response.json())
+
+    @ddt.data(
+        # A good admin role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
+        {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good learner role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
+        {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good operator role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
+        {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+    )
+    def test_assignment_policy_detail_view(self, role_context_dict):
+        """
+        Test that assignment-based policies serialize their related assignment configuration record.
+        """
+        self.set_jwt_cookie([role_context_dict])
+
+        # Create a pair of AssignmentConfiguration + SubsidyAccessPolicy for the main test customer.
+        assignment_configuration = AssignmentConfigurationFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+        )
+        assigned_learner_credit_policy = AssignedLearnerCreditAccessPolicyFactory(
+            display_name='An assigned learner credit policy, for the test customer.',
+            enterprise_customer_uuid=self.enterprise_uuid,
+            active=True,
+            assignment_configuration=assignment_configuration,
+            spend_limit=1000000,
+        )
+
+        policy_kwargs = {'uuid': str(assigned_learner_credit_policy.uuid)}
+        policy_detail_url = reverse('api:v1:subsidy-access-policies-detail', kwargs=policy_kwargs)
+
+        policy_response = self.client.get(policy_detail_url)
+        expected_config_response = {
+            'uuid': str(assignment_configuration.uuid),
+            'active': True,
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'subsidy_access_policy': str(assigned_learner_credit_policy.uuid),
+        }
+        assert policy_response.json()['assignment_configuration'] == expected_config_response
 
     @ddt.data(
         # A good admin role, but for a context/customer that doesn't match anything we're aware of, gets you a 403.
@@ -332,7 +373,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                     'amount_allocated_usd': 0.00,
                     'spend_available_usd_cents': 0,
                     'spend_available_usd': 0.00,
-                }
+                },
+                'assignment_configuration': None,
             },
             {
                 'access_method': 'direct',
@@ -357,7 +399,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                     'amount_allocated_usd': 0.00,
                     'spend_available_usd_cents': 2,
                     'spend_available_usd': 0.02,
-                }
+                },
+                'assignment_configuration': None,
             },
         ]
 
@@ -425,7 +468,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'amount_allocated_usd': 0.00,
                 'spend_available_usd_cents': 2,
                 'spend_available_usd': 0.02,
-            }
+            },
+            'assignment_configuration': None,
         }
         self.assertEqual(expected_response, response.json())
 
@@ -503,7 +547,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'amount_allocated_usd': 0.00,
                 'spend_available_usd_cents': 4,
                 'spend_available_usd': 0.04,
-            }
+            },
+            'assignment_configuration': None,
         }
         self.assertEqual(expected_response, response.json())
 
