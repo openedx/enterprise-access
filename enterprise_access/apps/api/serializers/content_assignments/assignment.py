@@ -43,9 +43,11 @@ class LearnerContentAssignmentRecentActionSerializer(serializers.Serializer):
     action_type = serializers.ChoiceField(
         help_text='Type of the recent action.',
         choices=AssignmentRecentActionTypes.CHOICES,
+        source='recent_action',
     )
     timestamp = serializers.DateTimeField(
         help_text='Date and time when the action was taken.',
+        source='recent_action_time',
     )
 
 
@@ -59,18 +61,6 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
     actions = LearnerContentAssignmentActionSerializer(
         help_text='All actions associated with this assignment.',
         many=True,
-    )
-    recent_action = LearnerContentAssignmentRecentActionSerializer(
-        help_text='Structured data about the most recent action. Meant to power a frontend table column.',
-        source='get_recent_action_data',
-    )
-    learner_state = serializers.ChoiceField(
-        help_text=(
-            'learner_state is an admin-facing dynamic state, not to be confused with `state`. Meant to power a '
-            'frontend table column.'
-        ),
-        choices=AssignmentLearnerStates.CHOICES,
-        source='get_learner_state',
     )
 
     class Meta:
@@ -86,6 +76,32 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
             'transaction_uuid',
             'last_notification_at',
             'actions',
+        ]
+        read_only_fields = fields
+
+
+class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentResponseSerializer):
+    """
+    A read-only Serializer for responding to requests for ``LearnerContentAssignment`` records FOR ADMINS.
+
+    Important: This serializer depends on extra dynamic fields annotated by calling
+    ``LearnerContentAssignment.annotate_dynamic_fields_onto_queryset()`` on the assignment queryset.
+    """
+
+    recent_action = LearnerContentAssignmentRecentActionSerializer(
+        help_text='Structured data about the most recent action. Meant to power a frontend table column.',
+        source='*',
+    )
+    learner_state = serializers.ChoiceField(
+        help_text=(
+            'learner_state is an admin-facing dynamic state, not to be confused with `state`. Meant to power a '
+            'frontend table column.'
+        ),
+        choices=AssignmentLearnerStates.CHOICES,
+    )
+
+    class Meta(LearnerContentAssignmentResponseSerializer.Meta):
+        fields = LearnerContentAssignmentResponseSerializer.Meta.fields + [
             'recent_action',
             'learner_state',
         ]

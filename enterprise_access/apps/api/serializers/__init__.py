@@ -1,7 +1,10 @@
 """
 API serializers module.
 """
-from .content_assignments.assignment import LearnerContentAssignmentResponseSerializer
+from .content_assignments.assignment import (
+    LearnerContentAssignmentAdminResponseSerializer,
+    LearnerContentAssignmentResponseSerializer
+)
 from .content_assignments.assignment_configuration import (
     AssignmentConfigurationCreateRequestSerializer,
     AssignmentConfigurationDeleteRequestSerializer,

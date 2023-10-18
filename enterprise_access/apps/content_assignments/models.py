@@ -294,66 +294,6 @@ class LearnerContentAssignment(TimeStampedModel):
             completed_at=timezone.now(),
         )
 
-    def get_recent_action_data(self):
-        """
-        Return structured data about the most recent action, meant to feed the serializer.
-
-        Recent action can ONLY be one of:
-        * AssignmentRecentActionTypes.REMINDED: Most recent ``reminded`` action.
-        * AssignmentRecentActionTypes.ASSIGNED: Assignment record creation event, if no reminded actions exist.
-
-        Notes:
-        * These are not 1:1 with EITHER the AssignmentAction types, OR internal lifecycle states of assignments.
-          Instead it is a hybrid of both.
-        * This logic duplicates what is performed in annotate_dynamic_fields_onto_queryset() to annotate the
-          `recent_action` and `recent_action_time` fields on an assignment queryset.  We rely on the serializer to
-          function even when the assignment object is not derived from a viewset's get_queryset().
-
-        Returns:
-            dict: {
-                'action_type': <one of AssignmentRecentActionTypes>,
-                'timestamp': <time of recent action>,
-            }
-        """
-        reminded_actions = self.actions.filter(action_type=AssignmentActions.REMINDED)
-        if len(reminded_actions) > 0:
-            recent_action_type = AssignmentRecentActionTypes.REMINDED
-            recent_action_time = reminded_actions.order_by('completed_at').last().completed_at
-        else:
-            recent_action_type = AssignmentRecentActionTypes.ASSIGNED
-            recent_action_time = self.created
-        return {
-            'action_type': recent_action_type,
-            'timestamp': recent_action_time,
-        }
-
-    def get_learner_state(self):
-        """
-        Returns the learner state of this assignment (not to be confused with state).
-
-        Notes:
-        * learner_state is not 1:1 with EITHER the AssignmentAction types, OR internal lifecycle states of assignments.
-          Instead it is a hybrid of both.
-        * This logic duplicates what is performed in annotate_dynamic_fields_onto_queryset() to annotate the
-          `learner_state` field on an assignment queryset.  We rely on the serializer to function even when the
-          assignment object is not derived from a viewset's get_queryset().
-
-        Returns:
-            str: One of AssignmentLearnerStates, or None if the assignment doesn't map to one.
-        """
-        has_notification = bool(LearnerContentAssignmentAction.objects.filter(
-            assignment=self,
-            action_type=AssignmentActions.NOTIFIED,
-        ))
-        if self.state == LearnerContentAssignmentStateChoices.ALLOCATED and not has_notification:
-            return AssignmentLearnerStates.NOTIFYING
-        elif self.state == LearnerContentAssignmentStateChoices.ALLOCATED and has_notification:
-            return AssignmentLearnerStates.WAITING
-        elif self.state == LearnerContentAssignmentStateChoices.ERRORED and has_notification:
-            return AssignmentLearnerStates.FAILED
-        else:
-            return None
-
     @classmethod
     def annotate_dynamic_fields_onto_queryset(cls, queryset):
         """
@@ -366,8 +306,7 @@ class LearnerContentAssignment(TimeStampedModel):
         * recent_action_time (DateTimeField)
 
         Notes:
-        * This class method duplicates the logic found in instance methods get_learner_state() and
-          get_recent_action_data(), but using pure ORM queryset logic instead of in-memory calculations.
+        * In order to use LearnerContentAssignmentAdminResponseSerializer, you must call this method on the queryset.
 
         Args:
             queryset (QuerySet): LearnerContentAssignment queryset, vanilla.

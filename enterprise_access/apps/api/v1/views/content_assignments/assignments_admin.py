@@ -46,7 +46,7 @@ class LearnerContentAssignmentAdminViewSet(
     Viewset supporting all Admin CRUD operations on ``LearnerContentAssignment`` records.
     """
     permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = serializers.LearnerContentAssignmentResponseSerializer
+    serializer_class = serializers.LearnerContentAssignmentAdminResponseSerializer
     authentication_classes = (JwtAuthentication, authentication.SessionAuthentication)
     filter_backends = (filters.NoFilterOnDetailBackend, OrderingFilter)
     filterset_class = filters.LearnerContentAssignmentAdminFilter
@@ -94,7 +94,7 @@ class LearnerContentAssignmentAdminViewSet(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
         summary='Retrieve a content assignment by UUID.',
         responses={
-            status.HTTP_200_OK: serializers.LearnerContentAssignmentResponseSerializer,
+            status.HTTP_200_OK: serializers.LearnerContentAssignmentAdminResponseSerializer,
             status.HTTP_404_NOT_FOUND: None,  # TODO: test that this actually returns 404 instead of 403 on RBAC error.
         },
     )
@@ -120,7 +120,7 @@ class LearnerContentAssignmentAdminViewSet(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
         summary='Cancel an assignment by UUID.',
         responses={
-            status.HTTP_200_OK: serializers.LearnerContentAssignmentResponseSerializer,
+            status.HTTP_200_OK: serializers.LearnerContentAssignmentAdminResponseSerializer,
             status.HTTP_404_NOT_FOUND: None,
             status.HTTP_422_UNPROCESSABLE_ENTITY: None,
         },
@@ -150,7 +150,7 @@ class LearnerContentAssignmentAdminViewSet(
             # Serialize the assignment object obtained via get_queryset() instead of the one from the assignments_api.
             # Only the former has the additional dynamic fields annotated, and those are required for serialization.
             assignment_to_cancel.refresh_from_db()
-            response_serializer = serializers.LearnerContentAssignmentResponseSerializer(assignment_to_cancel)
+            response_serializer = serializers.LearnerContentAssignmentAdminResponseSerializer(assignment_to_cancel)
             return Response(response_serializer.data, status=status.HTTP_200_OK)
         else:
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)

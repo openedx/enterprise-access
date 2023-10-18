@@ -593,11 +593,6 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
                 }
                 for action in self.requester_assignment_accepted.actions.order_by('completed_at')
             ],
-            'recent_action': {
-                'action_type': AssignmentRecentActionTypes.ASSIGNED,
-                'timestamp': self.requester_assignment_accepted.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
-            },
-            'learner_state': None,
         }
 
     def test_retrieve_other_assignment_not_found(self):
