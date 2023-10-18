@@ -142,6 +142,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'state': LearnerContentAssignmentStateChoices.ERRORED,
                     'transaction_uuid': None,
                     'uuid': str(self.alice_assignment.uuid),
+                    'actions': [],
                 },
             ],
             'created': [
@@ -155,6 +156,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
                     'transaction_uuid': None,
                     'uuid': str(self.bob_assignment.uuid),
+                    'actions': [],
                 },
             ],
             'no_change': [
@@ -168,6 +170,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
                     'transaction_uuid': None,
                     'uuid': str(self.carol_assignment.uuid),
+                    'actions': [],
                 },
             ],
         }
@@ -323,6 +326,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
 
     def setUp(self):
         super().setUp()
+        self.maxDiff = None
 
         self.enterprise_uuid = OTHER_TEST_ENTERPRISE_UUID
 
@@ -396,6 +400,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
                     'transaction_uuid': None,
                     'uuid': str(new_allocation.uuid),
+                    'actions': [],
                 },
             ],
             'no_change': [],

@@ -61,6 +61,10 @@ class LearnerContentAssignmentViewSet(
         """
         A base queryset to list or retrieve ``LearnerContentAssignment`` records.  In this viewset, only the assignments
         assigned to the requester are returned.
+
+        Unlike in LearnerContentAssignmentAdminViewSet, here we are not going to annotate the extra dynamic fields using
+        `annotate_dynamic_fields_onto_queryset()`, so we will NOT serialize `learner_state` and `recent_action` for each
+        assignment.
         """
         return LearnerContentAssignment.objects.filter(
             learner_email=self.requesting_user_email,

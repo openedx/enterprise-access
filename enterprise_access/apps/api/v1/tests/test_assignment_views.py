@@ -7,7 +7,11 @@ import ddt
 from rest_framework import status
 from rest_framework.reverse import reverse
 
-from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.content_assignments.constants import (
+    AssignmentLearnerStates,
+    AssignmentRecentActionTypes,
+    LearnerContentAssignmentStateChoices
+)
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
 from enterprise_access.apps.content_assignments.tests.factories import (
     AssignmentConfigurationFactory,
@@ -91,6 +95,8 @@ class CRUDViewTestMixin:
             transaction_uuid=None,
             assignment_configuration=self.assignment_configuration,
         )
+        self.assignment_allocated_post_link.add_successful_linked_action()
+        self.assignment_allocated_post_link.add_successful_notified_action()
 
         # This assignment has been accepted by the learner (state=accepted), AND the assigned learner is the requester.
         self.requester_assignment_accepted = LearnerContentAssignmentFactory(
@@ -100,6 +106,8 @@ class CRUDViewTestMixin:
             transaction_uuid=uuid4(),
             assignment_configuration=self.assignment_configuration,
         )
+        self.requester_assignment_accepted.add_successful_linked_action()
+        self.requester_assignment_accepted.add_successful_notified_action()
 
         # This assignment has been accepted by the learner (state=accepted), AND the assigned learner is not the
         # requester.
@@ -109,6 +117,8 @@ class CRUDViewTestMixin:
             transaction_uuid=uuid4(),
             assignment_configuration=self.assignment_configuration,
         )
+        self.assignment_accepted.add_successful_linked_action()
+        self.assignment_accepted.add_successful_notified_action()
 
         # This assignment has been cancelled (state=cancelled), AND the assigned learner is the requester.
         self.requester_assignment_cancelled = LearnerContentAssignmentFactory(
@@ -118,6 +128,8 @@ class CRUDViewTestMixin:
             transaction_uuid=uuid4(),
             assignment_configuration=self.assignment_configuration,
         )
+        self.requester_assignment_cancelled.add_successful_linked_action()
+        self.requester_assignment_cancelled.add_successful_notified_action()
 
         # This assignment has been cancelled (state=cancelled), AND the assigned learner is not the requester.
         self.assignment_cancelled = LearnerContentAssignmentFactory(
@@ -126,6 +138,8 @@ class CRUDViewTestMixin:
             transaction_uuid=uuid4(),
             assignment_configuration=self.assignment_configuration,
         )
+        self.assignment_cancelled.add_successful_linked_action()
+        self.assignment_cancelled.add_successful_notified_action()
 
         # This assignment encountered a system error (state=errored), AND the assigned learner is the requester.
         self.requester_assignment_errored = LearnerContentAssignmentFactory(
@@ -135,6 +149,9 @@ class CRUDViewTestMixin:
             transaction_uuid=uuid4(),
             assignment_configuration=self.assignment_configuration,
         )
+        linked_action, _ = self.assignment_cancelled.add_successful_linked_action()
+        linked_action.error_reason = 'Phony error reason.'
+        linked_action.save()
 
         ###
         # Below are additional assignments pertaining to a completely different customer than the main test customer.
@@ -322,6 +339,20 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             'lms_user_id': None,
             'state': LearnerContentAssignmentStateChoices.ALLOCATED,
             'transaction_uuid': self.assignment_allocated_pre_link.transaction_uuid,
+            'actions': [
+                {
+                    'uuid': str(action.uuid),
+                    'action_type': action.action_type,
+                    'completed_at': action.completed_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    'error_reason': None,
+                }
+                for action in self.assignment_allocated_pre_link.actions.order_by('completed_at')
+            ],
+            'recent_action': {
+                'action_type': AssignmentRecentActionTypes.ASSIGNED,
+                'timestamp': self.assignment_allocated_pre_link.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+            },
+            'learner_state': AssignmentLearnerStates.NOTIFYING,
         }
 
     @ddt.data(
@@ -349,6 +380,110 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         )
         expected_assignment_uuids = {assignment.uuid for assignment in expected_assignments_for_enterprise_customer}
         actual_assignment_uuids = {UUID(assignment['uuid']) for assignment in response.json()['results']}
+        assert actual_assignment_uuids == expected_assignment_uuids
+
+    @ddt.data(
+        None,
+        'recent_action_time',
+        '-recent_action_time',
+    )
+    def test_list_ordering_recent_action_time(self, ordering_key):
+        """
+        Test that the list view returns objects in the correct order when recent_action_time is the ordering key.  Also
+        check that when no ordering parameter is supplied, the default ordering uses recent_action_time.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+            'context': str(TEST_ENTERPRISE_UUID),
+        }])
+
+        # Add reminder action to perturb the output ordering:
+        self.assignment_allocated_post_link.add_successful_reminded_action()
+
+        # Add non-reminder actions to another assignment to make sure it does NOT perturb the output ordering.
+        self.assignment_allocated_pre_link.add_successful_linked_action()
+        self.assignment_allocated_pre_link.add_successful_notified_action()
+
+        query_params = None
+        if ordering_key:
+            query_params = {'ordering': ordering_key}
+
+        # Send a list request for all Assignments for the main test customer, optionally with a specific ordering.
+        response = self.client.get(ADMIN_ASSIGNMENTS_LIST_ENDPOINT, data=query_params)
+
+        # Explicitly define the REVERSE order of assignments returned by the list view.  This should be the order if
+        # ?ordering=+recent_action_time
+        recent_action_time_ordering = [
+            # First 6 assignments oredered by their creation time.
+            self.assignment_allocated_pre_link,  # Still chronologically first, despite recent non-reminder actions.
+            self.requester_assignment_accepted,
+            self.assignment_accepted,
+            self.requester_assignment_cancelled,
+            self.assignment_cancelled,
+            self.requester_assignment_errored,
+            # This assignment was created first, but is knocked to the end of the list because we added a reminded
+            # action most recently.
+            self.assignment_allocated_post_link,
+        ]
+        expected_assignments_ordering = None
+        if not ordering_key or ordering_key.startswith('-'):
+            # The default ordering is reversed of chronological order.
+            expected_assignments_ordering = reversed(recent_action_time_ordering)
+        else:
+            # Ordering is chronological IFF ?ordering=recent_action_time
+            expected_assignments_ordering = recent_action_time_ordering
+        expected_assignment_uuids = [assignment.uuid for assignment in expected_assignments_ordering]
+        actual_assignment_uuids = [UUID(assignment['uuid']) for assignment in response.json()['results']]
+        assert actual_assignment_uuids == expected_assignment_uuids
+
+    @ddt.data(
+        'learner_state_sort_order',
+        '-learner_state_sort_order',
+    )
+    def test_list_ordering_learner_state_sort_order(self, ordering_key):
+        """
+        Test that the list view returns objects in the correct order when learner_state_sort_order is the ordering key.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+            'context': str(TEST_ENTERPRISE_UUID),
+        }])
+
+        query_params = None
+        if ordering_key:
+            query_params = {'ordering': ordering_key}
+
+        # Send a list request for all Assignments for the main test customer, optionally with a specific ordering.
+        response = self.client.get(ADMIN_ASSIGNMENTS_LIST_ENDPOINT, data=query_params)
+
+        list_response_ordering = [
+            # First, list allocated, non-notified assignments.
+            self.assignment_allocated_pre_link,
+            # Then, list allocated, notified assignments.
+            self.assignment_allocated_post_link,
+            # Then, list errored assignments.
+            self.requester_assignment_errored,
+
+            # No need to test sort order of accepted and cancelled assignments since they are not displayed.
+            # self.assignment_accepted,
+            # self.requester_assignment_accepted,
+            # self.requester_assignment_cancelled,
+            # self.assignment_cancelled,
+        ]
+        expected_assignments_ordering = list_response_ordering
+        if ordering_key.startswith('-'):
+            # The default ordering is reversed of chronological order.
+            expected_assignments_ordering = reversed(list_response_ordering)
+        expected_assignment_uuids = [assignment.uuid for assignment in expected_assignments_ordering]
+        actual_assignment_uuids = [
+            UUID(assignment['uuid'])
+            for assignment in response.json()['results']
+            # Only gather the assignments with the states under test from the response.
+            if assignment['state'] in (
+                LearnerContentAssignmentStateChoices.ALLOCATED,
+                LearnerContentAssignmentStateChoices.ERRORED,
+            )
+        ]
         assert actual_assignment_uuids == expected_assignment_uuids
 
     def test_cancel(self):
@@ -449,6 +584,15 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             'lms_user_id': self.requester_assignment_accepted.lms_user_id,
             'state': LearnerContentAssignmentStateChoices.ACCEPTED,
             'transaction_uuid': str(self.requester_assignment_accepted.transaction_uuid),
+            'actions': [
+                {
+                    'uuid': str(action.uuid),
+                    'action_type': action.action_type,
+                    'completed_at': str(action.completed_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ')),
+                    'error_reason': None,
+                }
+                for action in self.requester_assignment_accepted.actions.order_by('completed_at')
+            ],
         }
 
     def test_retrieve_other_assignment_not_found(self):
@@ -480,7 +624,7 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
     )
     def test_list(self, role_context_dict):
         """
-        Test that the list view returns a 200 response code and the expected (list) results of serialization..
+        Test that the list view returns a 200 response code and the expected (list) results of serialization.
 
         This also tests that only Assignments for the requesting user are returned.
         """

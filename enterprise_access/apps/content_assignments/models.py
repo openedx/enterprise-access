@@ -5,12 +5,21 @@ from uuid import UUID, uuid4
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
+from django.db.models import Case, Exists, F, Max, OuterRef, Q, Value, When
+from django.db.models.fields import BooleanField, CharField, DateTimeField, IntegerField
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_create_with_history, bulk_update_with_history
 
-from .constants import AssignmentActionErrors, AssignmentActions, LearnerContentAssignmentStateChoices
+from .constants import (
+    AssignmentActionErrors,
+    AssignmentActions,
+    AssignmentLearnerStates,
+    AssignmentRecentActionTypes,
+    LearnerContentAssignmentStateChoices
+)
 
 BULK_OPERATION_BATCH_SIZE = 50
 
@@ -284,6 +293,105 @@ class LearnerContentAssignment(TimeStampedModel):
             action_type=AssignmentActions.REMINDED,
             completed_at=timezone.now(),
         )
+
+    @classmethod
+    def annotate_dynamic_fields_onto_queryset(cls, queryset):
+        """
+        Annotate extra dynamic fields used by this viewset for DRF-supported ordering and filtering.
+
+        Fields added:
+        * learner_state (CharField)
+        * learner_state_sort_order (IntegerField)
+        * recent_action (CharField)
+        * recent_action_time (DateTimeField)
+
+        Notes:
+        * In order to use LearnerContentAssignmentAdminResponseSerializer, you must call this method on the queryset.
+
+        Args:
+            queryset (QuerySet): LearnerContentAssignment queryset, vanilla.
+
+        Returns:
+            QuerySet: LearnerContentAssignment queryset, same objects but with extra fields annotated.
+        """
+        # Annotate a derived field ``recent_action_time`` using pure ORM so that we can order_by() it later.
+        # ``recent_action_time`` is defined as the time of the most recent reminder, and falls back to assignment
+        # creation time if there are no reminders.
+        new_queryset = queryset.annotate(
+            recent_action_time=Coalesce(
+                # Time of most recent reminder.
+                Max('actions__completed_at', filter=Q(actions__action_type=AssignmentActions.REMINDED)),
+                # Fallback to created time.
+                F('created'),
+                # Coerce CreationDateTimeField into a compatible field.
+                output_field=DateTimeField(),
+            )
+        )
+
+        # Annotate a derived field ``recent_action``
+        new_queryset = new_queryset.annotate(
+            has_reminded=Exists(
+                LearnerContentAssignmentAction.objects.filter(
+                    assignment=OuterRef('uuid'),
+                    action_type=AssignmentActions.REMINDED,
+                )
+            )
+        ).annotate(
+            recent_action=Case(
+                When(has_reminded=False, then=Value(AssignmentRecentActionTypes.ASSIGNED)),
+                When(has_reminded=True, then=Value(AssignmentRecentActionTypes.REMINDED)),
+                output_field=BooleanField(),
+            )
+        )
+
+        # Annotate a derived field ``learner_state`` using pure ORM so that we do not need to store it as duplicate
+        # source-of-truth data in the database.  This improves system integrity within production while simultaneously
+        # increasing analytics complexity downstream of production.
+        new_queryset = new_queryset.annotate(
+            # Step 1 is to add a dynamic field representing whether the learner has been successfully notified.
+            has_notification=Exists(
+                LearnerContentAssignmentAction.objects.filter(
+                    assignment=OuterRef('uuid'),
+                    action_type=AssignmentActions.NOTIFIED,
+                )
+            )
+        ).annotate(
+            learner_state=Case(
+                When(
+                    Q(state=LearnerContentAssignmentStateChoices.ALLOCATED) & Q(has_notification=False),
+                    then=Value(AssignmentLearnerStates.NOTIFYING),
+                ),
+                When(
+                    Q(state=LearnerContentAssignmentStateChoices.ALLOCATED) & Q(has_notification=True),
+                    then=Value(AssignmentLearnerStates.WAITING),
+                ),
+                When(
+                    Q(state=LearnerContentAssignmentStateChoices.ERRORED),
+                    then=Value(AssignmentLearnerStates.FAILED),
+                ),
+                # `accepted` and `cancelled` assignments will serialize with a NULL learner_state. This has no UX impact
+                # because those two states aren't displayed anyway.
+                default=None,
+                output_field=CharField()
+            )
+        )
+
+        # Annotate a derived field ``learner_state_sort_order`` using pure ORM so that we can order_by() it later.  It
+        # ostensibly sorts assignment lifecycle states, but has one additional trick up its sleeve: allocated
+        # assignments are further sorted by not-notified first, then notified last.
+        learner_state_sort_order_cases = [
+            When(learner_state=learner_state, then=Value(sort_order))
+            for sort_order, learner_state in enumerate(AssignmentLearnerStates.SORT_ORDER)
+        ]
+        new_queryset = new_queryset.annotate(
+            learner_state_sort_order=Case(
+                *learner_state_sort_order_cases,
+                default=Value(999),  # Anything that isn't a learner state gets sorted last.
+                output_field=IntegerField(),
+            )
+        )
+
+        return new_queryset
 
 
 class LearnerContentAssignmentAction(TimeStampedModel):
