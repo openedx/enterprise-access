@@ -46,4 +46,5 @@ class LearnerContentAssignmentFactory(factory.django.DjangoModelFactory):
     learner_email = factory.LazyAttribute(lambda _: FAKER.email())
     lms_user_id = factory.LazyAttribute(lambda _: FAKER.pyint())
     content_key = factory.LazyAttribute(lambda _: random_content_key())
+    content_title = factory.LazyAttribute(lambda _: f'{FAKER.word()}: a master class')
     content_quantity = factory.LazyAttribute(lambda _: FAKER.pyint())
