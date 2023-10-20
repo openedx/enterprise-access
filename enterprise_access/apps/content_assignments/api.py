@@ -8,6 +8,9 @@ import logging
 from typing import Iterable
 
 from django.db.models import Sum
+from opaque_keys import InvalidKeyError
+from opaque_keys.edx.keys import CourseKey
+from opaque_keys.edx.locator import CourseLocator
 
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
 
@@ -52,21 +55,114 @@ def get_assignments_for_configuration(
     return queryset
 
 
-def get_assignments_by_learner_email_and_content(
+def get_assignments_for_admin(
     assignment_configuration,
     learner_emails,
     content_key,
 ):
     """
-    Returns a queryset of all ``LearnerContentAssignment`` records
-    in the given assignment configuration for the provided list
-    of learner_emails and the given content_key.
+    Get any existing allocations relevant to an enterprise admin's allocation request.
+
+    Method of content_key comparison for assignment lookup:
+
+    +---+------------------------+-----------------------+--------------------+
+    | # | assignment content_key | requested content_key |  How to compare?   |
+    +---+------------------------+-----------------------+--------------------+
+    | 1 | course                 | course                | Simple comparison. |
+    | 2 | course                 | course run            | Not supported.     |
+    | 3 | course run             | course                | Not supported.     |
+    | 4 | course run             | course run            | Not supported.     |
+    +---+------------------------+-----------------------+--------------------+
+
+    Args:
+        assignment_configuration (AssignmentConfiguration):
+            The assignment configuration within which to search for assignments.
+        learner_emails (list of str): A list of emails for which the admin intends to find existing assignments.
+        content_key (str): A content key representing a course which the assignments are for.
+
+    Returns:
+        queryset of ``LearnerContentAssignment``: Existing records relevant to an admin's allocation request.
     """
     return get_assignments_for_configuration(
         assignment_configuration,
         learner_email__in=learner_emails,
         content_key=content_key,
     )
+
+
+def _get_course_key_from_locator(course_locator: CourseLocator) -> str:
+    """
+    Given a CourseLocator, construct a course key.
+    """
+    return f'{course_locator.org}+{course_locator.course}'
+
+
+def _normalize_course_key(course_key_str: str) -> str:
+    """
+    Given a course key string without without a namespace prefix, construct a course key without one.  This matches what
+    we expect to always be stored in assignments.
+    """
+    if course_key_str.startswith(CourseLocator.CANONICAL_NAMESPACE):
+        return course_key_str[len(CourseLocator.CANONICAL_NAMESPACE) + 1:]
+    else:
+        return course_key_str
+
+
+def get_assignment_for_learner(
+    assignment_configuration,
+    lms_user_id,
+    content_key,
+):
+    """
+    Get any existing allocations relevant to a learner's redemption request.
+
+    There's no guarantee that the given `content_key` and the assignment object's `content_key` are both course keys or
+    both course run keys, so a simple string comparison may not always suffice.  Method of content_key comparison for
+    assignment lookup:
+
+    +---+------------------------+-----------------------+----------------------------------------------+
+    | # | assignment content_key | requested content_key |              How to compare?                 |
+    +---+------------------------+-----------------------+----------------------------------------------+
+    | 1 | course                 | course                | Simple comparison.                           |
+    | 2 | course                 | course run            | Convert everything to courses, then compare. | (most common)
+    | 3 | course run             | course                | Not supported.                               |
+    | 4 | course run             | course run            | Not supported.                               |
+    +---+------------------------+-----------------------+----------------------------------------------+
+
+    Args:
+        assignment_configuration (AssignmentConfiguration):
+            The assignment configuration within which to search for assignments.
+        lms_user_id (int): One lms_user_id which the assignments are for.
+        content_key (str): A content key representing a course which the assignments are for.
+
+    Returns:
+        ``LearnerContentAssignment``: Existing assignment relevant to a learner's redemption request, or None if not
+        found.
+
+    Raises:
+        ``django.core.exceptions.MultipleObjectsReturned``: This should be impossible because of a db-level uniqueness
+        constraint across [assignment_configuration,lms_user_id,content_key].  BUT still technically possible if
+        internal staff managed to create a duplicate assignment configuration for a single enterprise.
+    """
+    content_key_to_match = None
+    # Whatever the requested content_key is, normalize it to a course with no namespace prefix.
+    try:
+        requested_course_run_locator = CourseKey.from_string(content_key)
+        # No exception raised, content_key represents a course run, so convert it to a course.
+        content_key_to_match = _get_course_key_from_locator(requested_course_run_locator)
+    except InvalidKeyError:
+        # Either the key was already a course key (no problem), or it was something else (weird).
+        content_key_to_match = _normalize_course_key(content_key)
+    queryset = LearnerContentAssignment.objects.select_related('assignment_configuration')
+    try:
+        return queryset.get(
+            assignment_configuration=assignment_configuration,
+            lms_user_id=lms_user_id,
+            # assignment content_key is assumed to always be a course with no namespace prefix.
+            content_key=content_key_to_match,
+        )
+    except LearnerContentAssignment.DoesNotExist:
+        return None
 
 
 def get_allocated_quantity_for_configuration(assignment_configuration):
@@ -123,7 +219,7 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     content_quantity = content_price_cents * -1
 
     # Fetch any existing assignments for all pairs of (learner, content) in this assignment config.
-    existing_assignments = get_assignments_by_learner_email_and_content(
+    existing_assignments = get_assignments_for_admin(
         assignment_configuration,
         learner_emails,
         content_key,
