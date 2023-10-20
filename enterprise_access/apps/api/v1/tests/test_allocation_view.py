@@ -54,6 +54,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
         super().setUpTestData()
         cls.enterprise_uuid = TEST_ENTERPRISE_UUID
         cls.content_key = 'course-v1:edX+edXPrivacy101+3T2020'
+        cls.content_title = 'edx: Privacy 101'
 
         # Create a pair of AssignmentConfiguration + SubsidyAccessPolicy for the main test customer.
         cls.assignment_configuration = AssignmentConfigurationFactory(
@@ -72,6 +73,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             learner_email='alice@foo.com',
             lms_user_id=None,
             content_key=cls.content_key,
+            content_title=cls.content_title,
             content_quantity=-123,
             state=LearnerContentAssignmentStateChoices.ERRORED,
         )
@@ -80,6 +82,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             learner_email='bob@foo.com',
             lms_user_id=None,
             content_key=cls.content_key,
+            content_title=cls.content_title,
             content_quantity=-456,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )
@@ -88,6 +91,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             learner_email='carol@foo.com',
             lms_user_id=None,
             content_key=cls.content_key,
+            content_title=cls.content_title,
             content_quantity=-789,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )
@@ -137,6 +141,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'learner_email': 'alice@foo.com',
                     'lms_user_id': None,
                     'content_key': self.content_key,
+                    'content_title': self.content_title,
                     'content_quantity': -123,
                     'last_notification_at': None,
                     'state': LearnerContentAssignmentStateChoices.ERRORED,
@@ -151,6 +156,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'learner_email': 'bob@foo.com',
                     'lms_user_id': None,
                     'content_key': self.content_key,
+                    'content_title': self.content_title,
                     'content_quantity': -456,
                     'last_notification_at': None,
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
@@ -165,6 +171,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'learner_email': 'carol@foo.com',
                     'lms_user_id': None,
                     'content_key': self.content_key,
+                    'content_title': self.content_title,
                     'content_quantity': -789,
                     'last_notification_at': None,
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
@@ -311,6 +318,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         super().setUpTestData()
         cls.enterprise_uuid = OTHER_TEST_ENTERPRISE_UUID
         cls.content_key = 'course-v1:edX+edXPrivacy101+3T2020'
+        cls.content_title = 'edX: Privacy 101'
 
         # Create a pair of AssignmentConfiguration + SubsidyAccessPolicy for the main test customer.
         cls.assignment_configuration = AssignmentConfigurationFactory(
@@ -356,8 +364,13 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     @mock.patch.object(
         AssignedLearnerCreditAccessPolicy, 'aggregates_for_policy', autospec=True,
     )
+    @mock.patch(
+        'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
+        return_value=mock.MagicMock(),
+    )
     def test_allocate_happy_path_e2e(
         self,
+        mock_get_and_cache_content_metadata,
         mock_aggregates_for_policy,
         mock_subsidy_balance,
         mock_is_subsidy_active,
@@ -367,6 +380,9 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         Tests that the allocate view does the underlying checks and creates
         assignment records as we'd expect.
         """
+        mock_get_and_cache_content_metadata.return_value = {
+            'title': self.content_title,
+        }
         mock_aggregates_for_policy.return_value = {
             'total_quantity': -100 * 100,
         }
@@ -395,6 +411,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
                     'learner_email': 'new@foo.com',
                     'lms_user_id': None,
                     'content_key': self.content_key,
+                    'content_title': self.content_title,
                     'content_quantity': -123.45 * 100,
                     'last_notification_at': None,
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
@@ -619,8 +636,13 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         'enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient',
         return_value=mock.MagicMock(),
     )
+    @mock.patch(
+        'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
+        return_value=mock.MagicMock(),
+    )
     def test_allocate_too_much_existing_allocation_e2e(
         self,
+        mock_get_and_cache_content_metadata,  # pylint: disable=unused-argument
         mock_lms_api_client,
         mock_is_subsidy_active,  # pylint: disable=unused-argument
         mock_catalog_inclusion,  # pylint: disable=unused-argument

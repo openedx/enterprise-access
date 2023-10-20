@@ -12,6 +12,8 @@ from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import CourseLocator
 
+from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
+
 from .constants import LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
 
@@ -281,16 +283,29 @@ def _update_and_refresh_assignments(assignment_records, fields_changed):
     )
 
 
+def _get_content_title(assignment_configuration, content_key):
+    """
+    Helper to retrieve (from cache) the title of a content_key'ed content_metadata
+    """
+    content_metadata = get_and_cache_content_metadata(
+        assignment_configuration.enterprise_customer_uuid,
+        content_key,
+    )
+    return content_metadata['title']
+
+
 def _create_new_assignments(assignment_configuration, learner_emails, content_key, content_quantity):
     """
     Helper to bulk save new LearnerContentAssignment instances.
     """
     assignments_to_create = []
     for learner_email in learner_emails:
+        content_title = _get_content_title(assignment_configuration, content_key)
         assignment = LearnerContentAssignment(
             assignment_configuration=assignment_configuration,
             learner_email=learner_email,
             content_key=content_key,
+            content_title=content_title,
             content_quantity=content_quantity,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )

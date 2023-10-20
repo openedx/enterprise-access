@@ -1,6 +1,8 @@
 """
 Tests for the ``api.py`` module of the content_assignments app.
 """
+from unittest import mock
+
 import ddt
 from django.test import TestCase
 
@@ -208,20 +210,29 @@ class TestContentAssignmentApi(TestCase):
                 content_price_cents,
             )
 
-    def test_allocate_assignments_happy_path(self):
+    @mock.patch(
+        'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
+        return_value=mock.MagicMock(),
+    )
+    def test_allocate_assignments_happy_path(self, mock_get_and_cache_content_metadata):
         """
         Tests the allocation of new assignments against a given configuration.
         """
         content_key = 'demoX'
+        content_title = 'edx: Demo 101'
         content_price_cents = 100
         learners_to_assign = [
             f'{name}@foo.com' for name in ('alice', 'bob', 'carol', 'david', 'eugene')
         ]
+        mock_get_and_cache_content_metadata.return_value = {
+            'title': content_title,
+        }
 
         allocated_assignment = LearnerContentAssignmentFactory.create(
             assignment_configuration=self.assignment_configuration,
             learner_email='alice@foo.com',
             content_key=content_key,
+            content_title=content_title,
             content_quantity=-content_price_cents,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )
@@ -229,6 +240,7 @@ class TestContentAssignmentApi(TestCase):
             assignment_configuration=self.assignment_configuration,
             learner_email='bob@foo.com',
             content_key=content_key,
+            content_title=content_title,
             content_quantity=-content_price_cents,
             state=LearnerContentAssignmentStateChoices.ACCEPTED,
         )
@@ -236,6 +248,7 @@ class TestContentAssignmentApi(TestCase):
             assignment_configuration=self.assignment_configuration,
             learner_email='carol@foo.com',
             content_key=content_key,
+            content_title=content_title,
             content_quantity=-200,
             state=LearnerContentAssignmentStateChoices.CANCELLED,
         )
@@ -243,6 +256,7 @@ class TestContentAssignmentApi(TestCase):
             assignment_configuration=self.assignment_configuration,
             learner_email='david@foo.com',
             content_key=content_key,
+            content_title=content_title,
             content_quantity=-200,
             state=LearnerContentAssignmentStateChoices.ERRORED,
         )
@@ -286,6 +300,7 @@ class TestContentAssignmentApi(TestCase):
         self.assertEqual(created_assignment.assignment_configuration, self.assignment_configuration)
         self.assertEqual(created_assignment.learner_email, 'eugene@foo.com')
         self.assertEqual(created_assignment.content_key, content_key)
+        self.assertEqual(created_assignment.content_title, content_title)
         self.assertEqual(created_assignment.content_quantity, -1 * content_price_cents)
         self.assertEqual(created_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
 

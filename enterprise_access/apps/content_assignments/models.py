@@ -142,6 +142,14 @@ class LearnerContentAssignment(TimeStampedModel):
             "ContentMetadata.content_key in enterprise-catalog."
         ),
     )
+    content_title = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text=(
+            "The ContentMetadata.title from content corresponding to the content_key"
+        ),
+    )
     content_quantity = models.BigIntegerField(
         null=False,
         blank=False,

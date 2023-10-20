@@ -71,6 +71,7 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
             'learner_email',
             'lms_user_id',
             'content_key',
+            'content_title',
             'content_quantity',
             'state',
             'transaction_uuid',
