@@ -1,6 +1,7 @@
 """
 Tests for the ``api.py`` module of the content_assignments app.
 """
+import ddt
 from django.test import TestCase
 
 from ..api import (
@@ -8,6 +9,7 @@ from ..api import (
     allocate_assignments,
     cancel_assignments,
     get_allocated_quantity_for_configuration,
+    get_assignment_for_learner,
     get_assignments_for_configuration
 )
 from ..constants import LearnerContentAssignmentStateChoices
@@ -15,6 +17,7 @@ from ..models import AssignmentConfiguration
 from .factories import LearnerContentAssignmentFactory
 
 
+@ddt.ddt
 class TestContentAssignmentApi(TestCase):
     """
     Tests functions of the ``content_assignment.api`` module.
@@ -24,6 +27,7 @@ class TestContentAssignmentApi(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.assignment_configuration = AssignmentConfiguration.objects.create()
+        cls.other_assignment_configuration = AssignmentConfiguration.objects.create()
 
     def test_get_assignments_for_configuration(self):
         """
@@ -81,6 +85,83 @@ class TestContentAssignmentApi(TestCase):
                 sorted(actual_assignments, key=lambda record: record.uuid),
                 sorted(expected_assignments[filter_state], key=lambda record: record.uuid),
             )
+
+    @ddt.data(
+        # Standard happy path.
+        {
+            'assignment_content_key': 'test+course',
+            'assignment_lms_user_id': 1,
+            'request_default_assignment_configuration': True,
+            'request_lms_user_id': 1,
+            'request_content_key': 'course-v1:test+course+run',
+            'expect_assignment_found': True,
+        },
+        # Happy path, requested content is a course (with prefix).
+        {
+            'assignment_content_key': 'test+course',
+            'assignment_lms_user_id': 1,
+            'request_default_assignment_configuration': True,
+            'request_lms_user_id': 1,
+            'request_content_key': 'course-v1:test+course',  # This is a course! With a prefix!
+            'expect_assignment_found': True,
+        },
+        # Happy path, requested content is a course (without prefix).
+        {
+            'assignment_content_key': 'test+course',
+            'assignment_lms_user_id': 1,
+            'request_default_assignment_configuration': True,
+            'request_lms_user_id': 1,
+            'request_content_key': 'test+course',  # This is a course! Without a prefix!
+            'expect_assignment_found': True,
+        },
+        # Different lms_user_id.
+        {
+            'assignment_content_key': 'test+course',
+            'assignment_lms_user_id': 1,
+            'request_default_assignment_configuration': True,
+            'request_lms_user_id': 2,  # Different lms_user_id!
+            'request_content_key': 'test+course',
+            'expect_assignment_found': False,
+        },
+        # Different customer.
+        {
+            'assignment_content_key': 'test+course',
+            'assignment_lms_user_id': 1,
+            'request_default_assignment_configuration': False,  # Different customer!
+            'request_lms_user_id': 1,
+            'request_content_key': 'test+course',
+            'expect_assignment_found': False,
+        },
+    )
+    @ddt.unpack
+    def test_get_assignment_for_learner(
+        self,
+        assignment_content_key,
+        assignment_lms_user_id,
+        request_default_assignment_configuration,
+        request_lms_user_id,
+        request_content_key,
+        expect_assignment_found,
+    ):
+        """
+        Test get_assignment_for_learner().
+        """
+        LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            content_key=assignment_content_key,
+            lms_user_id=assignment_lms_user_id,
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+        )
+        actual_assignment = get_assignment_for_learner(
+            (
+                self.assignment_configuration
+                if request_default_assignment_configuration
+                else self.other_assignment_configuration
+            ),
+            request_lms_user_id,
+            request_content_key,
+        )
+        assert (actual_assignment is not None) == expect_assignment_found
 
     def test_get_allocated_quantity_for_configuration(self):
         """

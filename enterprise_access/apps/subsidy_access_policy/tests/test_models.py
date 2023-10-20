@@ -12,11 +12,16 @@ from django.core.cache import cache as django_cache
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 
+from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
+from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_CONTENT_NOT_IN_CATALOG,
+    REASON_LEARNER_ASSIGNMENT_CANCELLED,
+    REASON_LEARNER_ASSIGNMENT_FAILED,
     REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
     REASON_LEARNER_MAX_SPEND_REACHED,
+    REASON_LEARNER_NOT_ASSIGNED_CONTENT,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     REASON_POLICY_EXPIRED,
@@ -91,7 +96,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
     """ SubsidyAccessPolicy model tests. """
 
     lms_user_id = 12345
-    course_id = 'course-v1:DemoX:2T2023'
+    course_id = 'course-v1:DemoX+flossing'
 
     @classmethod
     def setUpClass(cls):
@@ -714,7 +719,8 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
     """ Tests specific to the assigned learner credit type of access policy. """
 
     lms_user_id = 12345
-    content_key = 'course-v1:DemoX:2T2023'
+    course_key = 'DemoX+flossing'
+    course_run_key = 'course-v1:DemoX+flossing+2T2023'
 
     def setUp(self):
         """
@@ -723,12 +729,12 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         """
         super().setUp()
 
-        assignments_api_patcher = patch(
+        self.assignments_api_patcher = patch(
             'enterprise_access.apps.subsidy_access_policy.models.assignments_api',
             autospec=True,
         )
-        self.mock_assignments_api = assignments_api_patcher.start()
-        self.addCleanup(assignments_api_patcher.stop)
+        self.mock_assignments_api = self.assignments_api_patcher.start()
+        self.addCleanup(self.assignments_api_patcher.stop)
 
     @classmethod
     def setUpClass(cls):
@@ -785,12 +791,72 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
 
         self.assertEqual(policy.access_method, AccessMethods.ASSIGNED)
 
-    def test_can_redeem(self):
+    @ddt.data(
+        # Happy path, assignment exists and state='allocated'.
+        {
+            'assignment_state': LearnerContentAssignmentStateChoices.ALLOCATED,
+            'expected_policy_can_redeem': (True, None, []),
+        },
+        # Sad path, no assignment exists.
+        {
+            'assignment_state': None,
+            'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_ASSIGNED_CONTENT, []),
+        },
+        # Sad path, assignment has state='cancelled'.
+        {
+            'assignment_state': LearnerContentAssignmentStateChoices.CANCELLED,
+            'expected_policy_can_redeem': (False, REASON_LEARNER_ASSIGNMENT_CANCELLED, []),
+        },
+        # Sad path, assignment has state='errored'.
+        {
+            'assignment_state': LearnerContentAssignmentStateChoices.ERRORED,
+            'expected_policy_can_redeem': (False, REASON_LEARNER_ASSIGNMENT_FAILED, []),
+        },
+    )
+    @ddt.unpack
+    def test_can_redeem(
+        self,
+        assignment_state,
+        expected_policy_can_redeem,
+    ):
         """
-        Test stub for non-implemented method.
+        Test can_redeem() for assigned learner credit policies.
         """
-        with self.assertRaises(NotImplementedError):
-            self.active_policy.can_redeem(123, 'abc')
+        self.assignments_api_patcher.stop()
+
+        # Set up the entire environment to make the policy happy about all non-assignment stuff.
+        self.mock_lms_api_client.enterprise_contains_learner.return_value = True
+        self.mock_catalog_contains_content_key.return_value = True
+        self.mock_get_content_metadata.return_value = {
+            'content_price': 200,
+        }
+        self.mock_subsidy_client.can_redeem.return_value = {'can_redeem': True, 'active': True}
+        self.mock_transactions_cache_for_learner.return_value = {
+            'transactions': [],
+            'aggregates': {'total_quantity': -100},
+        }
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': -200},
+        }
+
+        # Create a single assignment (or not) per the test case.
+        if assignment_state:
+            LearnerContentAssignmentFactory.create(
+                assignment_configuration=self.assignment_configuration,
+                content_key=self.course_key,
+                lms_user_id=self.lms_user_id,
+                state=assignment_state,
+            )
+
+        can_redeem_result = self.active_policy.can_redeem(
+            self.lms_user_id,
+            # Note that this string differs from the assignment content_key, but that's okay because the policy should
+            # normalize everything to course key before comparison.
+            self.course_run_key,
+        )
+
+        assert can_redeem_result == expected_policy_can_redeem
 
     def test_redeem(self):
         """
@@ -803,7 +869,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         """
         Tests that inactive policies can't be allocated against.
         """
-        can_allocate, message = self.inactive_policy.can_allocate(10, self.content_key, 1000)
+        can_allocate, message = self.inactive_policy.can_allocate(10, self.course_key, 1000)
 
         self.assertFalse(can_allocate)
         self.assertEqual(message, REASON_POLICY_EXPIRED)
@@ -815,11 +881,11 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         """
         self.mock_catalog_contains_content_key.return_value = False
 
-        can_allocate, message = self.active_policy.can_allocate(10, self.content_key, 1000)
+        can_allocate, message = self.active_policy.can_allocate(10, self.course_key, 1000)
 
         self.assertFalse(can_allocate)
         self.assertEqual(message, REASON_CONTENT_NOT_IN_CATALOG)
-        self.mock_catalog_contains_content_key.assert_called_once_with(self.content_key)
+        self.mock_catalog_contains_content_key.assert_called_once_with(self.course_key)
 
     def test_can_allocate_subsidy_inactive(self):
         """
@@ -833,11 +899,11 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         }
         self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
 
-        can_allocate, message = self.active_policy.can_allocate(10, self.content_key, 1000)
+        can_allocate, message = self.active_policy.can_allocate(10, self.course_key, 1000)
 
         self.assertFalse(can_allocate)
         self.assertEqual(message, REASON_SUBSIDY_EXPIRED)
-        self.mock_catalog_contains_content_key.assert_called_once_with(self.content_key)
+        self.mock_catalog_contains_content_key.assert_called_once_with(self.course_key)
         self.mock_subsidy_client.retrieve_subsidy.assert_called_once_with(
             subsidy_uuid=self.active_policy.subsidy_uuid,
         )
@@ -866,7 +932,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         # The balance of the subsidy is just a bit less
         # than the amount to potentially allocated, e.g.
         # ((7 * 1000) + 500 + 500) > 7999
-        can_allocate, message = self.active_policy.can_allocate(7, self.content_key, 1000)
+        can_allocate, message = self.active_policy.can_allocate(7, self.course_key, 1000)
 
         self.assertFalse(can_allocate)
         self.assertEqual(message, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
@@ -899,7 +965,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         # than the amount to potentially allocated, e.g.
         # ((7 * 1000) + 2000 + 2000) < 15000 (the subsidy balance) but,
         # ((7 * 1000) + 2000 + 2000) > 10000 (the policy spend limit)
-        can_allocate, message = self.active_policy.can_allocate(7, self.content_key, 1000)
+        can_allocate, message = self.active_policy.can_allocate(7, self.course_key, 1000)
 
         self.assertFalse(can_allocate)
         self.assertEqual(message, REASON_POLICY_SPEND_LIMIT_REACHED)
@@ -931,7 +997,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
 
         # the subidy remaining balance and the spend limit are both 10,000
         # ((7 * 1000) + 1000 + 1000) < 10000
-        can_allocate, _ = self.active_policy.can_allocate(7, self.content_key, 1000)
+        can_allocate, _ = self.active_policy.can_allocate(7, self.course_key, 1000)
 
         self.assertTrue(can_allocate)
         self.mock_assignments_api.get_allocated_quantity_for_configuration.assert_called_once_with(
@@ -946,4 +1012,4 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         an assignment record.
         """
         with self.assertRaisesRegex(ValidationError, 'non-negative'):
-            self.active_policy.can_allocate(1, self.content_key, -1)
+            self.active_policy.can_allocate(1, self.course_key, -1)

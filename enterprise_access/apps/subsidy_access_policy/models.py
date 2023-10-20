@@ -16,14 +16,18 @@ from edx_django_utils.cache.utils import get_cache_key
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
+from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
 from enterprise_access.utils import is_none, is_not_none
 
 from ..content_assignments.models import AssignmentConfiguration
 from .constants import (
     CREDIT_POLICY_TYPE_PRIORITY,
     REASON_CONTENT_NOT_IN_CATALOG,
+    REASON_LEARNER_ASSIGNMENT_CANCELLED,
+    REASON_LEARNER_ASSIGNMENT_FAILED,
     REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
     REASON_LEARNER_MAX_SPEND_REACHED,
+    REASON_LEARNER_NOT_ASSIGNED_CONTENT,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     REASON_POLICY_EXPIRED,
@@ -1011,7 +1015,37 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         return max(0, super().spend_available + self.total_allocated)
 
     def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
-        raise NotImplementedError
+        """
+        Checks if the given lms_user_id has an existing assignment on the given content_key, ready to be accepted.
+        """
+        # perform generic access checks
+        should_attempt_redemption, reason, existing_redemptions = super().can_redeem(
+            lms_user_id,
+            content_key,
+            skip_customer_user_check,
+        )
+        if not should_attempt_redemption:
+            return (False, reason, existing_redemptions)
+        # Now that the default checks are complete, proceed with the custom checks for this assignment policy type.
+        found_assignment = assignments_api.get_assignment_for_learner(
+            self.assignment_configuration,
+            lms_user_id,
+            content_key,
+        )
+        if not found_assignment:
+            return (False, REASON_LEARNER_NOT_ASSIGNED_CONTENT, existing_redemptions)
+        elif found_assignment.state == LearnerContentAssignmentStateChoices.CANCELLED:
+            return (False, REASON_LEARNER_ASSIGNMENT_CANCELLED, existing_redemptions)
+        elif found_assignment.state == LearnerContentAssignmentStateChoices.ERRORED:
+            return (False, REASON_LEARNER_ASSIGNMENT_FAILED, existing_redemptions)
+        elif found_assignment.state == LearnerContentAssignmentStateChoices.ACCEPTED:
+            # This should never happen.  Even if the frontend had a bug that called the redemption endpoint for already
+            # redeemed content, we already check for existing redemptions at the beginning of this function and fail
+            # fast.  Reaching this block would be extremely weird.
+            return (False, REASON_LEARNER_NOT_ASSIGNED_CONTENT, existing_redemptions)
+
+        # Learner can redeem the subsidy access policy
+        return (True, None, existing_redemptions)
 
     def redeem(self, lms_user_id, content_key, all_transactions, metadata=None):
         raise NotImplementedError
