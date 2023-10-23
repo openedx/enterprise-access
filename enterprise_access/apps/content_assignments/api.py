@@ -9,8 +9,11 @@ from typing import Iterable
 
 from django.db.models import Sum
 
+from enterprise_access.apps.core.models import User
+
 from .constants import LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
+from .tasks import create_pending_enterprise_learner_for_assignment_task
 
 logger = logging.getLogger(__name__)
 
@@ -136,21 +139,27 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     learner_emails_with_existing_assignments = set()
 
     # Split up the existing assignment records by state
+    updated_fields = {'content_quantity', 'state'}
     for assignment in existing_assignments:
         learner_emails_with_existing_assignments.add(assignment.learner_email)
         if assignment.state in LearnerContentAssignmentStateChoices.REALLOCATE_STATES:
             assignment.content_quantity = content_quantity
             assignment.state = LearnerContentAssignmentStateChoices.ALLOCATED
+            if not assignment.lms_user_id:
+                first_user = User.objects.filter(email=assignment.learner_email).first()
+                if first_user:
+                    assignment.lms_user_id = first_user.lms_user_id
+                    updated_fields.add('lms_user_id')
             assignment.full_clean()
             cancelled_or_errored_to_update.append(assignment)
         else:
             already_allocated_or_accepted.append(assignment)
 
     # Bulk update and get a list of refreshed objects
-    updated_assignments = _update_and_refresh_assignments(
+    updated_assignments = list(_update_and_refresh_assignments(
         cancelled_or_errored_to_update,
-        ['content_quantity', 'state']
-    )
+        list(updated_fields),
+    ))
 
     # Narrow down creation list of learner emails
     learner_emails_for_assignment_creation = set(learner_emails) - learner_emails_with_existing_assignments
@@ -162,6 +171,10 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
         content_key,
         content_quantity,
     )
+
+    # Link all non-cancelled assignment learners to the enterprise customer record.
+    for assignment in updated_assignments + created_assignments:
+        create_pending_enterprise_learner_for_assignment_task.delay(assignment.uuid)
 
     # Return a mapping of the action we took to lists of relevant assignment records.
     return {

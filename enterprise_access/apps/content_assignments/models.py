@@ -8,10 +8,13 @@ from django.db import models
 from django.db.models import Case, Exists, F, Max, OuterRef, Q, Value, When
 from django.db.models.fields import BooleanField, CharField, DateTimeField, IntegerField
 from django.db.models.functions import Coalesce
+from django.dispatch import receiver
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_create_with_history, bulk_update_with_history
+
+from enterprise_access.apps.core.models import User
 
 from .constants import (
     AssignmentActionErrors,
@@ -447,4 +450,18 @@ class LearnerContentAssignmentAction(TimeStampedModel):
     def __str__(self):
         return (
             f'uuid={self.uuid}, action_type={self.action_type}, error_reason={self.error_reason}'
+        )
+
+
+@receiver(models.signals.post_save, sender=User)
+def update_assignment_lms_user_id_from_user_email(sender, **kwargs):  # pylint: disable=unused-argument
+    """ Post save hook to update assignment lms_user_id from core user records."""
+
+    user = kwargs['instance']
+    if user.lms_user_id:
+        LearnerContentAssignment.objects.filter(
+            learner_email=user.email,
+            lms_user_id=None,
+        ).update(
+            lms_user_id=user.lms_user_id,
         )

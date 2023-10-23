@@ -18,6 +18,7 @@ from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.utils import is_none, is_not_none
 
+from ..content_assignments.constants import LearnerContentAssignmentStateChoices
 from ..content_assignments.models import AssignmentConfiguration
 from .constants import (
     CREDIT_POLICY_TYPE_PRIORITY,
@@ -645,7 +646,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Returns:
             A ledger transaction, or None if the subsidy was not redeemed.
         """
-        if self.access_method == AccessMethods.DIRECT:
+        if self.access_method in (AccessMethods.DIRECT, AccessMethods.ASSIGNED):
             idempotency_key = create_idempotency_key_for_transaction(
                 subsidy_uuid=str(self.subsidy_uuid),
                 lms_user_id=lms_user_id,
@@ -1011,10 +1012,37 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         return max(0, super().spend_available + self.total_allocated)
 
     def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
-        raise NotImplementedError
+        redeemable, reason, existing_transactions = super().can_redeem(
+            lms_user_id, content_key, skip_customer_user_check
+        )
+        if not redeemable:
+            return (redeemable, reason, existing_transactions)
+
+        course_for_key = 'course-v1:edX+DemoX+Demo_Course'
+        has_allocated_assignment_for_course = self.assignment_configuration.assignments.filter(
+            lms_user_id=lms_user_id,
+            content_key=course_for_key,
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+        ).exists()
+        if has_allocated_assignment_for_course:
+            return (True, None, existing_transactions)
+        return (False, 'REASON_NO_ALLOCATION', existing_transactions)
 
     def redeem(self, lms_user_id, content_key, all_transactions, metadata=None):
-        raise NotImplementedError
+        course_for_key = 'course-v1:edX+DemoX+Demo_Course'
+        allocated_assignment = self.assignment_configuration.assignments.filter(
+            lms_user_id=lms_user_id,
+            content_key=course_for_key,
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+        ).first()
+        if not allocated_assignment:
+            raise Exception('no allocation')
+
+        transaction = super().redeem(lms_user_id, content_key, all_transactions, metadata=metadata)
+        allocated_assignment.state = LearnerContentAssignmentStateChoices.ACCEPTED
+        allocated_assignment.transaction_uuid = transaction['uuid']
+        allocated_assignment.save()
+        return transaction
 
     def can_allocate(self, number_of_learners, content_key, content_price_cents):
         """

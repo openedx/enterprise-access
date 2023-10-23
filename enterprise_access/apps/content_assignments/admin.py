@@ -88,7 +88,7 @@ class LearnerContentAssignmentAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
         'last_notification_at',
         'created',
         'modified',
-        'lms_user_id',
+        #'lms_user_id',
         'get_enterprise_customer_uuid',
     )
     autocomplete_fields = ['assignment_configuration']
