@@ -8,8 +8,10 @@ from django.conf import settings
 from edx_django_utils.cache import TieredCache
 from requests.exceptions import HTTPError
 
+from enterprise_access.cache_utils import versioned_cache_key
+
 from ..api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
-from .utils import get_versioned_subsidy_client, versioned_cache_key
+from .utils import get_versioned_subsidy_client
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,7 @@ def get_and_cache_content_metadata(enterprise_customer_uuid, content_key, timeou
     cache_key = versioned_cache_key('get_subsidy_content_metadata', enterprise_customer_uuid, content_key)
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
+        logger.info(f'cache hit for customer {enterprise_customer_uuid} and content {content_key}')
         return cached_response.value
 
     client = get_versioned_subsidy_client()
@@ -57,6 +60,7 @@ def get_and_cache_catalog_contains_content(enterprise_catalog_uuid, content_key,
     cache_key = versioned_cache_key('contains_content_key', enterprise_catalog_uuid, content_key)
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
+        logger.info(f'cache hit for catalog {enterprise_catalog_uuid} and content {content_key}')
         return cached_response.value
 
     try:
