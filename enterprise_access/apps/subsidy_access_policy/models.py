@@ -17,6 +17,7 @@ from edx_django_utils.cache.utils import get_cache_key
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.cache_utils import request_cache, versioned_cache_key
 from enterprise_access.utils import is_none, is_not_none
 
 from ..content_assignments.models import AssignmentConfiguration
@@ -44,15 +45,10 @@ from .exceptions import (
     SubsidyAPIHTTPError
 )
 from .subsidy_api import get_and_cache_transactions_for_learner
-from .utils import (
-    ProxyAwareHistoricalRecords,
-    create_idempotency_key_for_transaction,
-    get_versioned_subsidy_client,
-    request_cache,
-    versioned_cache_key
-)
+from .utils import ProxyAwareHistoricalRecords, create_idempotency_key_for_transaction, get_versioned_subsidy_client
 
-POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
+REQUEST_CACHE_NAMESPACE = 'subsidy_access_policy'
+POLICY_LOCK_RESOURCE_NAME = 'subsidy_access_policy'
 logger = logging.getLogger(__name__)
 
 
@@ -296,7 +292,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             self.enterprise_customer_uuid,
             self.subsidy_uuid,
         )
-        cached_response = request_cache().get_cached_response(cache_key)
+        cached_response = request_cache(namespace=REQUEST_CACHE_NAMESPACE).get_cached_response(cache_key)
         if cached_response.is_found:
             logger.info(
                 'subsidy_record cache hit '
@@ -311,7 +307,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             logger.warning('SubsidyAccessPolicy.subsidy_record() raised HTTPError: %s', exc)
             result = {}
 
-        request_cache().set(cache_key, result)
+        request_cache(namespace=REQUEST_CACHE_NAMESPACE).set(cache_key, result)
 
         logger.info(
             'subsidy_record cache miss '
