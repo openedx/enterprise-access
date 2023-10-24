@@ -10,6 +10,7 @@ from django.urls import reverse
 from drf_spectacular.utils import extend_schema_field
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
+from requests.exceptions import HTTPError
 from rest_framework import serializers
 
 from enterprise_access.apps.subsidy_access_policy.constants import CENTS_PER_DOLLAR, PolicyTypes
@@ -64,9 +65,8 @@ class SubsidyAccessPolicyAggregatesSerializer(serializers.Serializer):
             f"Total amount allocated for policies of type {PolicyTypes.ASSIGNED_LEARNER_CREDIT} (0 otherwise), in USD.",
         ),
     )
-    spend_available_usd_cents = serializers.IntegerField(
+    spend_available_usd_cents = serializers.SerializerMethodField(
         help_text="Total Amount of available spend for policy, in positive USD cents.",
-        source="spend_available",
     )
     spend_available_usd = serializers.SerializerMethodField(
         help_text="Total Amount of available spend for policy, in USD.",
@@ -76,8 +76,13 @@ class SubsidyAccessPolicyAggregatesSerializer(serializers.Serializer):
     def get_amount_redeemed_usd_cents(self, policy):
         """
         Make amount a positive number.
+        Protect against Subsidy API Errors.
         """
-        return policy.total_redeemed * -1
+        try:
+            return policy.total_redeemed * -1
+        except HTTPError as exc:
+            logger.exception(f"HTTPError from subsidy service: {exc}")
+            return None
 
     @extend_schema_field(serializers.IntegerField)
     def get_amount_allocated_usd_cents(self, policy):
@@ -86,17 +91,49 @@ class SubsidyAccessPolicyAggregatesSerializer(serializers.Serializer):
         """
         return policy.total_allocated * -1
 
+    @extend_schema_field(serializers.IntegerField)
+    def get_spend_available_usd_cents(self, policy):
+        """
+        Protect against Subsidy API Errors.
+        """
+        try:
+            return policy.spend_available
+        except HTTPError as exc:
+            logger.exception(f"HTTPError from subsidy service: {exc}")
+            return None
+
     @extend_schema_field(serializers.FloatField)
     def get_amount_redeemed_usd(self, policy):
-        return float(policy.total_redeemed * -1) / CENTS_PER_DOLLAR
+        """
+        Make amount a positive number.
+        Convert cents to dollars.
+        Protect against Subsidy API Errors.
+        """
+        try:
+            return float(policy.total_redeemed * -1) / CENTS_PER_DOLLAR
+        except HTTPError as exc:
+            logger.exception(f"HTTPError from subsidy service: {exc}")
+            return None
 
     @extend_schema_field(serializers.FloatField)
     def get_amount_allocated_usd(self, policy):
+        """
+        Make amount a positive number.
+        Convert cents to dollars.
+        """
         return float(policy.total_allocated * -1) / CENTS_PER_DOLLAR
 
     @extend_schema_field(serializers.FloatField)
     def get_spend_available_usd(self, policy):
-        return float(policy.spend_available) / CENTS_PER_DOLLAR
+        """
+        Convert cents to dollars.
+        Protect against Subsidy API Errors.
+        """
+        try:
+            return float(policy.spend_available) / CENTS_PER_DOLLAR
+        except HTTPError as exc:
+            logger.exception(f"HTTPError from subsidy service: {exc}")
+            return None
 
 
 class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):

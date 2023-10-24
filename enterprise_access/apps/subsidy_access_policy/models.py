@@ -336,6 +336,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         Returns:
             int: quantity >= 0 of USD Cents representing the policy-wide spend available.
+
+        Raises:
+            requests.exceptions.HTTPError if the request to Subsidy API (to fetch aggregates) fails.
         """
         # This is how much available spend the policy limit would allow, ignoring the subsidy balance.
         if self.spend_limit is not None:
@@ -354,6 +357,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         Returns:
             int: quantity <= 0 of USD Cents.
+
+        Raises:
+            requests.exceptions.HTTPError if the request to Subsidy API (to fetch aggregates) fails.
         """
         return self.aggregates_for_policy().get('total_quantity') or 0
 
@@ -406,6 +412,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
     def aggregates_for_policy(self):
         """
         Returns aggregate transaction data for this policy.
+
+        Raises:
+            requests.exceptions.HTTPError if the request to Subsidy API fails.
         """
         response_payload = self.subsidy_client.list_subsidy_transactions(
             subsidy_uuid=self.subsidy_uuid,
