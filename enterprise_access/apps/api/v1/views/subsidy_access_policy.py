@@ -47,7 +47,11 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     TransactionStateChoices
 )
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
-from enterprise_access.apps.subsidy_access_policy.exceptions import ContentPriceNullException, SubsidyAPIHTTPError
+from enterprise_access.apps.subsidy_access_policy.exceptions import (
+    ContentPriceNullException,
+    MissingAssignment,
+    SubsidyAPIHTTPError
+)
 from enterprise_access.apps.subsidy_access_policy.models import (
     SubsidyAccessPolicy,
     SubsidyAccessPolicyLockAttemptFailed
@@ -536,6 +540,11 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             error_payload['detail'] = f"Subsidy Transaction API error: {error_payload['detail']}"
             raise RedemptionRequestException(
                 detail=error_payload,
+            ) from exc
+        except MissingAssignment as exc:
+            logger.exception(f'{exc} when redeeming assigned learner credit.')
+            raise RedemptionRequestException(
+                detail=f'Assignments race-condition: {exc}',
             ) from exc
 
     def get_existing_redemptions(self, policies, lms_user_id):
