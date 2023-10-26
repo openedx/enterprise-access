@@ -13,7 +13,7 @@ from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import HTTPError
 from rest_framework import serializers
 
-from enterprise_access.apps.subsidy_access_policy.constants import CENTS_PER_DOLLAR, PolicyTypes
+from enterprise_access.apps.subsidy_access_policy.constants import CENTS_PER_DOLLAR, AccessMethods, PolicyTypes
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 
 from .content_assignments.assignment import LearnerContentAssignmentResponseSerializer
@@ -522,6 +522,19 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
         help_text='',
         source='subsidy_expiration_datetime',
     )
+    learner_content_assignments = serializers.SerializerMethodField('get_assignments_serializer')
+
+    def get_assignments_serializer(self, obj):
+        """
+        Return serialized assignments if the policy access method is of the 'assigned' type
+        """
+        if obj.access_method == AccessMethods.ASSIGNED:
+            assignments = obj.assignment_configuration.assignments.prefetch_related('actions').filter(
+                lms_user_id=self.context.get('lms_user_id')
+            )
+            serializer = LearnerContentAssignmentResponseSerializer(assignments, many=True)
+            return serializer.data
+        return []
 
     @extend_schema_field(serializers.IntegerField)
     def get_remaining_balance_per_user(self, obj):
@@ -535,6 +548,7 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
 
     @extend_schema_field(serializers.IntegerField)
     def get_remaining_balance(self, obj):
+        """Returns the remaining balance for the policy"""
         return obj.subsidy_balance()
 
 
