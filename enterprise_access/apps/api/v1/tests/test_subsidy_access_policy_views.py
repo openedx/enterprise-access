@@ -13,7 +13,11 @@ from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
 
-from enterprise_access.apps.content_assignments.tests.factories import AssignmentConfigurationFactory
+from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.content_assignments.tests.factories import (
+    AssignmentConfigurationFactory,
+    LearnerContentAssignmentFactory
+)
 from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
@@ -1320,6 +1324,91 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         else:
             # with an inactive (i.e., expired, not yet started) subsidy, we should get no records back.
             assert len(response_json) == 0
+
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_record')
+    def test_credits_available_endpoint_with_content_assignments(
+        self,
+        mock_subsidy_record,
+        mock_transactions_cache_for_learner  # pylint: disable=unused-argument
+    ):
+        """
+        Verify that SubsidyAccessPolicyViewset credits_available returns learner content assignments for assigned
+        learner credit access policies.
+        """
+        content_key = 'demoX'
+        content_title = 'edx: Demo 101'
+        content_price_cents = 100
+        # Create a pair of AssignmentConfiguration + SubsidyAccessPolicy for the main test customer.
+        assignment_configuration = AssignmentConfigurationFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+        )
+        AssignedLearnerCreditAccessPolicyFactory(
+            display_name='An assigned learner credit policy, for the test customer.',
+            enterprise_customer_uuid=self.enterprise_uuid,
+            active=True,
+            assignment_configuration=assignment_configuration,
+            spend_limit=1000000,
+        )
+        assignment1 = LearnerContentAssignmentFactory.create(
+            assignment_configuration=assignment_configuration,
+            learner_email='alice@foo.com',
+            lms_user_id=1234,
+            content_key=content_key,
+            content_title=content_title,
+            content_quantity=-content_price_cents,
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+        )
+        action, _ = assignment1.add_successful_linked_action()
+        LearnerContentAssignmentFactory.create(
+            assignment_configuration=assignment_configuration,
+            learner_email='bob@foo.com',
+            lms_user_id=12345,
+            content_key=content_key,
+            content_title=content_title,
+            content_quantity=-content_price_cents,
+            state=LearnerContentAssignmentStateChoices.ACCEPTED,
+        )
+        mock_subsidy_record.return_value = {
+            'uuid': str(uuid4()),
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': '5000',
+            'is_active': True,
+        }
+        self.lms_client_instance.enterprise_contains_learner.return_value = True
+        expected_learner_content_assignment = {
+            'uuid': str(assignment1.uuid),
+            'assignment_configuration': str(assignment_configuration.uuid),
+            'learner_email': 'alice@foo.com',
+            'lms_user_id': 1234,
+            'content_key': content_key,
+            'content_title': content_title,
+            'content_quantity': -content_price_cents,
+            'state': LearnerContentAssignmentStateChoices.ALLOCATED,
+            'transaction_uuid': None,
+            'last_notification_at': None,
+            'actions': [
+                {
+                    'created': action.created.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                    'modified': action.modified.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                    'uuid': str(action.uuid),
+                    'action_type': 'learner_linked',
+                    'completed_at': action.completed_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                    'error_reason': None
+                }
+            ]
+        }
+        query_params = {
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'lms_user_id': 1234,
+        }
+        response = self.client.get(self.subsidy_access_policy_credits_available_endpoint, query_params)
+        response_json = response.json()
+        self.assertEqual(len(response_json[0]['learner_content_assignments']), 1)
+        self.assertEqual(response_json[0]['learner_content_assignments'][0], expected_learner_content_assignment)
 
 
 @ddt.ddt
