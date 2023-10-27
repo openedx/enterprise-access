@@ -1,3 +1,7 @@
+set -euf -o pipefail
+
+. "$DEVSTACK_WORKSPACE/devstack/scripts/colors.sh"
+
 name="enterprise_access"
 port="18270"
 
@@ -8,7 +12,7 @@ docker-compose up -d --build
 
 # Wait for MySQL
 echo "Waiting for MySQL"
-until docker exec -i enterprise_access.db mysql -u root -se "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = 'root')" &> /dev/null
+until docker exec -i enterprise_access.mysql80 mysql -u root -se "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = 'root')" &> /dev/null
 do
   printf "."
   sleep 1
@@ -16,7 +20,7 @@ done
 sleep 5
 
 # Create the database
-docker exec -i enterprise_access.db mysql -u root -se "CREATE DATABASE enterprise_access;"
+docker exec -i enterprise_access.mysql80 mysql -u root -se "CREATE DATABASE IF NOT EXISTS enterprise_access;"
 
 # Run migrations
 echo -e "${GREEN}Running migrations for ${name}...${NC}"
