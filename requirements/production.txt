@@ -31,7 +31,6 @@ backoff==1.10.0
 backports-zoneinfo[tzdata]==0.2.1
     # via
     #   -r requirements/base.txt
-    #   backports-zoneinfo
     #   celery
     #   django
     #   kombu
@@ -53,7 +52,7 @@ cffi==1.16.0
     #   -r requirements/base.txt
     #   cryptography
     #   pynacl
-charset-normalizer==3.3.1
+charset-normalizer==3.3.0
     # via
     #   -r requirements/base.txt
     #   requests
@@ -189,7 +188,7 @@ edx-django-utils==5.7.0
     #   -r requirements/base.txt
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.12.0
+edx-drf-extensions==8.11.1
     # via
     #   -r requirements/base.txt
     #   edx-rbac
@@ -199,7 +198,6 @@ edx-opaque-keys[django]==2.5.1
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
-    #   edx-opaque-keys
     #   openedx-events
 edx-rbac==1.8.0
     # via -r requirements/base.txt
@@ -269,7 +267,7 @@ mysqlclient==2.2.0
     # via
     #   -r requirements/base.txt
     #   -r requirements/production.in
-newrelic==9.1.1
+newrelic==9.1.0
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -305,7 +303,7 @@ prompt-toolkit==3.0.39
     # via
     #   -r requirements/base.txt
     #   click-repl
-psutil==5.9.6
+psutil==5.9.5
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -320,7 +318,6 @@ pyjwt[crypto]==2.8.0
     #   edx-auth-backends
     #   edx-drf-extensions
     #   edx-rest-api-client
-    #   pyjwt
     #   social-auth-core
 pymemcache==4.0.0
     # via -r requirements/base.txt
@@ -404,7 +401,7 @@ slumber==0.7.1
     # via
     #   -r requirements/base.txt
     #   edx-rest-api-client
-social-auth-app-django==5.4.0
+social-auth-app-django==5.3.0
     # via
     #   -r requirements/base.txt
     #   edx-auth-backends
@@ -439,7 +436,7 @@ uritemplate==4.1.1
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.0.7
+urllib3==2.0.6
     # via
     #   -r requirements/base.txt
     #   requests

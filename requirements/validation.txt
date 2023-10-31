@@ -18,7 +18,7 @@ asgiref==3.7.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django
-astroid==3.0.1
+astroid==2.15.8
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -45,7 +45,6 @@ backports-zoneinfo[tzdata]==0.2.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-    #   backports-zoneinfo
     #   celery
     #   django
     #   kombu
@@ -71,7 +70,7 @@ cffi==1.16.0
     #   -r requirements/test.txt
     #   cryptography
     #   pynacl
-charset-normalizer==3.3.1
+charset-normalizer==3.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -132,7 +131,6 @@ coverage[toml]==7.3.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-    #   coverage
     #   pytest-cov
 cryptography==41.0.4
     # via
@@ -296,7 +294,7 @@ edx-django-utils==5.7.0
     #   -r requirements/test.txt
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==8.12.0
+edx-drf-extensions==8.11.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -314,7 +312,6 @@ edx-opaque-keys[django]==2.5.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-drf-extensions
-    #   edx-opaque-keys
     #   openedx-events
 edx-rbac==1.8.0
     # via
@@ -334,7 +331,7 @@ factory-boy==3.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==19.11.0
+faker==19.10.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -431,6 +428,11 @@ kombu==5.3.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   celery
+lazy-object-proxy==1.9.0
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   astroid
 markdown-it-py==3.0.0
     # via
     #   -r requirements/quality.txt
@@ -462,7 +464,7 @@ mysqlclient==2.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-newrelic==9.1.1
+newrelic==9.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -529,7 +531,7 @@ prompt-toolkit==3.0.39
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   click-repl
-psutil==5.9.6
+psutil==5.9.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -561,9 +563,8 @@ pyjwt[crypto]==2.8.0
     #   edx-auth-backends
     #   edx-drf-extensions
     #   edx-rest-api-client
-    #   pyjwt
     #   social-auth-core
-pylint==3.0.2
+pylint==2.17.7
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -576,7 +577,7 @@ pylint-celery==0.3
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-lint
-pylint-django==2.5.4
+pylint-django==2.5.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -734,7 +735,7 @@ snowballstemmer==2.2.0
     # via
     #   -r requirements/quality.txt
     #   pydocstyle
-social-auth-app-django==5.4.0
+social-auth-app-django==5.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -805,7 +806,7 @@ uritemplate==4.1.1
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.0.7
+urllib3==2.0.6
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -828,6 +829,11 @@ wcwidth==0.2.8
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   prompt-toolkit
+wrapt==1.15.0
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   astroid
 zipp==3.17.0
     # via
     #   -r requirements/quality.txt
