@@ -448,6 +448,9 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         """
         Return a list of all redeemable policies for given `enterprise_customer_uuid`, `lms_user_id` that have
         redeemable credit available.
+        Note that, for each redeemable policy that is *assignable*, the policy record
+        in the response payload will also contain a list of `learner_content_assignments`
+        associated with the requested `lms_user_id`.
         """
         serializer = serializers.SubsidyAccessPolicyCreditsAvailableRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
@@ -456,10 +459,13 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         lms_user_id = serializer.data['lms_user_id']
 
         policies_with_credit_available = self.policies_with_credit_available(enterprise_customer_uuid, lms_user_id)
+
         response_data = serializers.SubsidyAccessPolicyCreditsAvailableResponseSerializer(
             policies_with_credit_available,
             many=True,
-            context={'lms_user_id': lms_user_id}
+            context={
+                'lms_user_id': lms_user_id,
+            },
         ).data
 
         return Response(

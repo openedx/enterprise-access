@@ -232,6 +232,13 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 return policy_class
         return None
 
+    @property
+    def is_assignable(self):
+        """
+        Convenience property to determine if this policy is assignable.
+        """
+        return self.access_method == AccessMethods.ASSIGNED
+
     def clean(self):
         """
         Used to help validate field values before saving this model instance.
