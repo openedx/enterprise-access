@@ -17,6 +17,7 @@ from edx_django_utils.cache.utils import get_cache_key
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.cache_utils import request_cache, versioned_cache_key
 from enterprise_access.utils import is_none, is_not_none
 
 from ..content_assignments.models import AssignmentConfiguration
@@ -37,17 +38,17 @@ from .constants import (
     TransactionStateChoices
 )
 from .content_metadata_api import get_and_cache_catalog_contains_content, get_and_cache_content_metadata
-from .exceptions import ContentPriceNullException, SubsidyAccessPolicyLockAttemptFailed, SubsidyAPIHTTPError
-from .subsidy_api import get_and_cache_transactions_for_learner
-from .utils import (
-    ProxyAwareHistoricalRecords,
-    create_idempotency_key_for_transaction,
-    get_versioned_subsidy_client,
-    request_cache,
-    versioned_cache_key
+from .exceptions import (
+    ContentPriceNullException,
+    MissingAssignment,
+    SubsidyAccessPolicyLockAttemptFailed,
+    SubsidyAPIHTTPError
 )
+from .subsidy_api import get_and_cache_transactions_for_learner
+from .utils import ProxyAwareHistoricalRecords, create_idempotency_key_for_transaction, get_versioned_subsidy_client
 
-POLICY_LOCK_RESOURCE_NAME = "subsidy_access_policy"
+REQUEST_CACHE_NAMESPACE = 'subsidy_access_policy'
+POLICY_LOCK_RESOURCE_NAME = 'subsidy_access_policy'
 logger = logging.getLogger(__name__)
 
 
@@ -291,7 +292,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             self.enterprise_customer_uuid,
             self.subsidy_uuid,
         )
-        cached_response = request_cache().get_cached_response(cache_key)
+        cached_response = request_cache(namespace=REQUEST_CACHE_NAMESPACE).get_cached_response(cache_key)
         if cached_response.is_found:
             logger.info(
                 'subsidy_record cache hit '
@@ -306,7 +307,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             logger.warning('SubsidyAccessPolicy.subsidy_record() raised HTTPError: %s', exc)
             result = {}
 
-        request_cache().set(cache_key, result)
+        request_cache(namespace=REQUEST_CACHE_NAMESPACE).set(cache_key, result)
 
         logger.info(
             'subsidy_record cache miss '
@@ -331,6 +332,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         Returns:
             int: quantity >= 0 of USD Cents representing the policy-wide spend available.
+
+        Raises:
+            requests.exceptions.HTTPError if the request to Subsidy API (to fetch aggregates) fails.
         """
         # This is how much available spend the policy limit would allow, ignoring the subsidy balance.
         if self.spend_limit is not None:
@@ -349,6 +353,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         Returns:
             int: quantity <= 0 of USD Cents.
+
+        Raises:
+            requests.exceptions.HTTPError if the request to Subsidy API (to fetch aggregates) fails.
         """
         return self.aggregates_for_policy().get('total_quantity') or 0
 
@@ -401,6 +408,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
     def aggregates_for_policy(self):
         """
         Returns aggregate transaction data for this policy.
+
+        Raises:
+            requests.exceptions.HTTPError if the request to Subsidy API fails.
         """
         response_payload = self.subsidy_client.list_subsidy_transactions(
             subsidy_uuid=self.subsidy_uuid,
@@ -646,10 +656,15 @@ class SubsidyAccessPolicy(TimeStampedModel):
     def redeem(self, lms_user_id, content_key, all_transactions, metadata=None):
         """
         Redeem a subsidy for the given learner and content.
+
         Returns:
-            A ledger transaction, or None if the subsidy was not redeemed.
+            A ledger transaction.
+
+        Raises:
+            SubsidyAPIHTTPError if the Subsidy API request failed.
+            ValueError if the access method of this policy is invalid.
         """
-        if self.access_method == AccessMethods.DIRECT:
+        if self.access_method in (AccessMethods.DIRECT, AccessMethods.ASSIGNED):
             idempotency_key = create_idempotency_key_for_transaction(
                 subsidy_uuid=str(self.subsidy_uuid),
                 lms_user_id=lms_user_id,
@@ -1048,7 +1063,45 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         return (True, None, existing_redemptions)
 
     def redeem(self, lms_user_id, content_key, all_transactions, metadata=None):
-        raise NotImplementedError
+        """
+        Redeem content, but only if there's a matching assignment.  On successful redemption, the assignment state will
+        be set to 'accepted', otherwise 'errored'.
+
+        Returns:
+            A ledger transaction.
+
+        Raises:
+            SubsidyAPIHTTPError if the Subsidy API request failed.
+            ValueError if the access method of this policy is invalid.
+        """
+        found_assignment = assignments_api.get_assignment_for_learner(
+            self.assignment_configuration,
+            lms_user_id,
+            content_key,
+        )
+        # The following checks for non-allocated assignments only exist to be defensive against race-conditions, but
+        # in practice should never happen if the caller locks the policy and runs can_redeem() before redeem().
+        if not found_assignment:
+            raise MissingAssignment(
+                f'No assignment was found for lms_user_id={lms_user_id} and content_key=<{content_key}>.'
+            )
+        if found_assignment.state != LearnerContentAssignmentStateChoices.ALLOCATED:
+            raise MissingAssignment(
+                f"Only an assignment with state='{found_assignment.state}' was found for lms_user_id={lms_user_id} "
+                f"and content_key=<{content_key}>."
+            )
+        try:
+            ledger_transaction = super().redeem(lms_user_id, content_key, all_transactions, metadata)
+        except SubsidyAPIHTTPError:
+            # Migrate assignment to errored if the subsidy API call errored.
+            found_assignment.state = LearnerContentAssignmentStateChoices.ERRORED
+            found_assignment.save()
+            raise
+        # Migrate assignment to accepted.
+        found_assignment.state = LearnerContentAssignmentStateChoices.ACCEPTED
+        found_assignment.transaction_uuid = ledger_transaction.get('uuid')  # uuid should always be in the API response.
+        found_assignment.save()
+        return ledger_transaction
 
     def can_allocate(self, number_of_learners, content_key, content_price_cents):
         """

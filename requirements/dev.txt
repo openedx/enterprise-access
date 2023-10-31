@@ -353,6 +353,10 @@ kombu==5.3.2
     # via
     #   -r requirements/validation.txt
     #   celery
+lazy-object-proxy==1.9.0
+    # via
+    #   -r requirements/validation.txt
+    #   astroid
 lxml==4.9.3
     # via edx-i18n-tools
 markdown-it-py==3.0.0

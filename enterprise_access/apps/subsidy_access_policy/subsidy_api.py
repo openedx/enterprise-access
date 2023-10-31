@@ -8,10 +8,14 @@ from collections import defaultdict
 
 import requests
 
+from enterprise_access.cache_utils import request_cache, versioned_cache_key
+
 from .exceptions import SubsidyAPIHTTPError
-from .utils import get_versioned_subsidy_client, request_cache, versioned_cache_key
+from .utils import get_versioned_subsidy_client
 
 logger = logging.getLogger(__name__)
+
+REQUEST_CACHE_NAMESPACE = 'subsidy_access_policy'
 
 
 class TransactionPolicyMismatchError(Exception):
@@ -32,8 +36,9 @@ def get_and_cache_transactions_for_learner(subsidy_uuid, lms_user_id):
     include transactions from multiple access policies.
     """
     cache_key = learner_transaction_cache_key(subsidy_uuid, lms_user_id)
-    cached_response = request_cache().get_cached_response(cache_key)
+    cached_response = request_cache(namespace=REQUEST_CACHE_NAMESPACE).get_cached_response(cache_key)
     if cached_response.is_found:
+        logger.info(f'cache hit for subsidy {subsidy_uuid} and user {lms_user_id}')
         return cached_response.value
 
     client = get_versioned_subsidy_client()
@@ -65,7 +70,7 @@ def get_and_cache_transactions_for_learner(subsidy_uuid, lms_user_id):
         lms_user_id,
         len(result['transactions']),
     )
-    request_cache().set(cache_key, result)
+    request_cache(namespace=REQUEST_CACHE_NAMESPACE).set(cache_key, result)
     return result
 
 

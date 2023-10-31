@@ -28,6 +28,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_POLICY_SPEND_LIMIT_REACHED,
     REASON_SUBSIDY_EXPIRED
 )
+from enterprise_access.apps.subsidy_access_policy.exceptions import MissingAssignment, SubsidyAPIHTTPError
 from enterprise_access.apps.subsidy_access_policy.models import (
     AssignedLearnerCreditAccessPolicy,
     PerLearnerEnrollmentCreditAccessPolicy,
@@ -858,12 +859,109 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
 
         assert can_redeem_result == expected_policy_can_redeem
 
-    def test_redeem(self):
+    @ddt.data(
+        # Happy path, assignment exists and state='allocated', and afterwards gets updated to 'accepted'.
+        {
+            'assignment_starting_state': LearnerContentAssignmentStateChoices.ALLOCATED,
+            'assignment_ending_state': LearnerContentAssignmentStateChoices.ACCEPTED,
+            'fail_subsidy_create_transaction': False,
+            'redeem_raises': None,
+        },
+        # Sad path, no assignment exists.
+        {
+            'assignment_starting_state': None,
+            'assignment_ending_state': None,
+            'fail_subsidy_create_transaction': False,
+            'redeem_raises': MissingAssignment,
+        },
+        # Sad path, assignment has state='accepted'.
+        {
+            'assignment_starting_state': LearnerContentAssignmentStateChoices.ACCEPTED,
+            'assignment_ending_state': LearnerContentAssignmentStateChoices.ACCEPTED,
+            'fail_subsidy_create_transaction': False,
+            'redeem_raises': MissingAssignment,
+        },
+        # Sad path, assignment has state='cancelled'.
+        {
+            'assignment_starting_state': LearnerContentAssignmentStateChoices.CANCELLED,
+            'assignment_ending_state': LearnerContentAssignmentStateChoices.CANCELLED,
+            'fail_subsidy_create_transaction': False,
+            'redeem_raises': MissingAssignment,
+        },
+        # Sad path, assignment has state='errored'.
+        {
+            'assignment_starting_state': LearnerContentAssignmentStateChoices.ERRORED,
+            'assignment_ending_state': LearnerContentAssignmentStateChoices.ERRORED,
+            'fail_subsidy_create_transaction': False,
+            'redeem_raises': MissingAssignment,
+        },
+        # Sad path, request to subsidy API failed.
+        {
+            'assignment_starting_state': LearnerContentAssignmentStateChoices.ALLOCATED,
+            'assignment_ending_state': LearnerContentAssignmentStateChoices.ERRORED,
+            'fail_subsidy_create_transaction': True,
+            'redeem_raises': SubsidyAPIHTTPError,
+        },
+    )
+    @ddt.unpack
+    def test_redeem(
+        self,
+        assignment_starting_state,
+        assignment_ending_state,
+        fail_subsidy_create_transaction,
+        redeem_raises,
+    ):
         """
-        Test stub for non-implemented method.
+        Test redeem() for assigned learner credit policies.
         """
-        with self.assertRaises(NotImplementedError):
-            self.active_policy.redeem(123, 'abc', [])
+        self.assignments_api_patcher.stop()
+
+        # Set up the entire environment to make the policy happy about all non-assignment stuff.
+        self.mock_lms_api_client.enterprise_contains_learner.return_value = True
+        self.mock_catalog_contains_content_key.return_value = True
+        self.mock_get_content_metadata.return_value = {
+            'content_price': 200,
+        }
+        self.mock_subsidy_client.can_redeem.return_value = {'can_redeem': True, 'active': True}
+        self.mock_transactions_cache_for_learner.return_value = {
+            'transactions': [],
+            'aggregates': {'total_quantity': -100},
+        }
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': -200},
+        }
+
+        # Optionally simulate a failed subsidy API request to create a transaction:
+        test_transaction_uuid = uuid4()
+        if fail_subsidy_create_transaction:
+            self.mock_subsidy_client.create_subsidy_transaction.side_effect = requests.exceptions.HTTPError
+        else:
+            self.mock_subsidy_client.create_subsidy_transaction.return_value = {'uuid': str(test_transaction_uuid)}
+
+        # Create a single assignment (or not) per the test case.
+        assignment = None
+        if assignment_starting_state:
+            assignment = LearnerContentAssignmentFactory.create(
+                assignment_configuration=self.assignment_configuration,
+                content_key=self.course_key,
+                lms_user_id=self.lms_user_id,
+                state=assignment_starting_state,
+            )
+
+        if redeem_raises:
+            with self.assertRaises(redeem_raises):
+                self.active_policy.redeem(self.lms_user_id, self.course_run_key, [])
+        else:
+            self.active_policy.redeem(self.lms_user_id, self.course_run_key, [])
+
+        # Finally, assert that the assignment object was correctly updated to reflect the success/failure.
+        if assignment:
+            assignment.refresh_from_db()
+            assert assignment.state == assignment_ending_state
+            # happy path should result in an updated transaction_uuid.
+            if not redeem_raises:
+                assert assignment.transaction_uuid == test_transaction_uuid
 
     def test_can_allocate_inactive_policy(self):
         """

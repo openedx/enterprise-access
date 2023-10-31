@@ -50,3 +50,10 @@ class SubsidyAPIHTTPError(requests.exceptions.HTTPError):
         return {
             'detail': str(self),
         }
+
+
+class MissingAssignment(SubsidyAccessPolicyException):
+    """
+    Raised in rare/impossible cases where attempts to redeem assigned content resulted in a race condition where an
+    assignment couldn't be found.
+    """
