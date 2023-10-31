@@ -7,7 +7,6 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from enterprise_access.apps.content_assignments.constants import (
-    AssignmentActions,
     AssignmentLearnerStates,
     AssignmentRecentActionTypes,
     LearnerContentAssignmentStateChoices
@@ -134,3 +133,89 @@ class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentRe
 
         # Get the most recently errored action.
         return related_actions_with_error.first().error_reason
+
+
+class CoursePartnerSerializer(serializers.Serializer):
+    """
+    Serialized partner ``name`` and ``logo_image_url`` for content_metadata of an assignment.
+    """
+    name = serializers.CharField(help_text='The partner name')
+    logo_image_url = serializers.CharField(help_text='The URL for the parter logo image')
+
+
+class ContentMetadataForAssignmentSerializer(serializers.Serializer):
+    """
+    Serializer to help return additional content metadata for assignments.  These fields should
+    map more or less 1-1 to the fields in content metadata dicts returned from the
+    enterprise-catalog `get_content_metadata` response payload.
+    """
+    start_date = serializers.SerializerMethodField(
+        help_text='The start date of the course',
+    )
+    end_date = serializers.SerializerMethodField(
+        help_text='The end date of the course',
+    )
+    enroll_by_date = serializers.SerializerMethodField(
+        help_text='The date by which the learner must accept/enroll',
+    )
+    content_price = serializers.SerializerMethodField(
+        help_text='The price, in USD, of this content',
+    )
+    partners = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.DateTimeField)
+    def get_start_date(self, obj):
+        return obj.get('normalized_metadata', {}).get('start_date')
+
+    @extend_schema_field(serializers.DateTimeField)
+    def get_end_date(self, obj):
+        return obj.get('normalized_metadata', {}).get('end_date')
+
+    @extend_schema_field(serializers.DateTimeField)
+    def get_enroll_by_date(self, obj):
+        return obj.get('normalized_metadata', {}).get('enroll_by_date')
+
+    @extend_schema_field(serializers.IntegerField)
+    def get_content_price(self, obj):
+        return obj.get('normalized_metadata', {}).get('content_price')
+
+    @extend_schema_field(CoursePartnerSerializer)
+    def get_partners(self, obj):
+        """
+        See ``get_course_partners()`` in
+        enterprise-catalog/enterprise_catalog/apps/catalog/algolia_utils.py
+        """
+        partners = []
+        owners = obj.get('owners') or []
+
+        for owner in owners:
+            partner_name = owner.get('name')
+            if partner_name:
+                partner_metadata = {
+                    'name': partner_name,
+                    'logo_image_url': owner.get('logo_image_url'),
+                }
+                partners.append(partner_metadata)
+
+        return CoursePartnerSerializer(partners, many=True).data
+
+
+class LearnerContentAssignmentWithContentMetadataResponseSerializer(LearnerContentAssignmentResponseSerializer):
+    """
+    Read-only serializer for LearnerContentAssignment records that also includes additional content metadata,
+    fetched from the catalog service (or cache).
+    """
+    content_metadata = serializers.SerializerMethodField(
+        help_text='Additional content metadata fetched from the catalog service or cache.',
+    )
+
+    class Meta(LearnerContentAssignmentResponseSerializer.Meta):
+        fields = LearnerContentAssignmentResponseSerializer.Meta.fields + ['content_metadata']
+        read_only_fields = fields
+
+    @extend_schema_field(ContentMetadataForAssignmentSerializer)
+    def get_content_metadata(self, obj):
+        metadata_lookup = self.context.get('content_metadata')
+        if metadata_lookup and (assignment_content_metadata := metadata_lookup.get(obj.content_key)):
+            return ContentMetadataForAssignmentSerializer(assignment_content_metadata).data
+        return None
