@@ -328,11 +328,7 @@ class LearnerContentAssignment(TimeStampedModel):
         new_queryset = queryset.annotate(
             recent_action_time=Coalesce(
                 # Time of most recent reminder.
-                Max('actions__completed_at', filter=(
-                    Q(actions__action_type=AssignmentActions.REMINDED) &
-                    Q(actions__error_reason__isnull=True) &
-                    Q(actions__completed_at__isnull=False)
-                )),
+                Max('actions__completed_at', filter=Q(actions__action_type=AssignmentActions.REMINDED)),
                 # Fallback to created time.
                 F('created'),
                 # Coerce CreationDateTimeField into a compatible field.
