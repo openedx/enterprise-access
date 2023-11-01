@@ -60,10 +60,7 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
     # This causes the related AssignmentConfiguration to be serialized as a UUID (in the response).
     assignment_configuration = serializers.PrimaryKeyRelatedField(read_only=True)
 
-    actions = LearnerContentAssignmentActionSerializer(
-        help_text='All actions associated with this assignment.',
-        many=True,
-    )
+    actions = serializers.SerializerMethodField()
 
     class Meta:
         model = LearnerContentAssignment
@@ -81,6 +78,17 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
             'actions',
         ]
         read_only_fields = fields
+
+    def get_actions(self, assignment):
+        """
+        Resolves any associated actions to the assignment in chronological order based on modified timestamp.
+        """
+        related_actions = assignment.actions.order_by('modified').all()
+        return LearnerContentAssignmentActionSerializer(
+            related_actions,
+            help_text='All actions associated with this assignment.',
+            many=True,
+        ).data
 
 
 class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentResponseSerializer):
@@ -102,10 +110,33 @@ class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentRe
         ),
         choices=AssignmentLearnerStates.CHOICES,
     )
+    error_reason = serializers.SerializerMethodField()
 
     class Meta(LearnerContentAssignmentResponseSerializer.Meta):
         fields = LearnerContentAssignmentResponseSerializer.Meta.fields + [
             'recent_action',
             'learner_state',
+            'error_reason',
         ]
         read_only_fields = fields
+
+    def get_error_reason(self, assignment):
+        """
+        Resolves the error reason for the assignment, if any, for display purposes based on
+        any associated actions.
+        """
+        # If the assignment is not in an errored state, there should be no error reason.
+        if assignment.state != LearnerContentAssignmentStateChoices.ERRORED:
+            return None
+
+        # Assignment is an errored state, so determine the appropriate error reason so clients don't need to.
+        related_actions = assignment.actions.order_by('-modified').all()
+        if not related_actions:
+            logger.warning(
+                'LearnerContentAssignment with UUID %s is in an errored state, but has no related actions.',
+                assignment.uuid,
+            )
+            return None
+
+        # Get the most recently errored action.
+        return related_actions.filter(error_reason__isnull=False).order_by('-modified').first().error_reason

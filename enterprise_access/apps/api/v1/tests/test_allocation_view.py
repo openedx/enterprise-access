@@ -6,7 +6,6 @@ from uuid import uuid4
 
 import ddt
 from django.core.cache import cache as django_cache
-from django.core.exceptions import ValidationError
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.serializers import ValidationError

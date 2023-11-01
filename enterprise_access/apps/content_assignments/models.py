@@ -323,12 +323,16 @@ class LearnerContentAssignment(TimeStampedModel):
             QuerySet: LearnerContentAssignment queryset, same objects but with extra fields annotated.
         """
         # Annotate a derived field ``recent_action_time`` using pure ORM so that we can order_by() it later.
-        # ``recent_action_time`` is defined as the time of the most recent reminder, and falls back to assignment
-        # creation time if there are no reminders.
+        # ``recent_action_time`` is defined as the time of the most recent successful reminder, and falls
+        # back to assignment creation time if there are no successful reminders.
         new_queryset = queryset.annotate(
             recent_action_time=Coalesce(
                 # Time of most recent reminder.
-                Max('actions__completed_at', filter=Q(actions__action_type=AssignmentActions.REMINDED)),
+                Max('actions__completed_at', filter=(
+                    Q(actions__action_type=AssignmentActions.REMINDED) &
+                    Q(actions__error_reason__isnull=True) &
+                    Q(actions__completed_at__isnull=False)
+                )),
                 # Fallback to created time.
                 F('created'),
                 # Coerce CreationDateTimeField into a compatible field.
@@ -342,6 +346,8 @@ class LearnerContentAssignment(TimeStampedModel):
                 LearnerContentAssignmentAction.objects.filter(
                     assignment=OuterRef('uuid'),
                     action_type=AssignmentActions.REMINDED,
+                    completed_at__isnull=False,
+                    error_reason__isnull=True,
                 )
             )
         ).annotate(
@@ -361,6 +367,8 @@ class LearnerContentAssignment(TimeStampedModel):
                 LearnerContentAssignmentAction.objects.filter(
                     assignment=OuterRef('uuid'),
                     action_type=AssignmentActions.NOTIFIED,
+                    completed_at__isnull=False,
+                    error_reason__isnull=True,
                 )
             )
         ).annotate(
