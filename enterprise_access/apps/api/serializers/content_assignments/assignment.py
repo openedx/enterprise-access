@@ -130,13 +130,14 @@ class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentRe
             return None
 
         # Assignment is an errored state, so determine the appropriate error reason so clients don't need to.
-        related_actions = assignment.actions.order_by('-created').all()
-        if not related_actions:
+        related_actions_with_error = assignment.actions.filter(error_reason__isnull=False).order_by('-created').all()
+        if not related_actions_with_error:
             logger.warning(
-                'LearnerContentAssignment with UUID %s is in an errored state, but has no related actions.',
+                'LearnerContentAssignment with UUID %s is in an errored state, but has no related '
+                'actions in an error state.',
                 assignment.uuid,
             )
             return None
 
         # Get the most recently errored action.
-        return related_actions.filter(error_reason__isnull=False).order_by('-created').first().error_reason
+        return related_actions_with_error.first().error_reason
