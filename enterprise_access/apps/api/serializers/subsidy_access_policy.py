@@ -604,7 +604,7 @@ class SubsidyAccessPolicyAllocateRequestSerializer(serializers.Serializer):
         allow_empty=False,
         help_text='Learner emails to whom LearnerContentAssignments should be allocated.',
     )
-    content_key = ContentKeyField(
+    content_key = serializers.CharField(
         required=True,
         help_text='Course content_key to which these learners are assigned.',
     )
