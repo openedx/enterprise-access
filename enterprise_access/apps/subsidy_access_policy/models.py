@@ -270,8 +270,11 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 policy_type = args[policy_name_field_index]
             # get proxy class, by name, from current module
             proxy_class = getattr(sys.modules[__name__], policy_type)
-        finally:
-            return super().__new__(proxy_class)  # pylint: disable=lost-exception
+
+        except Exception:  # pylint: disable=broad-except
+            pass
+
+        return super().__new__(proxy_class)  # pylint: disable=lost-exception
 
     def subsidy_record(self):
         """
