@@ -24,6 +24,8 @@ class LearnerContentAssignmentActionSerializer(serializers.ModelSerializer):
     class Meta:
         model = LearnerContentAssignmentAction
         fields = [
+            'created',
+            'modified',
             'uuid',
             'action_type',
             'completed_at',

@@ -418,8 +418,7 @@ class LearnerContentAssignmentAction(TimeStampedModel):
     assignment = models.ForeignKey(
         LearnerContentAssignment,
         related_name="actions",
-        on_delete=models.SET_NULL,
-        null=True,
+        on_delete=models.CASCADE,
         help_text="The LearnerContentAssignment on which this action was performed.",
     )
     action_type = models.CharField(
