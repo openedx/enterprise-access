@@ -81,9 +81,9 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
 
     def get_actions(self, assignment):
         """
-        Resolves any associated actions to the assignment in chronological order based on modified timestamp.
+        Resolves any associated actions to the assignment in chronological order based on created timestamp.
         """
-        related_actions = assignment.actions.order_by('modified').all()
+        related_actions = assignment.actions.order_by('created').all()
         return LearnerContentAssignmentActionSerializer(
             related_actions,
             help_text='All actions associated with this assignment.',
@@ -130,7 +130,7 @@ class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentRe
             return None
 
         # Assignment is an errored state, so determine the appropriate error reason so clients don't need to.
-        related_actions = assignment.actions.order_by('-modified').all()
+        related_actions = assignment.actions.order_by('-created').all()
         if not related_actions:
             logger.warning(
                 'LearnerContentAssignment with UUID %s is in an errored state, but has no related actions.',
@@ -139,4 +139,4 @@ class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentRe
             return None
 
         # Get the most recently errored action.
-        return related_actions.filter(error_reason__isnull=False).order_by('-modified').first().error_reason
+        return related_actions.filter(error_reason__isnull=False).order_by('-created').first().error_reason
