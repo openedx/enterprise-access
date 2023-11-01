@@ -525,8 +525,13 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
 
     @extend_schema_field(serializers.IntegerField)
     def get_remaining_balance_per_user(self, obj):
-        lms_user_id = self.context.get('lms_user_id')
-        return obj.remaining_balance_per_user(lms_user_id=lms_user_id)
+        """
+        The remaining balance per user for this policy, in USD cents, if applicable.
+        """
+        if hasattr(obj, 'remaining_balance_per_user'):
+            lms_user_id = self.context.get('lms_user_id')
+            return obj.remaining_balance_per_user(lms_user_id=lms_user_id)
+        return None
 
     @extend_schema_field(serializers.IntegerField)
     def get_remaining_balance(self, obj):
