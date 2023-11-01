@@ -6,8 +6,10 @@ from uuid import uuid4
 
 import ddt
 from django.core.cache import cache as django_cache
+from django.core.exceptions import ValidationError
 from rest_framework import status
 from rest_framework.reverse import reverse
+from rest_framework.serializers import ValidationError
 
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
 from enterprise_access.apps.content_assignments.tests.factories import (
@@ -30,6 +32,8 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
 from enterprise_access.apps.subsidy_access_policy.models import AssignedLearnerCreditAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
 from test_utils import APITest, APITestWithMocks
+
+from ...serializers import SubsidyAccessPolicyAllocateRequestSerializer
 
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:subsidy-access-policies-list')
 
@@ -106,6 +110,57 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             'context': str(self.enterprise_uuid),
         }])
         self.addCleanup(django_cache.clear)  # clear any leftover allocation locks
+
+    @ddt.data(
+        {
+            'learner_emails': [],
+            'content_key': 'course+abc',
+            'content_price_cents': 100,
+            'error_regex': 'This list may not be empty',
+        },
+        {
+            'learner_emails': ['not-a-valid-email'],
+            'content_key': 'course+abc',
+            'content_price_cents': 100,
+            'error_regex': 'Enter a valid email address',
+        },
+        {
+            'learner_emails': ['everything-valid@example.com'],
+            'content_key': 'course+abc',  # valid course key
+            'content_price_cents': 100,
+            'error_regex': '',
+        },
+        {
+            'learner_emails': ['everything-valid@example.com'],
+            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',  # valid course run key
+            'content_price_cents': 100,
+            'error_regex': '',
+        },
+        {
+            'learner_emails': ['everything-valid@example.com'],
+            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',  # valid course run key
+            'content_price_cents': -100,
+            'error_regex': 'Ensure this value is greater than or equal to 0',
+        },
+    )
+    @ddt.unpack
+    def test_request_serialization(self, learner_emails, content_key, content_price_cents, error_regex):
+        """
+        Validates that the allocation request serializer appropriately accepts
+        or rejects request payloads.
+        """
+        request_payload = {
+            'learner_emails': learner_emails,
+            'content_key': content_key,
+            'content_price_cents': content_price_cents,
+        }
+        if error_regex:
+            with self.assertRaisesRegex(ValidationError, error_regex):
+                serializer = SubsidyAccessPolicyAllocateRequestSerializer(data=request_payload)
+                serializer.is_valid(raise_exception=True)
+        else:
+            serializer = SubsidyAccessPolicyAllocateRequestSerializer(data=request_payload)
+            self.assertTrue(serializer.is_valid())
 
     @mock.patch.object(AssignedLearnerCreditAccessPolicy, 'can_allocate', autospec=True)
     @mock.patch(
