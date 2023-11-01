@@ -347,8 +347,9 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
                     'uuid': str(action.uuid),
                     'action_type': action.action_type,
                     'completed_at': action.completed_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    'error_reason': action.error_reason,
                 }
-                for action in self.assignment_allocated_pre_link.actions.order_by('modified')
+                for action in self.assignment_allocated_pre_link.actions.order_by('created')
             ],
             'error_reason': None,
             'recent_action': {
@@ -594,11 +595,11 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
                     'modified': action.modified.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                     'uuid': str(action.uuid),
                     'action_type': action.action_type,
-                    'completed_at': str(action.completed_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ')),
+                    'completed_at': action.completed_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    'error_reason': action.error_reason,
                 }
-                for action in self.requester_assignment_accepted.actions.order_by('completed_at')
+                for action in self.requester_assignment_accepted.actions.order_by('created')
             ],
-            'error_reason': None,
         }
 
     def test_retrieve_other_assignment_not_found(self):
