@@ -78,10 +78,13 @@ CORS_ORIGIN_WHITELIST = [
     'http://localhost:8734',  # frontend-app-learner-portal-enterprise
     'http://localhost:18450',  # frontend-app-support-tools
 ]
+# END CORS
+
+# CSRF CONFIG
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:1991',  # frontend-app-admin-portal
 ]
-# END CORS
+# END CSRF CONFIG
 
 ECOMMERCE_URL = 'http://edx.devstack.ecommerce:18130'
 LICENSE_MANAGER_URL = 'http://license-manager.app:18170'
