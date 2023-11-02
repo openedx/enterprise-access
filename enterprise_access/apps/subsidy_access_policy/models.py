@@ -274,7 +274,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         except Exception:  # pylint: disable=broad-except
             pass
 
-        return super().__new__(proxy_class)  # pylint: disable=lost-exception
+        return super().__new__(proxy_class)
 
     def subsidy_record(self):
         """

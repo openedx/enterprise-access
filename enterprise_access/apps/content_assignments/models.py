@@ -323,8 +323,8 @@ class LearnerContentAssignment(TimeStampedModel):
             QuerySet: LearnerContentAssignment queryset, same objects but with extra fields annotated.
         """
         # Annotate a derived field ``recent_action_time`` using pure ORM so that we can order_by() it later.
-        # ``recent_action_time`` is defined as the time of the most recent reminder, and falls back to assignment
-        # creation time if there are no reminders.
+        # ``recent_action_time`` is defined as the time of the most recent successful reminder, and falls
+        # back to assignment creation time if there are no successful reminders.
         new_queryset = queryset.annotate(
             recent_action_time=Coalesce(
                 # Time of most recent reminder.
@@ -342,6 +342,8 @@ class LearnerContentAssignment(TimeStampedModel):
                 LearnerContentAssignmentAction.objects.filter(
                     assignment=OuterRef('uuid'),
                     action_type=AssignmentActions.REMINDED,
+                    error_reason__isnull=True,
+                    completed_at__isnull=False,
                 )
             )
         ).annotate(
@@ -361,6 +363,8 @@ class LearnerContentAssignment(TimeStampedModel):
                 LearnerContentAssignmentAction.objects.filter(
                     assignment=OuterRef('uuid'),
                     action_type=AssignmentActions.NOTIFIED,
+                    error_reason__isnull=True,
+                    completed_at__isnull=False,
                 )
             )
         ).annotate(
@@ -418,8 +422,7 @@ class LearnerContentAssignmentAction(TimeStampedModel):
     assignment = models.ForeignKey(
         LearnerContentAssignment,
         related_name="actions",
-        on_delete=models.SET_NULL,
-        null=True,
+        on_delete=models.CASCADE,
         help_text="The LearnerContentAssignment on which this action was performed.",
     )
     action_type = models.CharField(
@@ -451,6 +454,9 @@ class LearnerContentAssignmentAction(TimeStampedModel):
     )
 
     history = HistoricalRecords()
+
+    class Meta:
+        ordering = ['created']
 
     def __str__(self):
         return (

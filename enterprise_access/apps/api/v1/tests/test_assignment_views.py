@@ -342,13 +342,16 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             'transaction_uuid': self.assignment_allocated_pre_link.transaction_uuid,
             'actions': [
                 {
+                    'created': action.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    'modified': action.modified.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                     'uuid': str(action.uuid),
                     'action_type': action.action_type,
                     'completed_at': action.completed_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
-                    'error_reason': None,
+                    'error_reason': action.error_reason,
                 }
-                for action in self.assignment_allocated_pre_link.actions.order_by('completed_at')
+                for action in self.assignment_allocated_pre_link.actions.order_by('created')
             ],
+            'error_reason': None,
             'recent_action': {
                 'action_type': AssignmentRecentActionTypes.ASSIGNED,
                 'timestamp': self.assignment_allocated_pre_link.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
@@ -588,12 +591,14 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             'transaction_uuid': str(self.requester_assignment_accepted.transaction_uuid),
             'actions': [
                 {
+                    'created': action.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    'modified': action.modified.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                     'uuid': str(action.uuid),
                     'action_type': action.action_type,
-                    'completed_at': str(action.completed_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ')),
-                    'error_reason': None,
+                    'completed_at': action.completed_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    'error_reason': action.error_reason,
                 }
-                for action in self.requester_assignment_accepted.actions.order_by('completed_at')
+                for action in self.requester_assignment_accepted.actions.order_by('created')
             ],
         }
 

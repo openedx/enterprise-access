@@ -24,6 +24,8 @@ class LearnerContentAssignmentActionSerializer(serializers.ModelSerializer):
     class Meta:
         model = LearnerContentAssignmentAction
         fields = [
+            'created',
+            'modified',
             'uuid',
             'action_type',
             'completed_at',
@@ -100,10 +102,35 @@ class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentRe
         ),
         choices=AssignmentLearnerStates.CHOICES,
     )
+    error_reason = serializers.SerializerMethodField()
 
     class Meta(LearnerContentAssignmentResponseSerializer.Meta):
         fields = LearnerContentAssignmentResponseSerializer.Meta.fields + [
             'recent_action',
             'learner_state',
+            'error_reason',
         ]
         read_only_fields = fields
+
+    @extend_schema_field(serializers.CharField)
+    def get_error_reason(self, assignment):
+        """
+        Resolves the error reason for the assignment, if any, for display purposes based on
+        any associated actions.
+        """
+        # If the assignment is not in an errored state, there should be no error reason.
+        if assignment.state != LearnerContentAssignmentStateChoices.ERRORED:
+            return None
+
+        # Assignment is an errored state, so determine the appropriate error reason so clients don't need to.
+        related_actions_with_error = assignment.actions.filter(error_reason__isnull=False).order_by('-created')
+        if not related_actions_with_error:
+            logger.warning(
+                'LearnerContentAssignment with UUID %s is in an errored state, but has no related '
+                'actions in an error state.',
+                assignment.uuid,
+            )
+            return None
+
+        # Get the most recently errored action.
+        return related_actions_with_error.first().error_reason
