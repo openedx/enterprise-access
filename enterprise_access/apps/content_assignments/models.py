@@ -342,8 +342,8 @@ class LearnerContentAssignment(TimeStampedModel):
                 LearnerContentAssignmentAction.objects.filter(
                     assignment=OuterRef('uuid'),
                     action_type=AssignmentActions.REMINDED,
-                    completed_at__isnull=False,
                     error_reason__isnull=True,
+                    completed_at__isnull=False,
                 )
             )
         ).annotate(
@@ -363,8 +363,8 @@ class LearnerContentAssignment(TimeStampedModel):
                 LearnerContentAssignmentAction.objects.filter(
                     assignment=OuterRef('uuid'),
                     action_type=AssignmentActions.NOTIFIED,
-                    completed_at__isnull=False,
                     error_reason__isnull=True,
+                    completed_at__isnull=False,
                 )
             )
         ).annotate(
@@ -454,6 +454,9 @@ class LearnerContentAssignmentAction(TimeStampedModel):
     )
 
     history = HistoricalRecords()
+
+    class Meta:
+        ordering = ['created']
 
     def __str__(self):
         return (

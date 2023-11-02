@@ -60,7 +60,10 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
     # This causes the related AssignmentConfiguration to be serialized as a UUID (in the response).
     assignment_configuration = serializers.PrimaryKeyRelatedField(read_only=True)
 
-    actions = serializers.SerializerMethodField()
+    actions = LearnerContentAssignmentActionSerializer(
+        help_text='All actions associated with this assignment.',
+        many=True,
+    )
 
     class Meta:
         model = LearnerContentAssignment
@@ -78,17 +81,6 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
             'actions',
         ]
         read_only_fields = fields
-
-    def get_actions(self, assignment):
-        """
-        Resolves any associated actions to the assignment in chronological order based on created timestamp.
-        """
-        related_actions = assignment.actions.order_by('created').all()
-        return LearnerContentAssignmentActionSerializer(
-            related_actions,
-            help_text='All actions associated with this assignment.',
-            many=True,
-        ).data
 
 
 class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentResponseSerializer):
@@ -120,6 +112,7 @@ class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentRe
         ]
         read_only_fields = fields
 
+    @extend_schema_field(serializers.CharField)
     def get_error_reason(self, assignment):
         """
         Resolves the error reason for the assignment, if any, for display purposes based on
@@ -130,7 +123,7 @@ class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentRe
             return None
 
         # Assignment is an errored state, so determine the appropriate error reason so clients don't need to.
-        related_actions_with_error = assignment.actions.filter(error_reason__isnull=False).order_by('-created').all()
+        related_actions_with_error = assignment.actions.filter(error_reason__isnull=False).order_by('-created')
         if not related_actions_with_error:
             logger.warning(
                 'LearnerContentAssignment with UUID %s is in an errored state, but has no related '

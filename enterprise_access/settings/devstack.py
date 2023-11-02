@@ -74,9 +74,12 @@ CELERY_TASK_ALWAYS_EAGER = (
 
 # CORS CONFIG
 CORS_ORIGIN_WHITELIST = [
-    'http://localhost:1991',  # frontend-admin-portal
+    'http://localhost:1991',  # frontend-app-admin-portal
     'http://localhost:8734',  # frontend-app-learner-portal-enterprise
     'http://localhost:18450',  # frontend-app-support-tools
+]
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:1991',  # frontend-app-admin-portal
 ]
 # END CORS
 
