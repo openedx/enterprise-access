@@ -435,7 +435,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         assignment records as we'd expect.
         """
         mock_get_and_cache_content_metadata.return_value = {
-            'title': self.content_title,
+            'content_title': self.content_title,
         }
         mock_aggregates_for_policy.return_value = {
             'total_quantity': -100 * 100,

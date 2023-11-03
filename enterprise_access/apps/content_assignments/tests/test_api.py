@@ -225,7 +225,7 @@ class TestContentAssignmentApi(TestCase):
             f'{name}@foo.com' for name in ('alice', 'bob', 'carol', 'david', 'eugene')
         ]
         mock_get_and_cache_content_metadata.return_value = {
-            'title': content_title,
+            'content_title': content_title,
         }
 
         allocated_assignment = LearnerContentAssignmentFactory.create(
