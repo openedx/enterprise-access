@@ -12,6 +12,7 @@ from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import CourseLocator
 
+from enterprise_access.apps.content_assignments.tasks import send_cancel_email_for_pending_assignment
 from enterprise_access.apps.content_metadata.api import get_and_cache_catalog_content_metadata
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
@@ -442,6 +443,9 @@ def cancel_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
         assignment_to_cancel.state = LearnerContentAssignmentStateChoices.CANCELLED
 
     cancelled_assignments = _update_and_refresh_assignments(cancelable_assignments, ['state'])
+    for cancelled_assignment in cancelled_assignments:
+        send_cancel_email_for_pending_assignment.delay(cancelled_assignment.uuid)
+
     return {
         'cancelled': list(set(cancelled_assignments) | already_cancelled_assignments),
         'non_cancelable': list(non_cancelable_assignments),

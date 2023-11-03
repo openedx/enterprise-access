@@ -3,12 +3,16 @@ Tasks for content_assignments app.
 """
 
 import logging
+from datetime import datetime
 
 from celery import shared_task
 from django.apps import apps
 from django.conf import settings
 
+from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
+from enterprise_access.apps.content_assignments.constants import AssignmentActionErrors, AssignmentActions
+from enterprise_access.apps.content_assignments.models import LearnerContentAssignmentAction
 from enterprise_access.tasks import LoggedTaskWithRetry
 
 from .constants import LearnerContentAssignmentStateChoices
@@ -75,3 +79,55 @@ def create_pending_enterprise_learner_for_assignment_task(learner_content_assign
         f'Successfully linked learner to enterprise {enterprise_customer_uuid} '
         f'for assignment {assignment.uuid}'
     )
+
+
+@shared_task(base=LoggedTaskWithRetry)
+def send_cancel_email_for_pending_assignment(cancelled_assignment_uuid):
+    """
+    Send email via braze for cancelling pending assignment
+
+    Args:
+        cancelled_assignment: (string) the cancelled assignment uuid
+    """
+    learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
+
+    try:
+        assignment = learner_content_assignment_model.objects.get(uuid=cancelled_assignment_uuid)
+    except learner_content_assignment_model.DoesNotExist:
+        logger.warning(f'request with uuid: {cancelled_assignment_uuid} does not exist.')
+        return
+    learner_content_assignment_action = LearnerContentAssignmentAction(
+        assignment=assignment, action_type=AssignmentActions.CANCELLED_NOTIFICATION
+    )
+
+    braze_trigger_properties = {}
+    braze_client_instance = BrazeApiClient()
+    lms_client = LmsApiClient()
+    enterprise_customer_uuid = assignment.assignment_configuration.enterprise_customer_uuid
+    enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
+    lms_user_id = assignment.lms_user_id
+    admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
+    braze_trigger_properties['contact_admin_link'] = braze_client_instance.generate_mailto_link(admin_emails)
+
+    try:
+        recipient = braze_client_instance.create_recipient(
+            user_email=assignment.learner_email,
+            lms_user_id=assignment.lms_user_id
+        )
+        braze_trigger_properties["organization"] = enterprise_customer_data['name']
+        braze_trigger_properties["course_name"] = assignment.content_title
+        braze_client_instance.send_campaign_message(
+            settings.BRAZE_ASSIGNMENT_CANCELLED_NOTIFICATION_CAMPAIGN,
+            recipients=[recipient],
+            trigger_properties=braze_trigger_properties,
+        )
+        learner_content_assignment_action.completed_at = datetime.now()
+        learner_content_assignment_action.save()
+        logger.info(f'Sending braze campaign message for cancelled assignment {assignment}')
+        return
+    except Exception as exc:
+        logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
+        learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
+        learner_content_assignment_action.traceback = exc
+        learner_content_assignment_action.save()
+        raise

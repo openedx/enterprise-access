@@ -321,7 +321,8 @@ class TestContentAssignmentApi(TestCase):
             (cancelled_assignment, errored_assignment, created_assignment)
         ], any_order=True)
 
-    def test_cancel_assignments_happy_path(self):
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_cancel_email_for_pending_assignment')
+    def test_cancel_assignments_happy_path(self, mock_notify):
         """
         Tests the allocation of new assignments against a given configuration.
         """
@@ -383,6 +384,9 @@ class TestContentAssignmentApi(TestCase):
         self.assertEqual(accepted_assignment.state, LearnerContentAssignmentStateChoices.ACCEPTED)
         self.assertEqual(cancelled_assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
         self.assertEqual(errored_assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
+        mock_notify.delay.assert_has_calls([
+            mock.call(assignment.uuid) for assignment in (allocated_assignment, errored_assignment)
+        ], any_order=True)
 
     @mock.patch(
         'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task'
