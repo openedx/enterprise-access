@@ -9,7 +9,7 @@ from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from rest_framework import authentication, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.filters import OrderingFilter
+from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
 from enterprise_access.apps.api import filters, serializers, utils
@@ -48,7 +48,7 @@ class LearnerContentAssignmentAdminViewSet(
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = serializers.LearnerContentAssignmentAdminResponseSerializer
     authentication_classes = (JwtAuthentication, authentication.SessionAuthentication)
-    filter_backends = (filters.NoFilterOnDetailBackend, OrderingFilter)
+    filter_backends = (filters.NoFilterOnDetailBackend, OrderingFilter, SearchFilter)
     filterset_class = filters.LearnerContentAssignmentAdminFilter
     pagination_class = PaginationWithPageCount
     lookup_field = 'uuid'
@@ -58,6 +58,8 @@ class LearnerContentAssignmentAdminViewSet(
     ordering_fields = ['recent_action_time', 'learner_state_sort_order']
     # `ordering` defines the default order.
     ordering = ['-recent_action_time']
+
+    search_fields = ['content_title', 'learner_email']
 
     @property
     def requested_assignment_configuration_uuid(self):
