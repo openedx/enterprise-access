@@ -291,7 +291,7 @@ def _get_content_title(assignment_configuration, content_key):
         assignment_configuration.enterprise_customer_uuid,
         content_key,
     )
-    return content_metadata.get('title')
+    return content_metadata.get('content_title')
 
 
 def _create_new_assignments(assignment_configuration, learner_emails, content_key, content_quantity):
