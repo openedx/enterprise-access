@@ -12,12 +12,25 @@ from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import CourseLocator
 
+from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
 
 from .constants import LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
+from .utils import chunks
 
 logger = logging.getLogger(__name__)
+
+# The number of emails we are allowed to filter on in a single User request.
+#
+# Batch size derivation inputs:
+#   * The old MySQL client limit was 1 MB for a long time.
+#   * 254 is the maximum number of characters in an email.
+#   * 258 is the length an email plus 4 character delimiter: `', '`
+#   * Divide result by 10 in case we are off by an order of magnitude.
+#
+# Batch size derivation formula: ((1 MB) / (258 B)) / 10 ≈ 350
+USER_EMAIL_READ_BATCH_SIZE = 350
 
 
 class AllocationException(Exception):
@@ -233,6 +246,11 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     # new assignments for these.
     learner_emails_with_existing_assignments = set()
 
+    # Try to populate lms_user_id field on any existing assignments found.  We already ran this function on these
+    # assignments (when they were created in a prior request), but time has passed since then so the outcome might be
+    # different this time. It's technically possible some learners have registered since the last request.
+    assignments_with_updated_lms_user_id = _try_populate_assignments_lms_user_id(existing_assignments)
+
     # Split up the existing assignment records by state
     for assignment in existing_assignments:
         learner_emails_with_existing_assignments.add(assignment.learner_email)
@@ -244,10 +262,20 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
         else:
             already_allocated_or_accepted.append(assignment)
 
+    # These two sets of updated assignments may contain duplicates when combined. Since the duplicates are just
+    # references to the same assignment object, and django model instances are hashable (on PK), they can be
+    # de-duplicated using set union.
+    existing_assignments_to_update = set(cancelled_or_errored_to_update).union(assignments_with_updated_lms_user_id)
+
     # Bulk update and get a list of refreshed objects
     updated_assignments = _update_and_refresh_assignments(
-        cancelled_or_errored_to_update,
-        ['content_quantity', 'state']
+        existing_assignments_to_update,
+        [
+            # `lms_user_id` is updated via the _try_populate_assignments_lms_user_id() function.
+            'lms_user_id',
+            # `content_quantity` and `state` are updated via the for-loop above.
+            'content_quantity', 'state',
+        ]
     )
 
     # Narrow down creation list of learner emails
@@ -294,10 +322,53 @@ def _get_content_title(assignment_configuration, content_key):
     return content_metadata.get('content_title')
 
 
+def _try_populate_assignments_lms_user_id(assignments):
+    """
+    For all given assignments, try to populate the lms_user_id field based on a matching User.
+
+    Notes:
+    * This function does NOT save() the assignment record, only alters the given objects as a side-effect..
+    * This is a best-effort only; most of the time a User will not exist for an assignment, and this function is a no-op
+      for that assignment.
+    * If multiple User records match based on email, choice is non-deterministic.
+    * Performance: This results in one or more reads against the User model.  The chunk size has been tuned to minimize
+      the number of reads while simultaneously avoiding hard limits on statement length.
+
+    Args:
+        assignments (list of LearnerContentAssignment):
+            The unsaved assignments on which to update the lms_user_id field.
+
+    Returns:
+        list of LearnerContentAssignment: A non-strict subset of the input assignments, only the ones altered.
+    """
+    # only operate on assignments that actually need to be updated.
+    assignments_with_empty_lms_user_id = [assignment for assignment in assignments if assignment.lms_user_id is None]
+
+    assignments_to_save = []
+
+    for assignment_chunk in chunks(assignments_with_empty_lms_user_id, USER_EMAIL_READ_BATCH_SIZE):
+        emails = [assignment.learner_email for assignment in assignment_chunk]
+        # Construct a list of tuples containing (email, lms_user_id) for every assignment in this chunk.
+        email_lms_user_id = User.objects.filter(
+            email__in=emails,  # this is the part that could exceed max statement length if batch size is too large.
+            lms_user_id__isnull=False,
+        ).values_list('email', 'lms_user_id')
+        # dict() on a list of 2-tuples treats the first elements as keys and second elements as values.
+        lms_user_id_by_email = dict(email_lms_user_id)
+        for assignment in assignment_chunk:
+            lms_user_id = lms_user_id_by_email.get(assignment.learner_email)
+            if lms_user_id:
+                assignment.lms_user_id = lms_user_id
+                assignments_to_save.append(assignment)
+
+    return assignments_to_save
+
+
 def _create_new_assignments(assignment_configuration, learner_emails, content_key, content_quantity):
     """
     Helper to bulk save new LearnerContentAssignment instances.
     """
+    # First, prepare assignment objects using data available in-memory only.
     assignments_to_create = []
     for learner_email in learner_emails:
         content_title = _get_content_title(assignment_configuration, content_key)
@@ -309,8 +380,19 @@ def _create_new_assignments(assignment_configuration, learner_emails, content_ke
             content_quantity=content_quantity,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )
-        assignment.full_clean()
         assignments_to_create.append(assignment)
+
+    # Next, try to populate the lms_user_id field on all assignments to be created (resulting in reads against User).
+    # Note: This covers the case where an admin assigns content to a learner AFTER they register.  For the case where an
+    # admin assigns content to a learner BEFORE they register, see the User post_save hook implemented in signals.py.
+    #
+    # Do not store result because we are simply relying on the side-effect of the function (a subset of
+    # `assignments_to_create` has been altered).
+    _ = _try_populate_assignments_lms_user_id(assignments_to_create)
+
+    # Validate all assignments to be created.
+    for assignment in assignments_to_create:
+        assignment.full_clean()
 
     # Do the bulk creation to save these records
     return LearnerContentAssignment.bulk_create(assignments_to_create)

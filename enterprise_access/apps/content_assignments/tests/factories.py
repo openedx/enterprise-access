@@ -37,7 +37,7 @@ class AssignmentConfigurationFactory(factory.django.DjangoModelFactory):
 
 class LearnerContentAssignmentFactory(factory.django.DjangoModelFactory):
     """
-    Base Test factory for the ``LearnerContentAssisgnment`` model.
+    Base Test factory for the ``LearnerContentAssignment`` model.
     """
     class Meta:
         model = LearnerContentAssignment
