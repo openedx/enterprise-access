@@ -2,7 +2,7 @@
 Tests for Subsidy Access Policy Assignment Allocation view(s).
 """
 from unittest import mock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import ddt
 from django.core.cache import cache as django_cache
@@ -422,8 +422,12 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
         return_value=mock.MagicMock(),
     )
+    @mock.patch(
+        'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task'
+    )
     def test_allocate_happy_path_e2e(
         self,
+        mock_pending_learner_task,
         mock_get_and_cache_content_metadata,
         mock_aggregates_for_policy,
         mock_subsidy_balance,
@@ -481,6 +485,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         mock_catalog_inclusion.assert_called_once_with(self.assigned_learner_credit_policy, self.content_key)
         mock_aggregates_for_policy.assert_called_once_with(self.assigned_learner_credit_policy)
         mock_subsidy_balance.assert_called_once_with(self.assigned_learner_credit_policy)
+        mock_pending_learner_task.delay.assert_called_once_with(new_allocation.uuid)
 
     @mock.patch.object(
         AssignedLearnerCreditAccessPolicy, 'catalog_contains_content_key', autospec=True, return_value=False
@@ -694,8 +699,12 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
         return_value=mock.MagicMock(),
     )
+    @mock.patch(
+        'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task'
+    )
     def test_allocate_too_much_existing_allocation_e2e(
         self,
+        mock_pending_learner_task,
         mock_get_and_cache_content_metadata,  # pylint: disable=unused-argument
         mock_lms_api_client,
         mock_is_subsidy_active,  # pylint: disable=unused-argument
@@ -753,6 +762,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             ],
             response.json(),
         )
+        mock_pending_learner_task.delay.assert_called_once_with(UUID(ok_response.json()['created'][0]['uuid']))
 
     @mock.patch.object(
         AssignedLearnerCreditAccessPolicy, 'subsidy_balance', autospec=True,

@@ -218,10 +218,13 @@ class TestContentAssignmentApi(TestCase):
             )
 
     @mock.patch(
+        'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task'
+    )
+    @mock.patch(
         'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
         return_value=mock.MagicMock(),
     )
-    def test_allocate_assignments_happy_path(self, mock_get_and_cache_content_metadata):
+    def test_allocate_assignments_happy_path(self, mock_get_and_cache_content_metadata, mock_pending_learner_task):
         """
         Tests the allocation of new assignments against a given configuration.
         """
@@ -312,6 +315,12 @@ class TestContentAssignmentApi(TestCase):
         self.assertEqual(created_assignment.content_quantity, -1 * content_price_cents)
         self.assertEqual(created_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
 
+        # Assert that an async task was enqueued for each of the updated and created assignments
+        mock_pending_learner_task.delay.assert_has_calls([
+            mock.call(assignment.uuid) for assignment in
+            (cancelled_assignment, errored_assignment, created_assignment)
+        ], any_order=True)
+
     def test_cancel_assignments_happy_path(self):
         """
         Tests the allocation of new assignments against a given configuration.
@@ -376,6 +385,9 @@ class TestContentAssignmentApi(TestCase):
         self.assertEqual(errored_assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
 
     @mock.patch(
+        'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task'
+    )
+    @mock.patch(
         'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
         return_value=mock.MagicMock(),
     )
@@ -425,6 +437,7 @@ class TestContentAssignmentApi(TestCase):
     def test_allocate_assignments_set_lms_user_id(
         self,
         mock_get_and_cache_content_metadata,
+        mock_pending_learner_task,
         user_exists,
         existing_assignment_state,
     ):
@@ -470,6 +483,11 @@ class TestContentAssignmentApi(TestCase):
             assert assignment.lms_user_id == lms_user_id
         else:
             assert assignment.lms_user_id is None
+
+        if not existing_assignment_state or (
+            existing_assignment_state in (LearnerContentAssignmentStateChoices.REALLOCATE_STATES)
+        ):
+            mock_pending_learner_task.delay.assert_called_once_with(assignment.uuid)
 
     @mock.patch(
         'enterprise_access.apps.content_assignments.api.USER_EMAIL_READ_BATCH_SIZE',

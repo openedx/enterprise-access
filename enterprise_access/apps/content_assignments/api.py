@@ -18,6 +18,7 @@ from enterprise_access.apps.subsidy_access_policy.content_metadata_api import ge
 
 from .constants import LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
+from .tasks import create_pending_enterprise_learner_for_assignment_task
 from .utils import chunks
 
 logger = logging.getLogger(__name__)
@@ -290,6 +291,10 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
         content_quantity,
     )
 
+    # Enqueue an asynchronous task to link assigned learners to the customer
+    for assignment in updated_assignments + created_assignments:
+        create_pending_enterprise_learner_for_assignment_task.delay(assignment.uuid)
+
     # Return a mapping of the action we took to lists of relevant assignment records.
     return {
         'updated': updated_assignments,
@@ -307,8 +312,10 @@ def _update_and_refresh_assignments(assignment_records, fields_changed):
     LearnerContentAssignment.bulk_update(assignment_records, fields_changed)
 
     # Get a list of refreshed objects that we just updated
-    return LearnerContentAssignment.objects.filter(
-        uuid__in=[record.uuid for record in assignment_records],
+    return list(
+        LearnerContentAssignment.objects.filter(
+            uuid__in=[record.uuid for record in assignment_records],
+        )
     )
 
 
