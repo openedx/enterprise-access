@@ -367,8 +367,8 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
     )
     def test_list(self, role_context_dict):
         """
-        Test that the list view returns a 200 response code and the expected (list) results of serialization.  It should
-        also allow system-wide admins and operators.
+        Test that the list view returns a 200 response code and the expected (list) results of serialization, including
+        the `learner_state_counts` overview metadata. It should also allow system-wide admins and operators.
 
         This also tests that only Assignment in the requested AssignmentConfiguration are returned.
         """
@@ -377,14 +377,22 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
 
         # Send a list request for all Assignments for the main test customer.
         response = self.client.get(ADMIN_ASSIGNMENTS_LIST_ENDPOINT)
+        response_json = response.json()
 
         # Only the Assignments for the main customer is returned, and not that of the other customer.
         expected_assignments_for_enterprise_customer = LearnerContentAssignment.objects.filter(
             assignment_configuration__enterprise_customer_uuid=TEST_ENTERPRISE_UUID
         )
         expected_assignment_uuids = {assignment.uuid for assignment in expected_assignments_for_enterprise_customer}
-        actual_assignment_uuids = {UUID(assignment['uuid']) for assignment in response.json()['results']}
+        actual_assignment_uuids = {UUID(assignment['uuid']) for assignment in response_json['results']}
         assert actual_assignment_uuids == expected_assignment_uuids
+
+        expected_learner_state_counts = [
+            {'count': 1, 'learner_state': 'waiting'},
+            {'count': 1, 'learner_state': 'notifying'},
+            {'count': 1, 'learner_state': 'failed'},
+        ]
+        assert response_json['learner_state_counts'] == expected_learner_state_counts
 
     @ddt.data(
         None,

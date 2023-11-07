@@ -221,6 +221,9 @@ class LearnerContentAssignmentWithContentMetadataResponseSerializer(LearnerConte
 
     @extend_schema_field(ContentMetadataForAssignmentSerializer)
     def get_content_metadata(self, obj):
+        """
+        Serializers content metadata for the assignment, if available.
+        """
         metadata_lookup = self.context.get('content_metadata')
         if metadata_lookup and (assignment_content_metadata := metadata_lookup.get(obj.content_key)):
             return ContentMetadataForAssignmentSerializer(assignment_content_metadata).data

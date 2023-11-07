@@ -3,8 +3,8 @@ Admin-facing REST API views for LearnerContentAssignments in the content_assignm
 """
 import logging
 
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from django.db.models import Count
+from drf_spectacular.utils import extend_schema
 from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from rest_framework import authentication, mixins, permissions, status, viewsets
@@ -37,6 +37,40 @@ def assignment_admin_permission_fn(request, *args, assignment_configuration_uuid
     return utils.get_assignment_config_customer_uuid(assignment_configuration_uuid)
 
 
+class PaginationWithPageCountAndLearnerStateCounts(PaginationWithPageCount):
+    """
+    Custom paginator class that adds a `learner_state_counts` field to the response schema such that
+    it shows in the DRF Spectacular generated docs.
+    """
+
+    def get_paginated_response_schema(self, schema):
+        """
+        Annotate the paginated response schema with the extra fields provided by edx_rest_framework_extensions'
+        DefaultPagination class (e.g., `page_count`).
+        """
+        response_schema = super().get_paginated_response_schema(schema)
+        response_schema['properties']['learner_state_counts'] = {
+            'type': 'array',
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'learner_state': {
+                        'type': 'string',
+                        'description': 'The learner state for the assignment',
+                        'example': 'waiting',
+                    },
+                    'count': {
+                        'type': 'integer',
+                        'description': 'The number of assignments in this state',
+                        'example': 123,
+                    },
+                },
+            },
+
+        }
+        return response_schema
+
+
 class LearnerContentAssignmentAdminViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -50,7 +84,7 @@ class LearnerContentAssignmentAdminViewSet(
     authentication_classes = (JwtAuthentication, authentication.SessionAuthentication)
     filter_backends = (filters.NoFilterOnDetailBackend, OrderingFilter, SearchFilter)
     filterset_class = filters.LearnerContentAssignmentAdminFilter
-    pagination_class = PaginationWithPageCount
+    pagination_class = PaginationWithPageCountAndLearnerStateCounts
     lookup_field = 'uuid'
 
     # Settings that control list ordering, powered by OrderingFilter.
@@ -116,7 +150,16 @@ class LearnerContentAssignmentAdminViewSet(
         """
         Lists ``LearnerContentAssignment`` records, filtered by the given query parameters.
         """
-        return super().list(request, *args, **kwargs)
+        response = super().list(request, *args, **kwargs)
+        queryset = self.get_queryset()
+        learner_state_counts = queryset.values('learner_state') \
+            .exclude(learner_state__isnull=True) \
+            .annotate(count=Count('uuid', distinct=True)) \
+            .order_by('-count')
+
+        # Add the learner_state_overview to the default response.
+        response.data['learner_state_counts'] = learner_state_counts
+        return response
 
     @extend_schema(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
