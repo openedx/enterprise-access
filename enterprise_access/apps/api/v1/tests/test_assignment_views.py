@@ -388,9 +388,9 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         assert actual_assignment_uuids == expected_assignment_uuids
 
         expected_learner_state_counts = [
-            { 'count': 1, 'learner_state': 'waiting' },
-            { 'count': 1, 'learner_state': 'notifying' },
-            { 'count': 1, 'learner_state': 'failed' },
+            {'count': 1, 'learner_state': 'waiting'},
+            {'count': 1, 'learner_state': 'notifying'},
+            {'count': 1, 'learner_state': 'failed'},
         ]
         assert response_json['learner_state_counts'] == expected_learner_state_counts
 
