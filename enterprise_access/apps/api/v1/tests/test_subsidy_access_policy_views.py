@@ -1398,6 +1398,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
                     'enroll_by_date': '2021-01-01 12:00:00Z',
                     'content_price': 123,
                 },
+                'course_type': 'verified-audit',
                 'owners': [
                     {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
                 ],
@@ -1434,6 +1435,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
                 'end_date': '2022-01-01 12:00:00Z',
                 'enroll_by_date': '2021-01-01 12:00:00Z',
                 'content_price': 123,
+                'course_type': 'verified-audit',
                 'partners': [
                     {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
                 ],

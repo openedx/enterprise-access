@@ -161,6 +161,12 @@ class ContentMetadataForAssignmentSerializer(serializers.Serializer):
     content_price = serializers.SerializerMethodField(
         help_text='The price, in USD, of this content',
     )
+    course_type = serializers.CharField(
+        help_text='The type of course, something like "executive-education-2u" or "verified-audit"',
+        # Try to be a little defensive against malformed data.
+        required=False,
+        allow_null=True,
+    )
     partners = serializers.SerializerMethodField()
 
     @extend_schema_field(serializers.DateTimeField)
