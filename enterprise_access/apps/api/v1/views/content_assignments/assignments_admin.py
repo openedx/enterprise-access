@@ -4,14 +4,10 @@ Admin-facing REST API views for LearnerContentAssignments in the content_assignm
 import logging
 
 from django.db.models import Count
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
+from drf_spectacular.utils import extend_schema
 from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
-from rest_framework import authentication, mixins, permissions
-from rest_framework import serializers as drf_serializers
-from rest_framework import status, viewsets
-from rest_framework.compat import coreapi
+from rest_framework import authentication, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
