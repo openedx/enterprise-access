@@ -38,6 +38,7 @@ class AllocationException(Exception):
     """
     Exception class specific to allocation commands and queries.
     """
+    user_message = 'An error occurred during allocation'
 
 
 def get_assignment_configuration(uuid):

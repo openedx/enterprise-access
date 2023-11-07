@@ -825,4 +825,13 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
             raise SubsidyAccessPolicyLockedException() from exc
         except (AllocationException, ValidationError) as exc:
             logger.exception(exc)
-            raise AllocationRequestException(detail=str(exc)) from exc
+            error_message = str(exc)
+            error_detail = [
+                {
+                    "reason": exc.__class__.__name__,
+                    "user_message": getattr(exc, 'user_message', error_message),
+                    "error_message": error_message,
+                    "policy_uuids": [policy.uuid],
+                }
+            ]
+            raise AllocationRequestException(detail=error_detail) from exc

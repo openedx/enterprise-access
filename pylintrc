@@ -291,6 +291,7 @@ disable =
 	django-not-configured,
 	consider-using-with,
 	useless-option-value,
+	superfluous-parens,
 
 [REPORTS]
 output-format = text
@@ -387,4 +388,4 @@ int-import-graph =
 [EXCEPTIONS]
 overgeneral-exceptions = builtins.Exception
 
-# 4c712ad184e59f726e85f128b944c31932706891
+# c7e3457c55ae8769596a575052e4ccb2ff98337e

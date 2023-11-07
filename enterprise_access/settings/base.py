@@ -476,3 +476,7 @@ ENTERPRISE_SUBSIDY_API_CLIENT_VERSION = 2
 
 # Allows broader modification of access policy records from django admin
 DJANGO_ADMIN_POLICY_SUPER_ADMIN = False
+
+# Defines error bounds for allocation price validation
+ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO = .95
+ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO = 1.05

@@ -10,3 +10,4 @@ DISABLE+=
     django-not-configured,
     consider-using-with,
     useless-option-value,
+    superfluous-parens,

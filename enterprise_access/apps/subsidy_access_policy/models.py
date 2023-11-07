@@ -41,6 +41,7 @@ from .content_metadata_api import get_and_cache_catalog_contains_content, get_an
 from .exceptions import (
     ContentPriceNullException,
     MissingAssignment,
+    PriceValidationError,
     SubsidyAccessPolicyLockAttemptFailed,
     SubsidyAPIHTTPError
 )
@@ -1113,6 +1114,23 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         found_assignment.save()
         return ledger_transaction
 
+    def validate_requested_allocation_price(self, content_key, requested_price_cents):
+        """
+        Validates that the requested allocation price (in USD cents)
+        is within some acceptable error bound interval.
+        """
+        if requested_price_cents < 0:
+            raise PriceValidationError('Can only allocate non-negative content_price_cents')
+
+        canonical_price_cents = self.get_content_price(content_key)
+        lower_bound = settings.ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO * canonical_price_cents
+        upper_bound = settings.ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO * canonical_price_cents
+        if not (lower_bound <= requested_price_cents <= upper_bound):
+            raise PriceValidationError(
+                f'Requested price {requested_price_cents} for {content_key} '
+                f'outside of acceptable interval on canonical course price of {canonical_price_cents}.'
+            )
+
     def can_allocate(self, number_of_learners, content_key, content_price_cents):
         """
         Takes allocated LearnerContentAssignment records related to this policy
@@ -1125,8 +1143,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
           content_key: Typically a course key (although theoretically could be *any* content identifier).
           content_price_cents: A **non-negative** integer reflecting the current price of the content in USD cents.
         """
-        if content_price_cents < 0:
-            raise ValidationError('Can only allocate non-negative content_price_cents')
+        self.validate_requested_allocation_price(content_key, content_price_cents)
 
         # inactive policy
         if not self.active:

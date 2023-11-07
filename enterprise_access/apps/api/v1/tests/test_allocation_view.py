@@ -28,6 +28,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_SUBSIDY_EXPIRED,
     MissingSubsidyAccessReasonUserMessages
 )
+from enterprise_access.apps.subsidy_access_policy.exceptions import PriceValidationError
 from enterprise_access.apps.subsidy_access_policy.models import AssignedLearnerCreditAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
 from test_utils import APITest, APITestWithMocks
@@ -418,6 +419,9 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     @mock.patch.object(
         AssignedLearnerCreditAccessPolicy, 'aggregates_for_policy', autospec=True,
     )
+    @mock.patch.object(
+        AssignedLearnerCreditAccessPolicy, 'get_content_price', autospec=True,
+    )
     @mock.patch(
         'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
         return_value=mock.MagicMock(),
@@ -425,6 +429,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     def test_allocate_happy_path_e2e(
         self,
         mock_get_and_cache_content_metadata,
+        mock_get_content_price,
         mock_aggregates_for_policy,
         mock_subsidy_balance,
         mock_is_subsidy_active,
@@ -437,6 +442,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         mock_get_and_cache_content_metadata.return_value = {
             'content_title': self.content_title,
         }
+        mock_get_content_price.return_value = 123.45 * 100
         mock_aggregates_for_policy.return_value = {
             'total_quantity': -100 * 100,
         }
@@ -483,13 +489,58 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         mock_subsidy_balance.assert_called_once_with(self.assigned_learner_credit_policy)
 
     @mock.patch.object(
+        AssignedLearnerCreditAccessPolicy, 'get_content_price', autospec=True,
+    )
+    @ddt.data(True, False)
+    def test_allocate_invalid_price_e2e(self, wrong_price_direction, mock_get_content_price):
+        """
+        Test that we get a 422 when the requested price doesn't match the canonical price.
+        """
+        real_price = 100
+        requested_price = int(real_price * .5 if wrong_price_direction else real_price * 1.5)
+        mock_get_content_price.return_value = real_price
+
+        allocate_url = _allocation_url(self.assigned_learner_credit_policy.uuid)
+        allocate_payload = {
+            'learner_emails': ['new@foo.com'],
+            'content_key': self.content_key,
+            'content_price_cents': requested_price,
+        }
+
+        response = self.client.post(allocate_url, data=allocate_payload)
+
+        self.assertEqual(status.HTTP_422_UNPROCESSABLE_ENTITY, response.status_code)
+        expected_error_message = (
+            f'Requested price {requested_price} for {self.content_key} '
+            f'outside of acceptable interval on canonical course price of {real_price}.'
+        )
+        self.assertEqual(
+            [
+                {
+                    'reason': PriceValidationError.__name__,
+                    'user_message': PriceValidationError.user_message,
+                    'error_message': str([expected_error_message]),
+                    'policy_uuids': [str(self.assigned_learner_credit_policy.uuid)],
+                },
+            ],
+            response.json(),
+        )
+        mock_get_content_price.assert_called_once_with(self.assigned_learner_credit_policy, self.content_key)
+
+    @mock.patch.object(
         AssignedLearnerCreditAccessPolicy, 'catalog_contains_content_key', autospec=True, return_value=False
+    )
+    @mock.patch.object(
+        AssignedLearnerCreditAccessPolicy, 'get_content_price', autospec=True, return_value=1,
     )
     @mock.patch(
         'enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient',
         return_value=mock.MagicMock(),
     )
-    def test_allocate_no_catalog_inclusion_e2e(self, mock_lms_api_client, mock_catalog_inclusion):
+    # pylint: disable=unused-argument
+    def test_allocate_no_catalog_inclusion_e2e(
+        self, mock_lms_api_client, mock_get_content_price, mock_catalog_inclusion
+    ):
         """
         Test that we get a 422 when the requested content is not in the catalog.
         """
@@ -527,11 +578,17 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     @mock.patch.object(
         AssignedLearnerCreditAccessPolicy, 'is_subsidy_active', new_callable=mock.PropertyMock, return_value=False
     )
+    @mock.patch.object(
+        AssignedLearnerCreditAccessPolicy, 'get_content_price', autospec=True, return_value=1,
+    )
     @mock.patch(
         'enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient',
         return_value=mock.MagicMock(),
     )
-    def test_allocate_inactive_subsidy_e2e(self, mock_lms_api_client, mock_is_subsidy_active, mock_catalog_inclusion):
+    # pylint: disable=unused-argument
+    def test_allocate_inactive_subsidy_e2e(
+        self, mock_lms_api_client, mock_get_content_price, mock_is_subsidy_active, mock_catalog_inclusion
+    ):
         """
         Test that we get a 422 when the requested subsidy is inactive.
         """
@@ -564,11 +621,15 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         mock_catalog_inclusion.assert_called_once_with(self.assigned_learner_credit_policy, self.content_key)
         mock_is_subsidy_active.assert_called_once_with()  # No args for PropertyMock
 
+    @mock.patch.object(
+        AssignedLearnerCreditAccessPolicy, 'get_content_price', autospec=True, return_value=1,
+    )
     @mock.patch(
         'enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient',
         return_value=mock.MagicMock(),
     )
-    def test_allocate_policy_expired_e2e(self, mock_lms_api_client):
+    # pylint: disable=unused-argument
+    def test_allocate_policy_expired_e2e(self, mock_lms_api_client, mock_get_content_price):
         """
         Test that we get a 422 when the requested policy is inactive
         """
@@ -621,6 +682,9 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     @mock.patch.object(
         AssignedLearnerCreditAccessPolicy, 'is_subsidy_active', new_callable=mock.PropertyMock, return_value=True
     )
+    @mock.patch.object(
+        AssignedLearnerCreditAccessPolicy, 'get_content_price', autospec=True, return_value=2,
+    )
     @mock.patch(
         'enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient',
         return_value=mock.MagicMock(),
@@ -628,6 +692,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     def test_allocate_too_much_subsidy_spend_e2e(
         self,
         mock_lms_api_client,
+        mock_get_content_price,  # pylint: disable=unused-argument
         mock_is_subsidy_active,
         mock_catalog_inclusion,
         mock_aggregates_for_policy,
@@ -690,6 +755,9 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         'enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient',
         return_value=mock.MagicMock(),
     )
+    @mock.patch.object(
+        AssignedLearnerCreditAccessPolicy, 'get_content_price', autospec=True, return_value=1,
+    )
     @mock.patch(
         'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
         return_value=mock.MagicMock(),
@@ -697,6 +765,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     def test_allocate_too_much_existing_allocation_e2e(
         self,
         mock_get_and_cache_content_metadata,  # pylint: disable=unused-argument
+        mock_get_content_price,  # pylint: disable=unused-argument
         mock_lms_api_client,
         mock_is_subsidy_active,  # pylint: disable=unused-argument
         mock_catalog_inclusion,  # pylint: disable=unused-argument
@@ -766,6 +835,9 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     @mock.patch.object(
         AssignedLearnerCreditAccessPolicy, 'is_subsidy_active', new_callable=mock.PropertyMock, return_value=True
     )
+    @mock.patch.object(
+        AssignedLearnerCreditAccessPolicy, 'get_content_price', autospec=True,
+    )
     @mock.patch(
         'enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient',
         return_value=mock.MagicMock(),
@@ -773,6 +845,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     def test_allocate_policy_spend_limit_exceeded_e2e(
         self,
         mock_lms_api_client,
+        mock_get_content_price,
         mock_is_subsidy_active,  # pylint: disable=unused-argument
         mock_catalog_inclusion,  # pylint: disable=unused-argument
         mock_aggregates_for_policy,
@@ -787,6 +860,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'admin_users': [{'email': 'admin@example.com'}],
         }
 
+        mock_get_content_price.return_value = self.assigned_learner_credit_policy.spend_limit + 10
         subsidy_balance = 15000 * 100
         mock_subsidy_balance.return_value = subsidy_balance
         mock_aggregates_for_policy.return_value = {
