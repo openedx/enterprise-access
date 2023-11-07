@@ -2,6 +2,7 @@
 API serializers module.
 """
 from .content_assignments.assignment import (
+    ContentMetadataForAssignmentSerializer,
     LearnerContentAssignmentAdminResponseSerializer,
     LearnerContentAssignmentResponseSerializer
 )
