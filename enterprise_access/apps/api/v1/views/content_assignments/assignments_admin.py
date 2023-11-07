@@ -157,7 +157,9 @@ class LearnerContentAssignmentAdminViewSet(
         response = super().list(request, *args, **kwargs)
         queryset = self.get_queryset()
         learner_state_counts = queryset.values('learner_state') \
-            .annotate(count=Count('uuid', distinct=True)).order_by('-count')
+            .exclude(learner_state__isnull=True) \
+            .annotate(count=Count('uuid', distinct=True)) \
+            .order_by('-count')
 
         # Add the learner_state_overview to the default response.
         response.data['learner_state_counts'] = learner_state_counts
