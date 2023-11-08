@@ -12,11 +12,13 @@ from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import CourseLocator
 
+from enterprise_access.apps.content_metadata.api import get_and_cache_catalog_content_metadata
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
 
 from .constants import LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
+from .tasks import create_pending_enterprise_learner_for_assignment_task
 from .utils import chunks
 
 logger = logging.getLogger(__name__)
@@ -37,6 +39,7 @@ class AllocationException(Exception):
     """
     Exception class specific to allocation commands and queries.
     """
+    user_message = 'An error occurred during allocation'
 
 
 def get_assignment_configuration(uuid):
@@ -289,6 +292,10 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
         content_quantity,
     )
 
+    # Enqueue an asynchronous task to link assigned learners to the customer
+    for assignment in updated_assignments + created_assignments:
+        create_pending_enterprise_learner_for_assignment_task.delay(assignment.uuid)
+
     # Return a mapping of the action we took to lists of relevant assignment records.
     return {
         'updated': updated_assignments,
@@ -306,8 +313,10 @@ def _update_and_refresh_assignments(assignment_records, fields_changed):
     LearnerContentAssignment.bulk_update(assignment_records, fields_changed)
 
     # Get a list of refreshed objects that we just updated
-    return LearnerContentAssignment.objects.filter(
-        uuid__in=[record.uuid for record in assignment_records],
+    return list(
+        LearnerContentAssignment.objects.filter(
+            uuid__in=[record.uuid for record in assignment_records],
+        )
     )
 
 
@@ -436,6 +445,28 @@ def cancel_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
     return {
         'cancelled': list(set(cancelled_assignments) | already_cancelled_assignments),
         'non_cancelable': list(non_cancelable_assignments),
+    }
+
+
+def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
+    """
+    Fetches (from cache or enterprise-catalog API call) content metadata
+    in bulk for the `content_keys` of the given assignments, provided
+    such metadata is related to the given `enterprise_catalog_uuid`.
+
+    Returns:
+        A dict mapping every content key of the provided assignments
+        to a content metadata dictionary, or null if no such dictionary
+        could be found for a given key.
+    """
+    content_keys = sorted({assignment.content_key for assignment in assignments})
+    content_metadata_list = get_and_cache_catalog_content_metadata(enterprise_catalog_uuid, content_keys)
+    metadata_by_key = {
+        record['key']: record for record in content_metadata_list
+    }
+    return {
+        assignment.content_key: metadata_by_key.get(assignment.content_key)
+        for assignment in assignments
     }
 
 def remind_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:

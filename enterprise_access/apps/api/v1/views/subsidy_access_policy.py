@@ -448,6 +448,9 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         """
         Return a list of all redeemable policies for given `enterprise_customer_uuid`, `lms_user_id` that have
         redeemable credit available.
+        Note that, for each redeemable policy that is *assignable*, the policy record
+        in the response payload will also contain a list of `learner_content_assignments`
+        associated with the requested `lms_user_id`.
         """
         serializer = serializers.SubsidyAccessPolicyCreditsAvailableRequestSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
@@ -456,10 +459,13 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         lms_user_id = serializer.data['lms_user_id']
 
         policies_with_credit_available = self.policies_with_credit_available(enterprise_customer_uuid, lms_user_id)
+
         response_data = serializers.SubsidyAccessPolicyCreditsAvailableResponseSerializer(
             policies_with_credit_available,
             many=True,
-            context={'lms_user_id': lms_user_id}
+            context={
+                'lms_user_id': lms_user_id,
+            },
         ).data
 
         return Response(
@@ -819,4 +825,13 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
             raise SubsidyAccessPolicyLockedException() from exc
         except (AllocationException, ValidationError) as exc:
             logger.exception(exc)
-            raise AllocationRequestException(detail=str(exc)) from exc
+            error_message = str(exc)
+            error_detail = [
+                {
+                    "reason": exc.__class__.__name__,
+                    "user_message": getattr(exc, 'user_message', error_message),
+                    "error_message": error_message,
+                    "policy_uuids": [policy.uuid],
+                }
+            ]
+            raise AllocationRequestException(detail=error_detail) from exc

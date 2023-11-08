@@ -2,6 +2,7 @@
 Exceptions that can be raised by the ``subsidy_access_policy`` app.
 """
 import requests
+from django.core.exceptions import ValidationError
 
 
 class SubsidyAccessPolicyException(Exception):
@@ -57,3 +58,11 @@ class MissingAssignment(SubsidyAccessPolicyException):
     Raised in rare/impossible cases where attempts to redeem assigned content resulted in a race condition where an
     assignment couldn't be found.
     """
+
+
+class PriceValidationError(ValidationError):
+    """
+    Raised in cases related to assignment allocation when the requested price
+    fails our validation checks.
+    """
+    user_message = 'An error occurred while validating the provided price.'

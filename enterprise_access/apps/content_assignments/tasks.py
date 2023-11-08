@@ -66,17 +66,17 @@ def create_pending_enterprise_learner_for_assignment_task(learner_content_assign
     assignment = learner_content_assignment_model.objects.get(uuid=learner_content_assignment_uuid)
     enterprise_customer_uuid = assignment.assignment_configuration.enterprise_customer_uuid
 
-    # Intentionally not logging the learner email (PII).
-    logger.info(f'Creating a pending enterprise user for enterprise {enterprise_customer_uuid}.')
-
     lms_client = LmsApiClient()
     # Could raise HTTPError and trigger task retry.  Intentionally ignoring response since success should just not throw
     # an exception.  Two possible success statuses are 201 (created) and 200 (found), but there's no reason to
     # distinguish them for the purpose of this task.
     lms_client.create_pending_enterprise_users(enterprise_customer_uuid, [assignment.learner_email])
 
-    # TODO: ENT-7596: Save activity history on this assignment to represent that the learner is successfully linked to
-    # the enterprise.
+    assignment.add_successful_linked_action()
+    logger.info(
+        f'Successfully linked learner to enterprise {enterprise_customer_uuid} '
+        f'for assignment {assignment.uuid}'
+    )
 
 
 @shared_task(base=LoggedTaskWithRetry)

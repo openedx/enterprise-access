@@ -13,10 +13,14 @@ from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import HTTPError
 from rest_framework import serializers
 
-from enterprise_access.apps.subsidy_access_policy.constants import CENTS_PER_DOLLAR, AccessMethods, PolicyTypes
+from enterprise_access.apps.content_assignments.api import get_content_metadata_for_assignments
+from enterprise_access.apps.subsidy_access_policy.constants import CENTS_PER_DOLLAR, PolicyTypes
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 
-from .content_assignments.assignment import LearnerContentAssignmentResponseSerializer
+from .content_assignments.assignment import (
+    LearnerContentAssignmentResponseSerializer,
+    LearnerContentAssignmentWithContentMetadataResponseSerializer
+)
 from .content_assignments.assignment_configuration import AssignmentConfigurationResponseSerializer
 
 logger = logging.getLogger(__name__)
@@ -340,8 +344,14 @@ class SubsidyAccessPolicyCreditsAvailableRequestSerializer(serializers.Serialize
 
     For view: SubsidyAccessPolicyRedeemViewset.credits_available
     """
-    enterprise_customer_uuid = serializers.UUIDField(required=True)
-    lms_user_id = serializers.IntegerField(required=True)
+    enterprise_customer_uuid = serializers.UUIDField(
+        required=True,
+        help_text='The customer for which available policies are filtered.',
+    )
+    lms_user_id = serializers.IntegerField(
+        required=True,
+        help_text='The user identifier for which available policies are filtered.',
+    )
 
 
 # pylint: disable=abstract-method
@@ -519,22 +529,30 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
         help_text='Remaining balance on the entire subsidy, in USD cents.',
     )
     subsidy_expiration_date = serializers.DateTimeField(
-        help_text='',
+        help_text='The date at which the related Subsidy record expires.',
         source='subsidy_expiration_datetime',
     )
     learner_content_assignments = serializers.SerializerMethodField('get_assignments_serializer')
 
+    @extend_schema_field(LearnerContentAssignmentWithContentMetadataResponseSerializer)
     def get_assignments_serializer(self, obj):
         """
         Return serialized assignments if the policy access method is of the 'assigned' type
         """
-        if obj.access_method == AccessMethods.ASSIGNED:
-            assignments = obj.assignment_configuration.assignments.prefetch_related('actions').filter(
-                lms_user_id=self.context.get('lms_user_id')
-            )
-            serializer = LearnerContentAssignmentResponseSerializer(assignments, many=True)
-            return serializer.data
-        return []
+        if not obj.is_assignable:
+            return []
+
+        assignments = obj.assignment_configuration.assignments.prefetch_related('actions').filter(
+            lms_user_id=self.context.get('lms_user_id')
+        )
+        content_metadata_lookup = get_content_metadata_for_assignments(obj.catalog_uuid, assignments)
+        context = {'content_metadata': content_metadata_lookup}
+        serializer = LearnerContentAssignmentWithContentMetadataResponseSerializer(
+            assignments,
+            many=True,
+            context=context,
+        )
+        return serializer.data
 
     @extend_schema_field(serializers.IntegerField)
     def get_remaining_balance_per_user(self, obj):

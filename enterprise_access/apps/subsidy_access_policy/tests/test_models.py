@@ -8,6 +8,7 @@ from uuid import uuid4
 import ddt
 import pytest
 import requests
+from django.conf import settings
 from django.core.cache import cache as django_cache
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
@@ -43,6 +44,7 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
 )
 
 from ..constants import AccessMethods
+from ..exceptions import PriceValidationError
 
 ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID = uuid4()
 ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID = uuid4()
@@ -967,6 +969,9 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         """
         Tests that inactive policies can't be allocated against.
         """
+        self.mock_get_content_metadata.return_value = {
+            'content_price': 1000,
+        }
         can_allocate, message = self.inactive_policy.can_allocate(10, self.course_key, 1000)
 
         self.assertFalse(can_allocate)
@@ -978,6 +983,9 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         that is not included in the related catalog.
         """
         self.mock_catalog_contains_content_key.return_value = False
+        self.mock_get_content_metadata.return_value = {
+            'content_price': 1000,
+        }
 
         can_allocate, message = self.active_policy.can_allocate(10, self.course_key, 1000)
 
@@ -991,6 +999,9 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         against if the related subsidy is inactive.
         """
         self.mock_catalog_contains_content_key.return_value = True
+        self.mock_get_content_metadata.return_value = {
+            'content_price': 1000,
+        }
         mock_subsidy = {
             'id': 12345,
             'is_active': False,
@@ -1012,6 +1023,9 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         against if the related subsidy does not have enough remaining balance.
         """
         self.mock_catalog_contains_content_key.return_value = True
+        self.mock_get_content_metadata.return_value = {
+            'content_price': 1000,
+        }
         mock_subsidy = {
             'id': 12345,
             'is_active': True,
@@ -1044,6 +1058,9 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         against if it would exceed the policy spend_limit.
         """
         self.mock_catalog_contains_content_key.return_value = True
+        self.mock_get_content_metadata.return_value = {
+            'content_price': 1000,
+        }
         mock_subsidy = {
             'id': 12345,
             'is_active': True,
@@ -1078,6 +1095,9 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         of (allocated + potentially allocated + spent) < spend_limit.
         """
         self.mock_catalog_contains_content_key.return_value = True
+        self.mock_get_content_metadata.return_value = {
+            'content_price': 1010,
+        }
         mock_subsidy = {
             'id': 12345,
             'is_active': True,
@@ -1093,6 +1113,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         self.mock_subsidy_client.list_subsidy_transactions.return_value = transactions_for_policy
         self.mock_assignments_api.get_allocated_quantity_for_configuration.return_value = -1000
 
+        # Request a price just slightly different from the canonical price
         # the subidy remaining balance and the spend limit are both 10,000
         # ((7 * 1000) + 1000 + 1000) < 10000
         can_allocate, _ = self.active_policy.can_allocate(7, self.course_key, 1000)
@@ -1105,9 +1126,26 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
     def test_can_allocate_negative_quantity(self):
         """
         Test that attempting to allocate a negative quantity
-        results in a ValidationError.  The cost of the content should
+        results in a PriceValidationError.  The cost of the content should
         be negated just prior to storing the ``content_quantity`` of
         an assignment record.
         """
-        with self.assertRaisesRegex(ValidationError, 'non-negative'):
+        with self.assertRaisesRegex(PriceValidationError, 'non-negative'):
             self.active_policy.can_allocate(1, self.course_key, -1)
+
+    @ddt.data(
+        {'real_price': 100, 'requested_price': (100 * settings.ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO) + 1},
+        {'real_price': 100, 'requested_price': (100 * settings.ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO) - 1},
+    )
+    @ddt.unpack
+    def test_can_allocate_invalid_price(self, real_price, requested_price):
+        """
+        Test that attempting to allocate a price that is too far
+        away from the price defined for the content in the enterprise-catalog
+        service will result in a PriceValidationError.
+        """
+        self.mock_get_content_metadata.return_value = {
+            'content_price': real_price,
+        }
+        with self.assertRaisesRegex(PriceValidationError, 'outside of acceptable interval'):
+            self.active_policy.can_allocate(1, self.course_key, requested_price)

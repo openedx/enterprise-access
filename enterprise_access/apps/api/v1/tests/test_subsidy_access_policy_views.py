@@ -1325,12 +1325,14 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             # with an inactive (i.e., expired, not yet started) subsidy, we should get no records back.
             assert len(response_json) == 0
 
+    @mock.patch('enterprise_access.apps.api.serializers.subsidy_access_policy.get_content_metadata_for_assignments')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_record')
     def test_credits_available_endpoint_with_content_assignments(
         self,
         mock_subsidy_record,
-        mock_transactions_cache_for_learner  # pylint: disable=unused-argument
+        mock_transactions_cache_for_learner,  # pylint: disable=unused-argument
+        mock_get_metadata,
     ):
         """
         Verify that SubsidyAccessPolicyViewset credits_available returns learner content assignments for assigned
@@ -1360,6 +1362,8 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )
         action, _ = assignment1.add_successful_linked_action()
+
+        # Implicitly tests that this response only includes allocated assignments
         LearnerContentAssignmentFactory.create(
             assignment_configuration=assignment_configuration,
             learner_email='bob@foo.com',
@@ -1379,6 +1383,32 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'is_active': True,
         }
         self.lms_client_instance.enterprise_contains_learner.return_value = True
+        query_params = {
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'lms_user_id': 1234,
+        }
+        # See LearnerContentAssignmentWithContentMetadataResponseSerializer
+        # for what we expect to be in the response payload w.r.t. content metadata.
+        mock_get_metadata.return_value = {
+            content_key: {
+                'key': content_key,
+                'normalized_metadata': {
+                    'start_date': '2020-01-01 12:00:00Z',
+                    'end_date': '2022-01-01 12:00:00Z',
+                    'enroll_by_date': '2021-01-01 12:00:00Z',
+                    'content_price': 123,
+                },
+                'course_type': 'verified-audit',
+                'owners': [
+                    {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
+                ],
+            },
+        }
+
+        response = self.client.get(self.subsidy_access_policy_credits_available_endpoint, query_params)
+
+        response_json = response.json()
+        self.assertEqual(len(response_json[0]['learner_content_assignments']), 1)
         expected_learner_content_assignment = {
             'uuid': str(assignment1.uuid),
             'assignment_configuration': str(assignment_configuration.uuid),
@@ -1399,15 +1429,18 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
                     'completed_at': action.completed_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     'error_reason': None
                 }
-            ]
+            ],
+            'content_metadata': {
+                'start_date': '2020-01-01 12:00:00Z',
+                'end_date': '2022-01-01 12:00:00Z',
+                'enroll_by_date': '2021-01-01 12:00:00Z',
+                'content_price': 123,
+                'course_type': 'verified-audit',
+                'partners': [
+                    {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
+                ],
+            },
         }
-        query_params = {
-            'enterprise_customer_uuid': str(self.enterprise_uuid),
-            'lms_user_id': 1234,
-        }
-        response = self.client.get(self.subsidy_access_policy_credits_available_endpoint, query_params)
-        response_json = response.json()
-        self.assertEqual(len(response_json[0]['learner_content_assignments']), 1)
         self.assertEqual(response_json[0]['learner_content_assignments'][0], expected_learner_content_assignment)
 
 
