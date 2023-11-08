@@ -9,6 +9,8 @@ from django.apps import apps
 from django.conf import settings
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
+from enterprise_access.apps.content_assignments.models import LearnerContentAssignment, LearnerContentAssignmentAction
+from enterprise_access.apps.subsidy_request import _get_course_partners
 from enterprise_access.tasks import LoggedTaskWithRetry
 
 from .constants import LearnerContentAssignmentStateChoices
@@ -75,3 +77,68 @@ def create_pending_enterprise_learner_for_assignment_task(learner_content_assign
 
     # TODO: ENT-7596: Save activity history on this assignment to represent that the learner is successfully linked to
     # the enterprise.
+
+
+@shared_task(base=LoggedTaskWithRetry)
+def send_reminder_email_for_pending_assignment(assignment_uuid):
+    """
+    Send email via braze for reminding users of their pending assignment
+    Args:
+        assignment_uuid: (string) the subsidy request uuid
+    """
+    assignment = LearnerContentAssignment.objects.get(assignment_uuid)
+    policy = SubsidyAccessPolicy.objects.get(
+        assignment_configuration=assignment.assignment_configuration
+    )
+    # policy.catalog_uuid
+    get_content_metadata_for_assignments(policy.catalog_uuid, )
+    # caches (be mindful)
+
+    # subsidy = SubsidyRequest.objects.get(
+    #     uuid=policy.subsidy_uuid
+    # )
+
+    learner_content_assignment_action = LearnerContentAssignmentAction(
+        assignment=assignment, action_type=AssignmentActions.REMINDED,
+    )
+
+    if braze_trigger_properties is None:
+        braze_trigger_properties = {}
+
+    braze_client_instance = BrazeApiClient()
+    lms_client = LmsApiClient()
+    enterprise_customer_uuid = assignment.assignment_configuration.enterprise_customer_uuid
+    enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
+    # is content_key the same as course_id from subsidy info?
+    # if not can i fetch subsidy request which has the course_id?
+    course_data = discovery_client.get_course_data(assignment.content_key)
+    # how can a subsidy request have information about the course for this assignment though?
+    # course_data = discovery_client.get_course_data(subsidy.course_id)
+    lms_user_id = assignment.lms_user_id
+
+    try:
+        recipient = braze_client_instance.create_recipient(
+            user_email=assignment.learner_email,
+            lms_user_id=assignment.lms_user_id,
+        )
+        braze_trigger_properties["first_name"] = lms_user_id
+        braze_trigger_properties["organization"] = enterprise_customer_data['name']
+        braze_trigger_properties["course_title"] = assignment.content_title
+        braze_trigger_properties["enrollment_deadline"] = course_data["enrollment_end"]
+        braze_trigger_properties["start_date"] = course_data["start"]
+        braze_trigger_properties["course_partner"] = _get_course_partners(course_data)
+        braze_trigger_properties["course_card_image"] = course_data['card_image_url']
+        
+        # Call to action link to Learner Portal, with logistration logic.
+        # Admin email hyperlink (should be available in the LMS model for the enterprise – if not available, conditional logic might be required to make this not be a link).
+
+        braze_client_instance.send_campaign_message(
+            settings.BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN,
+            recipients=[recipient],
+            trigger_properties=braze_trigger_properties,
+        )
+        learner_content_assignment_action.completed_at = datetime.now()
+        learner_content_assignment_action.save()
+    except Exception as exc:
+        logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
+        learner_content_assignment_action.error_reason = exc

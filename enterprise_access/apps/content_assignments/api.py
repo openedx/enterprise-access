@@ -437,3 +437,47 @@ def cancel_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
         'cancelled': list(set(cancelled_assignments) | already_cancelled_assignments),
         'non_cancelable': list(non_cancelable_assignments),
     }
+
+def remind_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
+    """
+    Bulk remind assignments.
+
+    This is a no-op for assignments in the following states: [accepted, errored, canceled]. We only allow
+    assignments which are in the allocated state. Canceled and already-canceled assignments are bundled in the response because this function is meant to be idempotent.
+
+
+    Args:
+        assignments (list(LearnerContentAssignment)): One or more assignments to cancel.
+
+    Returns:
+        A dict representing canceled and non-cancelable assignments:
+        {
+            'canceled': <list of 0 or more canceled or already-canceled assignments>,
+            'non-cancelable': <list of 0 or more non-cancelable assignments, e.g. already accepted assignments>,
+        }
+    """
+    remindable_assignments = set(
+        assignment for assignment in assignments
+        if assignment.state in LearnerContentAssignmentStateChoices.REMINDABLE_STATES
+    )
+    already_reminded_assignments = set(
+        assignment for assignment in assignments
+        if assignment.state == LearnerContentAssignmentStateChoices.REMINDED
+    )
+    non_remindable_assignments = set(assignments) - remindable_assignments - already_reminded_assignments
+
+    logger.info(f'Skipping {len(non_remindable_assignments)} non-remindable assignments.')
+    logger.info(f'Skipping {len(already_reminded_assignments)} already reminded assignments.')
+    logger.info(f'Reminding {len(remindable_assignments)} assignments.')
+
+    for assignment_to_remind in remindable_assignments:
+        assignment_to_remind.state = LearnerContentAssignmentStateChoices.REMINDED
+
+    reminded_assignments = _update_and_refresh_assignments(remindable_assignments, ['state'])
+    for reminded_assignment in reminded_assignments:
+        send_reminder_email_for_pending_assignment.delay(reminded_assignment.uuid)
+
+    return {
+        'reminded': list(set(reminded_assignments) | already_reminded_assignments),
+        'non_remindable': list(non_remindable_assignments),
+    }

@@ -145,8 +145,37 @@ class LearnerContentAssignmentAdminViewSet(
         # if the assignment is not cancelable, this is a no-op.
         cancellation_info = assignments_api.cancel_assignments([assignment_to_cancel])
 
-        # If the response contains one element in the `cancelled` list, that is the one we sent, indicating succcess.
+        # If the response contains one element in the `cancelled` list, that is the one we sent, indicating success.
         cancellation_succeeded = len(cancellation_info['cancelled']) == 1
+
+        if cancellation_succeeded:
+            # Serialize the assignment object obtained via get_queryset() instead of the one from the assignments_api.
+            # Only the former has the additional dynamic fields annotated, and those are required for serialization.
+            assignment_to_cancel.refresh_from_db()
+            response_serializer = serializers.LearnerContentAssignmentAdminResponseSerializer(assignment_to_cancel)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    def remind(self, request, *args, uuid=None, **kwargs):
+        """
+        Send reminders to a single learners with associated ``LearnerContentAssignment`` 
+        record by uuid.
+
+        Raises:
+            404 if the assignment was not found.
+            422 if the assignment was not able to be reminded.
+        """
+        try:
+            assignment_to_remind = self.get_queryset().get(uuid=uuid)
+        except LearnerContentAssignment.DoesNotExist:
+            return Response(None, status=status.HTTP_404_NOT_FOUND)
+
+        # if the assignment is not cancelable, this is a no-op.
+        cancellation_info = assignments_api.cancel_assignments([assignment_to_cancel])
+
+        # If the response contains one element in the `canceled` list, that is the one we sent, indicating success.
+        cancellation_succeeded = len(cancellation_info['canceled']) == 1
 
         if cancellation_succeeded:
             # Serialize the assignment object obtained via get_queryset() instead of the one from the assignments_api.
