@@ -1,8 +1,8 @@
 """
 Admin-facing REST API views for LearnerContentAssignments in the content_assignments app.
 """
-from collections import Counter
 import logging
+from collections import Counter
 
 from drf_spectacular.utils import extend_schema
 from edx_rbac.decorators import permission_required
