@@ -556,6 +556,31 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         self.assignment_allocated_post_link.refresh_from_db()
         assert self.assignment_accepted.state == LearnerContentAssignmentStateChoices.ACCEPTED
 
+    def test_learner_state_query_param_filter(self):
+        """
+        Test that the list view supports filtering on one or more ``learner_state`` values via a query parameter.
+        """
+        # Set the JWT-based auth that we'll use for every request.
+        self.set_jwt_cookie([{'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}])
+
+        # Fetch our list of assignments associated with the test enterprise.
+        assignments_for_enterprise_customer = LearnerContentAssignment.objects.filter(
+            assignment_configuration__enterprise_customer_uuid=TEST_ENTERPRISE_UUID
+        )
+        # Double check we have stuff to work with
+        assert assignments_for_enterprise_customer.count() > 1
+
+        # Hit the view with a learner_state query param.
+        learner_states_to_query = [AssignmentLearnerStates.WAITING, AssignmentLearnerStates.FAILED]
+        learner_state_query_param_value = ",".join(learner_states_to_query)
+        response = self.client.get(
+            ADMIN_ASSIGNMENTS_LIST_ENDPOINT + f"?learner_state={learner_state_query_param_value}"
+        )
+        # Assert the results only contain the requested ``learner_state`` values.
+        for assignment in response.json().get('results'):
+            assert assignment.get('learner_state') in learner_states_to_query
+
+
     def test_assignment_search_query_param(self):
         """
         Test that the list view follows the default Django API filtering with the usage of the ``search`` query param.
@@ -577,7 +602,7 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             ADMIN_ASSIGNMENTS_LIST_ENDPOINT + f"?search={first_assignment.content_title}"
         )
         # Assert any of the results contain the content title matching the first assignment's.
-        for assignment in response.data.get('results'):
+        for assignment in response.json().get('results'):
             assert assignment.get('content_title') == first_assignment.content_title
 
         # Hit the view with a search query param for the learner email of another assignment.
@@ -586,7 +611,7 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             ADMIN_ASSIGNMENTS_LIST_ENDPOINT + f"?search={second_assignment.learner_email}"
         )
         # Assert any of the results contain the learner email matching the second assignment's.
-        for assignment in response.data.get('results'):
+        for assignment in response.json().get('results'):
             assert assignment.get('learner_email') == second_assignment.learner_email
 
         # Hit the view with a search query param for a random string that should not match any assignments.
