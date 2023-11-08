@@ -1,6 +1,7 @@
 """
 Admin-facing REST API views for LearnerContentAssignments in the content_assignments app.
 """
+from collections import Counter
 import logging
 
 from drf_spectacular.utils import extend_schema
@@ -121,7 +122,7 @@ class LearnerContentAssignmentAdminViewSet(
         # * learner_state_sort_order
         # * recent_action
         # * recent_action_time
-        queryset = LearnerContentAssignment.annotate_dynamic_fields_onto_queryset(queryset)
+        queryset = LearnerContentAssignment.annotate_dynamic_fields_onto_queryset(queryset).prefetch_related('actions')
 
         return queryset
 
@@ -153,13 +154,16 @@ class LearnerContentAssignmentAdminViewSet(
 
         # Compute the learner_state_counts for the filtered queryset.
         queryset = self.filter_queryset(self.get_queryset())
-        learner_states_counts = []
-        for learner_state, __ in AssignmentLearnerStates.CHOICES:
-            count = queryset.filter(learner_state=learner_state).count()
-            learner_states_counts.append({'learner_state': learner_state, 'count': count})
+        learner_state_counter = Counter(
+            queryset.exclude(learner_state__isnull=True).values_list('learner_state', flat=True)
+        )
+        learner_state_counts = [
+            {'learner_state': state, 'count': count}
+            for state, count in learner_state_counter.most_common()
+        ]
 
         # Add the learner_state_counts to the default response.
-        response.data['learner_state_counts'] = sorted(learner_states_counts, key=lambda x: x['count'], reverse=True)
+        response.data['learner_state_counts'] = learner_state_counts
         return response
 
     @extend_schema(
