@@ -3,7 +3,6 @@ Admin-facing REST API views for LearnerContentAssignments in the content_assignm
 """
 import logging
 
-from django.db.models import Count, F, OuterRef, Subquery, Value
 from drf_spectacular.utils import extend_schema
 from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
