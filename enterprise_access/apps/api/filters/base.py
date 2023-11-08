@@ -1,7 +1,12 @@
 """
 Base FilterSet utility classes.
 """
+from django_filters import BaseInFilter, CharFilter
 from django_filters import rest_framework as drf_filters
+
+
+class CharInFilter(BaseInFilter, CharFilter):
+    pass
 
 
 class HelpfulFilterSet(drf_filters.FilterSet):

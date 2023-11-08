@@ -2,7 +2,7 @@
 API Filters for resources defined in the ``assignment_policy`` app.
 """
 from ...content_assignments.models import AssignmentConfiguration, LearnerContentAssignment
-from .base import HelpfulFilterSet
+from .base import CharInFilter, HelpfulFilterSet
 
 
 class AssignmentConfigurationFilter(HelpfulFilterSet):
@@ -18,6 +18,8 @@ class LearnerContentAssignmentAdminFilter(HelpfulFilterSet):
     """
     Base filter for LearnerContentAssignment views.
     """
+    learner_state = CharInFilter(field_name='learner_state', lookup_expr='in')
+
     class Meta:
         model = LearnerContentAssignment
         fields = [
@@ -25,4 +27,5 @@ class LearnerContentAssignmentAdminFilter(HelpfulFilterSet):
             'learner_email',
             'lms_user_id',
             'state',
+            'learner_state',
         ]
