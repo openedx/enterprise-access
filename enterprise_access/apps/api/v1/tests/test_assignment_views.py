@@ -580,7 +580,6 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         for assignment in response.json().get('results'):
             assert assignment.get('learner_state') in learner_states_to_query
 
-
     def test_assignment_search_query_param(self):
         """
         Test that the list view follows the default Django API filtering with the usage of the ``search`` query param.
