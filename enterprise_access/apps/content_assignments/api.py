@@ -469,22 +469,24 @@ def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
         for assignment in assignments
     }
 
+
 def remind_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
     """
     Bulk remind assignments.
 
     This is a no-op for assignments in the following states: [accepted, errored, canceled]. We only allow
-    assignments which are in the allocated state. Canceled and already-canceled assignments are bundled in the response because this function is meant to be idempotent.
+    assignments which are in the allocated state. Reminded and already-reminded assignments are bundled in
+    the response because this function is meant to be idempotent.
 
 
     Args:
-        assignments (list(LearnerContentAssignment)): One or more assignments to cancel.
+        assignments (list(LearnerContentAssignment)): One or more assignments to remind.
 
     Returns:
-        A dict representing canceled and non-cancelable assignments:
+        A dict representing reminded and non-remindable assignments:
         {
-            'canceled': <list of 0 or more canceled or already-canceled assignments>,
-            'non-cancelable': <list of 0 or more non-cancelable assignments, e.g. already accepted assignments>,
+            'reminded': <list of 0 or more reminded or already-reminded assignments>,
+            'non-remindable': <list of 0 or more non-remindable assignments>,
         }
     """
     remindable_assignments = set(

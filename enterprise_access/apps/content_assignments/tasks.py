@@ -3,14 +3,17 @@ Tasks for content_assignments app.
 """
 
 import logging
+from datetime import datetime
 
 from celery import shared_task
 from django.apps import apps
 from django.conf import settings
 
+import enterprise_access.apps.content_assignments.api as content_api
+from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
+from enterprise_access.apps.content_assignments.constants import AssignmentActionErrors, AssignmentActions
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment, LearnerContentAssignmentAction
-from enterprise_access.apps.subsidy_request import _get_course_partners
 from enterprise_access.tasks import LoggedTaskWithRetry
 
 from .constants import LearnerContentAssignmentStateChoices
@@ -79,6 +82,14 @@ def create_pending_enterprise_learner_for_assignment_task(learner_content_assign
     )
 
 
+def _get_course_partners(course_data):
+    """
+    Returns a list of course partner data for subsidy requests given a course dictionary.
+    """
+    owners = course_data.get('owners') or []
+    return [{'uuid': owner.get('uuid'), 'name': owner.get('name')} for owner in owners]
+
+
 @shared_task(base=LoggedTaskWithRetry)
 def send_reminder_email_for_pending_assignment(assignment_uuid):
     """
@@ -86,51 +97,51 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
     Args:
         assignment_uuid: (string) the subsidy request uuid
     """
-    assignment = LearnerContentAssignment.objects.get(assignment_uuid)
-    policy = SubsidyAccessPolicy.objects.get(
-        assignment_configuration=assignment.assignment_configuration
-    )
-    # policy.catalog_uuid
-    get_content_metadata_for_assignments(policy.catalog_uuid, )
-    # caches (be mindful)
+    learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
+    subsidy_policy_model = apps.get_model('subsidy_access_policy.SubsidyAccessPolicy')
+    try:
+        assignment = learner_content_assignment_model.objects.get(uuid=assignment_uuid)
+    except learner_content_assignment_model.DoesNotExist:
+        logger.warning(f'request with uuid: {cancelled_assignment_uuid} does not exist.')
+        return
 
-    # subsidy = SubsidyRequest.objects.get(
-    #     uuid=policy.subsidy_uuid
-    # )
+    try:
+        policy = subsidy_policy_model.objects.get(
+            assignment_configuration=assignment.assignment_configuration
+        )
+    except subsidy_policy_model.DoesNotExist:
+        logger.warning(f'policy with assignment config: {assignment.assignment_configuration} does not exist.')
+        return
 
     learner_content_assignment_action = LearnerContentAssignmentAction(
         assignment=assignment, action_type=AssignmentActions.REMINDED,
     )
-
-    if braze_trigger_properties is None:
-        braze_trigger_properties = {}
-
+    braze_trigger_properties = {}
     braze_client_instance = BrazeApiClient()
     lms_client = LmsApiClient()
     enterprise_customer_uuid = assignment.assignment_configuration.enterprise_customer_uuid
     enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-    # is content_key the same as course_id from subsidy info?
-    # if not can i fetch subsidy request which has the course_id?
-    course_data = discovery_client.get_course_data(assignment.content_key)
-    # how can a subsidy request have information about the course for this assignment though?
-    # course_data = discovery_client.get_course_data(subsidy.course_id)
+    admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
+    course_metadata = content_api.get_content_metadata_for_assignments(
+        policy.catalog_uuid, assignment.assignment_configuration
+    )
     lms_user_id = assignment.lms_user_id
+    braze_trigger_properties['contact_admin_link'] = braze_client_instance.generate_mailto_link(admin_emails)
 
     try:
         recipient = braze_client_instance.create_recipient(
             user_email=assignment.learner_email,
             lms_user_id=assignment.lms_user_id,
         )
-        braze_trigger_properties["first_name"] = lms_user_id
         braze_trigger_properties["organization"] = enterprise_customer_data['name']
         braze_trigger_properties["course_title"] = assignment.content_title
-        braze_trigger_properties["enrollment_deadline"] = course_data["enrollment_end"]
-        braze_trigger_properties["start_date"] = course_data["start"]
-        braze_trigger_properties["course_partner"] = _get_course_partners(course_data)
-        braze_trigger_properties["course_card_image"] = course_data['card_image_url']
-        
+        braze_trigger_properties["enrollment_deadline"] = course_metadata['normalized_metadata']['enroll_by_date']
+        braze_trigger_properties["start_date"] = course_metadata['normalized_metadata']['start_date']
+        braze_trigger_properties["course_partner"] = _get_course_partners(course_metadata)
+        braze_trigger_properties["course_card_image"] = course_metadata['card_image_url']
         # Call to action link to Learner Portal, with logistration logic.
-        # Admin email hyperlink (should be available in the LMS model for the enterprise – if not available, conditional logic might be required to make this not be a link).
+        # Admin email hyperlink (should be available in the LMS model for the enterprise –
+        # if not available, conditional logic might be required to make this not be a link).
 
         braze_client_instance.send_campaign_message(
             settings.BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN,
@@ -139,6 +150,10 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         )
         learner_content_assignment_action.completed_at = datetime.now()
         learner_content_assignment_action.save()
+        logger.info(f'Sending braze campaign message for reminded assignment {assignment}')
+        return
     except Exception as exc:
         logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
-        learner_content_assignment_action.error_reason = exc
+        learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
+        learner_content_assignment_action.traceback = exc
+        learner_content_assignment_action.save()
