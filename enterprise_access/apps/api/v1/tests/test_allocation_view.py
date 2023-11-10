@@ -429,8 +429,10 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     @mock.patch(
         'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task'
     )
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_email_for_new_assignment')
     def test_allocate_happy_path_e2e(
         self,
+        mock_email,   # pylint: disable=unused-argument
         mock_pending_learner_task,
         mock_get_and_cache_content_metadata,
         mock_get_content_price,
@@ -770,8 +772,10 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     @mock.patch(
         'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task'
     )
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_email_for_new_assignment')
     def test_allocate_too_much_existing_allocation_e2e(
         self,
+        mock_email,   # pylint: disable=unused-argument
         mock_pending_learner_task,
         mock_get_and_cache_content_metadata,  # pylint: disable=unused-argument
         mock_get_content_price,  # pylint: disable=unused-argument

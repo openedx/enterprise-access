@@ -3,7 +3,6 @@ Tasks for content_assignments app.
 """
 
 import logging
-from datetime import datetime
 
 from celery import shared_task
 from django.apps import apps
@@ -13,10 +12,12 @@ from django.utils import timezone
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments.constants import AssignmentActionErrors, AssignmentActions
+from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignmentAction
 from enterprise_access.tasks import LoggedTaskWithRetry
 
 from .constants import LearnerContentAssignmentStateChoices
+from .exceptions import MissingContentAssignment, MissingPolicy
 from .utils import format_traceback
 
 logger = logging.getLogger(__name__)
@@ -124,7 +125,7 @@ def send_cancel_email_for_pending_assignment(cancelled_assignment_uuid):
             recipients=[recipient],
             trigger_properties=braze_trigger_properties,
         )
-        learner_content_assignment_action.completed_at = datetime.now()
+        learner_content_assignment_action.completed_at = timezone.now()
         learner_content_assignment_action.save()
         logger.info(f'Sending braze campaign message for cancelled assignment {assignment}')
         return
@@ -144,10 +145,6 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
     Args:
         assignment_uuid: (string) the subsidy request uuid
     """
-    # importing this here to get around a cyclical import error
-    # pylint: disable=import-outside-toplevel
-    from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
-
     learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
     subsidy_policy_model = apps.get_model('subsidy_access_policy.SubsidyAccessPolicy')
     try:
@@ -202,7 +199,7 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
             recipients=[recipient],
             trigger_properties=braze_trigger_properties,
         )
-        learner_content_assignment_action.completed_at = datetime.now()
+        learner_content_assignment_action.completed_at = timezone.now()
         learner_content_assignment_action.save()
         return
     except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -212,6 +209,92 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         learner_content_assignment_action.save()
         assignment.state = LearnerContentAssignmentStateChoices.ERRORED
         assignment.full_clean()
+
+
+def _get_course_partners(course_data):
+    """
+    Returns a list of course partner data for subsidy requests given a course dictionary.
+    """
+    owners = course_data.get('owners') or []
+    return [{'uuid': owner.get('uuid'), 'name': owner.get('name')} for owner in owners]
+
+
+@shared_task(base=LoggedTaskWithRetry)
+def send_email_for_new_assignment(new_assignment_uuid):
+    """
+    Send email via braze for new assignment
+
+    Args:
+        new_assignment_uuid: (string) the new assignment uuid
+    """
+    learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
+    subsidy_policy_model = apps.get_model('subsidy_access_policy.SubsidyAccessPolicy')
+
+    try:
+        assignment = learner_content_assignment_model.objects.get(uuid=new_assignment_uuid)
+    except learner_content_assignment_model.DoesNotExist as exc:
+        logger.warning(f'request with uuid: {new_assignment_uuid} does not exist.')
+        raise MissingContentAssignment(
+            f'No assignment was found for assignment_uuid={new_assignment_uuid}.'
+        ) from exc
+    learner_content_assignment_action = LearnerContentAssignmentAction(
+        assignment=assignment, action_type=AssignmentActions.NOTIFIED
+    )
+
+    try:
+        policy = subsidy_policy_model.objects.get(
+            assignment_configuration=assignment.assignment_configuration
+        )
+    except subsidy_policy_model.DoesNotExist as exc:
+        logger.warning(f'policy with assignment config: {assignment.assignment_configuration} does not exist.')
+        raise MissingPolicy(
+            f'No assignment was found for assignment_uuid={new_assignment_uuid}.'
+        ) from exc
+
+    braze_trigger_properties = {}
+    braze_client_instance = BrazeApiClient()
+    lms_client = LmsApiClient()
+    enterprise_customer_uuid = assignment.assignment_configuration.enterprise_customer_uuid
+    enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
+
+    course_metadata = get_content_metadata_for_assignments(
+        policy.catalog_uuid, [assignment]
+    )
+    learner_portal_url = '{}/{}'.format(
+        settings.ENTERPRISE_LEARNER_PORTAL_URL,
+        enterprise_customer_data['slug'],
+    )
+    lms_user_id = assignment.lms_user_id
+    admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
+    braze_trigger_properties['contact_admin_link'] = braze_client_instance.generate_mailto_link(admin_emails)
+
+    try:
+        recipient = braze_client_instance.create_recipient(
+            user_email=assignment.learner_email,
+            lms_user_id=assignment.lms_user_id
+        )
+        braze_trigger_properties["organization"] = enterprise_customer_data['name']
+        braze_trigger_properties["course_title"] = assignment.content_title
+        braze_trigger_properties["enrollment_deadline"] = course_metadata['normalized_metadata']['enroll_by_date']
+        braze_trigger_properties["start_date"] = course_metadata['normalized_metadata']['start_date']
+        braze_trigger_properties["course_partner"] = _get_course_partners(course_metadata)
+        braze_trigger_properties["course_card_image"] = course_metadata['card_image_url']
+        braze_trigger_properties["learner_portal_link"] = learner_portal_url
+        logger.info(f'Sending braze campaign message for new assignment {assignment}')
+        braze_client_instance.send_campaign_message(
+            settings.BRAZE_ASSIGNMENT_NOTIFICATION_CAMPAIGN,
+            recipients=[recipient],
+            trigger_properties=braze_trigger_properties,
+        )
+        learner_content_assignment_action.completed_at = timezone.now()
+        learner_content_assignment_action.save()
+        return
+    except Exception as exc:
+        logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
+        learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
+        learner_content_assignment_action.traceback = format_traceback(exc)
+        learner_content_assignment_action.save()
+        raise
 
 
 @shared_task(base=LoggedTaskWithRetry)
