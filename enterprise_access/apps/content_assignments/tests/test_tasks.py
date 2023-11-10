@@ -20,13 +20,17 @@ from enterprise_access.apps.content_assignments.tasks import (
     create_pending_enterprise_learner_for_assignment_task,
     send_assignment_automatically_expired_email,
     send_cancel_email_for_pending_assignment,
+    send_email_for_new_assignment,
     send_reminder_email_for_pending_assignment
 )
 from enterprise_access.apps.content_assignments.tests.factories import (
     AssignmentConfigurationFactory,
     LearnerContentAssignmentFactory
 )
-from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
+from enterprise_access.apps.subsidy_access_policy.tests.factories import (
+    AssignedLearnerCreditAccessPolicyFactory,
+    PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory
+)
 from test_utils import APITestWithMocks
 
 TEST_ENTERPRISE_UUID = uuid4()
@@ -211,6 +215,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
             lms_user_id=TEST_LMS_USER_ID,
             assignment_configuration=self.assignment_configuration,
         )
+        self.policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
 
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
@@ -254,7 +259,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.objects')
-    @mock.patch('enterprise_access.apps.content_assignments.content_metadata_api.get_content_metadata_for_assignments')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     def test_send_reminder_email_for_pending_assignment(
@@ -317,6 +322,74 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'learner_portal_link': 'http://enterprise-learner-portal.example.com/test-slug'
             },
         )
+
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.objects')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
+    def test_send_email_for_new_assignment(
+        self,
+        mock_braze_client,
+        mock_lms_client,
+        mock_get_metadata,
+        mock_policy_model   # pylint: disable=unused-argument
+    ):
+        """
+        Verify send_email_for_new_assignment hits braze client with expected args
+        """
+        content_key = 'demoX'
+        admin_email = 'test@admin.com'
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
+            'uuid': TEST_ENTERPRISE_UUID,
+            'slug': 'test-slug',
+            'admin_users': [{
+                'email': admin_email,
+                'lms_user_id': 1
+            }],
+            'name': self.enterprise_customer_name,
+        }
+        mock_recipient = {
+            'external_user_id': 1
+        }
+        mock_get_metadata.return_value = {
+            'key': content_key,
+            'normalized_metadata': {
+                'start_date': '2020-01-01 12:00:00Z',
+                'end_date': '2022-01-01 12:00:00Z',
+                'enroll_by_date': '2021-01-01 12:00:00Z',
+                'content_price': 123,
+            },
+            'owners': [
+                {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
+            ],
+            'card_image_url': 'https://itsanimage.com',
+        }
+
+        mock_admin_mailto = f'mailto:{admin_email}'
+        mock_braze_client.return_value.create_recipient.return_value = mock_recipient
+        mock_braze_client.return_value.generate_mailto_link.return_value = mock_admin_mailto
+        send_email_for_new_assignment(self.assignment.uuid)
+
+        # Make sure our LMS client got called correct times and with what we expected
+        mock_lms_client.return_value.get_enterprise_customer_data.assert_called_with(
+            self.assignment_configuration.enterprise_customer_uuid
+        )
+
+        mock_braze_client.return_value.send_campaign_message.assert_any_call(
+            'test-assignment-notification-campaign',
+            recipients=[mock_recipient],
+            trigger_properties={
+                'contact_admin_link': mock_admin_mailto,
+                'organization': self.enterprise_customer_name,
+                'course_title': self.assignment.content_title,
+                'enrollment_deadline': '2021-01-01 12:00:00Z',
+                'start_date': '2020-01-01 12:00:00Z',
+                'course_partner': [{'uuid': None, 'name': 'Smart Folks'}],
+                'course_card_image': 'https://itsanimage.com',
+                'learner_portal_link': '{}/{}'.format(settings.ENTERPRISE_LEARNER_PORTAL_URL, 'test-slug'),
+            },
+        )
+        assert mock_braze_client.return_value.send_campaign_message.call_count == 1
 
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     def test_send_assignment_automatically_expired_email(self, mock_braze_client):

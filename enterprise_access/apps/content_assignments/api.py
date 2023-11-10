@@ -19,7 +19,7 @@ from enterprise_access.apps.subsidy_access_policy.content_metadata_api import ge
 
 from .constants import LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
-from .tasks import create_pending_enterprise_learner_for_assignment_task
+from .tasks import create_pending_enterprise_learner_for_assignment_task, send_email_for_new_assignment
 from .utils import chunks
 
 logger = logging.getLogger(__name__)
@@ -299,6 +299,7 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     # when the celery task does its read of updated/created assignments.
     for assignment in updated_assignments + created_assignments:
         create_pending_enterprise_learner_for_assignment_task.delay(assignment.uuid)
+        send_email_for_new_assignment.delay(assignment.uuid)
 
     # Return a mapping of the action we took to lists of relevant assignment records.
     return {
