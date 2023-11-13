@@ -142,7 +142,7 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
     """
     # importing this here to get around a cyclical import error
     # pylint: disable=import-outside-toplevel
-    from enterprise_access.apps.content_assignments.api import get_content_metadata_for_assignments
+    from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
 
     learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
     subsidy_policy_model = apps.get_model('subsidy_access_policy.SubsidyAccessPolicy')

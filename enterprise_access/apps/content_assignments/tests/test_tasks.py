@@ -246,7 +246,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.objects')
-    @mock.patch('enterprise_access.apps.content_assignments.api.get_content_metadata_for_assignments')
+    @mock.patch('enterprise_access.apps.content_assignments.content_metadata_api.get_content_metadata_for_assignments')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     def test_send_reminder_email_for_pending_assignment(
