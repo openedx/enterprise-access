@@ -141,7 +141,9 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         assignment_uuid: (string) the subsidy request uuid
     """
     # importing this here to get around a cyclical import error
-    import enterprise_access.apps.content_assignments.api as content_api  # pylint: disable=import-outside-toplevel
+    # pylint: disable=import-outside-toplevel
+    from enterprise_access.apps.content_assignments.api import get_content_metadata_for_assignments
+
     learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
     subsidy_policy_model = apps.get_model('subsidy_access_policy.SubsidyAccessPolicy')
     try:
@@ -167,7 +169,7 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
     enterprise_customer_uuid = assignment.assignment_configuration.enterprise_customer_uuid
     enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
     admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
-    course_metadata = content_api.get_content_metadata_for_assignments(
+    course_metadata = get_content_metadata_for_assignments(
         policy.catalog_uuid, assignment.assignment_configuration
     )
     learner_portal_url = '{}/{}'.format(

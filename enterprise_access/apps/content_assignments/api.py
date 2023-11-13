@@ -12,7 +12,6 @@ from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import CourseLocator
 
-from enterprise_access.apps.content_assignments.tasks import send_cancel_email_for_pending_assignment
 from enterprise_access.apps.content_metadata.api import get_and_cache_catalog_content_metadata
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
@@ -425,6 +424,9 @@ def cancel_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
             'non-cancelable': <list of 0 or more non-cancelable assignments, e.g. already accepted assignments>,
         }
     """
+    # pylint: disable=import-outside-toplevel
+    from enterprise_access.apps.content_assignments.tasks import send_cancel_email_for_pending_assignment
+
     cancelable_assignments = set(
         assignment for assignment in assignments
         if assignment.state in LearnerContentAssignmentStateChoices.CANCELABLE_STATES
