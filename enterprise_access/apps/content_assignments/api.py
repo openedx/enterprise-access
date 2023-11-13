@@ -489,6 +489,9 @@ def remind_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
             'non-remindable': <list of 0 or more non-remindable assignments>,
         }
     """
+    from enterprise_access.apps.content_assignments.tasks import (  # pylint: disable=import-outside-toplevel
+        send_reminder_email_for_pending_assignment
+    )
     remindable_assignments = set(
         assignment for assignment in assignments
         if assignment.state in LearnerContentAssignmentStateChoices.REMINDABLE_STATES

@@ -13,7 +13,6 @@ from rest_framework import status
 
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
-from enterprise_access.apps.content_assignments.models import LearnerContentAssignment, LearnerContentAssignmentAction
 from enterprise_access.apps.content_assignments.tasks import (
     create_pending_enterprise_learner_for_assignment_task,
     send_reminder_email_for_pending_assignment
@@ -214,7 +213,8 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     def test_send_reminder_email_for_pending_assignment(
-        self, mock_braze_client, mock_lms_client, mock_get_metadata, mock_policy_model
+        self, mock_braze_client, mock_lms_client, mock_get_metadata,
+        mock_policy_model,  # pylint: disable=unused-argument
     ):
         """
         Verify send_reminder_email_for_pending_assignment hits braze client with expected args
@@ -257,17 +257,17 @@ class TestBrazeEmailTasks(APITestWithMocks):
             self.assignment_configuration.enterprise_customer_uuid
         )
 
-        mock_braze_client.return_value.send_campaign_message.assert_any_call(
+        assert mock_braze_client.return_value.send_campaign_message.call_count == 1
+        mock_braze_client.return_value.send_campaign_message.assert_called_once_with(
             'test-assignment-remind-campaign',
             recipients=[mock_recipient],
             trigger_properties={
                 'contact_admin_link': mock_admin_mailto,
                 'organization': self.enterprise_customer_name,
-                'course_name': self.assignment.content_title,
+                'course_title': self.assignment.content_title,
                 'enrollment_deadline': '2021-01-01 12:00:00Z',
                 'start_date': '2020-01-01 12:00:00Z',
                 'course_partner': 'Smart Folks',
                 'course_card_image': 'https://itsanimage.com',
             },
         )
-        assert mock_braze_client.return_value.send_campaign_message.call_count == 1
