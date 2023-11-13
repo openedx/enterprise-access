@@ -2,8 +2,8 @@
 Admin-facing REST API views for LearnerContentAssignments in the content_assignments app.
 """
 import logging
+from collections import Counter
 
-from django.db.models import Count
 from drf_spectacular.utils import extend_schema
 from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
@@ -15,8 +15,8 @@ from rest_framework.response import Response
 from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.v1.views.utils import PaginationWithPageCount
 from enterprise_access.apps.content_assignments import api as assignments_api
-from enterprise_access.apps.content_assignments.constants import AssignmentActions, LearnerContentAssignmentStateChoices
-from enterprise_access.apps.content_assignments.models import LearnerContentAssignment, LearnerContentAssignmentAction
+from enterprise_access.apps.content_assignments.constants import AssignmentLearnerStates
+from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
 from enterprise_access.apps.core.constants import (
     CONTENT_ASSIGNMENT_ADMIN_READ_PERMISSION,
     CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION
@@ -89,7 +89,7 @@ class LearnerContentAssignmentAdminViewSet(
 
     # Settings that control list ordering, powered by OrderingFilter.
     # Fields in `ordering_fields` are what we allow to be passed to the "?ordering=" query param.
-    ordering_fields = ['recent_action_time', 'learner_state_sort_order']
+    ordering_fields = ['recent_action_time', 'learner_state_sort_order', 'content_quantity']
     # `ordering` defines the default order.
     ordering = ['-recent_action_time']
 
@@ -122,7 +122,7 @@ class LearnerContentAssignmentAdminViewSet(
         # * learner_state_sort_order
         # * recent_action
         # * recent_action_time
-        queryset = LearnerContentAssignment.annotate_dynamic_fields_onto_queryset(queryset)
+        queryset = LearnerContentAssignment.annotate_dynamic_fields_onto_queryset(queryset).prefetch_related('actions')
 
         return queryset
 
@@ -151,13 +151,18 @@ class LearnerContentAssignmentAdminViewSet(
         Lists ``LearnerContentAssignment`` records, filtered by the given query parameters.
         """
         response = super().list(request, *args, **kwargs)
-        queryset = self.get_queryset()
-        learner_state_counts = queryset.values('learner_state') \
-            .exclude(learner_state__isnull=True) \
-            .annotate(count=Count('uuid', distinct=True)) \
-            .order_by('-count')
 
-        # Add the learner_state_overview to the default response.
+        # Compute the learner_state_counts for the filtered queryset.
+        queryset = self.filter_queryset(self.get_queryset())
+        learner_state_counter = Counter(
+            queryset.exclude(learner_state__isnull=True).values_list('learner_state', flat=True)
+        )
+        learner_state_counts = [
+            {'learner_state': state, 'count': count}
+            for state, count in learner_state_counter.most_common()
+        ]
+
+        # Add the learner_state_counts to the default response.
         response.data['learner_state_counts'] = learner_state_counts
         return response
 

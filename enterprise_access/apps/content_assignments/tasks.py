@@ -9,7 +9,6 @@ from celery import shared_task
 from django.apps import apps
 from django.conf import settings
 
-import enterprise_access.apps.content_assignments.api as content_api
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments.constants import AssignmentActionErrors, AssignmentActions
@@ -83,12 +82,66 @@ def create_pending_enterprise_learner_for_assignment_task(learner_content_assign
 
 
 @shared_task(base=LoggedTaskWithRetry)
+def send_cancel_email_for_pending_assignment(cancelled_assignment_uuid):
+    """
+    Send email via braze for cancelling pending assignment
+
+    Args:
+        cancelled_assignment: (string) the cancelled assignment uuid
+    """
+    learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
+
+    try:
+        assignment = learner_content_assignment_model.objects.get(uuid=cancelled_assignment_uuid)
+    except learner_content_assignment_model.DoesNotExist:
+        logger.warning(f'request with uuid: {cancelled_assignment_uuid} does not exist.')
+        return
+    learner_content_assignment_action = LearnerContentAssignmentAction(
+        assignment=assignment, action_type=AssignmentActions.CANCELLED_NOTIFICATION
+    )
+
+    braze_trigger_properties = {}
+    braze_client_instance = BrazeApiClient()
+    lms_client = LmsApiClient()
+    enterprise_customer_uuid = assignment.assignment_configuration.enterprise_customer_uuid
+    enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
+    lms_user_id = assignment.lms_user_id
+    admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
+    braze_trigger_properties['contact_admin_link'] = braze_client_instance.generate_mailto_link(admin_emails)
+
+    try:
+        recipient = braze_client_instance.create_recipient(
+            user_email=assignment.learner_email,
+            lms_user_id=assignment.lms_user_id
+        )
+        braze_trigger_properties["organization"] = enterprise_customer_data['name']
+        braze_trigger_properties["course_name"] = assignment.content_title
+        braze_client_instance.send_campaign_message(
+            settings.BRAZE_ASSIGNMENT_CANCELLED_NOTIFICATION_CAMPAIGN,
+            recipients=[recipient],
+            trigger_properties=braze_trigger_properties,
+        )
+        learner_content_assignment_action.completed_at = datetime.now()
+        learner_content_assignment_action.save()
+        logger.info(f'Sending braze campaign message for cancelled assignment {assignment}')
+        return
+    except Exception as exc:
+        logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
+        learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
+        learner_content_assignment_action.traceback = exc
+        learner_content_assignment_action.save()
+        raise
+
+
+@shared_task(base=LoggedTaskWithRetry)
 def send_reminder_email_for_pending_assignment(assignment_uuid):
     """
     Send email via braze for reminding users of their pending assignment
     Args:
         assignment_uuid: (string) the subsidy request uuid
     """
+    # importing this here to get around a cyclical import error
+    import enterprise_access.apps.content_assignments.api as content_api  # pylint: disable=import-outside-toplevel
     learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
     subsidy_policy_model = apps.get_model('subsidy_access_policy.SubsidyAccessPolicy')
     try:
@@ -117,6 +170,10 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
     course_metadata = content_api.get_content_metadata_for_assignments(
         policy.catalog_uuid, assignment.assignment_configuration
     )
+    learner_portal_url = '{}/{}'.format(
+        settings.ENTERPRISE_LEARNER_PORTAL_URL,
+        enterprise_customer_data['slug'],
+    )
     lms_user_id = assignment.lms_user_id
     braze_trigger_properties['contact_admin_link'] = braze_client_instance.generate_mailto_link(admin_emails)
 
@@ -131,9 +188,7 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         braze_trigger_properties["start_date"] = course_metadata['normalized_metadata']['start_date']
         braze_trigger_properties["course_partner"] = course_metadata['owners'][0]['name']
         braze_trigger_properties["course_card_image"] = course_metadata['card_image_url']
-        # Call to action link to Learner Portal, with logistration logic.
-        # Admin email hyperlink (should be available in the LMS model for the enterprise –
-        # if not available, conditional logic might be required to make this not be a link).
+        braze_trigger_properties["learner_portal_link"] = learner_portal_url
 
         logger.info(f'Sending braze campaign message for reminded assignment {assignment}')
         braze_client_instance.send_campaign_message(

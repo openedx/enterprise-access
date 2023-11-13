@@ -38,11 +38,13 @@ class AssignmentActions:
     LEARNER_LINKED = 'learner_linked'
     NOTIFIED = 'notified'
     REMINDED = 'reminded'
+    CANCELLED_NOTIFICATION = 'cancelled'
 
     CHOICES = (
         (LEARNER_LINKED, 'Learner linked to customer'),
         (NOTIFIED, 'Learner notified of assignment'),
         (REMINDED, 'Learner reminded about assignment'),
+        (CANCELLED_NOTIFICATION, 'Learner assignment cancelled'),
     )
 
 
