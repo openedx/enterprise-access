@@ -145,3 +145,10 @@ Accepted September 2023, this ADR defines:
 
 Accepted October 2023, this ADR describes an approach to persisting data about
 certain actions related to a ``LearnerContentAssignment`` record in a distinct model.
+
+`<0014-assignment-price-validation.rst>`_
+*******************************************
+*Feature: Assigned Learner Credit*
+
+Accepted November 2023, this ADR describes an approach to validating
+client-provided allocation prices.
