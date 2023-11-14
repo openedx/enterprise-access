@@ -8,6 +8,7 @@ from datetime import datetime
 from celery import shared_task
 from django.apps import apps
 from django.conf import settings
+from django.utils import timezone
 
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
@@ -209,3 +210,50 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         learner_content_assignment_action.save()
         assignment.state = LearnerContentAssignmentStateChoices.ERRORED
         assignment.full_clean()
+
+
+@shared_task(base=LoggedTaskWithRetry)
+def send_assignment_automatically_expired_email(expired_assignment_uuid, admin_emails):
+    """
+    Send email via braze for automatically expired assignment
+    Args:
+        expired_assignment_uuid: (string) expired assignment uuid
+    """
+    learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
+
+    try:
+        assignment = learner_content_assignment_model.objects.get(uuid=expired_assignment_uuid)
+    except learner_content_assignment_model.DoesNotExist:
+        logger.warning(f'Request with uuid: {expired_assignment_uuid} does not exist.')
+        return
+
+    learner_content_assignment_action = LearnerContentAssignmentAction(
+        assignment=assignment, action_type=AssignmentActions.AUTOMATIC_CANCELLATION_NOTIFICATION
+    )
+
+    braze_trigger_properties = {}
+    braze_client_instance = BrazeApiClient()
+    lms_user_id = assignment.lms_user_id
+    braze_trigger_properties['contact_admin_link'] = braze_client_instance.generate_mailto_link(admin_emails)
+
+    try:
+        recipient = braze_client_instance.create_recipient(
+            user_email=assignment.learner_email,
+            lms_user_id=assignment.lms_user_id
+        )
+        braze_trigger_properties["course_name"] = assignment.content_title
+        braze_client_instance.send_campaign_message(
+            settings.BRAZE_ASSIGNMENT_AUTOMATIC_CANCELLATION_NOTIFICATION_CAMPAIGN,
+            recipients=[recipient],
+            trigger_properties=braze_trigger_properties,
+        )
+        learner_content_assignment_action.completed_at = timezone.now()
+        learner_content_assignment_action.save()
+        logger.info(f'Sending braze campaign message for automatically expired assignment {assignment}')
+        return
+    except Exception as exc:
+        logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
+        learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
+        learner_content_assignment_action.traceback = exc
+        learner_content_assignment_action.save()
+        raise
