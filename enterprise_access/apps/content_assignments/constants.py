@@ -37,12 +37,14 @@ class AssignmentActions:
     NOTIFIED = 'notified'
     REMINDED = 'reminded'
     CANCELLED_NOTIFICATION = 'cancelled'
+    AUTOMATIC_CANCELLATION_NOTIFICATION = 'automatic_cancellation'
 
     CHOICES = (
         (LEARNER_LINKED, 'Learner linked to customer'),
         (NOTIFIED, 'Learner notified of assignment'),
         (REMINDED, 'Learner reminded about assignment'),
         (CANCELLED_NOTIFICATION, 'Learner assignment cancelled'),
+        (AUTOMATIC_CANCELLATION_NOTIFICATION, 'Learner assignment cancelled automatically'),
     )
 
 
@@ -89,3 +91,15 @@ class AssignmentLearnerStates:
         WAITING,
         FAILED,
     )
+
+
+class AssignmentAutomaticExpiredReason:
+    """
+    Reason for assignment automatic expiry.
+    """
+    NIENTY_DAYS_PASSED = 'NIENTY_DAYS_PASSED'
+    ENROLLMENT_DATE_PASSED = 'ENROLLMENT_DATE_PASSED'
+    SUBSIDY_EXPIRED = 'SUBSIDY_EXPIRED'
+
+
+NUM_DAYS_BEFORE_AUTO_CANCELLATION = 90

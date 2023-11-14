@@ -18,6 +18,7 @@ from enterprise_access.apps.content_assignments.constants import (
 )
 from enterprise_access.apps.content_assignments.tasks import (
     create_pending_enterprise_learner_for_assignment_task,
+    send_assignment_automatically_expired_email,
     send_cancel_email_for_pending_assignment,
     send_reminder_email_for_pending_assignment
 )
@@ -316,3 +317,28 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'learner_portal_link': 'http://enterprise-learner-portal.example.com/test-slug'
             },
         )
+
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
+    def test_send_assignment_automatically_expired_email(self, mock_braze_client):
+        """
+        Verify `send_assignment_automatically_expired_email` task work as expected
+        """
+        admin_emails = ['admin1@example.com', 'admin2@example.com']
+        mock_recipient = {
+            'external_user_id': 1
+        }
+
+        mock_admin_mailto = f'mailto:{",".join(admin_emails)}'
+        mock_braze_client.return_value.create_recipient.return_value = mock_recipient
+        mock_braze_client.return_value.generate_mailto_link.return_value = mock_admin_mailto
+        send_assignment_automatically_expired_email(self.assignment.uuid, admin_emails)
+
+        mock_braze_client.return_value.send_campaign_message.assert_any_call(
+            'test-assignment-expired-campaign',
+            recipients=[mock_recipient],
+            trigger_properties={
+                'contact_admin_link': mock_admin_mailto,
+                'course_name': self.assignment.content_title
+            },
+        )
+        assert mock_braze_client.return_value.send_campaign_message.call_count == 1
