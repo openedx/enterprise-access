@@ -7,6 +7,7 @@ from __future__ import annotations  # needed for using QuerySet in type hinting.
 import logging
 from typing import Iterable
 
+from django.db import transaction
 from django.db.models import Sum
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
@@ -271,29 +272,32 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     # de-duplicated using set union.
     existing_assignments_to_update = set(cancelled_or_errored_to_update).union(assignments_with_updated_lms_user_id)
 
-    # Bulk update and get a list of refreshed objects
-    updated_assignments = _update_and_refresh_assignments(
-        existing_assignments_to_update,
-        [
-            # `lms_user_id` is updated via the _try_populate_assignments_lms_user_id() function.
-            'lms_user_id',
-            # `content_quantity` and `state` are updated via the for-loop above.
-            'content_quantity', 'state',
-        ]
-    )
+    with transaction.atomic():
+        # Bulk update and get a list of refreshed objects
+        updated_assignments = _update_and_refresh_assignments(
+            existing_assignments_to_update,
+            [
+                # `lms_user_id` is updated via the _try_populate_assignments_lms_user_id() function.
+                'lms_user_id',
+                # `content_quantity` and `state` are updated via the for-loop above.
+                'content_quantity', 'state',
+            ]
+        )
 
-    # Narrow down creation list of learner emails
-    learner_emails_for_assignment_creation = set(learner_emails) - learner_emails_with_existing_assignments
+        # Narrow down creation list of learner emails
+        learner_emails_for_assignment_creation = set(learner_emails) - learner_emails_with_existing_assignments
 
-    # Initialize and save LearnerContentAssignment instances for each of them
-    created_assignments = _create_new_assignments(
-        assignment_configuration,
-        learner_emails_for_assignment_creation,
-        content_key,
-        content_quantity,
-    )
+        # Initialize and save LearnerContentAssignment instances for each of them
+        created_assignments = _create_new_assignments(
+            assignment_configuration,
+            learner_emails_for_assignment_creation,
+            content_key,
+            content_quantity,
+        )
 
     # Enqueue an asynchronous task to link assigned learners to the customer
+    # This has to happen outside of the atomic block to avoid a race condition
+    # when the celery task does its read of updated/created assignments.
     for assignment in updated_assignments + created_assignments:
         create_pending_enterprise_learner_for_assignment_task.delay(assignment.uuid)
 

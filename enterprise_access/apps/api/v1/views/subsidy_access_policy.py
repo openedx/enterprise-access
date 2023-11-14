@@ -9,7 +9,6 @@ from contextlib import suppress
 import requests
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import transaction
 from django.utils.functional import cached_property
 from drf_spectacular.utils import extend_schema
 from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient
@@ -798,7 +797,7 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
         content_price_cents = serializer.data['content_price_cents']
 
         try:
-            with policy.lock(), transaction.atomic():
+            with policy.lock():
                 can_allocate, reason = policy.can_allocate(
                     len(learner_emails),
                     content_key,

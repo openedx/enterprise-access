@@ -48,7 +48,7 @@ class CreatePendingEnterpriseLearnerForAssignmentTaskBase(LoggedTaskWithRetry): 
                     'The task failure resulted from exceeding the locally defined max number of retries '
                     '(settings.TASK_MAX_RETRIES).'
                 )
-        except assignment.DoesNotExist:
+        except learner_content_assignment_model.DoesNotExist:
             logger.error(f'LearnerContentAssignment not found with UUID: {learner_content_assignment_uuid}')
 
 
