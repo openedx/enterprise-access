@@ -13,6 +13,9 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
 from enterprise_access.apps.api import filters, serializers, utils
+from enterprise_access.apps.api.serializers.content_assignments.assignment import (
+    LearnerContentAssignmentActionRequestSerializer
+)
 from enterprise_access.apps.api.v1.views.utils import PaginationWithPageCount
 from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.content_assignments.constants import AssignmentLearnerStates
@@ -126,6 +129,41 @@ class LearnerContentAssignmentAdminViewSet(
 
         return queryset
 
+    def cancel_remind_helper(self, uuid, cancel):
+        """
+        Execute action to a single learner with associated ``LearnerContentAssignment``
+        record by uuid.
+
+        Args:
+            uuid: single uuid of an ``LearnerContentAssignment``
+            cancel: true if executing cancel, false if executing remind
+
+        Raises:
+            404 if the assignment was not found.
+            422 if the assignment was not able to be canceled/reminded.
+        """
+        try:
+            actionable_assignment = self.get_queryset().get(uuid=uuid)
+        except LearnerContentAssignment.DoesNotExist:
+            return Response(None, status=status.HTTP_404_NOT_FOUND)
+
+        if (cancel):
+            cancellation_info = assignments_api.cancel_assignments([self.get_queryset().get(uuid=uuid)])
+            # If the response contains one element in the `cancelled` list, that is the one we sent, indicating success.
+            action_succeeded = len(cancellation_info['cancelled']) == 1
+        else:
+            reminder_info = assignments_api.remind_assignments([actionable_assignment])
+            action_succeeded = len(reminder_info['reminded']) == 1
+
+        if action_succeeded:
+            # Serialize the assignment object obtained via get_queryset() instead of the one from the assignments_api.
+            # Only the former has the additional dynamic fields annotated, and those are required for serialization.
+            actionable_assignment.refresh_from_db()
+            response_serializer = serializers.LearnerContentAssignmentAdminResponseSerializer(actionable_assignment)
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
     @extend_schema(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
         summary='Retrieve a content assignment by UUID.',
@@ -168,68 +206,63 @@ class LearnerContentAssignmentAdminViewSet(
 
     @extend_schema(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
-        summary='Cancel an assignment by UUID.',
+        summary='Cancel assignments by UUID.',
+        parameters=[LearnerContentAssignmentActionRequestSerializer],
         responses={
             status.HTTP_200_OK: serializers.LearnerContentAssignmentAdminResponseSerializer,
-            status.HTTP_404_NOT_FOUND: None,
             status.HTTP_422_UNPROCESSABLE_ENTITY: None,
         },
     )
     @permission_required(CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION, fn=assignment_admin_permission_fn)
-    @action(detail=True, methods=['post'])
-    def cancel(self, request, *args, uuid=None, **kwargs):
+    @action(detail=False, methods=['post'])
+    def cancel(self, request, *args, **kwargs):
         """
-        Cancel a single ``LearnerContentAssignment`` record by uuid.
+        Cancel a list of ``LearnerContentAssignment`` records by uuid.
 
         Raises:
-            404 if the assignment was not found.
-            422 if the assignment is not cancelable.
+            422 if any of the assignments threw an error
         """
-        try:
-            assignment_to_cancel = self.get_queryset().get(uuid=uuid)
-        except LearnerContentAssignment.DoesNotExist:
-            return Response(None, status=status.HTTP_404_NOT_FOUND)
+        serializer = LearnerContentAssignmentActionRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        uuid_response_dict = {}
 
-        # if the assignment is not cancelable, this is a no-op.
-        cancellation_info = assignments_api.cancel_assignments([assignment_to_cancel])
+        uuids = serializer.data['assignment_uuids']
+        for uuid in uuids:
+            response = self.cancel_remind_helper(uuid, True)
+            uuid_response_dict[uuid] = response.status_code
+        for uuid in uuid_response_dict.keys():
+            if uuid_response_dict[uuid] != status.HTTP_200_OK:
+                return Response(uuid_response_dict, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        return Response(uuid_response_dict, status=status.HTTP_200_OK)
 
-        # If the response contains one element in the `cancelled` list, that is the one we sent, indicating success.
-        cancellation_succeeded = len(cancellation_info['cancelled']) == 1
-
-        if cancellation_succeeded:
-            # Serialize the assignment object obtained via get_queryset() instead of the one from the assignments_api.
-            # Only the former has the additional dynamic fields annotated, and those are required for serialization.
-            assignment_to_cancel.refresh_from_db()
-            response_serializer = serializers.LearnerContentAssignmentAdminResponseSerializer(assignment_to_cancel)
-            return Response(response_serializer.data, status=status.HTTP_200_OK)
-        else:
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-
-    def remind(self, request, *args, uuid=None, **kwargs):
+    @extend_schema(
+        tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
+        summary='Remind assignments by UUID.',
+        parameters=[LearnerContentAssignmentActionRequestSerializer],
+        responses={
+            status.HTTP_200_OK: serializers.LearnerContentAssignmentAdminResponseSerializer,
+            status.HTTP_422_UNPROCESSABLE_ENTITY: None,
+        },
+    )
+    @permission_required(CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION, fn=assignment_admin_permission_fn)
+    @action(detail=False, methods=['post'])
+    def remind(self, request, *args, **kwargs):
         """
-        Send reminders to a single learners with associated ``LearnerContentAssignment``
-        record by uuid.
+        Send reminders to a list of learners with associated ``LearnerContentAssignment``
+        record by list of uuids.
 
         Raises:
-            404 if the assignment was not found.
-            422 if the assignment was not able to be reminded.
+            422 if any of the assignments threw an error
         """
-        try:
-            assignment_to_remind = self.get_queryset().get(uuid=uuid)
-        except LearnerContentAssignment.DoesNotExist:
-            return Response(None, status=status.HTTP_404_NOT_FOUND)
+        serializer = LearnerContentAssignmentActionRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        uuid_response_dict = {}
 
-        # if the assignment is not remindable, this is a no-op.
-        reminder_info = assignments_api.remind_assignments([assignment_to_remind])
-
-        # If the response contains one element in the `reminded` list, that is the one we sent, indicating success.
-        reminder_succeeded = len(reminder_info['reminded']) == 1
-
-        if reminder_succeeded:
-            # Serialize the assignment object obtained via get_queryset() instead of the one from the assignments_api.
-            # Only the former has the additional dynamic fields annotated, and those are required for serialization.
-            assignment_to_remind.refresh_from_db()
-            response_serializer = serializers.LearnerContentAssignmentAdminResponseSerializer(assignment_to_remind)
-            return Response(response_serializer.data, status=status.HTTP_200_OK)
-        else:
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        uuids = serializer.data['assignment_uuids']
+        for uuid in uuids:
+            response = self.cancel_remind_helper(uuid, False)
+            uuid_response_dict[uuid] = response.status_code
+        for uuid in uuid_response_dict.keys():
+            if uuid_response_dict[uuid] != status.HTTP_200_OK:
+                return Response(uuid_response_dict, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        return Response(uuid_response_dict, status=status.HTTP_200_OK)

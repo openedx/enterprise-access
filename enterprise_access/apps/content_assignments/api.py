@@ -12,6 +12,7 @@ from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import CourseLocator
 
+from enterprise_access.apps.content_assignments.tasks import send_reminder_email_for_pending_assignment
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
 
@@ -472,31 +473,21 @@ def remind_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
             'non-remindable': <list of 0 or more non-remindable assignments>,
         }
     """
-    from enterprise_access.apps.content_assignments.tasks import (  # pylint: disable=import-outside-toplevel
-        send_reminder_email_for_pending_assignment
-    )
     remindable_assignments = set(
         assignment for assignment in assignments
         if assignment.state in LearnerContentAssignmentStateChoices.REMINDABLE_STATES
     )
-    already_reminded_assignments = set(
-        assignment for assignment in assignments
-        if assignment.state == LearnerContentAssignmentStateChoices.REMINDED
-    )
-    non_remindable_assignments = set(assignments) - remindable_assignments - already_reminded_assignments
+
+    non_remindable_assignments = set(assignments) - remindable_assignments
 
     logger.info(f'Skipping {len(non_remindable_assignments)} non-remindable assignments.')
-    logger.info(f'Skipping {len(already_reminded_assignments)} already reminded assignments.')
     logger.info(f'Reminding {len(remindable_assignments)} assignments.')
-
-    for assignment_to_remind in remindable_assignments:
-        assignment_to_remind.state = LearnerContentAssignmentStateChoices.REMINDED
 
     reminded_assignments = _update_and_refresh_assignments(remindable_assignments, ['state'])
     for reminded_assignment in reminded_assignments:
         send_reminder_email_for_pending_assignment.delay(reminded_assignment.uuid)
 
     return {
-        'reminded': list(set(reminded_assignments) | already_reminded_assignments),
+        'reminded': list(set(reminded_assignments)),
         'non_remindable': list(non_remindable_assignments),
     }

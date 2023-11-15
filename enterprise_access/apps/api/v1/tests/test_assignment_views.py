@@ -1,6 +1,7 @@
 """
 Tests for LearnerContentAssignment API views.
 """
+import json
 from uuid import UUID, uuid4
 
 import ddt
@@ -228,8 +229,15 @@ class TestAdminAssignmentsUnauthorizedCRUD(CRUDViewTestMixin, APITest):
             'uuid': str(self.assignment_allocated_pre_link.uuid),
         }
         detail_url = reverse('api:v1:admin-assignments-detail', kwargs=detail_kwargs)
-        cancel_url = detail_url + 'cancel/'
 
+        # Call the cancel endpoint.
+        cancel_kwargs = {
+            'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID),
+        }
+        cancel_url = reverse('api:v1:admin-assignments-cancel', kwargs=cancel_kwargs)
+        query_params = {
+            'assignment_uuids': [str(self.assignment_allocated_post_link.uuid)],
+        }
         # Test views that need CONTENT_ASSIGNMENT_ADMIN_READ_PERMISSION:
 
         # GET/retrieve endpoint:
@@ -244,7 +252,7 @@ class TestAdminAssignmentsUnauthorizedCRUD(CRUDViewTestMixin, APITest):
         # Test views that need CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION:
 
         # cancel endpoint:
-        response = self.client.post(cancel_url)
+        response = self.client.post(cancel_url, query_params)
         assert response.status_code == expected_response_code
 
 
@@ -426,7 +434,7 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # Explicitly define the REVERSE order of assignments returned by the list view.  This should be the order if
         # ?ordering=+recent_action_time
         recent_action_time_ordering = [
-            # First 6 assignments oredered by their creation time.
+            # First 6 assignments ordered by their creation time.
             self.assignment_allocated_pre_link,  # Still chronologically first, despite recent non-reminder actions.
             self.requester_assignment_accepted,
             self.assignment_accepted,
@@ -498,6 +506,60 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         ]
         assert actual_assignment_uuids == expected_assignment_uuids
 
+    def test_remind(self):
+        """
+        Test that the remind view reminds the learner of their assignment and returns
+        an appropriate response with 200 status code.
+        """
+        # Set the JWT-based auth to an operator.
+
+        print(self.assignment_allocated_post_link.state)
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        # Call the remind endpoint.
+        remind_kwargs = {
+            'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID),
+        }
+        remind_url = reverse('api:v1:admin-assignments-remind', kwargs=remind_kwargs)
+        query_params = {
+            'assignment_uuids': [str(self.assignment_allocated_post_link.uuid)],
+        }
+
+        response = self.client.post(remind_url, query_params)
+
+        # Verify the API response.
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_bulk_remind(self):
+        """
+        Test that the remind view reminds the learner of their assignment and returns an appropriate response
+        with 422 status code if any of the uuids fail.
+        """
+        # Set the JWT-based auth to an operator.
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        # Call the remind endpoint.
+        remind_kwargs = {
+            'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID),
+        }
+        remind_url = reverse('api:v1:admin-assignments-remind', kwargs=remind_kwargs)
+        random_uuid = str(uuid4())
+        query_params = {
+            'assignment_uuids': [str(self.assignment_allocated_post_link.uuid), random_uuid],
+        }
+
+        response = self.client.post(remind_url, query_params)
+
+        # Verify the API response.
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        response_dict = json.loads(response.content.decode('utf-8'))
+        assert response_dict[random_uuid] == status.HTTP_404_NOT_FOUND
+        assert response_dict[str(self.assignment_allocated_post_link.uuid)] == status.HTTP_200_OK
+
     def test_cancel(self):
         """
         Test that the cancel view cancels the assignment and returns an appropriate response with 200 status code and
@@ -509,52 +571,49 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         ])
 
         # Call the cancel endpoint.
-        detail_kwargs = {
+        cancel_kwargs = {
             'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID),
-            'uuid': str(self.assignment_allocated_post_link.uuid),
         }
-        detail_url = reverse('api:v1:admin-assignments-detail', kwargs=detail_kwargs)
-        cancel_url = detail_url + 'cancel/'
-        response = self.client.post(cancel_url)
+        cancel_url = reverse('api:v1:admin-assignments-cancel', kwargs=cancel_kwargs)
+        query_params = {
+            'assignment_uuids': [str(self.assignment_allocated_post_link.uuid)],
+        }
+
+        response = self.client.post(cancel_url, query_params)
 
         # Verify the API response.
         assert response.status_code == status.HTTP_200_OK
-        assert response.json()['state'] == LearnerContentAssignmentStateChoices.CANCELLED
 
-        # Check that the assignment state was updated.
+        # Check that the assignments state were updated.
         self.assignment_allocated_post_link.refresh_from_db()
         assert self.assignment_allocated_post_link.state == LearnerContentAssignmentStateChoices.CANCELLED
 
-        # Test idempotency of the cancel endpoint.  This time, the status is 204 because the assignment was already
-        # cancelled.
-        response = self.client.post(cancel_url)
-        assert response.status_code == status.HTTP_200_OK
-        assert response.json()['state'] == LearnerContentAssignmentStateChoices.CANCELLED
-
-    def test_cancel_non_cancelable_returns_422(self):
+    def test_bulk_cancel(self):
         """
-        Test that the cancel view fails with a 422 if the assignment is non-cancelable.
+        Test that the cancel view cancels the assignment and returns an appropriate response
+        with 422 status code if any of the uuids fail.
         """
         # Set the JWT-based auth to an operator.
         self.set_jwt_cookie([
             {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
         ])
 
-        # Call the cancel endpoint on an already accepted assignment.
+        # Call the cancel endpoint.
         detail_kwargs = {
             'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID),
-            'uuid': str(self.assignment_accepted.uuid),
         }
-        detail_url = reverse('api:v1:admin-assignments-detail', kwargs=detail_kwargs)
-        cancel_url = detail_url + 'cancel/'
-        response = self.client.post(cancel_url)
+        cancel_url = reverse('api:v1:admin-assignments-cancel', kwargs=detail_kwargs)
+        query_params = {
+            'assignment_uuids': [str(self.assignment_allocated_post_link.uuid), str(self.assignment_accepted.uuid)],
+        }
 
-        # Verify the API response.
+        response = self.client.post(cancel_url, query_params)
+
+        # The first one has a status of accepted (not cancelable), hence the 422
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-
-        # Check that the assignment state was NOT updated, and the state is still accepted.
-        self.assignment_allocated_post_link.refresh_from_db()
-        assert self.assignment_accepted.state == LearnerContentAssignmentStateChoices.ACCEPTED
+        response_dict = json.loads(response.content.decode('utf-8'))
+        assert response_dict[str(self.assignment_accepted.uuid)] == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response_dict[str(self.assignment_allocated_post_link.uuid)] == status.HTTP_200_OK
 
     def test_learner_state_query_param_filter(self):
         """
@@ -714,7 +773,7 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
 
         # Only Assignments that match the following qualifications are returned in paginated response:
         # 1. Assignment is for the requesting user.
-        # 2. Assignment is in the requested AssignementConfiguration.
+        # 2. Assignment is in the requested AssignmentConfiguration.
         expected_assignments_for_requester = [
             self.requester_assignment_accepted,
             self.requester_assignment_cancelled,

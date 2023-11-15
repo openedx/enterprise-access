@@ -140,7 +140,19 @@ class CoursePartnerSerializer(serializers.Serializer):
     Serialized partner ``name`` and ``logo_image_url`` for content_metadata of an assignment.
     """
     name = serializers.CharField(help_text='The partner name')
-    logo_image_url = serializers.CharField(help_text='The URL for the parter logo image')
+    logo_image_url = serializers.CharField(help_text='The URL for the partner logo image')
+
+
+# pylint: disable=abstract-method
+class LearnerContentAssignmentActionRequestSerializer(serializers.Serializer):
+    """
+    Request serializer to validate remind and cancel endpoint query params.
+
+    For view: LearnerContentAssignmentAdminViewSet.remind and LearnerContentAssignmentAdminViewSet.cancel
+    """
+    assignment_uuids = serializers.ListField(
+        child=serializers.UUIDField()
+    )
 
 
 class ContentMetadataForAssignmentSerializer(serializers.Serializer):

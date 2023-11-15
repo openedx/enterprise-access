@@ -125,12 +125,13 @@ def send_cancel_email_for_pending_assignment(cancelled_assignment_uuid):
         learner_content_assignment_action.save()
         logger.info(f'Sending braze campaign message for cancelled assignment {assignment}')
         return
-    except Exception as exc:
+    except Exception as exc:  # pylint: disable=broad-exception-caught
         logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
         learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
         learner_content_assignment_action.traceback = exc
         learner_content_assignment_action.save()
-        raise
+        assignment.state = LearnerContentAssignmentStateChoices.ERRORED
+        assignment.full_clean()
 
 
 @shared_task(base=LoggedTaskWithRetry)
@@ -206,3 +207,5 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
         learner_content_assignment_action.traceback = exc
         learner_content_assignment_action.save()
+        assignment.state = LearnerContentAssignmentStateChoices.ERRORED
+        assignment.full_clean()

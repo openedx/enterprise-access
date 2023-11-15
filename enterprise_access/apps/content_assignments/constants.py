@@ -11,24 +11,22 @@ class LearnerContentAssignmentStateChoices:
     ACCEPTED = 'accepted'
     CANCELLED = 'cancelled'
     ERRORED = 'errored'
-    REMINDED = 'reminded'
 
     CHOICES = (
         (ALLOCATED, 'Allocated'),
         (ACCEPTED, 'Accepted'),
         (CANCELLED, 'Cancelled'),
         (ERRORED, 'Errored'),
-        (REMINDED, 'Reminded')
     )
 
     # States which allow reallocation by an admin.
     REALLOCATE_STATES = (CANCELLED, ERRORED)
 
     # States which allow cancellation by an admin.
-    CANCELABLE_STATES = (ALLOCATED, ERRORED, REMINDED)
+    CANCELABLE_STATES = (ALLOCATED, ERRORED)
 
     # States which allow reminders by an admin.
-    REMINDABLE_STATES = (ALLOCATED)
+    REMINDABLE_STATES = (ALLOCATED,)
 
 
 class AssignmentActions:
