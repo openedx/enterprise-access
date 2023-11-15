@@ -1,7 +1,6 @@
 """
 Tests for LearnerContentAssignment API views.
 """
-import json
 from uuid import UUID, uuid4
 
 import ddt
@@ -535,7 +534,7 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
     def test_bulk_remind(self):
         """
         Test that the remind view reminds the learner of their assignment and returns an appropriate response
-        with 422 status code if any of the uuids fail.
+        with 404 status code if any of the uuids cannot be found.
         """
         # Set the JWT-based auth to an operator.
         self.set_jwt_cookie([
@@ -553,12 +552,8 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         }
 
         response = self.client.post(remind_url, query_params)
-
-        # Verify the API response.
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-        response_dict = json.loads(response.content.decode('utf-8'))
-        assert response_dict[random_uuid] == status.HTTP_404_NOT_FOUND
-        assert response_dict[str(self.assignment_allocated_post_link.uuid)] == status.HTTP_200_OK
+        # Verify the API response (one of the uuid's cannot be found)
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
     def test_cancel(self):
         """
@@ -611,9 +606,6 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
 
         # The first one has a status of accepted (not cancelable), hence the 422
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-        response_dict = json.loads(response.content.decode('utf-8'))
-        assert response_dict[str(self.assignment_accepted.uuid)] == status.HTTP_422_UNPROCESSABLE_ENTITY
-        assert response_dict[str(self.assignment_allocated_post_link.uuid)] == status.HTTP_200_OK
 
     def test_learner_state_query_param_filter(self):
         """

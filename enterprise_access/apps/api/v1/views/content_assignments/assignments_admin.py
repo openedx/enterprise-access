@@ -129,41 +129,6 @@ class LearnerContentAssignmentAdminViewSet(
 
         return queryset
 
-    def cancel_remind_helper(self, uuid, cancel):
-        """
-        Execute action to a single learner with associated ``LearnerContentAssignment``
-        record by uuid.
-
-        Args:
-            uuid: single uuid of an ``LearnerContentAssignment``
-            cancel: true if executing cancel, false if executing remind
-
-        Raises:
-            404 if the assignment was not found.
-            422 if the assignment was not able to be canceled/reminded.
-        """
-        try:
-            actionable_assignment = self.get_queryset().get(uuid=uuid)
-        except LearnerContentAssignment.DoesNotExist:
-            return Response(None, status=status.HTTP_404_NOT_FOUND)
-
-        if (cancel):
-            cancellation_info = assignments_api.cancel_assignments([self.get_queryset().get(uuid=uuid)])
-            # If the response contains one element in the `cancelled` list, that is the one we sent, indicating success.
-            action_succeeded = len(cancellation_info['cancelled']) == 1
-        else:
-            reminder_info = assignments_api.remind_assignments([actionable_assignment])
-            action_succeeded = len(reminder_info['reminded']) == 1
-
-        if action_succeeded:
-            # Serialize the assignment object obtained via get_queryset() instead of the one from the assignments_api.
-            # Only the former has the additional dynamic fields annotated, and those are required for serialization.
-            actionable_assignment.refresh_from_db()
-            response_serializer = serializers.LearnerContentAssignmentAdminResponseSerializer(actionable_assignment)
-            return Response(response_serializer.data, status=status.HTTP_200_OK)
-        else:
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-
     @extend_schema(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
         summary='Retrieve a content assignment by UUID.',
@@ -209,7 +174,8 @@ class LearnerContentAssignmentAdminViewSet(
         summary='Cancel assignments by UUID.',
         parameters=[LearnerContentAssignmentActionRequestSerializer],
         responses={
-            status.HTTP_200_OK: serializers.LearnerContentAssignmentAdminResponseSerializer,
+            status.HTTP_200_OK: None,
+            status.HTTP_404_NOT_FOUND: None,
             status.HTTP_422_UNPROCESSABLE_ENTITY: None,
         },
     )
@@ -220,27 +186,31 @@ class LearnerContentAssignmentAdminViewSet(
         Cancel a list of ``LearnerContentAssignment`` records by uuid.
 
         Raises:
+            404 if any of the assignments were not found
             422 if any of the assignments threw an error
         """
         serializer = LearnerContentAssignmentActionRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        uuid_response_dict = {}
-
-        uuids = serializer.data['assignment_uuids']
-        for uuid in uuids:
-            response = self.cancel_remind_helper(uuid, True)
-            uuid_response_dict[uuid] = response.status_code
-        for uuid in uuid_response_dict.keys():
-            if uuid_response_dict[uuid] != status.HTTP_200_OK:
-                return Response(uuid_response_dict, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-        return Response(uuid_response_dict, status=status.HTTP_200_OK)
+        assignments = self.get_queryset().filter(
+            assignment_configuration__uuid=self.requested_assignment_configuration_uuid,
+            uuid__in=serializer.data['assignment_uuids'])
+        try:
+            response = assignments_api.cancel_assignments(assignments)
+            if len(assignments) < len(request.data['assignment_uuids']):
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            if response.get('non_cancelable'):
+                return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_200_OK)
+        except Exception:  # pylint: disable=broad-except
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     @extend_schema(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
         summary='Remind assignments by UUID.',
         parameters=[LearnerContentAssignmentActionRequestSerializer],
         responses={
-            status.HTTP_200_OK: serializers.LearnerContentAssignmentAdminResponseSerializer,
+            status.HTTP_200_OK: None,
+            status.HTTP_404_NOT_FOUND: None,
             status.HTTP_422_UNPROCESSABLE_ENTITY: None,
         },
     )
@@ -252,17 +222,20 @@ class LearnerContentAssignmentAdminViewSet(
         record by list of uuids.
 
         Raises:
+            404 if any of the assignments were not found
             422 if any of the assignments threw an error
         """
         serializer = LearnerContentAssignmentActionRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        uuid_response_dict = {}
-
-        uuids = serializer.data['assignment_uuids']
-        for uuid in uuids:
-            response = self.cancel_remind_helper(uuid, False)
-            uuid_response_dict[uuid] = response.status_code
-        for uuid in uuid_response_dict.keys():
-            if uuid_response_dict[uuid] != status.HTTP_200_OK:
-                return Response(uuid_response_dict, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-        return Response(uuid_response_dict, status=status.HTTP_200_OK)
+        assignments = self.get_queryset().filter(
+            assignment_configuration__uuid=self.requested_assignment_configuration_uuid,
+            uuid__in=serializer.data['assignment_uuids'])
+        try:
+            response = assignments_api.remind_assignments(assignments)
+            if len(assignments) < len(request.data['assignment_uuids']):
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            if response.get('non_remindable_assignments'):
+                return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_200_OK)
+        except Exception:  # pylint: disable=broad-except
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
