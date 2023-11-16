@@ -16,6 +16,7 @@ from enterprise_access.apps.content_assignments.models import LearnerContentAssi
 from enterprise_access.tasks import LoggedTaskWithRetry
 
 from .constants import LearnerContentAssignmentStateChoices
+from .utils import format_traceback
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class CreatePendingEnterpriseLearnerForAssignmentTaskBase(LoggedTaskWithRetry): 
             assignment = learner_content_assignment_model.objects.get(uuid=learner_content_assignment_uuid)
             assignment.state = LearnerContentAssignmentStateChoices.ERRORED
             assignment.save()
+            assignment.add_errored_linked_action(exc)
             if self.request.retries == settings.TASK_MAX_RETRIES:
                 # The failure resulted from too many retries.  This fact would be a useful thing to record in a "reason"
                 # field on the assignment if one existed.
@@ -128,6 +130,6 @@ def send_cancel_email_for_pending_assignment(cancelled_assignment_uuid):
     except Exception as exc:
         logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
         learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
-        learner_content_assignment_action.traceback = exc
+        learner_content_assignment_action.traceback = format_traceback(exc)
         learner_content_assignment_action.save()
         raise

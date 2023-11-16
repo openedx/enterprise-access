@@ -20,6 +20,7 @@ from .constants import (
     AssignmentRecentActionTypes,
     LearnerContentAssignmentStateChoices
 )
+from .utils import format_traceback
 
 BULK_OPERATION_BATCH_SIZE = 50
 
@@ -257,6 +258,16 @@ class LearnerContentAssignment(TimeStampedModel):
             },
         )
         return record, was_created
+
+    def add_errored_linked_action(self, exc):
+        """
+        Adds an errored "linked" action for this assignment record, given an exception instance.
+        """
+        return self.actions.create(
+            action_type=AssignmentActions.LEARNER_LINKED,
+            error_reason=AssignmentActionErrors.INTERNAL_API_ERROR,
+            traceback=format_traceback(exc),
+        )
 
     def get_successful_notified_action(self):
         """
