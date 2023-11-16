@@ -25,6 +25,9 @@ class LearnerContentAssignmentStateChoices:
     # States which allow cancellation by an admin.
     CANCELABLE_STATES = (ALLOCATED, ERRORED)
 
+    # States which allow reminders by an admin.
+    REMINDABLE_STATES = (ALLOCATED,)
+
 
 class AssignmentActions:
     """

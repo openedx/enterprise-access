@@ -13,8 +13,7 @@ from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import CourseLocator
 
-from enterprise_access.apps.content_assignments.tasks import send_cancel_email_for_pending_assignment
-from enterprise_access.apps.content_metadata.api import get_and_cache_catalog_content_metadata
+from enterprise_access.apps.content_assignments.tasks import send_reminder_email_for_pending_assignment
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
 
@@ -429,6 +428,9 @@ def cancel_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
             'non-cancelable': <list of 0 or more non-cancelable assignments, e.g. already accepted assignments>,
         }
     """
+    # pylint: disable=import-outside-toplevel
+    from enterprise_access.apps.content_assignments.tasks import send_cancel_email_for_pending_assignment
+
     cancelable_assignments = set(
         assignment for assignment in assignments
         if assignment.state in LearnerContentAssignmentStateChoices.CANCELABLE_STATES
@@ -456,23 +458,40 @@ def cancel_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
     }
 
 
-def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
+def remind_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
     """
-    Fetches (from cache or enterprise-catalog API call) content metadata
-    in bulk for the `content_keys` of the given assignments, provided
-    such metadata is related to the given `enterprise_catalog_uuid`.
+    Bulk remind assignments.
+
+    This is a no-op for assignments in the following states: [accepted, errored, canceled]. We only allow
+    assignments which are in the allocated state. Reminded and already-reminded assignments are bundled in
+    the response because this function is meant to be idempotent.
+
+
+    Args:
+        assignments (list(LearnerContentAssignment)): One or more assignments to remind.
 
     Returns:
-        A dict mapping every content key of the provided assignments
-        to a content metadata dictionary, or null if no such dictionary
-        could be found for a given key.
+        A dict representing reminded and non-remindable assignments:
+        {
+            'reminded': <list of 0 or more reminded or already-reminded assignments>,
+            'non-remindable': <list of 0 or more non-remindable assignments>,
+        }
     """
-    content_keys = sorted({assignment.content_key for assignment in assignments})
-    content_metadata_list = get_and_cache_catalog_content_metadata(enterprise_catalog_uuid, content_keys)
-    metadata_by_key = {
-        record['key']: record for record in content_metadata_list
-    }
+    remindable_assignments = set(
+        assignment for assignment in assignments
+        if assignment.state in LearnerContentAssignmentStateChoices.REMINDABLE_STATES
+    )
+
+    non_remindable_assignments = set(assignments) - remindable_assignments
+
+    logger.info(f'Skipping {len(non_remindable_assignments)} non-remindable assignments.')
+    logger.info(f'Reminding {len(remindable_assignments)} assignments.')
+
+    reminded_assignments = _update_and_refresh_assignments(remindable_assignments, ['state'])
+    for reminded_assignment in reminded_assignments:
+        send_reminder_email_for_pending_assignment.delay(reminded_assignment.uuid)
+
     return {
-        assignment.content_key: metadata_by_key.get(assignment.content_key)
-        for assignment in assignments
+        'reminded': list(set(reminded_assignments)),
+        'non_remindable': list(non_remindable_assignments),
     }
