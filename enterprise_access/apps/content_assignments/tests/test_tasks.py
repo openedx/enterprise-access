@@ -11,7 +11,11 @@ from requests.exceptions import HTTPError
 from rest_framework import status
 
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
-from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.content_assignments.constants import (
+    AssignmentActionErrors,
+    AssignmentActions,
+    LearnerContentAssignmentStateChoices
+)
 from enterprise_access.apps.content_assignments.tasks import (
     create_pending_enterprise_learner_for_assignment_task,
     send_cancel_email_for_pending_assignment,
@@ -142,6 +146,9 @@ class TestCreatePendingEnterpriseLearnerForAssignmentTask(APITestWithMocks):
         # Finally, make sure the on_failure() handler successfully updated assignment state to errored.
         self.assignment.refresh_from_db()
         assert self.assignment.state == LearnerContentAssignmentStateChoices.ERRORED
+        action = self.assignment.actions.filter(action_type=AssignmentActions.LEARNER_LINKED).first()
+        self.assertIn('HTTPError', action.traceback)
+        self.assertEqual(action.error_reason, AssignmentActionErrors.INTERNAL_API_ERROR)
 
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
     def test_last_retry_success(self, mock_oauth_client):
