@@ -13,7 +13,7 @@ from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import HTTPError
 from rest_framework import serializers
 
-from enterprise_access.apps.content_assignments.api import get_content_metadata_for_assignments
+from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
 from enterprise_access.apps.subsidy_access_policy.constants import CENTS_PER_DOLLAR, PolicyTypes
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 

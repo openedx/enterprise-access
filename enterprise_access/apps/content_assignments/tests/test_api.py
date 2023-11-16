@@ -321,7 +321,7 @@ class TestContentAssignmentApi(TestCase):
             (cancelled_assignment, errored_assignment, created_assignment)
         ], any_order=True)
 
-    @mock.patch('enterprise_access.apps.content_assignments.api.send_cancel_email_for_pending_assignment')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.send_cancel_email_for_pending_assignment')
     def test_cancel_assignments_happy_path(self, mock_notify):
         """
         Tests the allocation of new assignments against a given configuration.
