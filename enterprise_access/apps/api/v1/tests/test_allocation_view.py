@@ -765,7 +765,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     )
     @mock.patch(
         'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
-        return_value=mock.MagicMock(),
+        return_value={'content_title': 'the-title'},
     )
     @mock.patch(
         'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task'
