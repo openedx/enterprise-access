@@ -607,7 +607,11 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # The first one has a status of accepted (not cancelable), hence the 422
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_learner_state_query_param_filter(self):
+    @ddt.data(
+        [AssignmentLearnerStates.WAITING, AssignmentLearnerStates.FAILED],
+        [AssignmentLearnerStates.WAITING],
+    )
+    def test_learner_state_query_param_filter(self, learner_states_to_query):
         """
         Test that the list view supports filtering on one or more ``learner_state`` values via a query parameter.
         """
@@ -622,14 +626,40 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         assert assignments_for_enterprise_customer.count() > 1
 
         # Hit the view with a learner_state query param.
-        learner_states_to_query = [AssignmentLearnerStates.WAITING, AssignmentLearnerStates.FAILED]
         learner_state_query_param_value = ",".join(learner_states_to_query)
         response = self.client.get(
-            ADMIN_ASSIGNMENTS_LIST_ENDPOINT + f"?learner_state={learner_state_query_param_value}"
+            ADMIN_ASSIGNMENTS_LIST_ENDPOINT + f"?learner_state__in={learner_state_query_param_value}"
         )
         # Assert the results only contain the requested ``learner_state`` values.
         for assignment in response.json().get('results'):
             assert assignment.get('learner_state') in learner_states_to_query
+
+    @ddt.data(
+        [LearnerContentAssignmentStateChoices.ALLOCATED, LearnerContentAssignmentStateChoices.ERRORED],
+        [LearnerContentAssignmentStateChoices.ALLOCATED],
+    )
+    def test_multi_state_query_param_filter(self, states_to_query):
+        """
+        Test that the list view supports filtering on one or more ``state`` values via a query parameter.
+        """
+        # Set the JWT-based auth that we'll use for every request.
+        self.set_jwt_cookie([{'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}])
+
+        # Fetch our list of assignments associated with the test enterprise.
+        assignments_for_enterprise_customer = LearnerContentAssignment.objects.filter(
+            assignment_configuration__enterprise_customer_uuid=TEST_ENTERPRISE_UUID
+        )
+        # Double check we have stuff to work with
+        assert assignments_for_enterprise_customer.count() > 1
+
+        # Hit the view with a state query param.
+        state_query_param_value = ",".join(states_to_query)
+        response = self.client.get(
+            ADMIN_ASSIGNMENTS_LIST_ENDPOINT + f"?state__in={state_query_param_value}"
+        )
+        # Assert the results only contain the requested ``state`` values.
+        for assignment in response.json().get('results'):
+            assert assignment.get('state') in states_to_query
 
     def test_assignment_search_query_param(self):
         """
