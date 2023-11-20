@@ -316,9 +316,9 @@ def _update_and_refresh_assignments(assignment_records, fields_changed):
     # Save the assignments to update
     LearnerContentAssignment.bulk_update(assignment_records, fields_changed)
 
-    # Get a list of refreshed objects that we just updated
+    # Get a list of refreshed objects that we just updated, along with their prefetched action records
     return list(
-        LearnerContentAssignment.objects.filter(
+        LearnerContentAssignment.objects.prefetch_related('actions').filter(
             uuid__in=[record.uuid for record in assignment_records],
         )
     )
@@ -382,9 +382,9 @@ def _create_new_assignments(assignment_configuration, learner_emails, content_ke
     Helper to bulk save new LearnerContentAssignment instances.
     """
     # First, prepare assignment objects using data available in-memory only.
+    content_title = _get_content_title(assignment_configuration, content_key)
     assignments_to_create = []
     for learner_email in learner_emails:
-        content_title = _get_content_title(assignment_configuration, content_key)
         assignment = LearnerContentAssignment(
             assignment_configuration=assignment_configuration,
             learner_email=learner_email,
@@ -405,10 +405,17 @@ def _create_new_assignments(assignment_configuration, learner_emails, content_ke
 
     # Validate all assignments to be created.
     for assignment in assignments_to_create:
-        assignment.full_clean()
+        assignment.clean()
 
     # Do the bulk creation to save these records
-    return LearnerContentAssignment.bulk_create(assignments_to_create)
+    created_assignments = LearnerContentAssignment.bulk_create(assignments_to_create)
+
+    # Return a list of refreshed objects that we just created, along with their prefetched action records
+    return list(
+        LearnerContentAssignment.objects.prefetch_related('actions').filter(
+            uuid__in=[record.uuid for record in created_assignments],
+        )
+    )
 
 
 def cancel_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
