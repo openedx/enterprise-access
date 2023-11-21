@@ -229,6 +229,12 @@ class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcces
         'subsidy_uuid',
     )
 
+    readonly_fields = BaseSubsidyAccessPolicyMixin.readonly_fields + (
+        'assignment_configuration',
+        'per_learner_spend_limit',
+        'per_learner_enrollment_limit',
+    )
+
     fieldsets = [
         (
             'Base configuration',
@@ -243,7 +249,7 @@ class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcces
                     'assignment_configuration',
                     'created',
                     'modified',
-                ]
+                ],
             }
         ),
         (

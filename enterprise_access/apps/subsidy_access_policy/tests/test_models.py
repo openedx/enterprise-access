@@ -763,10 +763,6 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
                 spend_limit=None,
                 assignment_configuration=self.assignment_configuration,
             ).clean()
-        with self.assertRaisesRegex(ValidationError, 'must relate to an AssignmentConfiguration'):
-            AssignedLearnerCreditAccessPolicy(
-                spend_limit=100,
-            ).clean()
         with self.assertRaisesRegex(ValidationError, 'must not define a per-learner spend limit'):
             AssignedLearnerCreditAccessPolicy(
                 spend_limit=1,
@@ -783,16 +779,21 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
     def test_save(self):
         """
         These types of policies should always get saved with an
-        access_method of 'assigned'.
+        access_method of 'assigned' and an ``assignment_configuration`` record.
         """
+        # let the assignments API actually create an assignment configuration
+        self.assignments_api_patcher.stop()
+
         policy = AssignedLearnerCreditAccessPolicyFactory(
             access_method=AccessMethods.DIRECT,
             spend_limit=100,
-            assignment_configuration=AssignmentConfiguration.objects.create(),
         )
+
         policy.save()
+        policy.refresh_from_db()
 
         self.assertEqual(policy.access_method, AccessMethods.ASSIGNED)
+        self.assertIsNotNone(policy.assignment_configuration)
 
     @ddt.data(
         # Happy path, assignment exists and state='allocated'.
