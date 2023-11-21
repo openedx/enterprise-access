@@ -996,11 +996,11 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
     """
     objects = PolicyManager()
 
-    # Policies of this type *must* define a spend_limit and assignment_configuration.
+    # Policies of this type *must* define a spend_limit.
     # Policies of this type *must not* define either of the per-learner limits.
+    # Note that the save() method of this model enforces the existence of an assignment_configuration.
     FIELD_CONSTRAINTS = {
         'spend_limit': (is_not_none, 'must define a spend_limit.'),
-        'assignment_configuration': (is_not_none, 'must relate to an AssignmentConfiguration.'),
         'per_learner_spend_limit': (is_none, 'must not define a per-learner spend limit.'),
         'per_learner_enrollment_limit': (is_none, 'must not define a per-learner enrollment limit.'),
     }
@@ -1012,8 +1012,16 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
     def save(self, *args, **kwargs):
         """
         This type of policy must always have an access_method of "assigned".
+        Additionally, if this record is being created, and no ``assignment_configuration``
+        is present, create one and associate it with this record.
         """
         self.access_method = AccessMethods.ASSIGNED
+        # https://docs.djangoproject.com/en/4.2/ref/models/instances/#django.db.models.Model._state
+        # self._state.adding indicates that the instance has not been added to the database yet.
+        if self._state.adding and not self.assignment_configuration:
+            self.assignment_configuration = assignments_api.create_assignment_configuration(
+                self.enterprise_customer_uuid
+            )
         super().save(*args, **kwargs)
 
     @property

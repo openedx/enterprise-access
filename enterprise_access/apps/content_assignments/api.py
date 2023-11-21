@@ -43,6 +43,16 @@ class AllocationException(Exception):
     user_message = 'An error occurred during allocation'
 
 
+def create_assignment_configuration(enterprise_customer_uuid, **kwargs):
+    """
+    Create a new ``AssignmentConfiguration`` for the given customer identifier.
+    """
+    return AssignmentConfiguration.objects.create(
+        enterprise_customer_uuid=enterprise_customer_uuid,
+        **kwargs,
+    )
+
+
 def get_assignment_configuration(uuid):
     """
     Returns an `AssignmentConfiguration` record with the given uuid,
