@@ -187,8 +187,10 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         )
         braze_trigger_properties["organization"] = enterprise_customer_data['name']
         braze_trigger_properties["course_title"] = assignment.content_title
-        braze_trigger_properties["enrollment_deadline"] = course_metadata['normalized_metadata']['enroll_by_date']
-        braze_trigger_properties["start_date"] = course_metadata['normalized_metadata']['start_date']
+        enrollment_deadline = course_metadata.get('normalized_metadata', {}).get('enroll_by_date')
+        braze_trigger_properties["enrollment_deadline"] = enrollment_deadline
+        start_date = course_metadata.get('normalized_metadata', {}).get('start_date')
+        braze_trigger_properties["start_date"] = start_date
         braze_trigger_properties["course_partner"] = course_metadata['owners'][0]['name']
         braze_trigger_properties["course_card_image"] = course_metadata['card_image_url']
         braze_trigger_properties["learner_portal_link"] = learner_portal_url
@@ -275,8 +277,10 @@ def send_email_for_new_assignment(new_assignment_uuid):
         )
         braze_trigger_properties["organization"] = enterprise_customer_data['name']
         braze_trigger_properties["course_title"] = assignment.content_title
-        braze_trigger_properties["enrollment_deadline"] = course_metadata['normalized_metadata']['enroll_by_date']
-        braze_trigger_properties["start_date"] = course_metadata['normalized_metadata']['start_date']
+        enrollment_deadline = course_metadata.get('normalized_metadata', {}).get('enroll_by_date')
+        braze_trigger_properties["enrollment_deadline"] = enrollment_deadline
+        start_date = course_metadata.get('normalized_metadata', {}).get('start_date')
+        braze_trigger_properties["start_date"] = start_date
         braze_trigger_properties["course_partner"] = _get_course_partners(course_metadata)
         braze_trigger_properties["course_card_image"] = course_metadata['card_image_url']
         braze_trigger_properties["learner_portal_link"] = learner_portal_url
