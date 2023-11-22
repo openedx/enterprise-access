@@ -127,7 +127,7 @@ def send_cancel_email_for_pending_assignment(cancelled_assignment_uuid):
         return
     except Exception as exc:  # pylint: disable=broad-exception-caught
         logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
-        learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
+        learner_content_assignment_action.error_reason = AssignmentActionErrors.CANCEL_ERROR
         learner_content_assignment_action.traceback = exc
         learner_content_assignment_action.save()
         assignment.state = LearnerContentAssignmentStateChoices.ERRORED
@@ -171,7 +171,7 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
     enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
     admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
     course_metadata = get_content_metadata_for_assignments(
-        policy.catalog_uuid, assignment.assignment_configuration
+        policy.catalog_uuid, {assignment}
     )
     learner_portal_url = '{}/{}'.format(
         settings.ENTERPRISE_LEARNER_PORTAL_URL,
@@ -204,7 +204,7 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         return
     except Exception as exc:  # pylint: disable=broad-exception-caught
         logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
-        learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
+        learner_content_assignment_action.error_reason = AssignmentActionErrors.REMIND_ERROR
         learner_content_assignment_action.traceback = exc
         learner_content_assignment_action.save()
         assignment.state = LearnerContentAssignmentStateChoices.ERRORED

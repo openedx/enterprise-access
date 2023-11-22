@@ -51,12 +51,16 @@ class AssignmentActionErrors:
     Error reasons (like an error code) for errors encountered
     during an assignment action.
     """
+    CANCEL_ERROR = 'cancel_error'
     EMAIL_ERROR = 'email_error'
     INTERNAL_API_ERROR = 'internal_api_error'
+    REMIND_ERROR = 'remind_error'
 
     CHOICES = (
+        (CANCEL_ERROR, 'Cancel error'),
         (EMAIL_ERROR, 'Email error'),
         (INTERNAL_API_ERROR, 'Internal API error'),
+        (REMIND_ERROR, 'Remind error'),
     )
 
 

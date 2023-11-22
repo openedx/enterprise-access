@@ -512,7 +512,6 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         """
         # Set the JWT-based auth to an operator.
 
-        print(self.assignment_allocated_post_link.state)
         self.set_jwt_cookie([
             {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
         ])
