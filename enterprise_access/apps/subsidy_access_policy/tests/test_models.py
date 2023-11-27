@@ -2,7 +2,7 @@
 Tests for subsidy_access_policy models.
 """
 from datetime import datetime, timedelta
-from unittest.mock import PropertyMock, patch
+from unittest.mock import ANY, PropertyMock, patch
 from uuid import uuid4
 
 import ddt
@@ -952,11 +952,30 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
                 state=assignment_starting_state,
             )
 
+        # Do the redemption
         if redeem_raises:
             with self.assertRaises(redeem_raises):
                 self.active_policy.redeem(self.lms_user_id, self.course_run_key, [])
         else:
             self.active_policy.redeem(self.lms_user_id, self.course_run_key, [])
+
+        # Assert that we call the subsidy client's `create_subsidy_transaction` method
+        # with the expected payload, but only for test conditions where redeem() doesn't
+        # fail before getting to that point.
+        if fail_subsidy_create_transaction or not redeem_raises:
+            expected_redeem_payload = {
+                'subsidy_uuid': str(self.active_policy.subsidy_uuid),
+                'lms_user_id': self.lms_user_id,
+                'content_key': self.course_run_key,
+                'subsidy_access_policy_uuid': str(self.active_policy.uuid),
+                'metadata': None,
+                'idempotency_key': ANY,
+            }
+            if assignment:
+                expected_redeem_payload['requested_price_cents'] = -1 * assignment.content_quantity
+            self.mock_subsidy_client.create_subsidy_transaction.assert_called_once_with(
+                **expected_redeem_payload,
+            )
 
         # Finally, assert that the assignment object was correctly updated to reflect the success/failure.
         if assignment:
