@@ -664,7 +664,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             )
         ]
 
-    def redeem(self, lms_user_id, content_key, all_transactions, metadata=None):
+    def redeem(self, lms_user_id, content_key, all_transactions, metadata=None, **kwargs):
         """
         Redeem a subsidy for the given learner and content.
 
@@ -684,14 +684,18 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 historical_redemptions_uuids=self._redemptions_for_idempotency_key(all_transactions),
             )
             try:
-                return self.subsidy_client.create_subsidy_transaction(
-                    subsidy_uuid=str(self.subsidy_uuid),
-                    lms_user_id=lms_user_id,
-                    content_key=content_key,
-                    subsidy_access_policy_uuid=str(self.uuid),
-                    metadata=metadata,
-                    idempotency_key=idempotency_key,
-                )
+                creation_payload = {
+                    'subsidy_uuid': str(self.subsidy_uuid),
+                    'lms_user_id': lms_user_id,
+                    'content_key': content_key,
+                    'subsidy_access_policy_uuid': str(self.uuid),
+                    'metadata': metadata,
+                    'idempotency_key': idempotency_key,
+                }
+                requested_price_cents = kwargs.get('requested_price_cents')
+                if requested_price_cents is not None:
+                    creation_payload['requested_price_cents'] = requested_price_cents
+                return self.subsidy_client.create_subsidy_transaction(**creation_payload)
             except requests.exceptions.HTTPError as exc:
                 raise SubsidyAPIHTTPError('HTTPError occurred in Subsidy API request.') from exc
         else:
@@ -1081,7 +1085,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         # Learner can redeem the subsidy access policy
         return (True, None, existing_redemptions)
 
-    def redeem(self, lms_user_id, content_key, all_transactions, metadata=None):
+    def redeem(self, lms_user_id, content_key, all_transactions, metadata=None, **kwargs):
         """
         Redeem content, but only if there's a matching assignment.  On successful redemption, the assignment state will
         be set to 'accepted', otherwise 'errored'.
@@ -1110,7 +1114,14 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
                 f"and content_key=<{content_key}>."
             )
         try:
-            ledger_transaction = super().redeem(lms_user_id, content_key, all_transactions, metadata)
+            requested_price_cents = -1 * found_assignment.content_quantity
+            ledger_transaction = super().redeem(
+                lms_user_id,
+                content_key,
+                all_transactions,
+                metadata=metadata,
+                requested_price_cents=requested_price_cents,
+            )
         except SubsidyAPIHTTPError:
             # Migrate assignment to errored if the subsidy API call errored.
             found_assignment.state = LearnerContentAssignmentStateChoices.ERRORED
@@ -1163,9 +1174,6 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
 
         if not self.is_subsidy_active:
             return (False, REASON_SUBSIDY_EXPIRED)
-
-        # TODO ENT-7793: validate that the provided price
-        # matches what we have in our content metadata source-of-truth
 
         # Determine total cost, in cents, of content to potentially allocated
         positive_total_price_cents = number_of_learners * content_price_cents

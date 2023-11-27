@@ -301,7 +301,7 @@ edx-drf-extensions==8.13.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.3.7
+edx-enterprise-subsidy-client==0.4.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
