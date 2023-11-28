@@ -780,6 +780,9 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         """
         These types of policies should always get saved with an
         access_method of 'assigned' and an ``assignment_configuration`` record.
+        Furthermore, the related assignment_configuration should always be updated
+        to have an ``enterprise_customer_uuid`` that matches the customer uuid
+        defined on the policy record.
         """
         # let the assignments API actually create an assignment configuration
         self.assignments_api_patcher.stop()
@@ -794,6 +797,14 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
 
         self.assertEqual(policy.access_method, AccessMethods.ASSIGNED)
         self.assertIsNotNone(policy.assignment_configuration)
+
+        new_customer_uuid = uuid4()
+        policy.enterprise_customer_uuid = new_customer_uuid
+        policy.save()
+        self.assertEqual(
+            policy.assignment_configuration.enterprise_customer_uuid,
+            new_customer_uuid,
+        )
 
     @ddt.data(
         # Happy path, assignment exists and state='allocated'.

@@ -1016,16 +1016,19 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
     def save(self, *args, **kwargs):
         """
         This type of policy must always have an access_method of "assigned".
-        Additionally, if this record is being created, and no ``assignment_configuration``
+        Additionally, if no ``assignment_configuration``
         is present, create one and associate it with this record.
+        Lastly, ensure that the associated assignment_configuration has the
+        same ``enterprise_customer_uuid`` as this policy record.
         """
         self.access_method = AccessMethods.ASSIGNED
-        # https://docs.djangoproject.com/en/4.2/ref/models/instances/#django.db.models.Model._state
-        # self._state.adding indicates that the instance has not been added to the database yet.
-        if self._state.adding and not self.assignment_configuration:
+        if not self.assignment_configuration:
             self.assignment_configuration = assignments_api.create_assignment_configuration(
                 self.enterprise_customer_uuid
             )
+        elif self.enterprise_customer_uuid != self.assignment_configuration.enterprise_customer_uuid:
+            self.assignment_configuration.enterprise_customer_uuid = self.enterprise_customer_uuid
+            self.assignment_configuration.save()
         super().save(*args, **kwargs)
 
     @property
