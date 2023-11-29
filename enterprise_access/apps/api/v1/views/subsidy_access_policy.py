@@ -147,6 +147,13 @@ def _get_user_message_for_reason(reason_slug, enterprise_admin_users):
     return MISSING_SUBSIDY_ACCESS_POLICY_REASONS[reason_slug]
 
 
+class SubsidyAccessPolicyPagination(PaginationWithPageCount):
+    """
+    Set a smaller page size for SubsidyAccessPolicy list views.
+    """
+    max_page_size = 10
+
+
 class SubsidyAccessPolicyViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
@@ -163,7 +170,7 @@ class SubsidyAccessPolicyViewSet(
     authentication_classes = (JwtAuthentication, authentication.SessionAuthentication)
     filter_backends = (filters.NoFilterOnDetailBackend,)
     filterset_class = filters.SubsidyAccessPolicyFilter
-    pagination_class = PaginationWithPageCount
+    pagination_class = SubsidyAccessPolicyPagination
     lookup_field = 'uuid'
 
     def __init__(self, *args, **kwargs):
