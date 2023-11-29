@@ -1057,6 +1057,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         }
         self.mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
 
+        self.active_policy.reload_subsidy_record()
         can_allocate, message = self.active_policy.can_allocate(10, self.course_key, 1000)
 
         self.assertFalse(can_allocate)
@@ -1093,6 +1094,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         # The balance of the subsidy is just a bit less
         # than the amount to potentially allocated, e.g.
         # ((7 * 1000) + 500 + 500) > 7999
+        self.active_policy.reload_subsidy_record()
         can_allocate, message = self.active_policy.can_allocate(7, self.course_key, 1000)
 
         self.assertFalse(can_allocate)
@@ -1129,6 +1131,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         # than the amount to potentially allocated, e.g.
         # ((7 * 1000) + 2000 + 2000) < 15000 (the subsidy balance) but,
         # ((7 * 1000) + 2000 + 2000) > 10000 (the policy spend limit)
+        self.active_policy.reload_subsidy_record()
         can_allocate, message = self.active_policy.can_allocate(7, self.course_key, 1000)
 
         self.assertFalse(can_allocate)

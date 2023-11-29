@@ -185,6 +185,11 @@ class SubsidyAccessPolicy(TimeStampedModel):
     # ProxyAwareHistoricalRecords docstring for more info.
     history = ProxyAwareHistoricalRecords(inherit=True)
 
+    def __init__(self, *args, **kwargs):
+        # an instance variable to memoize calls to subsidy service
+        self._subsidy_memo = None
+        super().__init__(*args, **kwargs)
+
     @property
     def subsidy_active_datetime(self):
         """
@@ -284,15 +289,26 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         return super().__new__(proxy_class)
 
+    def reload_subsidy_record(self):
+        """
+        Clear the memoized subsidy record.
+        """
+        self._subsidy_memo = None
+        return self.subsidy_record()
+
     def subsidy_record(self):
         """
         Retrieve this policy's corresponding subsidy record
         """
+        if self._subsidy_memo is not None:
+            return self._subsidy_memo
+
         # don't utilize the cache unless this experimental feature is enabled
         if not getattr(settings, 'MULTI_POLICY_RESOLUTION_ENABLED', False):
             logger.info('subsidy_record MULTI_POLICY_RESOLUTION_ENABLED disabled')
             try:
-                return self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
+                self._subsidy_memo = self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
+                return self._subsidy_memo
             except requests.exceptions.HTTPError as exc:
                 # when associated subsidy is soft-deleted, the subsidy retrieve API raises an exception.
                 logger.warning('SubsidyAccessPolicy.subsidy_record() raised HTTPError: %s', exc)
@@ -310,10 +326,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 f'enterprise_customer_uuid={self.enterprise_customer_uuid}, '
                 f'subsidy_uuid={self.subsidy_uuid}'
             )
+            self._subsidy_memo = cached_response.value
             return cached_response.value
 
         try:
             result = self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
+            self._subsidy_memo = result
         except requests.exceptions.HTTPError as exc:
             logger.warning('SubsidyAccessPolicy.subsidy_record() raised HTTPError: %s', exc)
             result = {}
