@@ -478,7 +478,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             raise Exception('Expected a sum of transaction quantities <= 0')
 
         positive_spent_amount = spent_amount * -1
-        return (positive_spent_amount + content_price) >= limit_to_check
+        return (positive_spent_amount + content_price) > limit_to_check
 
     def will_exceed_spend_limit(self, content_key, content_metadata=None):
         """

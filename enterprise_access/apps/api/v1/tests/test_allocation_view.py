@@ -798,7 +798,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         subsidy_balance = 300
         mock_subsidy_balance.return_value = subsidy_balance
         mock_aggregates_for_policy.return_value = {
-            'total_quantity': (subsidy_balance - 2) * -1,
+            'total_quantity': (subsidy_balance - 1) * -1,
         }
 
         allocate_url = _allocation_url(self.assigned_learner_credit_policy.uuid)
