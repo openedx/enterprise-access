@@ -569,6 +569,24 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         with self.assertRaisesRegex(Exception, 'Expected a sum of transaction quantities <= 0'):
             self.per_learner_enroll_policy.content_would_exceed_limit(10, 100, 15)
 
+    def test_spend_limit_sum_and_content_price_equal_to_remaining_budget(self):
+        """
+        Ensures that passing a spent_amount equal to the remaining budget will return False.
+        """
+        self.assertFalse(self.per_learner_enroll_policy.content_would_exceed_limit(-90, 100, 10))
+
+    def test_spend_limit_sum_and_content_price_less_than_remaining_budget(self):
+        """
+        Ensures that passing a spent_amount less than the remaining budget will return False.
+        """
+        self.assertFalse(self.per_learner_enroll_policy.content_would_exceed_limit(-90, 100, 5))
+
+    def test_spend_limit_sum_and_content_price_greater_than_remaining_budget(self):
+        """
+        Ensures that passing a spent_amount equal to the remaining budget will return True.
+        """
+        self.assertTrue(self.per_learner_enroll_policy.content_would_exceed_limit(-90, 100, 11))
+
     def test_mock_subsidy_datetimes(self):
         yesterday = datetime.utcnow() - timedelta(days=1)
         tomorrow = datetime.utcnow() + timedelta(days=1)
