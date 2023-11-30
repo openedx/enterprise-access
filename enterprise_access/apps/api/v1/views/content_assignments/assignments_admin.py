@@ -18,7 +18,10 @@ from enterprise_access.apps.api.serializers.content_assignments.assignment impor
 )
 from enterprise_access.apps.api.v1.views.utils import PaginationWithPageCount
 from enterprise_access.apps.content_assignments import api as assignments_api
-from enterprise_access.apps.content_assignments.constants import AssignmentLearnerStates
+from enterprise_access.apps.content_assignments.constants import (
+    AssignmentLearnerStates,
+    LearnerContentAssignmentStateChoices
+)
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
 from enterprise_access.apps.core.constants import (
     CONTENT_ASSIGNMENT_ADMIN_READ_PERMISSION,
@@ -120,12 +123,18 @@ class LearnerContentAssignmentAdminViewSet(
             # safe (and more performant).
             pass
 
-        # Annotate extra dynamic fields used by this viewset for DRF-supported ordering and filtering:
+        # Annotate extra dynamic fields used by this viewset for DRF-supported ordering and filtering,
+        # but only for the list and retrieve actions:
         # * learner_state
         # * learner_state_sort_order
         # * recent_action
         # * recent_action_time
-        queryset = LearnerContentAssignment.annotate_dynamic_fields_onto_queryset(queryset).prefetch_related('actions')
+        if self.action in ('list', 'retrieve'):
+            queryset = LearnerContentAssignment.annotate_dynamic_fields_onto_queryset(
+                queryset,
+            ).prefetch_related(
+                'actions',
+            )
 
         return queryset
 
@@ -147,6 +156,10 @@ class LearnerContentAssignmentAdminViewSet(
     @extend_schema(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
         summary='List content assignments.',
+        responses={
+            status.HTTP_200_OK: serializers.LearnerContentAssignmentAdminResponseSerializer,
+            status.HTTP_404_NOT_FOUND: None,
+        },
     )
     @permission_required(CONTENT_ASSIGNMENT_ADMIN_READ_PERMISSION, fn=assignment_admin_permission_fn)
     def list(self, request, *args, **kwargs):
@@ -204,6 +217,49 @@ class LearnerContentAssignmentAdminViewSet(
 
     @extend_schema(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
+        summary='Cancel all assignments for the requested assignment configuration.',
+        request=None,
+        responses={
+            status.HTTP_202_ACCEPTED: None,
+            status.HTTP_404_NOT_FOUND: None,
+            status.HTTP_422_UNPROCESSABLE_ENTITY: None,
+        },
+    )
+    @permission_required(CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION, fn=assignment_admin_permission_fn)
+    @action(detail=False, methods=['post'], url_path='cancel-all')
+    def cancel_all(self, request, *args, **kwargs):
+        """
+        Cancel all ``LearnerContentAssignment`` associated with the given assignment configuration.
+
+        Raises:
+            404 if any of the assignments were not found
+            422 if any of the assignments threw an error (not found or not cancelable)
+        """
+        assignments = self.get_queryset().filter(
+            assignment_configuration__uuid=self.requested_assignment_configuration_uuid,
+            state__in=LearnerContentAssignmentStateChoices.CANCELABLE_STATES,
+        )
+        if not assignments:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            response = assignments_api.cancel_assignments(assignments)
+            if non_cancelable_assignments := response.get('non_cancelable'):
+                # This is very unlikely to occur, because we filter down to only the cancelable
+                # assignments before calling `cancel_assignments()`, and that function
+                # only declares assignments to be non-cancelable if they are not
+                # in the set of cancelable states.
+                logger.error(
+                    'There were non-cancelable assignments in cancel-all: %s',
+                    non_cancelable_assignments,
+                )
+                return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_202_ACCEPTED)
+        except Exception:  # pylint: disable=broad-except
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    @extend_schema(
+        tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
         summary='Remind assignments by UUID.',
         parameters=[LearnerContentAssignmentActionRequestSerializer],
         responses={
@@ -227,11 +283,55 @@ class LearnerContentAssignmentAdminViewSet(
         serializer.is_valid(raise_exception=True)
         assignments = self.get_queryset().filter(
             assignment_configuration__uuid=self.requested_assignment_configuration_uuid,
-            uuid__in=serializer.data['assignment_uuids'])
+            uuid__in=serializer.data['assignment_uuids'],
+        )
         try:
             response = assignments_api.remind_assignments(assignments)
             if response.get('non_remindable_assignments') or len(assignments) < len(request.data['assignment_uuids']):
                 return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
             return Response(status=status.HTTP_200_OK)
+        except Exception:  # pylint: disable=broad-except
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    @extend_schema(
+        tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
+        summary='Remind all assignments for the given assignment configuration.',
+        request=None,
+        responses={
+            status.HTTP_202_ACCEPTED: None,
+            status.HTTP_404_NOT_FOUND: None,
+            status.HTTP_422_UNPROCESSABLE_ENTITY: None,
+        },
+    )
+    @permission_required(CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION, fn=assignment_admin_permission_fn)
+    @action(detail=False, methods=['post'], url_path='remind-all')
+    def remind_all(self, request, *args, **kwargs):
+        """
+        Send reminders for all assignments related to the given assignment configuration.
+
+        Raises:
+            404 if any of the assignments were not found
+            422 if any of the assignments threw an error (not found or not remindable)
+        """
+        assignments = self.get_queryset().filter(
+            assignment_configuration__uuid=self.requested_assignment_configuration_uuid,
+            state__in=LearnerContentAssignmentStateChoices.REMINDABLE_STATES,
+        )
+        if not assignments:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            response = assignments_api.remind_assignments(assignments)
+            if non_remindable_assignments := response.get('non_remindable_assignments'):
+                # This is very unlikely to occur, because we filter down to only the remindable
+                # assignments before calling `remind_assignments()`, and that function
+                # only declares assignments to be non-remindable if they are not
+                # in the set of remindable states.
+                logger.error(
+                    'There were non-remindable assignments in remind-all: %s',
+                    non_remindable_assignments,
+                )
+                return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_202_ACCEPTED)
         except Exception:  # pylint: disable=broad-except
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)

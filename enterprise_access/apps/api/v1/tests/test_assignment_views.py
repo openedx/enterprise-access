@@ -560,7 +560,11 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             'assignment_uuids': [str(self.assignment_allocated_post_link.uuid)],
         }
 
-        response = self.client.post(remind_url, query_params)
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.api.send_reminder_email_for_pending_assignment'
+        ) as mock_remind_task:
+            response = self.client.post(remind_url, query_params)
+            mock_remind_task.delay.assert_called_once_with(self.assignment_allocated_post_link.uuid)
 
         # Verify the API response.
         assert response.status_code == status.HTTP_200_OK
@@ -840,3 +844,259 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         expected_assignment_uuids = {assignment.uuid for assignment in expected_assignments_for_requester}
         actual_assignment_uuids = {UUID(assignment['uuid']) for assignment in response.json()['results']}
         assert actual_assignment_uuids == expected_assignment_uuids
+
+
+@ddt.ddt
+class TestRemindAllCancelAll(CRUDViewTestMixin, APITest):
+    """
+    Tests for the remind-all and cancel-all actions.
+    """
+    def setUp(self):  # pylint: disable=super-method-not-called
+        """
+        We don't need all the extra records created in super().setUp()
+        """
+        self.client.logout()
+
+    @ddt.data(
+        # A good admin role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good operator role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+    )
+    def test_remind_all(self, role_context_dict):
+        """
+        Tests the remind-all view.
+        """
+        self.set_jwt_cookie([role_context_dict])
+        assignment_1 = LearnerContentAssignmentFactory(
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+            lms_user_id=TEST_OTHER_LMS_USER_ID,
+            transaction_uuid=None,
+            assignment_configuration=self.assignment_configuration,
+        )
+        assignment_2 = LearnerContentAssignmentFactory(
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+            learner_email=TEST_EMAIL,
+            lms_user_id=TEST_USER_ID,
+            transaction_uuid=None,
+            assignment_configuration=self.assignment_configuration,
+        )
+
+        remind_kwargs = {
+            'assignment_configuration_uuid': str(self.assignment_configuration.uuid),
+        }
+        remind_url = reverse('api:v1:admin-assignments-remind-all', kwargs=remind_kwargs)
+
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.api.send_reminder_email_for_pending_assignment'
+        ) as mock_remind_task:
+            response = self.client.post(remind_url)
+            mock_remind_task.delay.assert_has_calls(
+                [mock.call(assignment_1.uuid), mock.call(assignment_2.uuid)],
+                any_order=True,
+            )
+
+        # Verify the API response.
+        assert response.status_code == status.HTTP_202_ACCEPTED
+
+        for assignment in (assignment_1, assignment_2):
+            assignment.refresh_from_db()
+            self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+
+    def test_learner_remind_all_403(self):
+        """
+        Learners can't perform the remind-all action.
+        """
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        ])
+
+        remind_kwargs = {
+            'assignment_configuration_uuid': str(self.assignment_configuration.uuid),
+        }
+        remind_url = reverse('api:v1:admin-assignments-remind-all', kwargs=remind_kwargs)
+
+        response = self.client.post(remind_url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_remind_all_no_remindable_assignments(self):
+        """
+        Tests the scenario where there are no assignments in a remindable state.
+        """
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        ])
+
+        LearnerContentAssignmentFactory(
+            state=LearnerContentAssignmentStateChoices.ACCEPTED,
+            lms_user_id=TEST_OTHER_LMS_USER_ID,
+            transaction_uuid=None,
+            assignment_configuration=self.assignment_configuration,
+        )
+
+        remind_kwargs = {
+            'assignment_configuration_uuid': str(self.assignment_configuration.uuid),
+        }
+        remind_url = reverse('api:v1:admin-assignments-remind-all', kwargs=remind_kwargs)
+
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.api.remind_assignments'
+        ) as mock_remind_function:
+            response = self.client.post(remind_url)
+            self.assertFalse(mock_remind_function.called)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_remind_all_unlikely_thing_to_happen(self):
+        """
+        Tests the unlikely scenario where we attempt to remind assignments
+        that are not in a remindable state, even after filtering at the view layer
+        """
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        ])
+
+        LearnerContentAssignmentFactory(
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+            lms_user_id=TEST_OTHER_LMS_USER_ID,
+            transaction_uuid=None,
+            assignment_configuration=self.assignment_configuration,
+        )
+
+        remind_kwargs = {
+            'assignment_configuration_uuid': str(self.assignment_configuration.uuid),
+        }
+        remind_url = reverse('api:v1:admin-assignments-remind-all', kwargs=remind_kwargs)
+
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.api.remind_assignments'
+        ) as mock_remind_function:
+            mock_remind_function.return_value = {
+                'non_remindable_assignments': mock.ANY,
+            }
+            response = self.client.post(remind_url)
+
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    @ddt.data(
+        # A good admin role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good operator role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+    )
+    def test_cancel_all(self, role_context_dict):
+        """
+        Tests the cancel-all view.
+        """
+        self.set_jwt_cookie([role_context_dict])
+        assignment_1 = LearnerContentAssignmentFactory(
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+            lms_user_id=TEST_OTHER_LMS_USER_ID,
+            transaction_uuid=None,
+            assignment_configuration=self.assignment_configuration,
+        )
+        assignment_2 = LearnerContentAssignmentFactory(
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+            learner_email=TEST_EMAIL,
+            lms_user_id=TEST_USER_ID,
+            transaction_uuid=None,
+            assignment_configuration=self.assignment_configuration,
+        )
+
+        cancel_kwargs = {
+            'assignment_configuration_uuid': str(self.assignment_configuration.uuid),
+        }
+        cancel_url = reverse('api:v1:admin-assignments-cancel-all', kwargs=cancel_kwargs)
+
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.tasks.send_cancel_email_for_pending_assignment'
+        ) as mock_cancel_task:
+            response = self.client.post(cancel_url)
+            mock_cancel_task.delay.assert_has_calls(
+                [mock.call(assignment_1.uuid), mock.call(assignment_2.uuid)],
+                any_order=True,
+            )
+
+        # Verify the API response.
+        assert response.status_code == status.HTTP_202_ACCEPTED
+
+        for assignment in (assignment_1, assignment_2):
+            assignment.refresh_from_db()
+            self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
+
+    def test_learner_cancel_all_403(self):
+        """
+        Learners can't perform the cancel-all action.
+        """
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        ])
+
+        cancel_kwargs = {
+            'assignment_configuration_uuid': str(self.assignment_configuration.uuid),
+        }
+        cancel_url = reverse('api:v1:admin-assignments-cancel-all', kwargs=cancel_kwargs)
+
+        response = self.client.post(cancel_url)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_cancel_all_no_cancelable_assignments(self):
+        """
+        Tests the scenario where there are no assignments in a cancelable state.
+        """
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        ])
+
+        LearnerContentAssignmentFactory(
+            state=LearnerContentAssignmentStateChoices.ACCEPTED,
+            lms_user_id=TEST_OTHER_LMS_USER_ID,
+            transaction_uuid=None,
+            assignment_configuration=self.assignment_configuration,
+        )
+
+        cancel_kwargs = {
+            'assignment_configuration_uuid': str(self.assignment_configuration.uuid),
+        }
+        cancel_url = reverse('api:v1:admin-assignments-cancel-all', kwargs=cancel_kwargs)
+
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.api.cancel_assignments'
+        ) as mock_cancel_function:
+            response = self.client.post(cancel_url)
+            self.assertFalse(mock_cancel_function.called)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_cancel_all_unlikely_thing_to_happen(self):
+        """
+        Tests the unlikely scenario where we attempt to cancel assignments
+        that are not in a cancelable state, even after filtering at the view layer
+        """
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        ])
+
+        LearnerContentAssignmentFactory(
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+            lms_user_id=TEST_OTHER_LMS_USER_ID,
+            transaction_uuid=None,
+            assignment_configuration=self.assignment_configuration,
+        )
+
+        cancel_kwargs = {
+            'assignment_configuration_uuid': str(self.assignment_configuration.uuid),
+        }
+        cancel_url = reverse('api:v1:admin-assignments-cancel-all', kwargs=cancel_kwargs)
+
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.api.cancel_assignments'
+        ) as mock_cancel_function:
+            mock_cancel_function.return_value = {
+                'non_cancelable': mock.ANY,
+            }
+            response = self.client.post(cancel_url)
+
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
