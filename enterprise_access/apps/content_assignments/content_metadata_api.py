@@ -2,7 +2,14 @@
 API file interacting with assignment metadata (created to avoid a circular
 import error)
 """
+from datetime import datetime
+
 from enterprise_access.apps.content_metadata.api import get_and_cache_catalog_content_metadata
+
+DATE_INPUT_PATTERNS = [
+    '%Y-%m-%dT%H:%M:%SZ',
+    '%Y-%m-%d %H:%M:%SZ',
+]
 
 
 def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
@@ -25,3 +32,51 @@ def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
         assignment.content_key: metadata_by_key.get(assignment.content_key)
         for assignment in assignments
     }
+
+
+def get_card_image_url(content_metadata):
+    """
+    Helper to get the appropriate course card image
+    from a content metadata dictionary.
+    """
+    if first_choice := content_metadata.get('card_image_url'):
+        return first_choice
+    if second_choice := content_metadata.get('image_url'):
+        return second_choice
+    return None
+
+
+def get_human_readable_date(datetime_string, output_pattern='%b %d, %Y'):
+    """
+    Given a datetime string value from some content metadata record,
+    convert it to the provided pattern.
+    """
+    if not datetime_string:
+        return None
+
+    last_exception = None
+    for input_pattern in DATE_INPUT_PATTERNS:
+        try:
+            datetime_obj = datetime.strptime(datetime_string, input_pattern)
+            return datetime_obj.strftime(output_pattern)
+        except ValueError as exc:
+            last_exception = exc
+
+    if last_exception is not None:
+        raise last_exception
+    return None
+
+
+def get_course_partners(course_metadata):
+    """
+    Returns a list of course partner data for subsidy requests given a course dictionary.
+    """
+    owners = course_metadata.get('owners') or []
+    names = [owner.get('name') for owner in owners]
+    if len(names) < 1:
+        raise Exception('Course must have a partner')
+    if len(names) == 1:
+        return names[0]
+    if len(names) == 2:
+        return ' and '.join(names)
+    return ', '.join(names[:-1]) + ', and ' + names[-1]

@@ -193,6 +193,7 @@ class TestCreatePendingEnterpriseLearnerForAssignmentTask(APITestWithMocks):
         assert self.assignment.state == LearnerContentAssignmentStateChoices.ALLOCATED
 
 
+@ddt.ddt
 class TestBrazeEmailTasks(APITestWithMocks):
     """
     Verify cancel and remind emails hit braze client with expected args
@@ -217,9 +218,13 @@ class TestBrazeEmailTasks(APITestWithMocks):
         )
         self.policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
 
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.objects')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
-    def test_send_cancel_email_for_pending_assignment(self, mock_braze_client, mock_lms_client):
+    def test_send_cancel_email_for_pending_assignment(
+        self, mock_braze_client, mock_lms_client,
+        mock_policy_model,  # pylint: disable=unused-argument
+    ):
         """
         Verify send_cancel_email_for_pending_assignment hits braze client with expected args
         """
@@ -253,7 +258,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
             trigger_properties={
                 'contact_admin_link': mock_admin_mailto,
                 'organization': self.enterprise_customer_name,
-                'course_name': self.assignment.content_title
+                'course_title': self.assignment.content_title
             },
         )
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
@@ -262,13 +267,18 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
+    @ddt.data(True, False)
     def test_send_reminder_email_for_pending_assignment(
-        self, mock_braze_client, mock_lms_client, mock_get_metadata,
+        self, is_logistrated, mock_braze_client, mock_lms_client, mock_get_metadata,
         mock_policy_model,  # pylint: disable=unused-argument
     ):
         """
         Verify send_reminder_email_for_pending_assignment hits braze client with expected args
         """
+        if not is_logistrated:
+            self.assignment.lms_user_id = None
+            self.assignment.save()
+
         content_key = 'demoX'
         admin_email = 'test@admin.com'
         mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
@@ -293,6 +303,8 @@ class TestBrazeEmailTasks(APITestWithMocks):
             },
             'owners': [
                 {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
+                {'name': 'Good People', 'logo_image_url': 'http://pictures.nice'},
+                {'name': 'Fast Learners', 'logo_image_url': 'http://pictures.totally'},
             ],
             'card_image_url': 'https://itsanimage.com'
         }
@@ -308,16 +320,19 @@ class TestBrazeEmailTasks(APITestWithMocks):
         )
 
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
+        expected_campaign_identifier = 'test-assignment-remind-campaign'
+        if is_logistrated:
+            expected_campaign_identifier = 'test-assignment-remind-post-logistration-campaign'
         mock_braze_client.return_value.send_campaign_message.assert_called_once_with(
-            'test-assignment-remind-campaign',
+            expected_campaign_identifier,
             recipients=[mock_recipient],
             trigger_properties={
                 'contact_admin_link': mock_admin_mailto,
                 'organization': self.enterprise_customer_name,
                 'course_title': self.assignment.content_title,
-                'enrollment_deadline': '2021-01-01 12:00:00Z',
-                'start_date': '2020-01-01 12:00:00Z',
-                'course_partner': 'Smart Folks',
+                'enrollment_deadline': 'Jan 01, 2021',
+                'start_date': 'Jan 01, 2020',
+                'course_partner': 'Smart Folks, Good People, and Fast Learners',
                 'course_card_image': 'https://itsanimage.com',
                 'learner_portal_link': 'http://enterprise-learner-portal.example.com/test-slug'
             },
@@ -354,13 +369,14 @@ class TestBrazeEmailTasks(APITestWithMocks):
         mock_get_metadata.return_value = {
             'key': content_key,
             'normalized_metadata': {
-                'start_date': '2020-01-01 12:00:00Z',
+                'start_date': '2020-01-01T12:00:00Z',
                 'end_date': '2022-01-01 12:00:00Z',
-                'enroll_by_date': '2021-01-01 12:00:00Z',
+                'enroll_by_date': '2021-01-01T12:00:00Z',
                 'content_price': 123,
             },
             'owners': [
                 {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
+                {'name': 'Good People', 'logo_image_url': 'http://pictures.nice'},
             ],
             'card_image_url': 'https://itsanimage.com',
         }
@@ -382,36 +398,52 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'contact_admin_link': mock_admin_mailto,
                 'organization': self.enterprise_customer_name,
                 'course_title': self.assignment.content_title,
-                'enrollment_deadline': '2021-01-01 12:00:00Z',
-                'start_date': '2020-01-01 12:00:00Z',
-                'course_partner': [{'uuid': None, 'name': 'Smart Folks'}],
+                'enrollment_deadline': 'Jan 01, 2021',
+                'start_date': 'Jan 01, 2020',
+                'course_partner': 'Smart Folks and Good People',
                 'course_card_image': 'https://itsanimage.com',
                 'learner_portal_link': '{}/{}'.format(settings.ENTERPRISE_LEARNER_PORTAL_URL, 'test-slug'),
             },
         )
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
 
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.objects')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
-    def test_send_assignment_automatically_expired_email(self, mock_braze_client):
+    def test_send_assignment_automatically_expired_email(
+        self, mock_braze_client, mock_lms_client,
+        mock_subsidy_model,  # pylint: disable=unused-argument
+    ):
         """
         Verify `send_assignment_automatically_expired_email` task work as expected
         """
-        admin_emails = ['admin1@example.com', 'admin2@example.com']
+        admin_email = 'test@admin.com'
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
+            'uuid': TEST_ENTERPRISE_UUID,
+            'slug': 'test-slug',
+            'admin_users': [{
+                'email': admin_email,
+                'lms_user_id': 1
+            }],
+            'name': self.enterprise_customer_name,
+        }
         mock_recipient = {
             'external_user_id': 1
         }
-
-        mock_admin_mailto = f'mailto:{",".join(admin_emails)}'
+        mock_braze_client.return_value.create_recipient.return_value = mock_recipient
+        mock_admin_mailto = f'mailto:{admin_email}'
         mock_braze_client.return_value.create_recipient.return_value = mock_recipient
         mock_braze_client.return_value.generate_mailto_link.return_value = mock_admin_mailto
-        send_assignment_automatically_expired_email(self.assignment.uuid, admin_emails)
+
+        send_assignment_automatically_expired_email(self.assignment.uuid)
 
         mock_braze_client.return_value.send_campaign_message.assert_any_call(
             'test-assignment-expired-campaign',
             recipients=[mock_recipient],
             trigger_properties={
                 'contact_admin_link': mock_admin_mailto,
-                'course_name': self.assignment.content_title
+                'course_title': self.assignment.content_title,
+                'organization': self.enterprise_customer_name,
             },
         )
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1

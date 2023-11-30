@@ -8,7 +8,6 @@ from django.core.management.base import BaseCommand
 from django.core.paginator import Paginator
 from django.utils.timezone import now, timedelta
 
-from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments.constants import (
     NUM_DAYS_BEFORE_AUTO_CANCELLATION,
     AssignmentAutomaticExpiredReason,
@@ -41,13 +40,6 @@ class Command(BaseCommand):
             help='Dry Run, print log messages without spawning the celery tasks.',
         )
 
-    def fetch_enterprise_customer_admin_emails(self, enterprise_customer_uuid):
-        """ Fetch enterprise customer admin emails """
-        lms_client = LmsApiClient()
-        enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-        admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
-        return admin_emails
-
     def handle(self, *args, **options):
         dry_run = options['dry_run']
 
@@ -66,10 +58,6 @@ class Command(BaseCommand):
                 assignment_configuration.uuid,
                 subsidy_access_policy.uuid,
                 enterprise_catalog_uuid,
-                assignment_configuration.enterprise_customer_uuid
-            )
-
-            admin_emails = self.fetch_enterprise_customer_admin_emails(
                 assignment_configuration.enterprise_customer_uuid
             )
 
@@ -126,4 +114,4 @@ class Command(BaseCommand):
                         if not dry_run:
                             assignment.state = LearnerContentAssignmentStateChoices.CANCELLED
                             assignment.save()
-                            send_assignment_automatically_expired_email.delay(expired_assignment_uuid, admin_emails)
+                            send_assignment_automatically_expired_email.delay(expired_assignment_uuid)

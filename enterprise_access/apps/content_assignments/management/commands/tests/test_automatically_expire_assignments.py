@@ -64,7 +64,6 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )
 
-    @mock.patch(COMMAND_PATH + '.LmsApiClient', return_value=mock.MagicMock())
     @mock.patch(COMMAND_PATH + '.get_content_metadata_for_assignments')
     @mock.patch(COMMAND_PATH + '.send_assignment_automatically_expired_email.delay')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
@@ -73,7 +72,6 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
         mock_subsidy_client,
         mock_send_assignment_automatically_expired_email_task,
         mock_content_metadata_for_assignments,
-        mock_lms_api_client
     ):
         """
         Verify that management command work as expected in dry run mode.
@@ -100,9 +98,6 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
                     'content_price': 123,
                 },
             },
-        }
-        mock_lms_api_client().get_enterprise_customer_data.return_value = {
-            'admin_users': [{'email': 'admin1@example.com'}, {'email': 'admin2@example.com'}],
         }
         mock_path = COMMAND_PATH + '.logger.info'
 
@@ -168,7 +163,6 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
         # verify that state has not changed for any assignment
         assert all_assignment.count() == allocated_assignments.count()
 
-    @mock.patch(COMMAND_PATH + '.LmsApiClient', return_value=mock.MagicMock())
     @mock.patch(COMMAND_PATH + '.get_content_metadata_for_assignments')
     @mock.patch(COMMAND_PATH + '.send_assignment_automatically_expired_email.delay')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
@@ -177,7 +171,6 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
         mock_subsidy_client,
         mock_send_assignment_automatically_expired_email_task,
         mock_content_metadata_for_assignments,
-        mock_lms_api_client
     ):
         """
         Verify that management command work as expected in dry run mode.
@@ -199,9 +192,6 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
                     'content_price': 123,
                 },
             },
-        }
-        mock_lms_api_client().get_enterprise_customer_data.return_value = {
-            'admin_users': [{'email': 'admin1@example.com'}, {'email': 'admin2@example.com'}],
         }
         mock_path = COMMAND_PATH + '.logger.info'
 
@@ -260,8 +250,8 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
             )
             mock_send_assignment_automatically_expired_email_task.assert_has_calls(
                 [
-                    call(self.alice_assignment.uuid, ['admin1@example.com', 'admin2@example.com']),
-                    call(self.bob_assignment.uuid, ['admin1@example.com', 'admin2@example.com'])
+                    call(self.alice_assignment.uuid),
+                    call(self.bob_assignment.uuid)
                 ]
             )
 
