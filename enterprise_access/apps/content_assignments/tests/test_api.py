@@ -231,8 +231,10 @@ class TestContentAssignmentApi(TestCase):
         content_key = 'demoX'
         content_title = 'edx: Demo 101'
         content_price_cents = 100
+        # add a duplicate email to the input list to ensure only one
+        # allocation occurs.
         learners_to_assign = [
-            f'{name}@foo.com' for name in ('alice', 'bob', 'carol', 'david', 'eugene')
+            f'{name}@foo.com' for name in ('alice', 'bob', 'carol', 'david', 'eugene', 'eugene', 'bob', 'eugene')
         ]
         mock_get_and_cache_content_metadata.return_value = {
             'content_title': content_title,

@@ -240,6 +240,8 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     if content_price_cents < 0:
         raise AllocationException('Allocation price must be >= 0')
 
+    learner_emails_to_allocate = _deduplicate_learner_emails_to_allocate(learner_emails)
+
     # We store the allocated quantity as a (future) debit
     # against a store of value, so we negate the provided non-negative
     # content_price_cents, and then persist that in the assignment records.
@@ -248,7 +250,7 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     # Fetch any existing assignments for all pairs of (learner, content) in this assignment config.
     existing_assignments = get_assignments_for_admin(
         assignment_configuration,
-        learner_emails,
+        learner_emails_to_allocate,
         content_key,
     )
 
@@ -294,7 +296,9 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
         )
 
         # Narrow down creation list of learner emails
-        learner_emails_for_assignment_creation = set(learner_emails) - learner_emails_with_existing_assignments
+        learner_emails_for_assignment_creation = (
+            set(learner_emails_to_allocate) - learner_emails_with_existing_assignments
+        )
 
         # Initialize and save LearnerContentAssignment instances for each of them
         created_assignments = _create_new_assignments(
@@ -317,6 +321,21 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
         'created': created_assignments,
         'no_change': already_allocated_or_accepted,
     }
+
+
+def _deduplicate_learner_emails_to_allocate(learner_emails):
+    """
+    Helper to deduplicate learner emails to allocate before any
+    allocation queries or logic take place.
+    """
+    deduplicated = []
+    seen_lowercased_emails = set()
+    for email in learner_emails:
+        email_lower = email.lower()
+        if email_lower not in seen_lowercased_emails:
+            deduplicated.append(email)
+            seen_lowercased_emails.add(email_lower)
+    return deduplicated
 
 
 def _update_and_refresh_assignments(assignment_records, fields_changed):
