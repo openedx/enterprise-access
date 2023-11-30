@@ -12,15 +12,140 @@ from django.utils import timezone
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments.constants import AssignmentActionErrors, AssignmentActions
-from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
+from enterprise_access.apps.content_assignments.content_metadata_api import (
+    get_card_image_url,
+    get_content_metadata_for_assignments,
+    get_course_partners,
+    get_human_readable_date
+)
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignmentAction
 from enterprise_access.tasks import LoggedTaskWithRetry
 
 from .constants import LearnerContentAssignmentStateChoices
-from .exceptions import MissingContentAssignment, MissingPolicy
+from .exceptions import MissingContentAssignment
 from .utils import format_traceback
 
 logger = logging.getLogger(__name__)
+
+
+class BrazeCampaignSender:
+    """
+    Class to help standardize the allowed keys and methods of conversion to values
+    for Braze API-triggered campaign properties.  Use as follows:
+
+    sender = BrazeCampaignSender(learner_content_assignment_record)
+    props = sender.get_properties(course_title, course_partner, ...) # any subset of ALLOWED_TRIGGER_PROPERTIES
+    sender.send_campaign_message(props, campaign_identifier)
+    """
+    ALLOWED_TRIGGER_PROPERTIES = {
+        'contact_admin_link',
+        'organization',
+        'course_title',
+        'enrollment_deadline',
+        'start_date',
+        'course_partner',
+        'course_card_image',
+        'learner_portal_link'
+    }
+
+    def __init__(self, assignment):
+        self.assignment = assignment
+        self.enterprise_customer_uuid = assignment.assignment_configuration.enterprise_customer_uuid
+
+        subsidy_policy_model = apps.get_model('subsidy_access_policy.SubsidyAccessPolicy')
+        try:
+            self.policy = subsidy_policy_model.objects.get(
+                assignment_configuration=assignment.assignment_configuration
+            )
+        except subsidy_policy_model.DoesNotExist:
+            logger.warning(f'policy with assignment config: {assignment.assignment_configuration} does not exist.')
+            raise
+
+        self.braze_client = BrazeApiClient()
+        self.lms_client = LmsApiClient()
+        self._customer_data = None
+        self._course_metadata = None
+
+    def send_campaign_message(self, braze_trigger_properties, campaign_identifier):
+        """
+        Creates a recipient and sends a braze campaign message.
+        """
+        recipient = self.braze_client.create_recipient(
+            user_email=self.assignment.learner_email,
+            lms_user_id=self.assignment.lms_user_id,
+        )
+        response = self.braze_client.send_campaign_message(
+            campaign_identifier,
+            recipients=[recipient],
+            trigger_properties=braze_trigger_properties,
+        )
+        return response
+
+    @property
+    def customer_data(self):
+        """
+        Returns memoized customer metadata dictionary.
+        """
+        if not self._customer_data:
+            self._customer_data = self.lms_client.get_enterprise_customer_data(self.enterprise_customer_uuid)
+        return self._customer_data
+
+    @property
+    def course_metadata(self):
+        """
+        Returns memoized course metadata dictionary.
+        """
+        if not self._course_metadata:
+            self._course_metadata = get_content_metadata_for_assignments(
+                self.policy.catalog_uuid, self.assignment.assignment_configuration
+            )
+        return self._course_metadata
+
+    def get_properties(self, *property_names):
+        """
+        Looks for instance methods on ``self`` that match "get_{property_name}"
+        for each provided property name, then evaluates those methods and
+        stores the result as the value in a dict keyed by property names.
+        This dict is then returned.
+        """
+        properties = {}
+        for property_name in property_names:
+            if property_name not in self.ALLOWED_TRIGGER_PROPERTIES:
+                logger.warning(f'{property_name} is not an allowed braze trigger property')
+                continue
+            get_property_value_func = getattr(self, f'get_{property_name}')
+            properties[property_name] = get_property_value_func()
+        return properties
+
+    def get_contact_admin_link(self):
+        admin_emails = [user['email'] for user in self.customer_data['admin_users']]
+        return self.braze_client.generate_mailto_link(admin_emails)
+
+    def get_organization(self):
+        return self.customer_data.get('name')
+
+    def get_course_title(self):
+        return self.assignment.content_title
+
+    def get_enrollment_deadline(self):
+        return get_human_readable_date(
+            self.course_metadata.get('normalized_metadata', {}).get('enroll_by_date')
+        )
+
+    def get_start_date(self):
+        return get_human_readable_date(
+            self.course_metadata.get('normalized_metadata', {}).get('start_date')
+        )
+
+    def get_course_partner(self):
+        return get_course_partners(self.course_metadata)
+
+    def get_course_card_image(self):
+        return get_card_image_url(self.course_metadata)
+
+    def get_learner_portal_link(self):
+        slug = self.customer_data["slug"]
+        return f'{settings.ENTERPRISE_LEARNER_PORTAL_URL}/{slug}'
 
 
 class CreatePendingEnterpriseLearnerForAssignmentTaskBase(LoggedTaskWithRetry):  # pylint: disable=abstract-method
@@ -99,43 +224,35 @@ def send_cancel_email_for_pending_assignment(cancelled_assignment_uuid):
         assignment = learner_content_assignment_model.objects.get(uuid=cancelled_assignment_uuid)
     except learner_content_assignment_model.DoesNotExist:
         logger.warning(f'request with uuid: {cancelled_assignment_uuid} does not exist.')
-        return
+        raise
+
     learner_content_assignment_action = LearnerContentAssignmentAction(
         assignment=assignment, action_type=AssignmentActions.CANCELLED_NOTIFICATION
     )
 
-    braze_trigger_properties = {}
-    braze_client_instance = BrazeApiClient()
-    lms_client = LmsApiClient()
-    enterprise_customer_uuid = assignment.assignment_configuration.enterprise_customer_uuid
-    enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-    lms_user_id = assignment.lms_user_id
-    admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
-    braze_trigger_properties['contact_admin_link'] = braze_client_instance.generate_mailto_link(admin_emails)
-
     try:
-        recipient = braze_client_instance.create_recipient(
-            user_email=assignment.learner_email,
-            lms_user_id=assignment.lms_user_id
+        campaign_sender = BrazeCampaignSender(assignment)
+        braze_trigger_properties = campaign_sender.get_properties(
+            'contact_admin_link',
+            'organization',
+            'course_title',
         )
-        braze_trigger_properties["organization"] = enterprise_customer_data['name']
-        braze_trigger_properties["course_name"] = assignment.content_title
-        braze_client_instance.send_campaign_message(
-            settings.BRAZE_ASSIGNMENT_CANCELLED_NOTIFICATION_CAMPAIGN,
-            recipients=[recipient],
-            trigger_properties=braze_trigger_properties,
+        campaign_uuid = settings.BRAZE_ASSIGNMENT_CANCELLED_NOTIFICATION_CAMPAIGN
+        campaign_sender.send_campaign_message(
+            braze_trigger_properties,
+            campaign_uuid,
         )
+        logger.info(f'Sent braze campaign cancelled uuid={campaign_uuid} message for assignment {assignment}')
         learner_content_assignment_action.completed_at = timezone.now()
         learner_content_assignment_action.save()
-        logger.info(f'Sending braze campaign message for cancelled assignment {assignment}')
-        return
     except Exception as exc:  # pylint: disable=broad-exception-caught
-        logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
+        logger.error(f"Unable to send assignment cancellation for {assignment.uuid} due to exception: {exc}")
         learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
         learner_content_assignment_action.traceback = format_traceback(exc)
         learner_content_assignment_action.save()
         assignment.state = LearnerContentAssignmentStateChoices.ERRORED
         assignment.full_clean()
+        assignment.save()
 
 
 @shared_task(base=LoggedTaskWithRetry)
@@ -146,79 +263,48 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         assignment_uuid: (string) the subsidy request uuid
     """
     learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
-    subsidy_policy_model = apps.get_model('subsidy_access_policy.SubsidyAccessPolicy')
+
     try:
         assignment = learner_content_assignment_model.objects.get(uuid=assignment_uuid)
     except learner_content_assignment_model.DoesNotExist:
         logger.warning(f'request with uuid: {assignment_uuid} does not exist.')
-        return
-
-    try:
-        policy = subsidy_policy_model.objects.get(
-            assignment_configuration=assignment.assignment_configuration
-        )
-    except subsidy_policy_model.DoesNotExist:
-        logger.warning(f'policy with assignment config: {assignment.assignment_configuration} does not exist.')
-        return
+        raise
 
     learner_content_assignment_action = LearnerContentAssignmentAction(
         assignment=assignment, action_type=AssignmentActions.REMINDED,
     )
-    braze_trigger_properties = {}
-    braze_client_instance = BrazeApiClient()
-    lms_client = LmsApiClient()
-    enterprise_customer_uuid = assignment.assignment_configuration.enterprise_customer_uuid
-    enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-    admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
-    course_metadata = get_content_metadata_for_assignments(
-        policy.catalog_uuid, assignment.assignment_configuration
-    )
-    learner_portal_url = '{}/{}'.format(
-        settings.ENTERPRISE_LEARNER_PORTAL_URL,
-        enterprise_customer_data['slug'],
-    )
-    lms_user_id = assignment.lms_user_id
-    braze_trigger_properties['contact_admin_link'] = braze_client_instance.generate_mailto_link(admin_emails)
 
     try:
-        recipient = braze_client_instance.create_recipient(
-            user_email=assignment.learner_email,
-            lms_user_id=assignment.lms_user_id,
+        campaign_sender = BrazeCampaignSender(assignment)
+        braze_trigger_properties = campaign_sender.get_properties(
+            'contact_admin_link',
+            'organization',
+            'course_title',
+            'enrollment_deadline',
+            'start_date',
+            'course_partner',
+            'course_card_image',
+            'learner_portal_link',
         )
-        braze_trigger_properties["organization"] = enterprise_customer_data['name']
-        braze_trigger_properties["course_title"] = assignment.content_title
-        enrollment_deadline = course_metadata.get('normalized_metadata', {}).get('enroll_by_date')
-        braze_trigger_properties["enrollment_deadline"] = enrollment_deadline
-        start_date = course_metadata.get('normalized_metadata', {}).get('start_date')
-        braze_trigger_properties["start_date"] = start_date
-        braze_trigger_properties["course_partner"] = course_metadata['owners'][0]['name']
-        braze_trigger_properties["course_card_image"] = course_metadata['card_image_url']
-        braze_trigger_properties["learner_portal_link"] = learner_portal_url
+        campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN
+        if assignment.lms_user_id is not None:
+            campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_POST_LOGISTRATION_NOTIFICATION_CAMPAIGN
 
-        logger.info(f'Sending braze campaign message for reminded assignment {assignment}')
-        braze_client_instance.send_campaign_message(
-            settings.BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN,
-            recipients=[recipient],
-            trigger_properties=braze_trigger_properties,
+        campaign_sender.send_campaign_message(
+            braze_trigger_properties,
+            campaign_uuid,
         )
+        logger.info(f'Sent braze campaign reminder uuid={campaign_uuid} message for assignment {assignment}')
         learner_content_assignment_action.completed_at = timezone.now()
         learner_content_assignment_action.save()
-        return
     except Exception as exc:  # pylint: disable=broad-exception-caught
-        logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
+        logger.error(f"Unable to send assignment reminder for {assignment.uuid} due to exception: {exc}")
         learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
-        learner_content_assignment_action.traceback = exc
+        learner_content_assignment_action.traceback = format_traceback(exc)
         learner_content_assignment_action.save()
         assignment.state = LearnerContentAssignmentStateChoices.ERRORED
         assignment.full_clean()
-
-
-def _get_course_partners(course_data):
-    """
-    Returns a list of course partner data for subsidy requests given a course dictionary.
-    """
-    owners = course_data.get('owners') or []
-    return [{'uuid': owner.get('uuid'), 'name': owner.get('name')} for owner in owners]
+        assignment.save()
 
 
 @shared_task(base=LoggedTaskWithRetry)
@@ -230,7 +316,6 @@ def send_email_for_new_assignment(new_assignment_uuid):
         new_assignment_uuid: (string) the new assignment uuid
     """
     learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
-    subsidy_policy_model = apps.get_model('subsidy_access_policy.SubsidyAccessPolicy')
 
     try:
         assignment = learner_content_assignment_model.objects.get(uuid=new_assignment_uuid)
@@ -239,62 +324,33 @@ def send_email_for_new_assignment(new_assignment_uuid):
         raise MissingContentAssignment(
             f'No assignment was found for assignment_uuid={new_assignment_uuid}.'
         ) from exc
+
     learner_content_assignment_action = LearnerContentAssignmentAction(
         assignment=assignment, action_type=AssignmentActions.NOTIFIED
     )
 
     try:
-        policy = subsidy_policy_model.objects.get(
-            assignment_configuration=assignment.assignment_configuration
+        campaign_sender = BrazeCampaignSender(assignment)
+        braze_trigger_properties = campaign_sender.get_properties(
+            'contact_admin_link',
+            'organization',
+            'course_title',
+            'enrollment_deadline',
+            'start_date',
+            'course_partner',
+            'course_card_image',
+            'learner_portal_link',
         )
-    except subsidy_policy_model.DoesNotExist as exc:
-        logger.warning(f'policy with assignment config: {assignment.assignment_configuration} does not exist.')
-        raise MissingPolicy(
-            f'No assignment was found for assignment_uuid={new_assignment_uuid}.'
-        ) from exc
-
-    braze_trigger_properties = {}
-    braze_client_instance = BrazeApiClient()
-    lms_client = LmsApiClient()
-    enterprise_customer_uuid = assignment.assignment_configuration.enterprise_customer_uuid
-    enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-
-    course_metadata = get_content_metadata_for_assignments(
-        policy.catalog_uuid, [assignment]
-    )
-    learner_portal_url = '{}/{}'.format(
-        settings.ENTERPRISE_LEARNER_PORTAL_URL,
-        enterprise_customer_data['slug'],
-    )
-    lms_user_id = assignment.lms_user_id
-    admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
-    braze_trigger_properties['contact_admin_link'] = braze_client_instance.generate_mailto_link(admin_emails)
-
-    try:
-        recipient = braze_client_instance.create_recipient(
-            user_email=assignment.learner_email,
-            lms_user_id=assignment.lms_user_id
+        campaign_uuid = settings.BRAZE_ASSIGNMENT_NOTIFICATION_CAMPAIGN
+        campaign_sender.send_campaign_message(
+            braze_trigger_properties,
+            campaign_uuid,
         )
-        braze_trigger_properties["organization"] = enterprise_customer_data['name']
-        braze_trigger_properties["course_title"] = assignment.content_title
-        enrollment_deadline = course_metadata.get('normalized_metadata', {}).get('enroll_by_date')
-        braze_trigger_properties["enrollment_deadline"] = enrollment_deadline
-        start_date = course_metadata.get('normalized_metadata', {}).get('start_date')
-        braze_trigger_properties["start_date"] = start_date
-        braze_trigger_properties["course_partner"] = _get_course_partners(course_metadata)
-        braze_trigger_properties["course_card_image"] = course_metadata['card_image_url']
-        braze_trigger_properties["learner_portal_link"] = learner_portal_url
-        logger.info(f'Sending braze campaign message for new assignment {assignment}')
-        braze_client_instance.send_campaign_message(
-            settings.BRAZE_ASSIGNMENT_NOTIFICATION_CAMPAIGN,
-            recipients=[recipient],
-            trigger_properties=braze_trigger_properties,
-        )
+        logger.info(f'Sent braze campaign notification uuid={campaign_uuid} message for assignment {assignment}')
         learner_content_assignment_action.completed_at = timezone.now()
         learner_content_assignment_action.save()
-        return
     except Exception as exc:
-        logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
+        logger.error(f"Unable to send assignment notification for {assignment.uuid} due to exception: {exc}")
         learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
         learner_content_assignment_action.traceback = format_traceback(exc)
         learner_content_assignment_action.save()
@@ -302,7 +358,7 @@ def send_email_for_new_assignment(new_assignment_uuid):
 
 
 @shared_task(base=LoggedTaskWithRetry)
-def send_assignment_automatically_expired_email(expired_assignment_uuid, admin_emails):
+def send_assignment_automatically_expired_email(expired_assignment_uuid):
     """
     Send email via braze for automatically expired assignment
     Args:
@@ -314,35 +370,30 @@ def send_assignment_automatically_expired_email(expired_assignment_uuid, admin_e
         assignment = learner_content_assignment_model.objects.get(uuid=expired_assignment_uuid)
     except learner_content_assignment_model.DoesNotExist:
         logger.warning(f'Request with uuid: {expired_assignment_uuid} does not exist.')
-        return
+        raise
 
     learner_content_assignment_action = LearnerContentAssignmentAction(
         assignment=assignment, action_type=AssignmentActions.AUTOMATIC_CANCELLATION_NOTIFICATION
     )
 
-    braze_trigger_properties = {}
-    braze_client_instance = BrazeApiClient()
-    lms_user_id = assignment.lms_user_id
-    braze_trigger_properties['contact_admin_link'] = braze_client_instance.generate_mailto_link(admin_emails)
-
     try:
-        recipient = braze_client_instance.create_recipient(
-            user_email=assignment.learner_email,
-            lms_user_id=assignment.lms_user_id
+        campaign_sender = BrazeCampaignSender(assignment)
+        braze_trigger_properties = campaign_sender.get_properties(
+            'contact_admin_link',
+            'organization',
+            'course_title',
         )
-        braze_trigger_properties["course_name"] = assignment.content_title
-        braze_client_instance.send_campaign_message(
-            settings.BRAZE_ASSIGNMENT_AUTOMATIC_CANCELLATION_NOTIFICATION_CAMPAIGN,
-            recipients=[recipient],
-            trigger_properties=braze_trigger_properties,
+        campaign_uuid = settings.BRAZE_ASSIGNMENT_AUTOMATIC_CANCELLATION_NOTIFICATION_CAMPAIGN
+        campaign_sender.send_campaign_message(
+            braze_trigger_properties,
+            campaign_uuid,
         )
+        logger.info(f'Sent braze campaign expiration uuid={campaign_uuid} message for assignment {assignment}')
         learner_content_assignment_action.completed_at = timezone.now()
         learner_content_assignment_action.save()
-        logger.info(f'Sending braze campaign message for automatically expired assignment {assignment}')
-        return
     except Exception as exc:
-        logger.error(f"Unable to send email for {lms_user_id} due to exception: {exc}")
+        logger.error(f"Unable to send assignment expiration for {assignment.uuid} due to exception: {exc}")
         learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
-        learner_content_assignment_action.traceback = exc
+        learner_content_assignment_action.traceback = format_traceback(exc)
         learner_content_assignment_action.save()
         raise
