@@ -294,6 +294,17 @@ class LearnerContentAssignment(TimeStampedModel):
         )
         return record, was_created
 
+    def add_errored_notified_action(self, exc):
+        """
+        Adds an errored action about the notification of the allocation of this assignment record,
+        given an exception instance.
+        """
+        return self.actions.create(
+            action_type=AssignmentActions.NOTIFIED,
+            error_reason=AssignmentActionErrors.EMAIL_ERROR,
+            traceback=format_traceback(exc),
+        )
+
     def get_last_successful_reminded_action(self):
         """
         Returns all successful "reminded" LearnerContentAssignmentActions for this assignment,
@@ -311,6 +322,54 @@ class LearnerContentAssignment(TimeStampedModel):
         return self.actions.create(
             action_type=AssignmentActions.REMINDED,
             completed_at=timezone.now(),
+        )
+
+    def add_errored_reminded_action(self, exc):
+        """
+        Adds an errored "reminded" LearnerContentAssignmentAction for this assignment record.
+        """
+        return self.actions.create(
+            action_type=AssignmentActions.REMINDED,
+            error_reason=AssignmentActionErrors.EMAIL_ERROR,
+            traceback=format_traceback(exc),
+        )
+
+    def add_successful_cancel_action(self):
+        """
+        Adds a successful "cancel" LearnerContentAssignmentAction for this assignment record.
+        """
+        return self.actions.create(
+            action_type=AssignmentActions.CANCELLED_NOTIFICATION,
+            completed_at=timezone.now(),
+        )
+
+    def add_errored_cancel_action(self, exc):
+        """
+        Adds an errored "cancel" LearnerContentAssignmentAction for this assignment record.
+        """
+        return self.actions.create(
+            action_type=AssignmentActions.CANCELLED_NOTIFICATION,
+            error_reason=AssignmentActionErrors.EMAIL_ERROR,
+            traceback=format_traceback(exc),
+        )
+
+    def add_successful_expiration_action(self):
+        """
+        Adds a successful expiration LearnerContentAssignmentAction for this assignment record.
+        """
+        return self.actions.create(
+            action_type=AssignmentActions.AUTOMATIC_CANCELLATION_NOTIFICATION,
+            completed_at=timezone.now(),
+        )
+
+    def add_errored_expiration_action(self, exc):
+        """
+        Adds an errored expiration LearnerContentAssignmentAction for this assignment record.
+        """
+        return self.actions.create(
+            action_type=AssignmentActions.AUTOMATIC_CANCELLATION_NOTIFICATION,
+            error_reason=AssignmentActionErrors.EMAIL_ERROR,
+            traceback=format_traceback(exc),
         )
 
     @classmethod

@@ -76,3 +76,15 @@ class BrazeApiClient(BrazeClient):
             'send_to_existing_only': False,
             'trigger_properties': trigger_properties or {},
         }
+
+    def create_recipient_no_external_id(self, user_email):
+        """
+        Create a Braze recipient dict identified only by an alias based on their email.
+        """
+        return {
+            'attributes': {'email': user_email},
+            'user_alias': {
+                'alias_label': ENTERPRISE_BRAZE_ALIAS_LABEL,
+                'alias_name': user_email,
+            },
+        }
