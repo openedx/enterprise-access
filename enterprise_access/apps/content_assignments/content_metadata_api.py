@@ -8,7 +8,9 @@ from enterprise_access.apps.content_metadata.api import get_and_cache_catalog_co
 
 DATE_INPUT_PATTERNS = [
     '%Y-%m-%dT%H:%M:%SZ',
+    '%Y-%m-%dT%H:%M:%S.%fZ',
     '%Y-%m-%d %H:%M:%SZ',
+    '%Y-%m-%d %H:%M:%S.%fZ',
 ]
 
 

@@ -7,25 +7,34 @@ import logging
 from celery import shared_task
 from django.apps import apps
 from django.conf import settings
-from django.utils import timezone
 
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
-from enterprise_access.apps.content_assignments.constants import AssignmentActionErrors, AssignmentActions
 from enterprise_access.apps.content_assignments.content_metadata_api import (
     get_card_image_url,
     get_content_metadata_for_assignments,
     get_course_partners,
     get_human_readable_date
 )
-from enterprise_access.apps.content_assignments.models import LearnerContentAssignmentAction
 from enterprise_access.tasks import LoggedTaskWithRetry
 
 from .constants import LearnerContentAssignmentStateChoices
-from .exceptions import MissingContentAssignment
-from .utils import format_traceback
 
 logger = logging.getLogger(__name__)
+
+
+def _get_assignment_or_raise(assignment_uuid):
+    """
+    Returns a ``LearnerContentAssignment`` instance with the given uuid, or raises
+    if no such record exists.
+    """
+    learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
+
+    try:
+        return learner_content_assignment_model.objects.get(uuid=assignment_uuid)
+    except learner_content_assignment_model.DoesNotExist:
+        logger.warning(f'Request with uuid: {assignment_uuid} does not exist.')
+        raise
 
 
 class BrazeCampaignSender:
@@ -70,10 +79,16 @@ class BrazeCampaignSender:
         """
         Creates a recipient and sends a braze campaign message.
         """
-        recipient = self.braze_client.create_recipient(
-            user_email=self.assignment.learner_email,
-            lms_user_id=self.assignment.lms_user_id,
-        )
+        if self.assignment.lms_user_id is None:
+            recipient = self.braze_client.create_recipient_no_external_id(
+                self.assignment.learner_email,
+            )
+        else:
+            recipient = self.braze_client.create_recipient(
+                user_email=self.assignment.learner_email,
+                lms_user_id=self.assignment.lms_user_id,
+            )
+
         response = self.braze_client.send_campaign_message(
             campaign_identifier,
             recipients=[recipient],
@@ -96,9 +111,16 @@ class BrazeCampaignSender:
         Returns memoized course metadata dictionary.
         """
         if not self._course_metadata:
-            self._course_metadata = get_content_metadata_for_assignments(
-                self.policy.catalog_uuid, self.assignment.assignment_configuration
+            metadata_by_key = get_content_metadata_for_assignments(
+                self.policy.catalog_uuid, [self.assignment]
             )
+            self._course_metadata = metadata_by_key.get(self.assignment.content_key)
+            if not self._course_metadata:
+                msg = (
+                    f'Could not fetch metadata for assignment {self.assignment.uuid}, '
+                    f'content_key {self.assignment.content_key}'
+                )
+                raise Exception(msg)
         return self._course_metadata
 
     def get_properties(self, *property_names):
@@ -148,12 +170,18 @@ class BrazeCampaignSender:
         return f'{settings.ENTERPRISE_LEARNER_PORTAL_URL}/{slug}'
 
 
-class CreatePendingEnterpriseLearnerForAssignmentTaskBase(LoggedTaskWithRetry):  # pylint: disable=abstract-method
+class BaseAssignmentRetryAndErrorActionTask(LoggedTaskWithRetry):
     """
-    Base class for the create_pending_enterprise_learner_for_assignment task.
-
-    Provides a place to define retry failure handling logic.
+    Base class that sets an errored state and action on an assignment.
+    Provides a place to define retry failure handling logic.  This helps ensure
+    that only *one* error action record gets written when a task is retried
+    multiple times.
     """
+    def add_errored_action(self, assignment, exc):
+        """
+        Do something here to add a related action with error info.
+        """
+        raise NotImplementedError
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """
@@ -161,24 +189,32 @@ class CreatePendingEnterpriseLearnerForAssignmentTaskBase(LoggedTaskWithRetry): 
 
         Function signature documented at: https://docs.celeryq.dev/en/stable/userguide/tasks.html#on_failure
         """
-        logger.error(f'"{task_id}" failed: "{exc}"')
-        learner_content_assignment_uuid = args[0]
-        learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
+        logger.error(
+            f'Assignment task {self.name} failed. task id: {task_id}, '
+            f'exception: {exc}, task args/assignment-uuid: {args}'
+        )
 
-        try:
-            assignment = learner_content_assignment_model.objects.get(uuid=learner_content_assignment_uuid)
-            assignment.state = LearnerContentAssignmentStateChoices.ERRORED
-            assignment.save()
-            assignment.add_errored_linked_action(exc)
-            if self.request.retries == settings.TASK_MAX_RETRIES:
-                # The failure resulted from too many retries.  This fact would be a useful thing to record in a "reason"
-                # field on the assignment if one existed.
-                logger.error(
-                    'The task failure resulted from exceeding the locally defined max number of retries '
-                    '(settings.TASK_MAX_RETRIES).'
-                )
-        except learner_content_assignment_model.DoesNotExist:
-            logger.error(f'LearnerContentAssignment not found with UUID: {learner_content_assignment_uuid}')
+        assignment = _get_assignment_or_raise(args[0])
+
+        assignment.state = LearnerContentAssignmentStateChoices.ERRORED
+        assignment.save()
+        self.add_errored_action(assignment, exc)
+        if self.request.retries == settings.TASK_MAX_RETRIES:
+            # The failure resulted from too many retries.  This fact would be a useful thing to record in a "reason"
+            # field on the assignment if one existed.
+            logger.error(
+                'The task failure resulted from exceeding the locally defined max number of retries '
+                '(settings.TASK_MAX_RETRIES).'
+            )
+
+
+# pylint: disable=abstract-method
+class CreatePendingEnterpriseLearnerForAssignmentTaskBase(BaseAssignmentRetryAndErrorActionTask):
+    """
+    Base class for the create_pending_enterprise_learner_for_assignment task.
+    """
+    def add_errored_action(self, assignment, exc):
+        assignment.add_errored_linked_action(exc)
 
 
 @shared_task(base=CreatePendingEnterpriseLearnerForAssignmentTaskBase)
@@ -193,8 +229,7 @@ def create_pending_enterprise_learner_for_assignment_task(learner_content_assign
     Raises:
         HTTPError if LMS API call fails with an HTTPError.
     """
-    learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
-    assignment = learner_content_assignment_model.objects.get(uuid=learner_content_assignment_uuid)
+    assignment = _get_assignment_or_raise(learner_content_assignment_uuid)
     enterprise_customer_uuid = assignment.assignment_configuration.enterprise_customer_uuid
 
     lms_client = LmsApiClient()
@@ -210,7 +245,16 @@ def create_pending_enterprise_learner_for_assignment_task(learner_content_assign
     )
 
 
-@shared_task(base=LoggedTaskWithRetry)
+# pylint: disable=abstract-method
+class SendCancelEmailTask(BaseAssignmentRetryAndErrorActionTask):
+    """
+    Base class for the ``send_cancel_email_for_pending_assignment`` task.
+    """
+    def add_errored_action(self, assignment, exc):
+        assignment.add_errored_cancel_action(exc)
+
+
+@shared_task(base=SendCancelEmailTask)
 def send_cancel_email_for_pending_assignment(cancelled_assignment_uuid):
     """
     Send email via braze for cancelling pending assignment
@@ -218,96 +262,74 @@ def send_cancel_email_for_pending_assignment(cancelled_assignment_uuid):
     Args:
         cancelled_assignment: (string) the cancelled assignment uuid
     """
-    learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
+    assignment = _get_assignment_or_raise(cancelled_assignment_uuid)
 
-    try:
-        assignment = learner_content_assignment_model.objects.get(uuid=cancelled_assignment_uuid)
-    except learner_content_assignment_model.DoesNotExist:
-        logger.warning(f'request with uuid: {cancelled_assignment_uuid} does not exist.')
-        raise
-
-    learner_content_assignment_action = LearnerContentAssignmentAction(
-        assignment=assignment, action_type=AssignmentActions.CANCELLED_NOTIFICATION
+    campaign_sender = BrazeCampaignSender(assignment)
+    braze_trigger_properties = campaign_sender.get_properties(
+        'contact_admin_link',
+        'organization',
+        'course_title',
     )
-
-    try:
-        campaign_sender = BrazeCampaignSender(assignment)
-        braze_trigger_properties = campaign_sender.get_properties(
-            'contact_admin_link',
-            'organization',
-            'course_title',
-        )
-        campaign_uuid = settings.BRAZE_ASSIGNMENT_CANCELLED_NOTIFICATION_CAMPAIGN
-        campaign_sender.send_campaign_message(
-            braze_trigger_properties,
-            campaign_uuid,
-        )
-        logger.info(f'Sent braze campaign cancelled uuid={campaign_uuid} message for assignment {assignment}')
-        learner_content_assignment_action.completed_at = timezone.now()
-        learner_content_assignment_action.save()
-    except Exception as exc:  # pylint: disable=broad-exception-caught
-        logger.error(f"Unable to send assignment cancellation for {assignment.uuid} due to exception: {exc}")
-        learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
-        learner_content_assignment_action.traceback = format_traceback(exc)
-        learner_content_assignment_action.save()
-        assignment.state = LearnerContentAssignmentStateChoices.ERRORED
-        assignment.full_clean()
-        assignment.save()
+    campaign_uuid = settings.BRAZE_ASSIGNMENT_CANCELLED_NOTIFICATION_CAMPAIGN
+    campaign_sender.send_campaign_message(
+        braze_trigger_properties,
+        campaign_uuid,
+    )
+    assignment.add_successful_cancel_action()
+    logger.info(f'Sent braze campaign cancelled uuid={campaign_uuid} message for assignment {assignment}')
 
 
-@shared_task(base=LoggedTaskWithRetry)
+# pylint: disable=abstract-method
+class SendReminderEmailTask(BaseAssignmentRetryAndErrorActionTask):
+    """
+    Base class for the ``send_reminder_email_for_pending_assignment`` task.
+    """
+    def add_errored_action(self, assignment, exc):
+        assignment.add_errored_reminded_action(exc)
+
+
+@shared_task(base=SendReminderEmailTask)
 def send_reminder_email_for_pending_assignment(assignment_uuid):
     """
     Send email via braze for reminding users of their pending assignment
     Args:
         assignment_uuid: (string) the subsidy request uuid
     """
-    learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
+    assignment = _get_assignment_or_raise(assignment_uuid)
 
-    try:
-        assignment = learner_content_assignment_model.objects.get(uuid=assignment_uuid)
-    except learner_content_assignment_model.DoesNotExist:
-        logger.warning(f'request with uuid: {assignment_uuid} does not exist.')
-        raise
-
-    learner_content_assignment_action = LearnerContentAssignmentAction(
-        assignment=assignment, action_type=AssignmentActions.REMINDED,
+    campaign_sender = BrazeCampaignSender(assignment)
+    braze_trigger_properties = campaign_sender.get_properties(
+        'contact_admin_link',
+        'organization',
+        'course_title',
+        'enrollment_deadline',
+        'start_date',
+        'course_partner',
+        'course_card_image',
+        'learner_portal_link',
     )
+    campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN
+    if assignment.lms_user_id is not None:
+        campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_POST_LOGISTRATION_NOTIFICATION_CAMPAIGN
 
-    try:
-        campaign_sender = BrazeCampaignSender(assignment)
-        braze_trigger_properties = campaign_sender.get_properties(
-            'contact_admin_link',
-            'organization',
-            'course_title',
-            'enrollment_deadline',
-            'start_date',
-            'course_partner',
-            'course_card_image',
-            'learner_portal_link',
-        )
-        campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN
-        if assignment.lms_user_id is not None:
-            campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_POST_LOGISTRATION_NOTIFICATION_CAMPAIGN
-
-        campaign_sender.send_campaign_message(
-            braze_trigger_properties,
-            campaign_uuid,
-        )
-        logger.info(f'Sent braze campaign reminder uuid={campaign_uuid} message for assignment {assignment}')
-        learner_content_assignment_action.completed_at = timezone.now()
-        learner_content_assignment_action.save()
-    except Exception as exc:  # pylint: disable=broad-exception-caught
-        logger.error(f"Unable to send assignment reminder for {assignment.uuid} due to exception: {exc}")
-        learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
-        learner_content_assignment_action.traceback = format_traceback(exc)
-        learner_content_assignment_action.save()
-        assignment.state = LearnerContentAssignmentStateChoices.ERRORED
-        assignment.full_clean()
-        assignment.save()
+    campaign_sender.send_campaign_message(
+        braze_trigger_properties,
+        campaign_uuid,
+    )
+    assignment.add_successful_reminded_action()
+    logger.info(f'Sent braze campaign reminder uuid={campaign_uuid} message for assignment {assignment}')
 
 
-@shared_task(base=LoggedTaskWithRetry)
+# pylint: disable=abstract-method
+class SendNotificationEmailTask(BaseAssignmentRetryAndErrorActionTask):
+    """
+    Base class for the ``send_email_for_new_assignment`` task.
+    """
+    def add_errored_action(self, assignment, exc):
+        assignment.add_errored_notified_action(exc)
+
+
+@shared_task(base=SendNotificationEmailTask)
 def send_email_for_new_assignment(new_assignment_uuid):
     """
     Send email via braze for new assignment
@@ -315,85 +337,56 @@ def send_email_for_new_assignment(new_assignment_uuid):
     Args:
         new_assignment_uuid: (string) the new assignment uuid
     """
-    learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
+    assignment = _get_assignment_or_raise(new_assignment_uuid)
 
-    try:
-        assignment = learner_content_assignment_model.objects.get(uuid=new_assignment_uuid)
-    except learner_content_assignment_model.DoesNotExist as exc:
-        logger.warning(f'request with uuid: {new_assignment_uuid} does not exist.')
-        raise MissingContentAssignment(
-            f'No assignment was found for assignment_uuid={new_assignment_uuid}.'
-        ) from exc
-
-    learner_content_assignment_action = LearnerContentAssignmentAction(
-        assignment=assignment, action_type=AssignmentActions.NOTIFIED
+    campaign_sender = BrazeCampaignSender(assignment)
+    braze_trigger_properties = campaign_sender.get_properties(
+        'contact_admin_link',
+        'organization',
+        'course_title',
+        'enrollment_deadline',
+        'start_date',
+        'course_partner',
+        'course_card_image',
+        'learner_portal_link',
     )
-
-    try:
-        campaign_sender = BrazeCampaignSender(assignment)
-        braze_trigger_properties = campaign_sender.get_properties(
-            'contact_admin_link',
-            'organization',
-            'course_title',
-            'enrollment_deadline',
-            'start_date',
-            'course_partner',
-            'course_card_image',
-            'learner_portal_link',
-        )
-        campaign_uuid = settings.BRAZE_ASSIGNMENT_NOTIFICATION_CAMPAIGN
-        campaign_sender.send_campaign_message(
-            braze_trigger_properties,
-            campaign_uuid,
-        )
-        logger.info(f'Sent braze campaign notification uuid={campaign_uuid} message for assignment {assignment}')
-        learner_content_assignment_action.completed_at = timezone.now()
-        learner_content_assignment_action.save()
-    except Exception as exc:
-        logger.error(f"Unable to send assignment notification for {assignment.uuid} due to exception: {exc}")
-        learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
-        learner_content_assignment_action.traceback = format_traceback(exc)
-        learner_content_assignment_action.save()
-        raise
+    campaign_uuid = settings.BRAZE_ASSIGNMENT_NOTIFICATION_CAMPAIGN
+    campaign_sender.send_campaign_message(
+        braze_trigger_properties,
+        campaign_uuid,
+    )
+    assignment.add_successful_notified_action()
+    logger.info(f'Sent braze campaign notification uuid={campaign_uuid} message for assignment {assignment}')
 
 
-@shared_task(base=LoggedTaskWithRetry)
+# pylint: disable=abstract-method
+class SendExpirationEmailTask(BaseAssignmentRetryAndErrorActionTask):
+    """
+    Base class for the ``send_assignment_automatically_expired_email`` task.
+    """
+    def add_errored_action(self, assignment, exc):
+        assignment.add_errored_expiration_action(exc)
+
+
+@shared_task(base=SendExpirationEmailTask)
 def send_assignment_automatically_expired_email(expired_assignment_uuid):
     """
     Send email via braze for automatically expired assignment
     Args:
         expired_assignment_uuid: (string) expired assignment uuid
     """
-    learner_content_assignment_model = apps.get_model('content_assignments.LearnerContentAssignment')
+    assignment = _get_assignment_or_raise(expired_assignment_uuid)
 
-    try:
-        assignment = learner_content_assignment_model.objects.get(uuid=expired_assignment_uuid)
-    except learner_content_assignment_model.DoesNotExist:
-        logger.warning(f'Request with uuid: {expired_assignment_uuid} does not exist.')
-        raise
-
-    learner_content_assignment_action = LearnerContentAssignmentAction(
-        assignment=assignment, action_type=AssignmentActions.AUTOMATIC_CANCELLATION_NOTIFICATION
+    campaign_sender = BrazeCampaignSender(assignment)
+    braze_trigger_properties = campaign_sender.get_properties(
+        'contact_admin_link',
+        'organization',
+        'course_title',
     )
-
-    try:
-        campaign_sender = BrazeCampaignSender(assignment)
-        braze_trigger_properties = campaign_sender.get_properties(
-            'contact_admin_link',
-            'organization',
-            'course_title',
-        )
-        campaign_uuid = settings.BRAZE_ASSIGNMENT_AUTOMATIC_CANCELLATION_NOTIFICATION_CAMPAIGN
-        campaign_sender.send_campaign_message(
-            braze_trigger_properties,
-            campaign_uuid,
-        )
-        logger.info(f'Sent braze campaign expiration uuid={campaign_uuid} message for assignment {assignment}')
-        learner_content_assignment_action.completed_at = timezone.now()
-        learner_content_assignment_action.save()
-    except Exception as exc:
-        logger.error(f"Unable to send assignment expiration for {assignment.uuid} due to exception: {exc}")
-        learner_content_assignment_action.error_reason = AssignmentActionErrors.EMAIL_ERROR
-        learner_content_assignment_action.traceback = format_traceback(exc)
-        learner_content_assignment_action.save()
-        raise
+    campaign_uuid = settings.BRAZE_ASSIGNMENT_AUTOMATIC_CANCELLATION_NOTIFICATION_CAMPAIGN
+    campaign_sender.send_campaign_message(
+        braze_trigger_properties,
+        campaign_uuid,
+    )
+    assignment.add_successful_expiration_action()
+    logger.info(f'Sent braze campaign expiration uuid={campaign_uuid} message for assignment {assignment}')

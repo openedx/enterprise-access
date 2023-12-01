@@ -1,6 +1,7 @@
 """
 Tests for LearnerContentAssignment API views.
 """
+from unittest import mock
 from uuid import UUID, uuid4
 
 import ddt
@@ -555,7 +556,8 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # Verify the API response (one of the uuid's cannot be found)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
-    def test_cancel(self):
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.send_cancel_email_for_pending_assignment')
+    def test_cancel(self, mock_send_cancel_email):
         """
         Test that the cancel view cancels the assignment and returns an appropriate response with 200 status code and
         the expected results of serialization.
@@ -582,6 +584,7 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # Check that the assignments state were updated.
         self.assignment_allocated_post_link.refresh_from_db()
         assert self.assignment_allocated_post_link.state == LearnerContentAssignmentStateChoices.CANCELLED
+        mock_send_cancel_email.delay.assert_called_once_with(self.assignment_allocated_post_link.uuid)
 
     def test_bulk_cancel(self):
         """

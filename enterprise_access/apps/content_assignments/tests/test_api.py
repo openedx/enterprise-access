@@ -217,14 +217,15 @@ class TestContentAssignmentApi(TestCase):
                 content_price_cents,
             )
 
-    @mock.patch(
-        'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task'
-    )
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_email_for_new_assignment')
+    @mock.patch('enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task')
     @mock.patch(
         'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
         return_value=mock.MagicMock(),
     )
-    def test_allocate_assignments_happy_path(self, mock_get_and_cache_content_metadata, mock_pending_learner_task):
+    def test_allocate_assignments_happy_path(
+        self, mock_get_and_cache_content_metadata, mock_pending_learner_task, mock_new_assignment_email_task
+    ):
         """
         Tests the allocation of new assignments against a given configuration.
         """
@@ -319,6 +320,12 @@ class TestContentAssignmentApi(TestCase):
 
         # Assert that an async task was enqueued for each of the updated and created assignments
         mock_pending_learner_task.delay.assert_has_calls([
+            mock.call(assignment.uuid) for assignment in
+            (cancelled_assignment, errored_assignment, created_assignment)
+        ], any_order=True)
+        # Assert that an async task to send notification emails was enqueued
+        # for each of the updated and created assignments
+        mock_new_assignment_email_task.delay.assert_has_calls([
             mock.call(assignment.uuid) for assignment in
             (cancelled_assignment, errored_assignment, created_assignment)
         ], any_order=True)
