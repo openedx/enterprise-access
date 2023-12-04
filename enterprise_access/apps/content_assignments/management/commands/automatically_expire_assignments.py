@@ -2,6 +2,7 @@
 Management command to automatically expire assignment records and then send email to learners.
 """
 
+import datetime
 import logging
 
 from django.core.management.base import BaseCommand
@@ -40,6 +41,21 @@ class Command(BaseCommand):
             help='Dry Run, print log messages without spawning the celery tasks.',
         )
 
+    @staticmethod
+    def to_datetime(value):
+        """
+        Return a datetime object of `value` if it is a str.
+        """
+        if isinstance(value, str):
+            return datetime.datetime.strptime(
+                value,
+                "%Y-%m-%dT%H:%M:%SZ"
+            ).replace(
+                tzinfo=datetime.timezone.utc
+            )
+
+        return value
+
     def handle(self, *args, **options):
         dry_run = options['dry_run']
 
@@ -50,7 +66,7 @@ class Command(BaseCommand):
         for assignment_configuration in AssignmentConfiguration.objects.filter(active=True):
             subsidy_access_policy = assignment_configuration.subsidy_access_policy
             enterprise_catalog_uuid = subsidy_access_policy.catalog_uuid
-            subsidy_expiration_datetime = subsidy_access_policy.subsidy_expiration_datetime
+            subsidy_expiration_datetime = self.to_datetime(subsidy_access_policy.subsidy_expiration_datetime)
 
             logger.info(
                 '%s Processing Assignment Configuration. UUID: [%s], Policy: [%s], Catalog: [%s], Enterprise: [%s]',
@@ -76,7 +92,8 @@ class Command(BaseCommand):
 
                 for assignment in assignments:
                     content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
-                    enrollment_end_date = content_metadata.get('normalized_metadata', {}).get('enroll_by_date')
+                    enrollment_end_date_str = content_metadata.get('normalized_metadata', {}).get('enroll_by_date')
+                    enrollment_end_date = self.to_datetime(enrollment_end_date_str)
 
                     logger.info(
                         '%s AssignmentUUID: [%s], ContentKey: [%s], AssignmentExpiry: [%s], EnrollmentEnd: [%s], SubsidyExpiry: [%s]',  # nopep8 pylint: disable=line-too-long
