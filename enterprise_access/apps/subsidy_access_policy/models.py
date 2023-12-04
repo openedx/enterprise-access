@@ -119,7 +119,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
         verbose_name='Display name',
         help_text='User-facing display name for this policy record',
     )
-    description = models.TextField(help_text="Brief description about a specific policy.")
+    description = models.TextField(
+        blank=True,
+        null=False,
+        default='',
+        help_text="Brief description about a specific policy.",
+    )
     active = models.BooleanField(
         default=False,
         help_text='Whether this policy is active, defaults to false.',

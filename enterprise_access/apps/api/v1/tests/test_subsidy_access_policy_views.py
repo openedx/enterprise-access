@@ -490,8 +490,45 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(expected_response, response.json())
 
-    @ddt.data(True, False)
-    def test_update_views(self, is_patch):
+    @ddt.data(
+        # Test sending a bunch of updates as a PATCH.
+        {
+            'is_patch': True,
+            'request_payload': {
+                'description': 'the new description',
+                'display_name': 'new display_name',
+                'active': True,
+                'catalog_uuid': str(uuid4()),
+                'subsidy_uuid': str(uuid4()),
+                'access_method': AccessMethods.ASSIGNED,
+                'spend_limit': None,
+                'per_learner_spend_limit': 10000,
+            },
+        },
+        # Test sending a bunch of updates as a PUT.
+        {
+            'is_patch': False,
+            'request_payload': {
+                'description': 'the new description',
+                'display_name': 'new display_name',
+                'active': True,
+                'catalog_uuid': str(uuid4()),
+                'subsidy_uuid': str(uuid4()),
+                'access_method': AccessMethods.ASSIGNED,
+                'spend_limit': None,
+                'per_learner_spend_limit': 10000,
+            },
+        },
+        # Test sending an empty string for `description`.
+        {
+            'is_patch': True,
+            'request_payload': {
+                'description': '',
+            },
+        }
+    )
+    @ddt.unpack
+    def test_update_views(self, is_patch, request_payload):
         """
         Test that the update and partial_update views can modify certain
         fields of a policy record.
@@ -508,17 +545,6 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             active=False,
         )
 
-        request_payload = {
-            'description': 'the new description',
-            'display_name': 'new display_name',
-            'active': True,
-            'catalog_uuid': str(uuid4()),
-            'subsidy_uuid': str(uuid4()),
-            'access_method': AccessMethods.ASSIGNED,
-            'spend_limit': None,
-            'per_learner_spend_limit': 10000,
-        }
-
         action = self.client.patch if is_patch else self.client.put
         url = reverse(
             'api:v1:subsidy-access-policies-detail',
@@ -529,18 +555,21 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         expected_response = {
-            'access_method': AccessMethods.ASSIGNED,
-            'active': True,
-            'catalog_uuid': request_payload['catalog_uuid'],
-            'display_name': request_payload['display_name'],
-            'description': request_payload['description'],
-            'enterprise_customer_uuid': str(self.enterprise_uuid),
-            'per_learner_enrollment_limit': None,
-            'per_learner_spend_limit': request_payload['per_learner_spend_limit'],
-            'policy_type': 'PerLearnerSpendCreditAccessPolicy',
-            'spend_limit': request_payload['spend_limit'],
-            'subsidy_uuid': request_payload['subsidy_uuid'],
+            # Fields that we officially support PATCHing.
+            'access_method': policy_for_edit.access_method,
+            'active': policy_for_edit.active,
+            'catalog_uuid': str(policy_for_edit.catalog_uuid),
+            'display_name': policy_for_edit.display_name,
+            'description': policy_for_edit.description,
+            'per_learner_spend_limit': policy_for_edit.per_learner_spend_limit,
+            'per_learner_enrollment_limit': policy_for_edit.per_learner_enrollment_limit,
+            'spend_limit': policy_for_edit.spend_limit,
+            'subsidy_uuid': str(policy_for_edit.subsidy_uuid),
+
+            # All the rest of the fields that we do not support PATCHing.
             'uuid': str(policy_for_edit.uuid),
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'policy_type': 'PerLearnerSpendCreditAccessPolicy',
             'subsidy_active_datetime': self.yesterday.isoformat(),
             'subsidy_expiration_datetime': self.tomorrow.isoformat(),
             'is_subsidy_active': True,
@@ -554,6 +583,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             },
             'assignment_configuration': None,
         }
+        expected_response.update(request_payload)
         self.assertEqual(expected_response, response.json())
 
     @ddt.data(

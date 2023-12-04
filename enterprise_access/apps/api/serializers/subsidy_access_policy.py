@@ -214,7 +214,7 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
                 'trim_whitespace': True,
             },
             'description': {
-                'allow_blank': False,
+                'allow_blank': True,
                 'min_length': None,
                 'max_length': 200,
                 'trim_whitespace': True,
@@ -413,7 +413,7 @@ class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
             },
             'description': {
                 'required': False,
-                'allow_blank': False,
+                'allow_blank': True,
                 'min_length': None,
                 'max_length': 200,
                 'trim_whitespace': True,
