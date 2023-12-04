@@ -103,6 +103,7 @@ SHELL_PLUS_IMPORTS = [
     'from enterprise_access.apps.subsidy_request.utils import localized_utcnow',
     'from enterprise_access.apps.content_assignments import api as assignments_api',
     'from pprint import pprint',
+    'from enterprise_access.apps.content_assignments import tasks as assignments_tasks',
 ]
 
 
