@@ -38,14 +38,19 @@ class APITest(APITestCase):
     """
     Base class for API Tests.
     """
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.user = UserFactory(username=TEST_USERNAME, email=TEST_EMAIL, is_active=True, password=TEST_PASSWORD)
+        cls.user.save()
+
+        cls.client = APIClient()
 
     def setUp(self):
         """
         Perform operations common to all tests.
         """
         super().setUp()
-        self.create_user(username=TEST_USERNAME, email=TEST_EMAIL, password=TEST_PASSWORD)
-        self.client = APIClient()
         self.client.login(username=TEST_USERNAME, password=TEST_PASSWORD)
 
     def tearDown(self):
