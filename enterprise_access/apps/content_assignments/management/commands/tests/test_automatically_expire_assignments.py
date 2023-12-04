@@ -77,7 +77,9 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
         Verify that management command work as expected in dry run mode.
         """
         enrollment_end = timezone.now() - timezone.timedelta(days=5)
+        enrollment_end = enrollment_end.replace(microsecond=0)
         subsidy_expiry = timezone.now() + timezone.timedelta(days=5)
+        subsidy_expiry = subsidy_expiry.replace(microsecond=0)
 
         # make an assignment expired
         self.alice_assignment.created = timezone.now() - timezone.timedelta(days=100)
@@ -85,7 +87,7 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
 
         mock_subsidy_client.retrieve_subsidy.return_value = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),
-            'expiration_datetime': subsidy_expiry,
+            'expiration_datetime': subsidy_expiry.strftime("%Y-%m-%dT%H:%M:%SZ"),
             'is_active': True,
         }
         mock_content_metadata_for_assignments.return_value = {
@@ -94,7 +96,7 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
                 'normalized_metadata': {
                     'start_date': '2020-01-01 12:00:00Z',
                     'end_date': '2022-01-01 12:00:00Z',
-                    'enroll_by_date': enrollment_end,
+                    'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     'content_price': 123,
                 },
             },
@@ -176,10 +178,13 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
         Verify that management command work as expected in dry run mode.
         """
         enrollment_end = timezone.now() + timezone.timedelta(days=5)
+        enrollment_end = enrollment_end.replace(microsecond=0)
         subsidy_expiry = timezone.now() - timezone.timedelta(days=5)
+        subsidy_expiry = subsidy_expiry.replace(microsecond=0)
+
         mock_subsidy_client.retrieve_subsidy.return_value = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),
-            'expiration_datetime': subsidy_expiry,
+            'expiration_datetime': subsidy_expiry.strftime("%Y-%m-%dT%H:%M:%SZ"),
             'is_active': True,
         }
         mock_content_metadata_for_assignments.return_value = {
@@ -188,7 +193,7 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
                 'normalized_metadata': {
                     'start_date': '2020-01-01 12:00:00Z',
                     'end_date': '2022-01-01 12:00:00Z',
-                    'enroll_by_date': enrollment_end,
+                    'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     'content_price': 123,
                 },
             },
