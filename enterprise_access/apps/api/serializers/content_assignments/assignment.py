@@ -7,6 +7,7 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from enterprise_access.apps.content_assignments.constants import (
+    AssignmentActionErrors,
     AssignmentLearnerStates,
     AssignmentRecentActionTypes,
     LearnerContentAssignmentStateChoices
@@ -49,6 +50,22 @@ class LearnerContentAssignmentRecentActionSerializer(serializers.Serializer):
     timestamp = serializers.DateTimeField(
         help_text='Date and time when the action was taken.',
         source='recent_action_time',
+    )
+
+
+class LearnerContentErrorReasonSerializer(serializers.Serializer):
+    """
+    Structured data about any errors associated with the most recent action,
+    meant to power a frontend table column.
+    """
+    action_type = serializers.ChoiceField(
+        help_text='Type of the recent action.',
+        choices=AssignmentRecentActionTypes.CHOICES,
+        source='recent_action',
+    )
+    error_reason = serializers.ChoiceField(
+        help_text='Type of the error reason.',
+        choices=AssignmentActionErrors.CHOICES,
     )
 
 
@@ -101,7 +118,9 @@ class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentRe
         ),
         choices=AssignmentLearnerStates.CHOICES,
     )
-    error_reason = serializers.SerializerMethodField()
+    error_reason = serializers.SerializerMethodField(
+        help_text='Structured data about the most recent error reason. Meant to power a frontend table column.',
+    )
 
     class Meta(LearnerContentAssignmentResponseSerializer.Meta):
         fields = LearnerContentAssignmentResponseSerializer.Meta.fields + [
@@ -132,7 +151,7 @@ class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentRe
             return None
 
         # Get the most recently errored action.
-        return related_actions_with_error.first().error_reason
+        return LearnerContentErrorReasonSerializer(related_actions_with_error.first())
 
 
 class CoursePartnerSerializer(serializers.Serializer):
