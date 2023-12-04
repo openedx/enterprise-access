@@ -4,6 +4,7 @@ Tasks for content_assignments app.
 
 import logging
 
+from braze.exceptions import BrazeBadRequestError
 from celery import shared_task
 from django.apps import apps
 from django.conf import settings
@@ -79,6 +80,9 @@ class BrazeCampaignSender:
         """
         Creates a recipient and sends a braze campaign message.
         """
+        if not campaign_identifier:
+            raise Exception('campaign_identifiers must be non-null/empty!')
+
         if self.assignment.lms_user_id is None:
             recipient = self.braze_client.create_recipient_no_external_id(
                 self.assignment.learner_email,
@@ -89,12 +93,22 @@ class BrazeCampaignSender:
                 lms_user_id=self.assignment.lms_user_id,
             )
 
-        response = self.braze_client.send_campaign_message(
-            campaign_identifier,
-            recipients=[recipient],
-            trigger_properties=braze_trigger_properties,
-        )
-        return response
+        try:
+            response = self.braze_client.send_campaign_message(
+                campaign_identifier,
+                recipients=[recipient],
+                trigger_properties=braze_trigger_properties,
+            )
+            return response
+        except BrazeBadRequestError as exc:
+            # hack into the underlying HTTPError to understand why the request was bad
+            exc_response_content = ''
+            if exc.__cause__ and hasattr(exc.__cause__, 'response'):
+                exc_response_content = exc.__cause__.response.content.decode()
+            logger.exception(
+                f'Braze request error {exc_response_content} while sending campaign {campaign_identifier}'
+            )
+            raise
 
     @property
     def customer_data(self):
