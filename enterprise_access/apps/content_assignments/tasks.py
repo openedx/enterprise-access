@@ -99,6 +99,11 @@ class BrazeCampaignSender:
                 recipients=[recipient],
                 trigger_properties=braze_trigger_properties,
             )
+            logger.info(
+                'Successfully sent Braze campaign message for campaign %s with trigger properties %s',
+                campaign_identifier,
+                braze_trigger_properties,
+            )
             return response
         except BrazeBadRequestError as exc:
             # hack into the underlying HTTPError to understand why the request was bad
@@ -177,7 +182,17 @@ class BrazeCampaignSender:
         return get_course_partners(self.course_metadata)
 
     def get_course_card_image(self):
-        return get_card_image_url(self.course_metadata)
+        """
+        Fetches the ``course_card_image`` property for this object's assignment and course.
+        """
+        image_url = get_card_image_url(self.course_metadata)
+        if not image_url:
+            logger.warning(
+                'Could not find course_card_image for %s with metadata %s',
+                self.assignment.uuid,
+                self.course_metadata,
+            )
+        return image_url
 
     def get_learner_portal_link(self):
         slug = self.customer_data["slug"]
