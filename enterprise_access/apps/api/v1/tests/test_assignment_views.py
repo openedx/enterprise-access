@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.reverse import reverse
 
 from enterprise_access.apps.content_assignments.constants import (
+    AssignmentActions,
     AssignmentLearnerStates,
     AssignmentRecentActionTypes,
     LearnerContentAssignmentStateChoices
@@ -149,6 +150,11 @@ class CRUDViewTestMixin:
             lms_user_id=TEST_USER_ID,
             transaction_uuid=uuid4(),
             assignment_configuration=self.assignment_configuration,
+        )
+        self.requester_assignment_errored.actions.create(
+            action_type=AssignmentActions.NOTIFIED,
+            error_reason='Phony error reason.',
+            traceback=None,
         )
         linked_action, _ = self.assignment_cancelled.add_successful_linked_action()
         linked_action.error_reason = 'Phony error reason.'
@@ -365,6 +371,34 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
                 'timestamp': self.assignment_allocated_pre_link.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
             },
             'learner_state': AssignmentLearnerStates.NOTIFYING,
+        }
+
+    @ddt.data(
+        # A good admin role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good operator role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+    )
+    def test_retrieve_errored_state(self, role_context_dict):
+        """
+        Test that the retrieve view returns a 200 response code and the expected results of serialization
+        when there is a recent error.
+        """
+        # Set the JWT-based auth that we'll use for every request.
+        self.set_jwt_cookie([role_context_dict])
+
+        # Setup and call the retrieve endpoint.
+        detail_kwargs = {
+            'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID),
+            'uuid': str(self.requester_assignment_errored.uuid),
+        }
+        detail_url = reverse('api:v1:admin-assignments-detail', kwargs=detail_kwargs)
+        response = self.client.get(detail_url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json().get('error_reason') == {
+            'action_type': AssignmentActions.NOTIFIED,
+            'error_reason': 'Phony error reason.',
         }
 
     @ddt.data(
