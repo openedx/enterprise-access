@@ -61,7 +61,6 @@ class LearnerContentErrorReasonSerializer(serializers.Serializer):
     action_type = serializers.ChoiceField(
         help_text='Type of the recent action.',
         choices=AssignmentRecentActionTypes.CHOICES,
-        source='recent_action',
     )
     error_reason = serializers.ChoiceField(
         help_text='Type of the error reason.',
@@ -151,7 +150,7 @@ class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentRe
             return None
 
         # Get the most recently errored action.
-        return LearnerContentErrorReasonSerializer(related_actions_with_error.first())
+        return LearnerContentErrorReasonSerializer(related_actions_with_error.first()).data
 
 
 class CoursePartnerSerializer(serializers.Serializer):
