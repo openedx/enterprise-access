@@ -1486,12 +1486,11 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         self.assertEqual(response_json[0]['learner_content_assignments'][0], expected_learner_content_assignment)
 
 
-@ddt.ddt
-class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
+class BaseCanRedeemTestMixin:
     """
-    Tests for the can-redeem view
+    Mixin to help with customer data, JWT cookies, and mock setup
+    for testing can-redeem view.
     """
-
     def setUp(self):
         super().setUp()
 
@@ -1501,13 +1500,6 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
             'context': self.enterprise_uuid,
         }])
-
-        self.redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
-            enterprise_customer_uuid=self.enterprise_uuid,
-            spend_limit=500000,
-        )
-        self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
-
         self.subsidy_access_policy_can_redeem_endpoint = reverse(
             "api:v1:policy-redemption-can-redeem",
             kwargs={"enterprise_customer_uuid": self.enterprise_uuid},
@@ -1562,6 +1554,22 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         self.addCleanup(contains_key_patcher.stop)
         self.addCleanup(get_content_metadata_patcher.stop)
         self.addCleanup(transactions_for_learner_patcher.stop)
+
+
+@ddt.ddt
+class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMocks):
+    """
+    Tests for the can-redeem view
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        self.redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            spend_limit=500000,
+        )
+        self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
 
     def test_can_redeem_policy_missing_params(self):
         """
@@ -1619,7 +1627,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         self.mock_get_content_metadata.side_effect = mock_get_subsidy_content_data
 
         with mock.patch(
-            'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_content_metadata',
+            'enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata',
             side_effect=mock_get_subsidy_content_data,
         ):
             query_params = {'content_key': [test_content_key_1, test_content_key_2]}
@@ -1714,7 +1722,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         self.mock_get_content_metadata.side_effect = mock_get_subsidy_content_data
 
         with mock.patch(
-            'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_content_metadata',
+            'enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata',
             side_effect=mock_get_subsidy_content_data,
         ):
             query_params = {'content_key': [test_content_key_1, test_content_key_2]}
@@ -1811,8 +1819,9 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
             "content_price": 19900,
         }
 
+        metadata_api_path = 'enterprise_access.apps.subsidy_access_policy.content_metadata_api'
         with mock.patch(
-            'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_content_metadata',
+            f'{metadata_api_path}.get_and_cache_content_metadata',
             return_value=mocked_content_data_from_view,
         ):
             query_params = {'content_key': 'course-v1:demox+1234+2T2023'}
@@ -1838,9 +1847,9 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         self.assertIsNone(response_list[0]["redeemable_subsidy_access_policy"])
         self.assertFalse(response_list[0]["can_redeem"])
         self.assertEqual(response_list[0]["reasons"], [])
-        # the subsidy.can_redeem check returns false, so we don't make
-        # it to the point of fetching subsidy content data
-        self.assertFalse(self.mock_get_content_metadata.called)
+
+        # We call this to fetch the list_price
+        self.mock_get_content_metadata.assert_called_once_with("course-v1:demox+1234+2T2023")
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     def test_can_redeem_policy_existing_reversed_redemptions(self, mock_transactions_cache_for_learner):
@@ -1886,7 +1895,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         }
 
         with mock.patch(
-            'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_content_metadata',
+            'enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata',
             return_value=mocked_content_data_from_view,
         ):
             query_params = {'content_key': 'course-v1:demox+1234+2T2023'}
@@ -1944,7 +1953,7 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         }
 
         with mock.patch(
-            'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_content_metadata',
+            'enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata',
             return_value=mocked_content_data_from_view,
         ):
             query_params = {'content_key': test_content_key}
@@ -1974,3 +1983,83 @@ class TestSubsidyAccessPolicyCanRedeemView(APITestWithMocks):
         assert response.json() == {
             'detail': 'Subsidy Transaction API error: HTTPError occurred in Subsidy API request.',
         }
+
+
+@ddt.ddt
+class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMocks):
+    """
+    Tests for the can-redeem view for assignment-based policies.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.assignment_configuration = AssignmentConfigurationFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+        )
+        self.assigned_learner_credit_policy = AssignedLearnerCreditAccessPolicyFactory(
+            display_name='An assigned learner credit policy, for the test customer.',
+            enterprise_customer_uuid=self.enterprise_uuid,
+            active=True,
+            assignment_configuration=self.assignment_configuration,
+            spend_limit=1000000,
+        )
+        self.content_key = 'edX+demoX'
+        self.content_title = 'edx: Demo 101'
+        self.assigned_price_cents = 25000
+        self.assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='alice@foo.com',
+            lms_user_id=self.user.lms_user_id,
+            content_key=self.content_key,
+            content_title=self.content_title,
+            content_quantity=-self.assigned_price_cents,
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+        )
+
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
+    def test_can_redeem_assigned_policy(self, mock_transactions_cache_for_learner):
+        """
+        Test that the can_redeem endpoint returns an assigned access policy when one is redeemable.
+        """
+        mock_transactions_cache_for_learner.return_value = {
+            'transactions': [],
+            'aggregates': {
+                'total_quantity': 0,
+            },
+        }
+        test_content_key_1 = f"course-v1:{self.content_key}+3T2020"
+        test_content_key_1_metadata_price = 29900
+
+        mock_get_subsidy_content_data = {
+            "content_uuid": str(uuid4()),
+            "content_key": test_content_key_1,
+            "source": "edX",
+            "content_price": test_content_key_1_metadata_price,
+        }
+
+        self.mock_get_content_metadata.return_value = mock_get_subsidy_content_data
+
+        with mock.patch(
+            'enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata',
+            side_effect=mock_get_subsidy_content_data,
+        ):
+            query_params = {'content_key': [test_content_key_1]}
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
+        assert response.status_code == status.HTTP_200_OK
+        response_list = response.json()
+
+        assert len(response_list) == 1
+
+        # Check the response for the first content_key given.
+        assert response_list[0]["content_key"] == test_content_key_1
+        assert response_list[0]["list_price"] == {
+            "usd": float(self.assigned_price_cents / 100),
+            "usd_cents": self.assigned_price_cents,
+        }
+        assert len(response_list[0]["redemptions"]) == 0
+        assert response_list[0]["has_successful_redemption"] is False
+        assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == \
+            str(self.assigned_learner_credit_policy.uuid)
+        assert response_list[0]["can_redeem"] is True
+        assert len(response_list[0]["reasons"]) == 0

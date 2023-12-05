@@ -37,7 +37,12 @@ from .constants import (
     AccessMethods,
     TransactionStateChoices
 )
-from .content_metadata_api import get_and_cache_catalog_contains_content, get_and_cache_content_metadata
+from .content_metadata_api import (
+    get_and_cache_catalog_contains_content,
+    get_and_cache_content_metadata,
+    get_list_price_for_content,
+    list_price_dict_from_usd_cents
+)
 from .exceptions import (
     ContentPriceNullException,
     MissingAssignment,
@@ -402,10 +407,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Returns a dict of content metadata for the given key.
         """
-        return get_and_cache_content_metadata(
-            self.enterprise_customer_uuid,
-            content_key,
-        )
+        return get_and_cache_content_metadata(self.enterprise_customer_uuid, content_key)
 
     def get_content_price(self, content_key, content_metadata=None):
         """
@@ -420,6 +422,18 @@ class SubsidyAccessPolicy(TimeStampedModel):
         if content_price is None:
             raise ContentPriceNullException(f'The price for {content_key} is null')
         return content_price
+
+    def get_list_price(self, lms_user_id, content_key):  # pylint: disable=unused-argument
+        """
+        Determine the price for content for display purposes only.
+        We likely have content metadata prefetched on this policy record instance at the time
+        of invocation, so we do that prefetch here via ``self.get_content_metadata()``.
+        """
+        return get_list_price_for_content(
+            self.enterprise_customer_uuid,
+            content_key,
+            self.get_content_metadata(content_key),
+        )
 
     def aggregates_for_policy(self):
         """
@@ -1060,6 +1074,54 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         # self.total_allocated is NEGATIVE USD Cents representing currently allocated assignments.
         return max(0, super().spend_available + self.total_allocated)
 
+    def get_assignment(self, lms_user_id, content_key):
+        """
+        Helper to get a ``LearnerContentAssignment`` for the given learner/content identifier pair
+        in this policy's assignment configuration.  Returns None if no such pair is assigned.
+        """
+        cache_key = versioned_cache_key('get_assignment', self.uuid, lms_user_id, content_key)
+        cached_response = request_cache(namespace=REQUEST_CACHE_NAMESPACE).get_cached_response(cache_key)
+        if cached_response.is_found:
+            logger.info(
+                'get_assignment cache hit: policy %s lms_user_id %s content_key %s',
+                self.uuid, lms_user_id, content_key,
+            )
+            return cached_response.value
+
+        assignment = assignments_api.get_assignment_for_learner(
+            self.assignment_configuration,
+            lms_user_id,
+            content_key,
+        )
+        request_cache(namespace=REQUEST_CACHE_NAMESPACE).set(cache_key, assignment)
+        logger.info(
+            'get_assignment cache hit: policy %s lms_user_id %s content_key %s',
+            self.uuid, lms_user_id, content_key,
+        )
+
+        return assignment
+
+    def get_list_price(self, lms_user_id, content_key):
+        """
+        Uses the relevant assignment for this policy instance to determine the appropriate
+        list price of the requested ``content_key``.
+
+        Returns:
+        A dictionary of the form
+        ```
+        {
+            "usd": 149.50, # the list price in US Dollars as a float
+            "usd_cents": 14950 # the list price in USD Cents as an int
+        }
+        Both ``usd`` and ``usd_cents`` will be non-negative.
+        """
+        found_assignment = self.get_assignment(lms_user_id, content_key)
+        if not found_assignment:
+            return super().get_list_price(lms_user_id, content_key)
+        # an assignment's content_quantity is always <= 0 to express the fact
+        # that value has been consumed from a subsidy (though not necessarily fulfilled)
+        return list_price_dict_from_usd_cents(found_assignment.content_quantity * -1)
+
     def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
         """
         Checks if the given lms_user_id has an existing assignment on the given content_key, ready to be accepted.
@@ -1073,11 +1135,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         if not should_attempt_redemption:
             return (False, reason, existing_redemptions)
         # Now that the default checks are complete, proceed with the custom checks for this assignment policy type.
-        found_assignment = assignments_api.get_assignment_for_learner(
-            self.assignment_configuration,
-            lms_user_id,
-            content_key,
-        )
+        found_assignment = self.get_assignment(lms_user_id, content_key)
         if not found_assignment:
             return (False, REASON_LEARNER_NOT_ASSIGNED_CONTENT, existing_redemptions)
         elif found_assignment.state == LearnerContentAssignmentStateChoices.CANCELLED:
@@ -1105,11 +1163,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             SubsidyAPIHTTPError if the Subsidy API request failed.
             ValueError if the access method of this policy is invalid.
         """
-        found_assignment = assignments_api.get_assignment_for_learner(
-            self.assignment_configuration,
-            lms_user_id,
-            content_key,
-        )
+        found_assignment = self.get_assignment(lms_user_id, content_key)
         # The following checks for non-allocated assignments only exist to be defensive against race-conditions, but
         # in practice should never happen if the caller locks the policy and runs can_redeem() before redeem().
         if not found_assignment:

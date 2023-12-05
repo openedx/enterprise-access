@@ -6,7 +6,6 @@ import os
 from collections import defaultdict
 from contextlib import suppress
 
-import requests
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.functional import cached_property
@@ -45,7 +44,6 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     MissingSubsidyAccessReasonUserMessages,
     TransactionStateChoices
 )
-from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
 from enterprise_access.apps.subsidy_access_policy.exceptions import (
     ContentPriceNullException,
     MissingAssignment,
@@ -664,18 +662,18 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             # Determine if the learner has already redeemed the requested content_key.  Just because a transaction has
             # state='committed' doesn't mean it counts as a successful redemption; it must also NOT have a committed
             # reversal.
-            has_successful_redemption = any(
-                redemption['state'] == TransactionStateChoices.COMMITTED and (
+            successful_redemptions = [
+                redemption for redemption in redemptions
+                if redemption['state'] == TransactionStateChoices.COMMITTED and (
                     not redemption['reversal'] or
                     redemption['reversal'].get('state') != TransactionStateChoices.COMMITTED
                 )
-                for redemption in redemptions
-            )
+            ]
 
             # Of all policies for this customer, determine which are redeemable and which are not.
             # But, only do this if there are no existing successful redemptions,
             # so we don't unnecessarily call `can_redeem()` on every policy.
-            if not has_successful_redemption:
+            if not successful_redemptions:
                 redeemable_policies, non_redeemable_policies = self.evaluate_policies(
                     enterprise_customer_uuid, lms_user_id, content_key
                 )
@@ -689,14 +687,31 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             if redeemable_policies:
                 resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
 
-            if resolved_policy or has_successful_redemption:
-                list_price = self._get_list_price(enterprise_customer_uuid, content_key)
+            try:
+                if resolved_policy:
+                    list_price = resolved_policy.get_list_price(lms_user_id, content_key)
+                elif successful_redemptions:
+                    # Get the policy record used at time of successful redemption.
+                    # [2023-12-05] TODO: consider cleaning this up.
+                    # This is kind of silly, b/c we only need this policy to compute the
+                    # list price, and it's really only *necessary* to fetch that price
+                    # from within the context of a *policy record* for cases where that successful
+                    # policy was assignment-based (because the list price for assignments might
+                    # slightly different from the current list price in the canonical content metadata).
+                    successfully_redeemed_policy = self.get_queryset().filter(
+                        uuid=successful_redemptions[0]['subsidy_access_policy_uuid'],
+                    ).first()
+                    list_price = successfully_redeemed_policy.get_list_price(lms_user_id, content_key)
+            except ContentPriceNullException as exc:
+                raise RedemptionRequestException(
+                    detail=f'Could not determine list price for content_key: {content_key}',
+                ) from exc
 
             element_response = {
                 "content_key": content_key,
                 "list_price": list_price,
                 "redemptions": redemptions,
-                "has_successful_redemption": has_successful_redemption,
+                "has_successful_redemption": bool(successful_redemptions),
                 "redeemable_subsidy_access_policy": resolved_policy,
                 "can_redeem": bool(resolved_policy),
                 "reasons": reasons,
@@ -712,30 +727,6 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             many=True,
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
-
-    def _get_list_price(self, enterprise_customer_uuid, content_key):
-        """
-        Determine the price for content for display purposes only.
-        """
-        try:
-            content_metadata = get_and_cache_content_metadata(enterprise_customer_uuid, content_key)
-            # Note that the "content_price" key is guaranteed to exist, but the value may be None.
-            list_price_integer_cents = content_metadata["content_price"]
-            # TODO: simplify this function by consolidating this conversion logic into the response serializer:
-            if list_price_integer_cents is not None:
-                list_price_decimal_dollars = float(list_price_integer_cents) / 100
-            else:
-                list_price_decimal_dollars = None
-        except requests.exceptions.HTTPError as exc:
-            logger.warning(f'{exc} when checking content metadata for {enterprise_customer_uuid} and {content_key}')
-            raise RedemptionRequestException(
-                detail=f'Could not determine price for content_key: {content_key}',
-            ) from exc
-
-        return {
-            "usd": list_price_decimal_dollars,
-            "usd_cents": list_price_integer_cents,
-        }
 
 
 class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequiredMixin, viewsets.GenericViewSet):

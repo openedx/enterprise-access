@@ -1,10 +1,11 @@
 """
 Utils for any app in the enterprise-access project.
 """
-
 from django.apps import apps
 
 from enterprise_access.apps.subsidy_request.constants import SubsidyTypeChoices
+
+_MEMO_MISS = object()
 
 
 def get_subsidy_model(subsidy_type):

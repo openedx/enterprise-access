@@ -31,6 +31,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
 )
 from enterprise_access.apps.subsidy_access_policy.exceptions import MissingAssignment, SubsidyAPIHTTPError
 from enterprise_access.apps.subsidy_access_policy.models import (
+    REQUEST_CACHE_NAMESPACE,
     AssignedLearnerCreditAccessPolicy,
     PerLearnerEnrollmentCreditAccessPolicy,
     PerLearnerSpendCreditAccessPolicy,
@@ -42,6 +43,7 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
 )
+from enterprise_access.cache_utils import request_cache
 
 from ..constants import AccessMethods
 from ..exceptions import PriceValidationError
@@ -76,8 +78,8 @@ class MockPolicyDependenciesMixin:
         )
         self.mock_catalog_contains_content_key = catalog_contains_content_key_patcher.start()
 
-        get_content_metadata_patcher = patch.object(
-            SubsidyAccessPolicy, 'get_content_metadata'
+        get_content_metadata_patcher = patch(
+            'enterprise_access.apps.subsidy_access_policy.models.get_and_cache_content_metadata'
         )
         self.mock_get_content_metadata = get_content_metadata_patcher.start()
 
@@ -329,7 +331,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
 
         if expect_content_metadata_fetch:
             # it's actually called twice
-            self.mock_get_content_metadata.assert_called_with(self.course_id)
+            self.mock_get_content_metadata.assert_called_with(policy_record.enterprise_customer_uuid, self.course_id)
         else:
             self.assertFalse(self.mock_get_content_metadata.called)
 
@@ -492,7 +494,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
 
         if expect_content_metadata_fetch:
             # it's actually called twice
-            self.mock_get_content_metadata.assert_called_with(self.course_id)
+            self.mock_get_content_metadata.assert_called_with(policy_record.enterprise_customer_uuid, self.course_id)
         else:
             self.assertFalse(self.mock_get_content_metadata.called)
 
@@ -771,6 +773,13 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
             spend_limit=10000,
             assignment_configuration=AssignmentConfiguration.objects.create(),
         )
+
+    def tearDown(self):
+        """
+        Clears any cached data for the test policy instances between test runs.
+        """
+        super().tearDown()
+        request_cache(namespace=REQUEST_CACHE_NAMESPACE).clear()
 
     def test_clean(self):
         """
