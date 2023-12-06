@@ -424,7 +424,6 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         response_json = response.json()
         self.assertEqual(response_json['count'], 0)
-        
         self.assertEqual(response_json['results'], [])
 
     @ddt.data(
