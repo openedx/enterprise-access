@@ -99,8 +99,14 @@ class BrazeCampaignSender:
                 recipients=[recipient],
                 trigger_properties=braze_trigger_properties,
             )
+            log_message = (
+                'Successfully sent Braze campaign message for assignment %s, recipient %s, '
+                'campaign %s, with trigger properties %s',
+            )
             logger.info(
-                'Successfully sent Braze campaign message for campaign %s with trigger properties %s',
+                log_message,
+                self.assignment.uuid,
+                recipient,
                 campaign_identifier,
                 braze_trigger_properties,
             )
@@ -186,12 +192,12 @@ class BrazeCampaignSender:
         Fetches the ``course_card_image`` property for this object's assignment and course.
         """
         image_url = get_card_image_url(self.course_metadata)
-        if not image_url:
-            logger.warning(
-                'Could not find course_card_image for %s with metadata %s',
-                self.assignment.uuid,
-                self.course_metadata,
-            )
+        logger.warning(
+            'Found course_card_image %s for assignment %s with metadata %s',
+            image_url,
+            self.assignment.uuid,
+            self.course_metadata,
+        )
         return image_url
 
     def get_learner_portal_link(self):
