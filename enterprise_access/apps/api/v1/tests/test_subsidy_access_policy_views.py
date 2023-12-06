@@ -347,7 +347,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         # Test the retrieve endpoint
         response = self.client.get(
             reverse('api:v1:subsidy-access-policies-list'),
-            {'enterprise_customer_uuid': str(self.enterprise_uuid)},
+            {'enterprise_customer_uuid': str(self.enterprise_uuid),
+             'active': True},
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         response_json = response.json()
@@ -413,6 +414,17 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             sorted(expected_results, key=sort_key),
             sorted(response_json['results'], key=sort_key),
         )
+
+        # Test the retrieve endpoint for inactive policies
+        response = self.client.get(
+            reverse('api:v1:subsidy-access-policies-list'),
+            {'enterprise_customer_uuid': str(self.enterprise_uuid),
+             'active': False},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response_json = response.json()
+        self.assertEqual(response_json['count'], 0)
+        self.assertEqual(response_json['results'], [])
 
     @ddt.data(
         {

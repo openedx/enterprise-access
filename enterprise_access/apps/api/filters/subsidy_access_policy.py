@@ -15,6 +15,10 @@ class SubsidyAccessPolicyFilter(HelpfulFilterSet):
         required=True,
         help_text=SubsidyAccessPolicy._meta.get_field('enterprise_customer_uuid').help_text,
     )
+    active = drf_filters.BooleanFilter(
+        required=False,
+        help_text=SubsidyAccessPolicy._meta.get_field('active').help_text,
+    )
 
     class Meta:
         model = SubsidyAccessPolicy
