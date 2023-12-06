@@ -49,6 +49,8 @@ class BrazeApiClient(BrazeClient):
     ):
         """
         Create a recipient object using the given user_email and lms_user_id.
+        Identifies the given email address with any existing Braze alias records
+        via the provided ``lms_user_id``.
         """
 
         user_alias = {

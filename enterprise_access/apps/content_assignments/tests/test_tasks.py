@@ -10,6 +10,7 @@ from django.conf import settings
 from requests.exceptions import HTTPError
 from rest_framework import status
 
+from enterprise_access.apps.api_client.braze_client import ENTERPRISE_BRAZE_ALIAS_LABEL
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
 from enterprise_access.apps.content_assignments.constants import (
     AssignmentActionErrors,
@@ -320,6 +321,12 @@ class TestBrazeEmailTasks(APITestWithMocks):
         if is_logistrated:
             expected_campaign_identifier = 'test-assignment-remind-post-logistration-campaign'
             expected_recipient = mock_braze_client.create_recipient.return_value
+            self.assertFalse(mock_braze_client.create_braze_alias.called)
+        else:
+            mock_braze_client.create_braze_alias.assert_called_once_with(
+                [self.assignment.learner_email],
+                ENTERPRISE_BRAZE_ALIAS_LABEL,
+            )
         mock_braze_client.send_campaign_message.assert_called_once_with(
             expected_campaign_identifier,
             recipients=[expected_recipient],

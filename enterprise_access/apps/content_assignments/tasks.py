@@ -9,7 +9,7 @@ from celery import shared_task
 from django.apps import apps
 from django.conf import settings
 
-from enterprise_access.apps.api_client.braze_client import BrazeApiClient
+from enterprise_access.apps.api_client.braze_client import ENTERPRISE_BRAZE_ALIAS_LABEL, BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments.content_metadata_api import (
     get_card_image_url,
@@ -86,6 +86,12 @@ class BrazeCampaignSender:
         if self.assignment.lms_user_id is None:
             recipient = self.braze_client.create_recipient_no_external_id(
                 self.assignment.learner_email,
+            )
+            # We need an alias record to exist in Braze before
+            # sending to any previously-unidentified users.
+            self.braze_client.create_braze_alias(
+                [self.assignment.learner_email],
+                ENTERPRISE_BRAZE_ALIAS_LABEL,
             )
         else:
             recipient = self.braze_client.create_recipient(
