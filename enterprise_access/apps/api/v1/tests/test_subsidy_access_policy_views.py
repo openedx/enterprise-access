@@ -424,14 +424,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         response_json = response.json()
         self.assertEqual(response_json['count'], 0)
-
-        expected_results = []
-
-        sort_key = itemgetter('spend_limit')
-        self.assertEqual(
-            sorted(expected_results, key=sort_key),
-            sorted(response_json['results'], key=sort_key),
-        )
+        
+        self.assertEqual(response_json['results'], [])
 
     @ddt.data(
         {
