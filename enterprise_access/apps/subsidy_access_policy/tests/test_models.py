@@ -125,6 +125,13 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             active=False,
         )
 
+    def tearDown(self):
+        """
+        Clears any cached data for the test policy instances between test runs.
+        """
+        super().tearDown()
+        request_cache(namespace=REQUEST_CACHE_NAMESPACE).clear()
+
     def test_can_not_create_parent_model_object(self, *args):
         """
         Verify that correct exception raised when we try to create object of SubsidyAccessPolicy
