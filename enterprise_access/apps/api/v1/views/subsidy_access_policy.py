@@ -3,6 +3,7 @@ REST API views for the subsidy_access_policy app.
 """
 import logging
 import os
+import time
 from collections import defaultdict
 from contextlib import suppress
 
@@ -795,21 +796,29 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
         content_price_cents = serializer.data['content_price_cents']
 
         try:
+            # TODO: remove the timing calls after slowness is identified
+            start_time = time.process_time()
             with policy.lock():
                 can_allocate, reason = policy.can_allocate(
                     len(learner_emails),
                     content_key,
                     content_price_cents,
                 )
+                can_allocate_time = time.process_time() - start_time
+                logger.info('allocate timing: can_allocate() %s', can_allocate_time)
                 if can_allocate:
                     allocation_result = policy.allocate(
                         learner_emails,
                         content_key,
                         content_price_cents,
                     )
+                    do_allocate_time = time.process_time() - can_allocate_time
+                    logger.info('allocate timing: do allocate() %s', do_allocate_time)
                     response_serializer = serializers.SubsidyAccessPolicyAllocationResponseSerializer(
                         allocation_result,
                     )
+                    serialization_time = time.process_time() - do_allocate_time
+                    logger.info('allocate timing: serialization %s', serialization_time)
                     return Response(response_serializer.data, status=status.HTTP_202_ACCEPTED)
                 else:
                     non_allocatable_reason_list = _get_reasons_for_no_redeemable_policies(
@@ -817,6 +826,11 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
                         {reason: [policy]}
                     )
                     raise AllocationRequestException(detail=non_allocatable_reason_list)
+            # we may not have hit the `if` block, so just get a time on the
+            # entire policy lock context.  We can infer the difference between
+            # that value and `serialization_time` if the latter is available in logs.
+            lock_release_time = time.process_time() - start_time
+            logger.info('allocate timing: policy lock release %s', lock_release_time)
         except SubsidyAccessPolicyLockAttemptFailed as exc:
             logger.exception(exc)
             raise SubsidyAccessPolicyLockedException() from exc
