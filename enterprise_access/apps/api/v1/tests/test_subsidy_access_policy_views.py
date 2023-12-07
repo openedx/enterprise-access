@@ -4,7 +4,7 @@ Tests for Enterprise Access Subsidy Access Policy app API v1 views.
 from datetime import datetime, timedelta
 from operator import itemgetter
 from unittest import mock
-from unittest.mock import patch
+from unittest.mock import call, patch
 from uuid import UUID, uuid4
 
 import ddt
@@ -425,6 +425,19 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         response_json = response.json()
         self.assertEqual(response_json['count'], 0)
         self.assertEqual(response_json['results'], [])
+
+        # Assert that we only call the subsidy service to list transaction
+        # aggregates once per policy
+        self.mock_subsidy_client.list_subsidy_transactions.assert_has_calls([
+            call(
+                subsidy_uuid=self.redeemable_policy.subsidy_uuid,
+                subsidy_access_policy_uuid=self.redeemable_policy.uuid
+            ),
+            call(
+                subsidy_uuid=self.non_redeemable_policy.subsidy_uuid,
+                subsidy_access_policy_uuid=self.non_redeemable_policy.uuid,
+            )
+        ])
 
     @ddt.data(
         {

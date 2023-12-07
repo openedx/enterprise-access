@@ -437,16 +437,34 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
     def aggregates_for_policy(self):
         """
-        Returns aggregate transaction data for this policy.
+        Returns aggregate transaction data for this policy. The result is cached via ``RequestCache``
+        for other use in the scope of a single request.
 
         Raises:
             requests.exceptions.HTTPError if the request to Subsidy API fails.
         """
+        _cache = request_cache(namespace=REQUEST_CACHE_NAMESPACE)
+        cache_key = versioned_cache_key('aggregates_for_policy', self.subsidy_uuid, self.uuid)
+
+        cached_response = _cache.get_cached_response(cache_key)
+        if cached_response.is_found:
+            logger.info(
+                'aggregates_for_policy cache hit: subsidy %s, policy %s',
+                self.subsidy_uuid, self.uuid,
+            )
+            return cached_response.value
+
         response_payload = self.subsidy_client.list_subsidy_transactions(
             subsidy_uuid=self.subsidy_uuid,
             subsidy_access_policy_uuid=self.uuid,
         )
-        return response_payload['aggregates']
+        result = response_payload['aggregates']
+        logger.info(
+            'aggregates_for_policy cache miss: subsidy %s, policy %s',
+            self.subsidy_uuid, self.uuid,
+        )
+        _cache.set(cache_key, result)
+        return result
 
     def transactions_for_learner(self, lms_user_id):
         """
