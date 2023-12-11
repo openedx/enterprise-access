@@ -35,8 +35,11 @@ from enterprise_access.apps.events.signals import SUBSIDY_REDEEMED
 from enterprise_access.apps.events.utils import send_subsidy_redemption_event_to_event_bus
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_CONTENT_NOT_IN_CATALOG,
+    REASON_LEARNER_ASSIGNMENT_CANCELLED,
+    REASON_LEARNER_ASSIGNMENT_FAILED,
     REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
     REASON_LEARNER_MAX_SPEND_REACHED,
+    REASON_LEARNER_NOT_ASSIGNED_CONTENT,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     REASON_POLICY_EXPIRED,
@@ -138,6 +141,9 @@ def _get_user_message_for_reason(reason_slug, enterprise_admin_users):
         REASON_LEARNER_MAX_SPEND_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
         REASON_LEARNER_MAX_ENROLLMENTS_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
         REASON_CONTENT_NOT_IN_CATALOG: MissingSubsidyAccessReasonUserMessages.CONTENT_NOT_IN_CATALOG,
+        REASON_LEARNER_NOT_ASSIGNED_CONTENT: MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_ASSIGNED_CONTENT,
+        REASON_LEARNER_ASSIGNMENT_CANCELLED: MissingSubsidyAccessReasonUserMessages.LEARNER_ASSIGNMENT_CANCELED,
+        REASON_LEARNER_ASSIGNMENT_FAILED: MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_ASSIGNED_CONTENT,
     }
 
     if reason_slug not in MISSING_SUBSIDY_ACCESS_POLICY_REASONS:

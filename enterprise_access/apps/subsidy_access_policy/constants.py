@@ -95,6 +95,10 @@ class MissingSubsidyAccessReasonUserMessages:
         "You can't enroll right now because this course is no longer available in your organization's catalog."
     LEARNER_NOT_IN_ENTERPRISE = \
         "You can't enroll right now because your account is no longer associated with the organization."
+    LEARNER_NOT_ASSIGNED_CONTENT = \
+        "You can't enroll right now because this course is not assigned to you."
+    LEARNER_ASSIGNMENT_CANCELED = \
+        "You can't enroll right now right now because your administrator canceled your course assignment."
 
 
 REASON_POLICY_EXPIRED = "policy_expired"
