@@ -24,6 +24,9 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
 from enterprise_access.apps.subsidy_access_policy.constants import (
+    REASON_LEARNER_ASSIGNMENT_CANCELLED,
+    REASON_LEARNER_ASSIGNMENT_FAILED,
+    REASON_LEARNER_NOT_ASSIGNED_CONTENT,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     AccessMethods,
     MissingSubsidyAccessReasonUserMessages,
@@ -2028,6 +2031,26 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
             content_quantity=-self.assigned_price_cents,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )
+        self.cancelled_content_key = 'edX+CancelledX'
+        self.cancelled_assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='alice@foo.com',
+            lms_user_id=self.user.lms_user_id,
+            content_key=self.cancelled_content_key,
+            content_title='CANCELLED ASSIGNMENT',
+            content_quantity=-self.assigned_price_cents,
+            state=LearnerContentAssignmentStateChoices.CANCELLED,
+        )
+        self.failed_content_key = 'edX+FailedX'
+        self.cancelled_assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='alice@foo.com',
+            lms_user_id=self.user.lms_user_id,
+            content_key=self.failed_content_key,
+            content_title='FAILED ASSIGNMENT',
+            content_quantity=-self.assigned_price_cents,
+            state=LearnerContentAssignmentStateChoices.ERRORED,
+        )
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     def test_can_redeem_assigned_policy(self, mock_transactions_cache_for_learner):
@@ -2076,3 +2099,90 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
             str(self.assigned_learner_credit_policy.uuid)
         assert response_list[0]["can_redeem"] is True
         assert len(response_list[0]["reasons"]) == 0
+
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
+    @ddt.data(
+        # Only a cancelled assignment exists.
+        {'has_cancelled_assignment': True, 'has_failed_assignment': False},
+        # Only an errored assignment exists.
+        {'has_cancelled_assignment': False, 'has_failed_assignment': True},
+        # No assignment exists for the learner/content pair to check.
+        {'has_cancelled_assignment': False, 'has_failed_assignment': True},
+    )
+    @ddt.unpack
+    def test_can_redeem_no_assignment_for_content(
+        self, mock_transactions_cache_for_learner, mock_lms_client,
+        has_cancelled_assignment, has_failed_assignment,
+    ):
+        """
+        Test that the can_redeem endpoint returns appropriate error reasons and user messages
+        when checking re-deemability of unassigned/cancelled/failed assigned content.
+        """
+        mock_transactions_cache_for_learner.return_value = {
+            'transactions': [],
+            'aggregates': {
+                'total_quantity': 0,
+            },
+        }
+        content_key_for_redemption = "course-v1:Unredeemable+Content+3T2020"
+        if has_cancelled_assignment:
+            content_key_for_redemption = f"course-v1:{self.cancelled_content_key}+1T2023"
+        elif has_failed_assignment:
+            content_key_for_redemption = f"course-v1:{self.failed_content_key}+1T2023"
+
+        content_key_for_redemption_metadata_price = 29900
+        mock_get_subsidy_content_data = {
+            "content_uuid": str(uuid4()),
+            "content_key": content_key_for_redemption,
+            "source": "edX",
+            "content_price": content_key_for_redemption_metadata_price,
+        }
+        self.mock_get_content_metadata.return_value = mock_get_subsidy_content_data
+
+        # It's an unredeemable response, so mock out some admin users to return
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
+            'slug': 'sluggy',
+            'admin_users': [{'email': 'edx@example.org'}],
+        }
+
+        with mock.patch(
+            'enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata',
+            side_effect=mock_get_subsidy_content_data,
+        ):
+            query_params = {'content_key': [content_key_for_redemption]}
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
+        assert response.status_code == status.HTTP_200_OK
+        response_list = response.json()
+
+        assert len(response_list) == 1
+
+        # Check the response for the first content_key given.
+        assert response_list[0]["content_key"] == content_key_for_redemption
+        assert response_list[0]["list_price"] is None
+        assert response_list[0]["redemptions"] == []
+        assert response_list[0]["has_successful_redemption"] is False
+        assert response_list[0]["redeemable_subsidy_access_policy"] is None
+        assert response_list[0]["can_redeem"] is False
+
+        expected_reason = REASON_LEARNER_NOT_ASSIGNED_CONTENT
+        expected_message = MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_ASSIGNED_CONTENT
+        if has_cancelled_assignment:
+            expected_reason = REASON_LEARNER_ASSIGNMENT_CANCELLED
+            expected_message = MissingSubsidyAccessReasonUserMessages.LEARNER_ASSIGNMENT_CANCELED
+        elif has_failed_assignment:
+            expected_reason = REASON_LEARNER_ASSIGNMENT_FAILED
+            expected_message = MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_ASSIGNED_CONTENT
+
+        expected_reasons = [
+            {
+                "reason": expected_reason,
+                "user_message": expected_message,
+                "metadata": {
+                    "enterprise_administrators": [{'email': 'edx@example.org'}],
+                },
+                "policy_uuids": [str(self.assigned_learner_credit_policy.uuid)],
+            },
+        ]
+        assert response_list[0]["reasons"] == expected_reasons
