@@ -20,7 +20,7 @@ def update_assignment_lms_user_id_from_user_email(sender, **kwargs):  # pylint: 
     user = kwargs['instance']
     if user.lms_user_id:
         assignments_to_update = LearnerContentAssignment.objects.filter(
-            learner_email=user.email,
+            learner_email__iexact=user.email,
             lms_user_id=None,
         )
 

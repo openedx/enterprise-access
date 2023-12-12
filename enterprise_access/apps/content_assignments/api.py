@@ -8,7 +8,8 @@ import logging
 from typing import Iterable
 
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
+from django.db.models.functions import Lower
 from opaque_keys import InvalidKeyError
 from opaque_keys.edx.keys import CourseKey
 from opaque_keys.edx.locator import CourseLocator
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 #   * Divide result by 10 in case we are off by an order of magnitude.
 #
 # Batch size derivation formula: ((1 MB) / (258 B)) / 10 ≈ 350
-USER_EMAIL_READ_BATCH_SIZE = 350
+USER_EMAIL_READ_BATCH_SIZE = 100
 
 
 class AllocationException(Exception):
@@ -392,14 +393,22 @@ def _try_populate_assignments_lms_user_id(assignments):
     for assignment_chunk in chunks(assignments_with_empty_lms_user_id, USER_EMAIL_READ_BATCH_SIZE):
         emails = [assignment.learner_email for assignment in assignment_chunk]
         # Construct a list of tuples containing (email, lms_user_id) for every assignment in this chunk.
-        email_lms_user_id = User.objects.filter(
-            email__in=emails,  # this is the part that could exceed max statement length if batch size is too large.
-            lms_user_id__isnull=False,
-        ).values_list('email', 'lms_user_id')
+        # this is the part that could exceed max statement length if batch size is too large.
+        # There's no case-insensitive IN query in Django, so we have to build up a big
+        # OR type of query.
+        email_filter = Q()
+        for assignment_email in emails:
+            email_filter |= Q(email__iexact=assignment_email)
+
+        email_lms_user_id = User.objects.filter(email_filter, lms_user_id__isnull=False).annotate(
+            email_lower=Lower('email'),
+        ).values_list('email_lower', 'lms_user_id')
+
         # dict() on a list of 2-tuples treats the first elements as keys and second elements as values.
         lms_user_id_by_email = dict(email_lms_user_id)
+
         for assignment in assignment_chunk:
-            lms_user_id = lms_user_id_by_email.get(assignment.learner_email)
+            lms_user_id = lms_user_id_by_email.get(assignment.learner_email.lower())
             if lms_user_id:
                 assignment.lms_user_id = lms_user_id
                 assignments_to_save.append(assignment)

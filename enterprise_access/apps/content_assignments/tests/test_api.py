@@ -467,7 +467,7 @@ class TestContentAssignmentApi(TestCase):
         }
 
         if user_exists:
-            UserFactory(username='alice', email=learner_email, lms_user_id=lms_user_id)
+            UserFactory(username='alice', email=learner_email.upper(), lms_user_id=lms_user_id)
 
         assignment = None
         if existing_assignment_state:
