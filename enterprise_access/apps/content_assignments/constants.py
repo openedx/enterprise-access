@@ -36,6 +36,7 @@ class AssignmentActions:
     LEARNER_LINKED = 'learner_linked'
     NOTIFIED = 'notified'
     REMINDED = 'reminded'
+    REDEEMED = 'redeemed'
     CANCELLED_NOTIFICATION = 'cancelled'
     AUTOMATIC_CANCELLATION_NOTIFICATION = 'automatic_cancellation'
 
@@ -43,6 +44,7 @@ class AssignmentActions:
         (LEARNER_LINKED, 'Learner linked to customer'),
         (NOTIFIED, 'Learner notified of assignment'),
         (REMINDED, 'Learner reminded about assignment'),
+        (REDEEMED, 'Learner redeemed the assigned content'),
         (CANCELLED_NOTIFICATION, 'Learner assignment cancelled'),
         (AUTOMATIC_CANCELLATION_NOTIFICATION, 'Learner assignment cancelled automatically'),
     )
@@ -55,10 +57,12 @@ class AssignmentActionErrors:
     """
     EMAIL_ERROR = 'email_error'
     INTERNAL_API_ERROR = 'internal_api_error'
+    ENROLLMENT_ERROR = 'enrollment_error'
 
     CHOICES = (
         (EMAIL_ERROR, 'Email error'),
         (INTERNAL_API_ERROR, 'Internal API error'),
+        (ENROLLMENT_ERROR, 'Enrollment error'),
     )
 
 
