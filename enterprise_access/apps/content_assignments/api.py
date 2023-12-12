@@ -44,6 +44,19 @@ class AllocationException(Exception):
     user_message = 'An error occurred during allocation'
 
 
+def _inexact_email_filter(emails, field_name='email'):
+    """
+    Helper that produces a Django Queryset filter
+    to query for records by an ``email`` feel
+    in a case-insensitive way.
+    """
+    email_filter = Q()
+    for email in emails:
+        kwargs = {f'{field_name}__iexact': email}
+        email_filter |= Q(**kwargs)
+    return email_filter
+
+
 def create_assignment_configuration(enterprise_customer_uuid, **kwargs):
     """
     Create a new ``AssignmentConfiguration`` for the given customer identifier.
@@ -67,6 +80,7 @@ def get_assignment_configuration(uuid):
 
 def get_assignments_for_configuration(
     assignment_configuration,
+    *args,
     **additional_filters,
 ):
     """
@@ -77,6 +91,7 @@ def get_assignments_for_configuration(
     queryset = LearnerContentAssignment.objects.select_related(
         'assignment_configuration',
     ).filter(
+        *args,
         assignment_configuration=assignment_configuration,
         **additional_filters,
     )
@@ -113,7 +128,7 @@ def get_assignments_for_admin(
     """
     return get_assignments_for_configuration(
         assignment_configuration,
-        learner_email__in=learner_emails,
+        _inexact_email_filter(learner_emails, field_name='learner_email'),
         content_key=content_key,
     )
 
@@ -270,7 +285,7 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
 
     # Split up the existing assignment records by state
     for assignment in existing_assignments:
-        learner_emails_with_existing_assignments.add(assignment.learner_email)
+        learner_emails_with_existing_assignments.add(assignment.learner_email.lower())
         if assignment.state in LearnerContentAssignmentStateChoices.REALLOCATE_STATES:
             assignment.content_quantity = content_quantity
             assignment.state = LearnerContentAssignmentStateChoices.ALLOCATED
@@ -297,9 +312,10 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
         )
 
         # Narrow down creation list of learner emails
-        learner_emails_for_assignment_creation = (
-            set(learner_emails_to_allocate) - learner_emails_with_existing_assignments
-        )
+        learner_emails_for_assignment_creation = {
+            email for email in learner_emails_to_allocate
+            if email.lower() not in learner_emails_with_existing_assignments
+        }
 
         # Initialize and save LearnerContentAssignment instances for each of them
         created_assignments = _create_new_assignments(
@@ -396,11 +412,10 @@ def _try_populate_assignments_lms_user_id(assignments):
         # this is the part that could exceed max statement length if batch size is too large.
         # There's no case-insensitive IN query in Django, so we have to build up a big
         # OR type of query.
-        email_filter = Q()
-        for assignment_email in emails:
-            email_filter |= Q(email__iexact=assignment_email)
-
-        email_lms_user_id = User.objects.filter(email_filter, lms_user_id__isnull=False).annotate(
+        email_lms_user_id = User.objects.filter(
+            _inexact_email_filter(emails, field_name='email'),
+            lms_user_id__isnull=False,
+        ).annotate(
             email_lower=Lower('email'),
         ).values_list('email_lower', 'lms_user_id')
 

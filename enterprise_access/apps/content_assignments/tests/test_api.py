@@ -234,8 +234,10 @@ class TestContentAssignmentApi(TestCase):
         content_price_cents = 100
         # add a duplicate email to the input list to ensure only one
         # allocation occurs.
+        # We throw a couple ALL UPPER CASE emails into the requested emails to allocate
+        # to verify that we filter for pre-existing assignments in a case-insensitive manner.
         learners_to_assign = [
-            f'{name}@foo.com' for name in ('alice', 'bob', 'carol', 'david', 'eugene', 'eugene', 'bob', 'eugene')
+            f'{name}@foo.com' for name in ('ALICE', 'bob', 'CAROL', 'david', 'eugene', 'eugene', 'bob', 'eugene')
         ]
         mock_get_and_cache_content_metadata.return_value = {
             'content_title': content_title,
@@ -251,7 +253,7 @@ class TestContentAssignmentApi(TestCase):
         )
         accepted_assignment = LearnerContentAssignmentFactory.create(
             assignment_configuration=self.assignment_configuration,
-            learner_email='bob@foo.com',
+            learner_email='BOB@foo.com',
             content_key=content_key,
             content_title=content_title,
             content_quantity=-content_price_cents,
