@@ -41,8 +41,8 @@ class SignalsTests(TestCase):
         test_user = UserFactory(email=TEST_EMAIL)
         # Simulate creating asignments for the test learner AFTER user creation.
         assignments_post_register = [
-            LearnerContentAssignmentFactory(learner_email=TEST_EMAIL, lms_user_id=None),
-            LearnerContentAssignmentFactory(learner_email=TEST_EMAIL, lms_user_id=None),
+            LearnerContentAssignmentFactory(learner_email=TEST_EMAIL.upper(), lms_user_id=None),
+            LearnerContentAssignmentFactory(learner_email=TEST_EMAIL.upper(), lms_user_id=None),
         ]
         # Simulate the learner logging in.
         test_user.last_login = timezone.now()
