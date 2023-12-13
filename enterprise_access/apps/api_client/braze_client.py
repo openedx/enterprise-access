@@ -68,6 +68,7 @@ class BrazeApiClient(BrazeClient):
         attributes = {
             "user_alias": user_alias,
             "email": user_email,
+            "is_enterprise_learner": True,
             "_update_existing_only": False,
         }
 
@@ -84,9 +85,13 @@ class BrazeApiClient(BrazeClient):
         Create a Braze recipient dict identified only by an alias based on their email.
         """
         return {
-            'attributes': {'email': user_email},
+            'attributes': {
+                'email': user_email,
+                'is_enterprise_learner': True,
+            },
             'user_alias': {
                 'alias_label': ENTERPRISE_BRAZE_ALIAS_LABEL,
                 'alias_name': user_email,
+
             },
         }
