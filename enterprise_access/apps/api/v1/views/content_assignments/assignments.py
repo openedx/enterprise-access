@@ -11,7 +11,7 @@ from rest_framework import authentication, mixins, permissions, status, viewsets
 from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.v1.views.utils import PaginationWithPageCount
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
-from enterprise_access.apps.core.constants import CONTENT_ASSIGNMENT_LEARNER_READ_PERMISSION
+from enterprise_access.apps.core.constants import (CONTENT_ASSIGNMENT_LEARNER_READ_PERMISSION, CONTENT_ASSIGNMENT_LEARNER_WRITE_PERMISSION)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ class LearnerContentAssignmentViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet,
+    mixins.UpdateModelMixin,
 ):
     """
     Viewset supporting all learner-facing CRUD operations on ``LearnerContentAssignment`` records.
@@ -43,6 +44,16 @@ class LearnerContentAssignmentViewSet(
     pagination_class = PaginationWithPageCount
     lookup_field = 'uuid'
 
+    def get_serializer_class(self):
+        """
+        Overrides the default behavior to return different serializers depending on the request action.
+        """
+
+        if self.action in ('update', 'partial_update'):
+            return serializers.LearnerContentAssignmentUpdateRequestSerializer
+        # list and retrieve use the default serializer.
+        return self.serializer_class
+    
     @property
     def requesting_user_email(self):
         """
@@ -98,3 +109,20 @@ class LearnerContentAssignmentViewSet(
         configuration.
         """
         return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        tags=[CONTENT_ASSIGNMENT_CRUD_API_TAG],
+        summary='Partially update (with a PATCH) a learner assignment by UUID.',
+        request=serializers.LearnerContentAssignmentUpdateRequestSerializer,
+        responses={
+            status.HTTP_200_OK: None,
+            status.HTTP_404_NOT_FOUND: None,
+            status.HTTP_422_UNPROCESSABLE_ENTITY: None,
+        },
+    )
+    @permission_required(CONTENT_ASSIGNMENT_LEARNER_WRITE_PERMISSION, fn=assignment_permission_fn)
+    def partial_update(self, request, *args, uuid=None, **kwargs):
+        """
+        Updates a single ``LearnerContentAssignment`` record by uuid.  All fields for the update are optional.
+        """
+        return super().partial_update(request, *args, uuid=uuid, **kwargs)

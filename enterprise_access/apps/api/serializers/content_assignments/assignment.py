@@ -94,6 +94,7 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
             'transaction_uuid',
             'last_notification_at',
             'actions',
+            'has_dismissed',
         ]
         read_only_fields = fields
 
@@ -258,3 +259,33 @@ class LearnerContentAssignmentWithContentMetadataResponseSerializer(LearnerConte
         if metadata_lookup and (assignment_content_metadata := metadata_lookup.get(obj.content_key)):
             return ContentMetadataForAssignmentSerializer(assignment_content_metadata).data
         return None
+
+class LearnerContentAssignmentUpdateRequestSerializer(serializers.ModelSerializer):
+    """
+    Request Serializer for PUT or PATCH requests to update a LearnerContentAssignment.
+
+    For views: LearnerContentAssignmentAdminViewSet.update and LearnerContentAssignmentAdminViewSet.partial_update.
+    """
+    class Meta:
+        model = LearnerContentAssignment
+        fields = (
+            'has_dismissed',
+        )
+
+    def validate(self, attrs):
+        """
+        Raises a ValidationError if any field not explicitly declared as a field in this serializer definition is
+        provided as input.
+        """
+        unknown = sorted(set(self.initial_data) - set(self.fields))
+        if unknown:
+            raise serializers.ValidationError("Field(s) are not updatable: {}".format(", ".join(unknown)))
+        return attrs
+
+    def to_representation(self, instance):
+        """
+        Once an LearnerContentAssignment has been updated, we want to serialize more fields from the instance than are
+        required in this, the input serializer.
+        """
+        read_serializer = LearnerContentAssignmentResponseSerializer(instance)
+        return read_serializer.data
