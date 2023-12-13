@@ -372,6 +372,25 @@ class LearnerContentAssignment(TimeStampedModel):
             traceback=format_traceback(exc),
         )
 
+    def add_successful_redeemed_action(self):
+        """
+        Adds a successful redeemed LearnerContentAssignmentAction for this assignment record.
+        """
+        return self.actions.create(
+            action_type=AssignmentActions.REDEEMED,
+            completed_at=timezone.now(),
+        )
+
+    def add_errored_redeemed_action(self, exc):
+        """
+        Adds an errored redeemed LearnerContentAssignmentAction for this assignment record.
+        """
+        return self.actions.create(
+            action_type=AssignmentActions.REDEEMED,
+            error_reason=AssignmentActionErrors.ENROLLMENT_ERROR,
+            traceback=format_traceback(exc),
+        )
+
     @classmethod
     def annotate_dynamic_fields_onto_queryset(cls, queryset):
         """

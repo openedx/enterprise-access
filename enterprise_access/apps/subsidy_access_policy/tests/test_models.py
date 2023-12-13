@@ -13,7 +13,11 @@ from django.core.cache import cache as django_cache
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 
-from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.content_assignments.constants import (
+    AssignmentActionErrors,
+    AssignmentActions,
+    LearnerContentAssignmentStateChoices
+)
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
 from enterprise_access.apps.subsidy_access_policy.constants import (
@@ -1022,13 +1026,24 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
                 **expected_redeem_payload,
             )
 
-        # Finally, assert that the assignment object was correctly updated to reflect the success/failure.
+        # assert that the assignment object was correctly updated to reflect the success/failure.
         if assignment:
             assignment.refresh_from_db()
             assert assignment.state == assignment_ending_state
-            # happy path should result in an updated transaction_uuid.
             if not redeem_raises:
+                # happy path should result in an updated transaction_uuid.
                 assert assignment.transaction_uuid == test_transaction_uuid
+
+                # happy path should also result in a null error_reason on the redeemed action.
+                redeemed_action = assignment.actions.last()
+                assert redeemed_action.action_type == AssignmentActions.REDEEMED
+                assert not redeemed_action.error_reason
+            if fail_subsidy_create_transaction:
+                # sad path should generate a failed redeememd action with populated error_reason and traceback.
+                redeemed_action = assignment.actions.last()
+                assert redeemed_action.action_type == AssignmentActions.REDEEMED
+                assert redeemed_action.error_reason == AssignmentActionErrors.ENROLLMENT_ERROR
+                assert redeemed_action.traceback
 
     def test_can_allocate_inactive_policy(self):
         """

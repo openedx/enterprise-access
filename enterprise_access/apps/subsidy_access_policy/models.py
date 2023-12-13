@@ -1202,15 +1202,17 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
                 metadata=metadata,
                 requested_price_cents=requested_price_cents,
             )
-        except SubsidyAPIHTTPError:
+        except SubsidyAPIHTTPError as exc:
             # Migrate assignment to errored if the subsidy API call errored.
             found_assignment.state = LearnerContentAssignmentStateChoices.ERRORED
             found_assignment.save()
+            found_assignment.add_errored_redeemed_action(exc)
             raise
         # Migrate assignment to accepted.
         found_assignment.state = LearnerContentAssignmentStateChoices.ACCEPTED
         found_assignment.transaction_uuid = ledger_transaction.get('uuid')  # uuid should always be in the API response.
         found_assignment.save()
+        found_assignment.add_successful_redeemed_action()
         return ledger_transaction
 
     def validate_requested_allocation_price(self, content_key, requested_price_cents):
