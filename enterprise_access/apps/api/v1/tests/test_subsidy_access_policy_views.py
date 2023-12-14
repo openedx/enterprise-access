@@ -2052,8 +2052,13 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
             state=LearnerContentAssignmentStateChoices.ERRORED,
         )
 
+    @mock.patch('enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
-    def test_can_redeem_assigned_policy(self, mock_transactions_cache_for_learner):
+    def test_can_redeem_assigned_policy(
+        self,
+        mock_transactions_cache_for_learner,
+        mock_content_get_and_cache_content_metadata
+    ):
         """
         Test that the can_redeem endpoint returns an assigned access policy when one is redeemable.
         """
@@ -2068,11 +2073,11 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
 
         mock_get_subsidy_content_data = {
             "content_uuid": str(uuid4()),
-            "content_key": test_content_key_1,
+            "content_key": self.content_key,
             "source": "edX",
             "content_price": test_content_key_1_metadata_price,
         }
-
+        mock_content_get_and_cache_content_metadata.return_value = mock_get_subsidy_content_data
         self.mock_get_content_metadata.return_value = mock_get_subsidy_content_data
 
         with mock.patch(
@@ -2125,16 +2130,19 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
                 'total_quantity': 0,
             },
         }
+        course_content_key = "Unredeemable+Content"
         content_key_for_redemption = "course-v1:Unredeemable+Content+3T2020"
         if has_cancelled_assignment:
+            course_content_key = self.cancelled_content_key
             content_key_for_redemption = f"course-v1:{self.cancelled_content_key}+1T2023"
         elif has_failed_assignment:
+            course_content_key = self.failed_content_key
             content_key_for_redemption = f"course-v1:{self.failed_content_key}+1T2023"
 
         content_key_for_redemption_metadata_price = 29900
         mock_get_subsidy_content_data = {
             "content_uuid": str(uuid4()),
-            "content_key": content_key_for_redemption,
+            "content_key": course_content_key,
             "source": "edX",
             "content_price": content_key_for_redemption_metadata_price,
         }
@@ -2146,9 +2154,11 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
             'admin_users': [{'email': 'edx@example.org'}],
         }
 
+        # @mock.patch('enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata')
+        # enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata
         with mock.patch(
-            'enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata',
-            side_effect=mock_get_subsidy_content_data,
+            'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
+            return_value=mock_get_subsidy_content_data,
         ):
             query_params = {'content_key': [content_key_for_redemption]}
             response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)

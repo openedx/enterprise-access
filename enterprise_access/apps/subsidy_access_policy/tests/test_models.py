@@ -764,7 +764,14 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
             autospec=True,
         )
         self.mock_assignments_api = self.assignments_api_patcher.start()
+
+        assign_get_content_metadata_patcher = patch(
+            'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata'
+        )
+        self.mock_assign_get_content_metadata = assign_get_content_metadata_patcher.start()
+
         self.addCleanup(self.assignments_api_patcher.stop)
+        self.addCleanup(assign_get_content_metadata_patcher.stop)
 
     @classmethod
     def setUpClass(cls):
@@ -879,6 +886,11 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         self.mock_get_content_metadata.return_value = {
             'content_price': 200,
         }
+        self.mock_assign_get_content_metadata.return_value = {
+            'content_price': 200,
+            'content_key': self.course_key,
+            'course_run_key': self.course_run_key,
+        }
         self.mock_subsidy_client.can_redeem.return_value = {'can_redeem': True, 'active': True}
         self.mock_transactions_cache_for_learner.return_value = {
             'transactions': [],
@@ -969,6 +981,11 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         self.mock_catalog_contains_content_key.return_value = True
         self.mock_get_content_metadata.return_value = {
             'content_price': 200,
+        }
+        self.mock_assign_get_content_metadata.return_value = {
+            'content_price': 200,
+            'content_key': self.course_key,
+            'course_run_key': self.course_run_key,
         }
         self.mock_subsidy_client.can_redeem.return_value = {'can_redeem': True, 'active': True}
         self.mock_transactions_cache_for_learner.return_value = {

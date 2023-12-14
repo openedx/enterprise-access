@@ -10,9 +10,6 @@ from typing import Iterable
 from django.db import transaction
 from django.db.models import Q, Sum
 from django.db.models.functions import Lower
-from opaque_keys import InvalidKeyError
-from opaque_keys.edx.keys import CourseKey
-from opaque_keys.edx.locator import CourseLocator
 
 from enterprise_access.apps.content_assignments.tasks import send_reminder_email_for_pending_assignment
 from enterprise_access.apps.core.models import User
@@ -133,22 +130,14 @@ def get_assignments_for_admin(
     )
 
 
-def _get_course_key_from_locator(course_locator: CourseLocator) -> str:
+def _normalize_course_key_from_metadata(assignment_configuration, content_key):
     """
-    Given a CourseLocator, construct a course key.
+    Helper method to take a course run key and normalize it into a coourse key
+    utilizing the enterprise subsidy content metadata summary endpoint.
     """
-    return f'{course_locator.org}+{course_locator.course}'
 
-
-def _normalize_course_key(course_key_str: str) -> str:
-    """
-    Given a course key string without without a namespace prefix, construct a course key without one.  This matches what
-    we expect to always be stored in assignments.
-    """
-    if course_key_str.startswith(CourseLocator.CANONICAL_NAMESPACE):
-        return course_key_str[len(CourseLocator.CANONICAL_NAMESPACE) + 1:]
-    else:
-        return course_key_str
+    content_summary = _get_content_summary(assignment_configuration, content_key)
+    return content_summary.get('content_key')
 
 
 def get_assignment_for_learner(
@@ -187,15 +176,10 @@ def get_assignment_for_learner(
         constraint across [assignment_configuration,lms_user_id,content_key].  BUT still technically possible if
         internal staff managed to create a duplicate assignment configuration for a single enterprise.
     """
-    content_key_to_match = None
-    # Whatever the requested content_key is, normalize it to a course with no namespace prefix.
-    try:
-        requested_course_run_locator = CourseKey.from_string(content_key)
-        # No exception raised, content_key represents a course run, so convert it to a course.
-        content_key_to_match = _get_course_key_from_locator(requested_course_run_locator)
-    except InvalidKeyError:
-        # Either the key was already a course key (no problem), or it was something else (weird).
-        content_key_to_match = _normalize_course_key(content_key)
+    content_key_to_match = _normalize_course_key_from_metadata(assignment_configuration, content_key)
+    if not content_key_to_match:
+        logger.error(f'Unable to normalize content_key {content_key} for {assignment_configuration} and {lms_user_id}')
+        return None
     queryset = LearnerContentAssignment.objects.select_related('assignment_configuration')
     try:
         return queryset.get(
@@ -371,14 +355,22 @@ def _update_and_refresh_assignments(assignment_records, fields_changed):
     )
 
 
-def _get_content_title(assignment_configuration, content_key):
+def _get_content_summary(assignment_configuration, content_key):
     """
-    Helper to retrieve (from cache) the title of a content_key'ed content_metadata
+    Helper to retrieve (from cache) the content metadata summary
     """
     content_metadata = get_and_cache_content_metadata(
         assignment_configuration.enterprise_customer_uuid,
         content_key,
     )
+    return content_metadata
+
+
+def _get_content_title(assignment_configuration, content_key):
+    """
+    Helper to retrieve (from cache) the title of a content_key'ed content_metadata
+    """
+    content_metadata = _get_content_summary(assignment_configuration, content_key)
     return content_metadata.get('content_title')
 
 

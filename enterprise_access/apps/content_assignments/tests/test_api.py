@@ -95,6 +95,10 @@ class TestContentAssignmentApi(TestCase):
                 sorted(expected_assignments[filter_state], key=lambda record: record.uuid),
             )
 
+    @mock.patch(
+        'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
+        return_value=mock.MagicMock(),
+    )
     @ddt.data(
         # Standard happy path.
         {
@@ -145,6 +149,7 @@ class TestContentAssignmentApi(TestCase):
     @ddt.unpack
     def test_get_assignment_for_learner(
         self,
+        mock_get_and_cache_content_metadata,
         assignment_content_key,
         assignment_lms_user_id,
         request_default_assignment_configuration,
@@ -155,6 +160,9 @@ class TestContentAssignmentApi(TestCase):
         """
         Test get_assignment_for_learner().
         """
+        mock_get_and_cache_content_metadata.return_value = {
+            'content_key': assignment_content_key,
+        }
         LearnerContentAssignmentFactory.create(
             assignment_configuration=self.assignment_configuration,
             content_key=assignment_content_key,
@@ -399,6 +407,7 @@ class TestContentAssignmentApi(TestCase):
             mock.call(assignment.uuid) for assignment in (allocated_assignment, errored_assignment)
         ], any_order=True)
 
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_email_for_new_assignment')
     @mock.patch(
         'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task'
     )
@@ -453,6 +462,7 @@ class TestContentAssignmentApi(TestCase):
         self,
         mock_get_and_cache_content_metadata,
         mock_pending_learner_task,
+        _mock_send_email_for_new_assignment,
         user_exists,
         existing_assignment_state,
     ):
@@ -465,7 +475,9 @@ class TestContentAssignmentApi(TestCase):
         learner_email = 'alice@foo.com'
         lms_user_id = 999
         mock_get_and_cache_content_metadata.return_value = {
-            'title': content_title,
+            'content_title': content_title,
+            'content_key': content_key,
+            'content_price': content_price_cents,
         }
 
         if user_exists:
