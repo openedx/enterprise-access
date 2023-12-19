@@ -152,3 +152,11 @@ certain actions related to a ``LearnerContentAssignment`` record in a distinct m
 
 Accepted November 2023, this ADR describes an approach to validating
 client-provided allocation prices.
+
+`<0015-expiration-improvements.rst>`_
+*******************************************
+*Feature: Assigned Learner Credit*
+
+Proposed December 2023, this ADR proposes an improved approach
+around assignment lifecycle and business logic related to expiration (and
+to a lesser degree, cancellation).
