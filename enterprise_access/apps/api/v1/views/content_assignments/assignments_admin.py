@@ -113,7 +113,7 @@ class LearnerContentAssignmentAdminViewSet(
         A base queryset to list or retrieve ``LearnerContentAssignment`` records.
         """
         queryset = LearnerContentAssignment.objects.all()
-        if self.action == 'list':
+        if self.action in ('list', 'remind_all', 'cancel_all'):
             # Limit results based on the requested assignment configuration.
             queryset = queryset.filter(
                 assignment_configuration__uuid=self.requested_assignment_configuration_uuid
@@ -124,12 +124,12 @@ class LearnerContentAssignmentAdminViewSet(
             pass
 
         # Annotate extra dynamic fields used by this viewset for DRF-supported ordering and filtering,
-        # but only for the list and retrieve actions:
+        # but only for the list, retrieve, and cancel/remind-all actions:
         # * learner_state
         # * learner_state_sort_order
         # * recent_action
         # * recent_action_time
-        if self.action in ('list', 'retrieve'):
+        if self.action in ('list', 'retrieve', 'remind_all', 'cancel_all'):
             queryset = LearnerContentAssignment.annotate_dynamic_fields_onto_queryset(
                 queryset,
             ).prefetch_related(
@@ -198,9 +198,11 @@ class LearnerContentAssignmentAdminViewSet(
         """
         Cancel a list of ``LearnerContentAssignment`` records by uuid.
 
+        ```
         Raises:
             404 if any of the assignments were not found
             422 if any of the assignments threw an error (not found or not cancelable)
+        ```
         """
         serializer = LearnerContentAssignmentActionRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -219,6 +221,7 @@ class LearnerContentAssignmentAdminViewSet(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
         summary='Cancel all assignments for the requested assignment configuration.',
         request=None,
+        filters=filters.LearnerContentAssignmentAdminFilter,
         responses={
             status.HTTP_202_ACCEPTED: None,
             status.HTTP_404_NOT_FOUND: None,
@@ -226,17 +229,19 @@ class LearnerContentAssignmentAdminViewSet(
         },
     )
     @permission_required(CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION, fn=assignment_admin_permission_fn)
-    @action(detail=False, methods=['post'], url_path='cancel-all')
+    @action(detail=False, methods=['post'], url_path='cancel-all', pagination_class=None)
     def cancel_all(self, request, *args, **kwargs):
         """
         Cancel all ``LearnerContentAssignment`` associated with the given assignment configuration.
+        Optionally, cancel only assignments matching the criteria of the provided query param filters.
 
+        ```
         Raises:
             404 if any of the assignments were not found
             422 if any of the assignments threw an error (not found or not cancelable)
+        ```
         """
         assignments = self.get_queryset().filter(
-            assignment_configuration__uuid=self.requested_assignment_configuration_uuid,
             state__in=LearnerContentAssignmentStateChoices.CANCELABLE_STATES,
         )
         if not assignments:
@@ -275,9 +280,11 @@ class LearnerContentAssignmentAdminViewSet(
         Send reminders to a list of learners with associated ``LearnerContentAssignment``
         record by list of uuids.
 
+        ```
         Raises:
             404 if any of the assignments were not found
             422 if any of the assignments threw an error (not found or not remindable)
+        ```
         """
         serializer = LearnerContentAssignmentActionRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -297,6 +304,7 @@ class LearnerContentAssignmentAdminViewSet(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
         summary='Remind all assignments for the given assignment configuration.',
         request=None,
+        filters=filters.LearnerContentAssignmentAdminFilter,
         responses={
             status.HTTP_202_ACCEPTED: None,
             status.HTTP_404_NOT_FOUND: None,
@@ -304,17 +312,19 @@ class LearnerContentAssignmentAdminViewSet(
         },
     )
     @permission_required(CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION, fn=assignment_admin_permission_fn)
-    @action(detail=False, methods=['post'], url_path='remind-all')
+    @action(detail=False, methods=['post'], url_path='remind-all', pagination_class=None)
     def remind_all(self, request, *args, **kwargs):
         """
         Send reminders for all assignments related to the given assignment configuration.
+        Optionally, remind only assignments matching the criteria of the provided query param filters.
 
+        ```
         Raises:
             404 if any of the assignments were not found
             422 if any of the assignments threw an error (not found or not remindable)
+        ```
         """
         assignments = self.get_queryset().filter(
-            assignment_configuration__uuid=self.requested_assignment_configuration_uuid,
             state__in=LearnerContentAssignmentStateChoices.REMINDABLE_STATES,
         )
         if not assignments:
