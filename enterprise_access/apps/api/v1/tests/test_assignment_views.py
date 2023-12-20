@@ -1100,3 +1100,143 @@ class TestRemindAllCancelAll(CRUDViewTestMixin, APITest):
             response = self.client.post(cancel_url)
 
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+
+class TestFilteredRemindAllCancelAll(CRUDViewTestMixin, APITest):
+    """
+    Tests for the remind-all and cancel-all actions when filters are provided in the request query.
+    """
+    def test_cancel_all_filter_multiple_learner_states(self):
+        """
+        Tests the cancel-all view with a provided filter on multiple learner_states.
+        """
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+        learner_states_to_query = [
+            AssignmentLearnerStates.WAITING,
+            AssignmentLearnerStates.FAILED,
+            AssignmentLearnerStates.NOTIFYING,
+        ]
+        cancel_kwargs = {
+            'assignment_configuration_uuid': str(self.assignment_configuration.uuid),
+        }
+        cancel_url = reverse('api:v1:admin-assignments-cancel-all', kwargs=cancel_kwargs)
+        learner_state_query_param_value = ",".join(learner_states_to_query)
+        cancel_url += f'?learner_state__in={learner_state_query_param_value}'
+
+        expected_cancelled_assignments = [
+            self.assignment_allocated_pre_link,
+            self.assignment_allocated_post_link,
+            self.requester_assignment_errored,
+        ]
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.tasks.send_cancel_email_for_pending_assignment'
+        ) as mock_cancel_task:
+            response = self.client.post(cancel_url)
+
+            assert response.status_code == status.HTTP_202_ACCEPTED
+            mock_cancel_task.delay.assert_has_calls(
+                [mock.call(assignment.uuid) for assignment in expected_cancelled_assignments],
+                any_order=True,
+            )
+            for assignment in expected_cancelled_assignments:
+                assignment.refresh_from_db()
+                self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
+
+    def test_cancel_all_filter_single_learner_state(self):
+        """
+        Tests the cancel-all view with a provided filter on a single learner_state.
+        """
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+        cancel_kwargs = {
+            'assignment_configuration_uuid': str(self.assignment_configuration.uuid),
+        }
+        cancel_url = reverse('api:v1:admin-assignments-cancel-all', kwargs=cancel_kwargs)
+        cancel_url += f'?learner_state={AssignmentLearnerStates.WAITING}'
+
+        expected_cancelled_assignments = [
+            self.assignment_allocated_post_link,
+        ]
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.tasks.send_cancel_email_for_pending_assignment'
+        ) as mock_cancel_task:
+            response = self.client.post(cancel_url)
+
+            assert response.status_code == status.HTTP_202_ACCEPTED
+            mock_cancel_task.delay.assert_has_calls(
+                [mock.call(assignment.uuid) for assignment in expected_cancelled_assignments],
+                any_order=True,
+            )
+            for assignment in expected_cancelled_assignments:
+                assignment.refresh_from_db()
+                self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
+
+    def test_remind_all_filter_multiple_learner_states(self):
+        """
+        Tests the remind-all view with a provided filter on multiple learner_states.
+        """
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+        learner_states_to_query = [
+            AssignmentLearnerStates.WAITING,
+            AssignmentLearnerStates.FAILED,
+            AssignmentLearnerStates.NOTIFYING,
+        ]
+        remind_kwargs = {
+            'assignment_configuration_uuid': str(self.assignment_configuration.uuid),
+        }
+        remind_url = reverse('api:v1:admin-assignments-remind-all', kwargs=remind_kwargs)
+        learner_state_query_param_value = ",".join(learner_states_to_query)
+        remind_url += f'?learner_state__in={learner_state_query_param_value}'
+
+        expected_reminded_assignments = [
+            self.assignment_allocated_pre_link,
+            self.assignment_allocated_post_link,
+        ]
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.api.send_reminder_email_for_pending_assignment'
+        ) as mock_remind_task:
+            response = self.client.post(remind_url)
+
+            assert response.status_code == status.HTTP_202_ACCEPTED
+            mock_remind_task.delay.assert_has_calls(
+                [mock.call(assignment.uuid) for assignment in expected_reminded_assignments],
+                any_order=True,
+            )
+            for assignment in expected_reminded_assignments:
+                assignment.refresh_from_db()
+                self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+
+    def test_remind_all_filter_single_learner_state(self):
+        """
+        Tests the remind-all view with a provided filter on a single learner_state.
+        """
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+        remind_kwargs = {
+            'assignment_configuration_uuid': str(self.assignment_configuration.uuid),
+        }
+        remind_url = reverse('api:v1:admin-assignments-remind-all', kwargs=remind_kwargs)
+        remind_url += f'?learner_state={AssignmentLearnerStates.WAITING}'
+
+        expected_reminded_assignments = [
+            self.assignment_allocated_post_link,
+        ]
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.api.send_reminder_email_for_pending_assignment'
+        ) as mock_remind_task:
+            response = self.client.post(remind_url)
+
+            assert response.status_code == status.HTTP_202_ACCEPTED
+            mock_remind_task.delay.assert_has_calls(
+                [mock.call(assignment.uuid) for assignment in expected_reminded_assignments],
+                any_order=True,
+            )
+            for assignment in expected_reminded_assignments:
+                assignment.refresh_from_db()
+                self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
