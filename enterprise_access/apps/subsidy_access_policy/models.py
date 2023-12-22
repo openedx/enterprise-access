@@ -1278,6 +1278,13 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             self.subsidy_balance(),
             positive_total_price_cents,
         ):
+            logger.info(
+                f'Content would exceed limit:'
+                f'subsidy_uuid: {self.subsidy_uuid}'
+                f'total_allocated_and_spent_centers: {total_allocated_and_spent_cents},'
+                f'subsidy_balance: {self.subsidy_balance()},'
+                f'positive_total_price_cents: {positive_total_price_cents}'
+            )
             return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
 
         # Lastly, use all of these pieces to ensure that the assignments to potentially
@@ -1287,6 +1294,13 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             self.spend_limit,
             positive_total_price_cents,
         ):
+            logger.info(
+                f'Content would exceed limit:'
+                f'subsidy_uuid: {self.subsidy_uuid}'
+                f'total_allocated_and_spent_centers: {total_allocated_and_spent_cents},'
+                f'spend_limit: {self.spend_limit},'
+                f'positive_total_price_cents: {positive_total_price_cents}'
+            )
             return (False, REASON_POLICY_SPEND_LIMIT_REACHED)
 
         return (True, None)
