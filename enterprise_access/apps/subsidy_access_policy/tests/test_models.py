@@ -1136,7 +1136,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
             },
         }
         self.mock_subsidy_client.list_subsidy_transactions.return_value = transactions_for_policy
-        self.mock_assignments_api.get_allocated_quantity_for_configuration.return_value = -500
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.return_value = -1000
 
         # The balance of the subsidy is just a bit less
         # than the amount to potentially allocated, e.g.

@@ -714,10 +714,11 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'admin_users': [{'email': 'admin@example.com'}],
         }
 
-        subsidy_balance = 300
+        subsidy_balance = 1
         mock_subsidy_balance.return_value = subsidy_balance
+        # NOTE johnnagro this figure is no longer used in the math
         mock_aggregates_for_policy.return_value = {
-            'total_quantity': (subsidy_balance - 1) * -1,
+            'total_quantity': 0,
         }
 
         allocate_url = _allocation_url(self.assigned_learner_credit_policy.uuid)
@@ -795,10 +796,11 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'admin_users': [{'email': 'admin@example.com'}],
         }
 
-        subsidy_balance = 300
+        subsidy_balance = 1
         mock_subsidy_balance.return_value = subsidy_balance
+        # TODO johnnagro this figure is no longer used in the math
         mock_aggregates_for_policy.return_value = {
-            'total_quantity': (subsidy_balance - 1) * -1,
+            'total_quantity': 0,
         }
 
         allocate_url = _allocation_url(self.assigned_learner_credit_policy.uuid)
