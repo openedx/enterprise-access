@@ -1273,11 +1273,20 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
 
         # Use all of these pieces to ensure that the assignments to potentially
         # allocate won't exceed the remaining balance of the related subsidy.
+        subsidy_balance = self.subsidy_balance()
         if self.content_would_exceed_limit(
             total_allocated_and_spent_cents,
-            self.subsidy_balance(),
+            subsidy_balance,
             positive_total_price_cents,
         ):
+            logger.info(
+                f'content_would_exceed_limit function: '
+                f'subsidy_uuid={self.subsidy_uuid}, '
+                f'policy_uuid={self.uuid},'
+                f'total_allocated_and_spent_centers={total_allocated_and_spent_cents}, '
+                f'subsidy_balance={subsidy_balance}, '
+                f'positive_total_price_cents={positive_total_price_cents}, '
+            )
             return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
 
         # Lastly, use all of these pieces to ensure that the assignments to potentially
@@ -1287,6 +1296,14 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             self.spend_limit,
             positive_total_price_cents,
         ):
+            logger.info(
+                f'content_would_exceed_limit function: '
+                f'subsidy_uuid={self.subsidy_uuid}, '
+                f'policy_uuid={self.uuid}, '
+                f'total_allocated_and_spent_centers={total_allocated_and_spent_cents}, '
+                f'spend_limit={self.spend_limit}, '
+                f'positive_total_price_cents={positive_total_price_cents}, '
+            )
             return (False, REASON_POLICY_SPEND_LIMIT_REACHED)
 
         return (True, None)
