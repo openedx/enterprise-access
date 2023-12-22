@@ -1275,7 +1275,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         # allocate won't exceed the remaining balance of the related subsidy.
         subsidy_balance = self.subsidy_balance()
         if self.content_would_exceed_limit(
-            total_allocated_and_spent_cents,
+            total_allocated_assignments_cents,
             subsidy_balance,
             positive_total_price_cents,
         ):
@@ -1283,7 +1283,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
                 f'content_would_exceed_limit function: '
                 f'subsidy_uuid={self.subsidy_uuid}, '
                 f'policy_uuid={self.uuid},'
-                f'total_allocated_and_spent_centers={total_allocated_and_spent_cents}, '
+                f'total_allocated_assignments_cents={total_allocated_assignments_cents}, '
                 f'subsidy_balance={subsidy_balance}, '
                 f'positive_total_price_cents={positive_total_price_cents}, '
             )
