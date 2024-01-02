@@ -237,13 +237,14 @@ class LearnerContentAssignmentAdminViewSet(
 
         ```
         Raises:
-            404 if any of the assignments were not found
+            404 if no cancelable assignments were found
             422 if any of the assignments threw an error (not found or not cancelable)
         ```
         """
-        assignments = self.get_queryset().filter(
+        base_queryset = self.get_queryset().filter(
             state__in=LearnerContentAssignmentStateChoices.CANCELABLE_STATES,
         )
+        assignments = self.filter_queryset(base_queryset)
         if not assignments:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -320,13 +321,14 @@ class LearnerContentAssignmentAdminViewSet(
 
         ```
         Raises:
-            404 if any of the assignments were not found
+            404 if no cancelable assignments were found
             422 if any of the assignments threw an error (not found or not remindable)
         ```
         """
-        assignments = self.get_queryset().filter(
+        base_queryset = self.get_queryset().filter(
             state__in=LearnerContentAssignmentStateChoices.REMINDABLE_STATES,
         )
+        assignments = self.filter_queryset(base_queryset)
         if not assignments:
             return Response(status=status.HTTP_404_NOT_FOUND)
 

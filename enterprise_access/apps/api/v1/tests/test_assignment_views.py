@@ -1140,6 +1140,7 @@ class TestFilteredRemindAllCancelAll(CRUDViewTestMixin, APITest):
                 [mock.call(assignment.uuid) for assignment in expected_cancelled_assignments],
                 any_order=True,
             )
+            assert mock_cancel_task.delay.call_count == len(expected_cancelled_assignments)
             for assignment in expected_cancelled_assignments:
                 assignment.refresh_from_db()
                 self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
@@ -1170,6 +1171,7 @@ class TestFilteredRemindAllCancelAll(CRUDViewTestMixin, APITest):
                 [mock.call(assignment.uuid) for assignment in expected_cancelled_assignments],
                 any_order=True,
             )
+            assert mock_cancel_task.delay.call_count == len(expected_cancelled_assignments)
             for assignment in expected_cancelled_assignments:
                 assignment.refresh_from_db()
                 self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
@@ -1207,6 +1209,7 @@ class TestFilteredRemindAllCancelAll(CRUDViewTestMixin, APITest):
                 [mock.call(assignment.uuid) for assignment in expected_reminded_assignments],
                 any_order=True,
             )
+            assert mock_remind_task.delay.call_count == len(expected_reminded_assignments)
             for assignment in expected_reminded_assignments:
                 assignment.refresh_from_db()
                 self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
@@ -1237,6 +1240,7 @@ class TestFilteredRemindAllCancelAll(CRUDViewTestMixin, APITest):
                 [mock.call(assignment.uuid) for assignment in expected_reminded_assignments],
                 any_order=True,
             )
+            assert mock_remind_task.delay.call_count == len(expected_reminded_assignments)
             for assignment in expected_reminded_assignments:
                 assignment.refresh_from_db()
                 self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
