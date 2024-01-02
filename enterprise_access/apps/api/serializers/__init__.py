@@ -4,7 +4,8 @@ API serializers module.
 from .content_assignments.assignment import (
     ContentMetadataForAssignmentSerializer,
     LearnerContentAssignmentAdminResponseSerializer,
-    LearnerContentAssignmentResponseSerializer
+    LearnerContentAssignmentResponseSerializer,
+    LearnerContentAssignmentUpdateRequestSerializer,
 )
 from .content_assignments.assignment_configuration import (
     AssignmentConfigurationCreateRequestSerializer,

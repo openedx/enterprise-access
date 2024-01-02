@@ -543,7 +543,9 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
             return []
 
         assignments = obj.assignment_configuration.assignments.prefetch_related('actions').filter(
-            lms_user_id=self.context.get('lms_user_id')
+            lms_user_id=self.context.get('lms_user_id'),
+            # only return assignments that have not been dismissed
+            has_dismissed=False
         )
         content_metadata_lookup = get_content_metadata_for_assignments(obj.catalog_uuid, assignments)
         context = {'content_metadata': content_metadata_lookup}

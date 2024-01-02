@@ -184,6 +184,10 @@ class LearnerContentAssignment(TimeStampedModel):
             "been notified."
         ),
     )
+    has_dismissed = models.BooleanField(
+        default=False,
+        help_text='True if the learner dismissed alert for cancelled or expired assignments. Default to false',
+    )
     history = HistoricalRecords()
 
     def __str__(self):

@@ -330,6 +330,15 @@ rules.add_perm(
     ),
 )
 
+rules.add_perm(
+    constants.CONTENT_ASSIGNMENT_LEARNER_WRITE_PERMISSION,
+    (
+        has_content_assignments_operator_access |
+        has_content_assignments_admin_access |
+        has_content_assignments_learner_access
+    ),
+)
+
 
 # Grants permission to allocate assignments from a policy if the user is a content assignment configuration admin.
 rules.add_perm(
