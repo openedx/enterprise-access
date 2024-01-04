@@ -24,7 +24,7 @@ async-timeout==4.0.3
     # via
     #   -r requirements/validation.txt
     #   redis
-attrs==23.1.0
+attrs==23.2.0
     # via
     #   -r requirements/validation.txt
     #   jsonschema
@@ -124,7 +124,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/validation.txt
     #   coreapi
-coverage[toml]==7.3.4
+coverage[toml]==7.4.0
     # via
     #   -r requirements/validation.txt
     #   coverage
@@ -134,7 +134,7 @@ cryptography==41.0.7
     #   -r requirements/validation.txt
     #   pyjwt
     #   social-auth-core
-ddt==1.7.0
+ddt==1.7.1
     # via -r requirements/validation.txt
 defusedxml==0.8.0rc2
     # via
@@ -151,7 +151,7 @@ distlib==0.3.8
     # via
     #   -r requirements/validation.txt
     #   virtualenv
-django==4.2.8
+django==4.2.9
     # via
     #   -r requirements/validation.txt
     #   django-celery-results
@@ -252,7 +252,7 @@ edx-django-utils==5.9.0
     #   -r requirements/validation.txt
     #   edx-drf-extensions
     #   edx-rest-api-client
-edx-drf-extensions==9.0.1
+edx-drf-extensions==9.1.1
     # via
     #   -r requirements/validation.txt
     #   edx-rbac
@@ -280,7 +280,7 @@ exceptiongroup==1.2.0
     #   pytest
 factory-boy==3.3.0
     # via -r requirements/validation.txt
-faker==21.0.0
+faker==22.0.0
     # via
     #   -r requirements/validation.txt
     #   factory-boy
@@ -297,7 +297,7 @@ idna==3.6
     # via
     #   -r requirements/validation.txt
     #   requests
-importlib-metadata==7.0.0
+importlib-metadata==7.0.1
     # via
     #   -r requirements/pip-tools.txt
     #   -r requirements/validation.txt
@@ -347,7 +347,7 @@ jsonschema==4.20.0
     # via
     #   -r requirements/validation.txt
     #   drf-spectacular
-jsonschema-specifications==2023.11.2
+jsonschema-specifications==2023.12.1
     # via
     #   -r requirements/validation.txt
     #   jsonschema
@@ -359,7 +359,7 @@ kombu==5.3.4
     # via
     #   -r requirements/validation.txt
     #   celery
-lxml==4.9.4
+lxml==5.0.0
     # via edx-i18n-tools
 markdown-it-py==3.0.0
     # via
@@ -518,7 +518,7 @@ pyproject-hooks==1.0.0
     # via
     #   -r requirements/pip-tools.txt
     #   build
-pytest==7.4.3
+pytest==7.4.4
     # via
     #   -r requirements/validation.txt
     #   pytest-cov
@@ -593,7 +593,7 @@ rich==13.7.0
     # via
     #   -r requirements/validation.txt
     #   twine
-rpds-py==0.15.2
+rpds-py==0.16.2
     # via
     #   -r requirements/validation.txt
     #   jsonschema
@@ -680,7 +680,7 @@ typing-extensions==4.9.0
     #   kombu
     #   pylint
     #   rich
-tzdata==2023.3
+tzdata==2023.4
     # via
     #   -r requirements/validation.txt
     #   backports-zoneinfo
