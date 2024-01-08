@@ -91,9 +91,20 @@ class Command(BaseCommand):
                 )
 
                 for assignment in assignments:
+                    enrollment_end_date = None
                     content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
-                    enrollment_end_date_str = content_metadata.get('normalized_metadata', {}).get('enroll_by_date')
-                    enrollment_end_date = self.to_datetime(enrollment_end_date_str)
+                    if content_metadata is not None:
+                        normalized_metadata = content_metadata.get('normalized_metadata') or {}
+                        enrollment_end_date_str = normalized_metadata.get('enroll_by_date')
+                        try:
+                            enrollment_end_date = self.to_datetime(enrollment_end_date_str)
+                        except ValueError:
+                            logger.warning(
+                                '%s Bad datetime format for %s, value: %s',
+                                log_prefix,
+                                assignment.content_key,
+                                enrollment_end_date_str,
+                            )
 
                     logger.info(
                         '%s AssignmentUUID: [%s], ContentKey: [%s], AssignmentExpiry: [%s], EnrollmentEnd: [%s], SubsidyExpiry: [%s]',  # nopep8 pylint: disable=line-too-long
