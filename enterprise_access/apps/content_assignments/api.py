@@ -10,14 +10,25 @@ from typing import Iterable
 from django.db import transaction
 from django.db.models import Q, Sum
 from django.db.models.functions import Lower
+from django.utils.timezone import now, timedelta
+from pytz import UTC
 
 from enterprise_access.apps.content_assignments.tasks import send_reminder_email_for_pending_assignment
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
 
-from .constants import LearnerContentAssignmentStateChoices
+from .constants import (
+    NUM_DAYS_BEFORE_AUTO_CANCELLATION,
+    AssignmentAutomaticExpiredReason,
+    LearnerContentAssignmentStateChoices
+)
+from .content_metadata_api import parse_datetime_string
 from .models import AssignmentConfiguration, LearnerContentAssignment
-from .tasks import create_pending_enterprise_learner_for_assignment_task, send_email_for_new_assignment
+from .tasks import (
+    create_pending_enterprise_learner_for_assignment_task,
+    send_assignment_automatically_expired_email,
+    send_email_for_new_assignment
+)
 from .utils import chunks
 
 logger = logging.getLogger(__name__)
@@ -548,3 +559,76 @@ def remind_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
         'reminded': list(set(reminded_assignments)),
         'non_remindable': list(non_remindable_assignments),
     }
+
+
+def expire_assignment(assignment_configuration, assignment, content_metadata, modify_assignment=True):
+    """
+    If applicable, retires the given assignment, returning an expiration reason.
+    Otherwise, returns `None` as a reason.
+    """
+    subsidy_access_policy = assignment_configuration.subsidy_access_policy
+    subsidy_expiration_datetime = parse_datetime_string(subsidy_access_policy.subsidy_expiration_datetime)
+    if subsidy_expiration_datetime:
+        subsidy_expiration_datetime = subsidy_expiration_datetime.replace(tzinfo=UTC)
+
+    enrollment_end_date = _get_enrollment_end_date(content_metadata)
+    auto_cancellation_date = assignment.created + timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION)
+
+    message = (
+        'Checking expirability for AssignmentUUID: [%s], ContentKey: [%s], AssignmentExpiry: [%s], '
+        'EnrollmentEnd: [%s], SubsidyExpiry: [%s]',
+    )
+    logger.info(
+        message,
+        assignment.uuid,
+        assignment.content_key,
+        auto_cancellation_date,
+        enrollment_end_date,
+        subsidy_expiration_datetime,
+    )
+
+    assignment_expiry_reason = None
+    current_date = now()
+
+    if current_date > auto_cancellation_date:
+        assignment_expiry_reason = AssignmentAutomaticExpiredReason.NIENTY_DAYS_PASSED
+    elif enrollment_end_date and enrollment_end_date < current_date:
+        assignment_expiry_reason = AssignmentAutomaticExpiredReason.ENROLLMENT_DATE_PASSED
+    elif subsidy_expiration_datetime and subsidy_expiration_datetime < current_date:
+        assignment_expiry_reason = AssignmentAutomaticExpiredReason.SUBSIDY_EXPIRED
+
+    if assignment_expiry_reason:
+        logger.info(
+            'Assignment should be expired. AssignmentConfigUUID: [%s], AssignmentUUID: [%s], Reason: [%s]',
+            assignment_configuration.uuid,
+            assignment.uuid,
+            assignment_expiry_reason,
+        )
+
+        if modify_assignment:
+            logger.info('Modifying assignment %s to expired', assignment.uuid)
+            assignment.state = LearnerContentAssignmentStateChoices.CANCELLED
+            assignment.save()
+            send_assignment_automatically_expired_email.delay(assignment.uuid)
+
+    return assignment_expiry_reason
+
+
+def _get_enrollment_end_date(content_metadata):
+    """
+    Helper to get the enrollment end date from a content metadata record.
+    """
+    if content_metadata is not None:
+        normalized_metadata = content_metadata.get('normalized_metadata') or {}
+        enrollment_end_date_str = normalized_metadata.get('enroll_by_date')
+        try:
+            datetime_obj = parse_datetime_string(enrollment_end_date_str)
+            if datetime_obj:
+                return datetime_obj.replace(tzinfo=UTC)
+        except ValueError:
+            logger.warning(
+                'Bad datetime format for %s, value: %s',
+                content_metadata.get('key'),
+                enrollment_end_date_str,
+            )
+    return None
