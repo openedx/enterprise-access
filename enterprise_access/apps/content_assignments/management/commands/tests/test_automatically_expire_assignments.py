@@ -197,6 +197,12 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
                     'content_price': 123,
                 },
             },
+            'edX+edXPrivacy101': {
+                'normalized_metadata': {
+                    # test that some other datetime format is handled gracefully
+                    'enroll_by_date': enrollment_end.strftime("%Y-%m-%d %H:%M"),
+                }
+            }
         }
         mock_path = COMMAND_PATH + '.logger.info'
 
