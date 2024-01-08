@@ -53,14 +53,24 @@ def get_human_readable_date(datetime_string, output_pattern='%b %d, %Y'):
     Given a datetime string value from some content metadata record,
     convert it to the provided pattern.
     """
+    datetime_obj = parse_datetime_string(datetime_string)
+    if datetime_obj:
+        return datetime_obj.strftime(output_pattern)
+    return None
+
+
+def parse_datetime_string(datetime_string):
+    """
+    Given a datetime string value from some content metadata record,
+    parse it into a datetime object.
+    """
     if not datetime_string:
         return None
 
     last_exception = None
     for input_pattern in DATE_INPUT_PATTERNS:
         try:
-            datetime_obj = datetime.strptime(datetime_string, input_pattern)
-            return datetime_obj.strftime(output_pattern)
+            return datetime.strptime(datetime_string, input_pattern)
         except ValueError as exc:
             last_exception = exc
 

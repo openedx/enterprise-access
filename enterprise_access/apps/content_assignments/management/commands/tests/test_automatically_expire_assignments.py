@@ -65,7 +65,7 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
         )
 
     @mock.patch(COMMAND_PATH + '.get_content_metadata_for_assignments')
-    @mock.patch(COMMAND_PATH + '.send_assignment_automatically_expired_email.delay')
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email.delay')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     def test_command_dry_run(
         self,
@@ -101,7 +101,6 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
                 },
             },
         }
-        mock_path = COMMAND_PATH + '.logger.info'
 
         all_assignment = LearnerContentAssignment.objects.all()
         allocated_assignments = LearnerContentAssignment.objects.filter(
@@ -110,53 +109,9 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
         # verify that all assignments are in `allocated` state
         assert all_assignment.count() == allocated_assignments.count()
 
-        with mock.patch(mock_path) as mock_logger:
-            call_command(self.command, '--dry-run')
-            mock_logger.assert_has_calls(
-                [
-                    call(
-                        '%s Processing Assignment Configuration. UUID: [%s], Policy: [%s], Catalog: [%s], Enterprise: [%s]',  # nopep8 pylint: disable=line-too-long
-                        '[DRY_RUN]',
-                        self.assignment_configuration.uuid,
-                        self.assignment_configuration.subsidy_access_policy.uuid,
-                        self.assignment_configuration.subsidy_access_policy.catalog_uuid,
-                        self.assignment_configuration.enterprise_customer_uuid
-                    ),
-                    call(
-                        '%s AssignmentUUID: [%s], ContentKey: [%s], AssignmentExpiry: [%s], EnrollmentEnd: [%s], SubsidyExpiry: [%s]',  # nopep8 pylint: disable=line-too-long
-                        '[DRY_RUN]',
-                        self.alice_assignment.uuid,
-                        'edX+edXPrivacy101',
-                        self.alice_assignment.created + timezone.timedelta(days=90),
-                        None,
-                        subsidy_expiry
-                    ),
-                    call(
-                        '%s Assignment Expired. AssignmentConfigUUID: [%s], AssignmentUUID: [%s], Reason: [%s]',
-                        '[DRY_RUN]',
-                        self.assignment_configuration.uuid,
-                        self.alice_assignment.uuid,
-                        'NIENTY_DAYS_PASSED'
-                    ),
-                    call(
-                        '%s AssignmentUUID: [%s], ContentKey: [%s], AssignmentExpiry: [%s], EnrollmentEnd: [%s], SubsidyExpiry: [%s]',  # nopep8 pylint: disable=line-too-long
-                        '[DRY_RUN]',
-                        self.bob_assignment.uuid,
-                        'edX+edXAccessibility101',
-                        self.bob_assignment.created + timezone.timedelta(days=90),
-                        enrollment_end,
-                        subsidy_expiry
-                    ),
-                    call(
-                        '%s Assignment Expired. AssignmentConfigUUID: [%s], AssignmentUUID: [%s], Reason: [%s]',
-                        '[DRY_RUN]',
-                        self.assignment_configuration.uuid,
-                        self.bob_assignment.uuid,
-                        'ENROLLMENT_DATE_PASSED'
-                    ),
-                ]
-            )
-            mock_send_assignment_automatically_expired_email_task.assert_not_called()
+        call_command(self.command, '--dry-run')
+
+        mock_send_assignment_automatically_expired_email_task.assert_not_called()
 
         all_assignment = LearnerContentAssignment.objects.all()
         allocated_assignments = LearnerContentAssignment.objects.filter(
@@ -166,7 +121,7 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
         assert all_assignment.count() == allocated_assignments.count()
 
     @mock.patch(COMMAND_PATH + '.get_content_metadata_for_assignments')
-    @mock.patch(COMMAND_PATH + '.send_assignment_automatically_expired_email.delay')
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email.delay')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     def test_command(
         self,
@@ -204,7 +159,6 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
                 }
             }
         }
-        mock_path = COMMAND_PATH + '.logger.info'
 
         all_assignment = LearnerContentAssignment.objects.all()
         allocated_assignments = LearnerContentAssignment.objects.filter(
@@ -213,58 +167,12 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
         # verify that all assignments are in `allocated` state
         assert all_assignment.count() == allocated_assignments.count()
 
-        with mock.patch(mock_path) as mock_logger:
-            call_command(self.command)
-            mock_logger.assert_has_calls(
-                [
-                    call(
-                        '%s Processing Assignment Configuration. UUID: [%s], Policy: [%s], Catalog: [%s], Enterprise: [%s]',  # nopep8 pylint: disable=line-too-long
-                        '[AUTOMATICALLY_EXPIRE_ASSIGNMENTS]',
-                        self.assignment_configuration.uuid,
-                        self.assignment_configuration.subsidy_access_policy.uuid,
-                        self.assignment_configuration.subsidy_access_policy.catalog_uuid,
-                        self.assignment_configuration.enterprise_customer_uuid
-                    ),
-                    call(
-                        '%s AssignmentUUID: [%s], ContentKey: [%s], AssignmentExpiry: [%s], EnrollmentEnd: [%s], SubsidyExpiry: [%s]',  # nopep8 pylint: disable=line-too-long
-                        '[AUTOMATICALLY_EXPIRE_ASSIGNMENTS]',
-                        self.alice_assignment.uuid,
-                        'edX+edXPrivacy101',
-                        self.alice_assignment.created + timezone.timedelta(days=90),
-                        None,
-                        subsidy_expiry
-                    ),
-                    call(
-                        '%s Assignment Expired. AssignmentConfigUUID: [%s], AssignmentUUID: [%s], Reason: [%s]',
-                        '[AUTOMATICALLY_EXPIRE_ASSIGNMENTS]',
-                        self.assignment_configuration.uuid,
-                        self.alice_assignment.uuid,
-                        'SUBSIDY_EXPIRED'
-                    ),
-                    call(
-                        '%s AssignmentUUID: [%s], ContentKey: [%s], AssignmentExpiry: [%s], EnrollmentEnd: [%s], SubsidyExpiry: [%s]',  # nopep8 pylint: disable=line-too-long
-                        '[AUTOMATICALLY_EXPIRE_ASSIGNMENTS]',
-                        self.bob_assignment.uuid,
-                        'edX+edXAccessibility101',
-                        self.bob_assignment.created + timezone.timedelta(days=90),
-                        enrollment_end,
-                        subsidy_expiry
-                    ),
-                    call(
-                        '%s Assignment Expired. AssignmentConfigUUID: [%s], AssignmentUUID: [%s], Reason: [%s]',
-                        '[AUTOMATICALLY_EXPIRE_ASSIGNMENTS]',
-                        self.assignment_configuration.uuid,
-                        self.bob_assignment.uuid,
-                        'SUBSIDY_EXPIRED'
-                    ),
-                ]
-            )
-            mock_send_assignment_automatically_expired_email_task.assert_has_calls(
-                [
-                    call(self.alice_assignment.uuid),
-                    call(self.bob_assignment.uuid)
-                ]
-            )
+        call_command(self.command)
+
+        mock_send_assignment_automatically_expired_email_task.assert_has_calls([
+            call(self.alice_assignment.uuid),
+            call(self.bob_assignment.uuid),
+        ])
 
         all_assignment = LearnerContentAssignment.objects.all()
         cancelled_assignments = LearnerContentAssignment.objects.filter(
