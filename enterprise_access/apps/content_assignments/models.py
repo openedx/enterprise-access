@@ -187,6 +187,15 @@ class LearnerContentAssignment(TimeStampedModel):
             "been notified."
         ),
     )
+
+    allocation_batch_id = models.UUIDField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text=(
+            "A reference to the batch that this assignment was created in. Helpful for grouping assignments together."
+        ),
+    )
     history = HistoricalRecords()
 
     def __str__(self):
