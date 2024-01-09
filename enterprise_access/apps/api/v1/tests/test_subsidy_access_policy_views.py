@@ -1419,7 +1419,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             content_quantity=-content_price_cents,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )
-        action, _ = assignment1.add_successful_linked_action()
+        action = assignment1.add_successful_linked_action()
 
         # Implicitly tests that this response only includes allocated assignments
         LearnerContentAssignmentFactory.create(

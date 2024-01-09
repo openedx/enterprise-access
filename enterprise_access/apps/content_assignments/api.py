@@ -10,18 +10,14 @@ from typing import Iterable
 from django.db import transaction
 from django.db.models import Q, Sum
 from django.db.models.functions import Lower
-from django.utils.timezone import now, timedelta
+from django.utils.timezone import now
 from pytz import UTC
 
 from enterprise_access.apps.content_assignments.tasks import send_reminder_email_for_pending_assignment
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
 
-from .constants import (
-    NUM_DAYS_BEFORE_AUTO_CANCELLATION,
-    AssignmentAutomaticExpiredReason,
-    LearnerContentAssignmentStateChoices
-)
+from .constants import AssignmentAutomaticExpiredReason, LearnerContentAssignmentStateChoices
 from .content_metadata_api import parse_datetime_string
 from .models import AssignmentConfiguration, LearnerContentAssignment
 from .tasks import (
@@ -561,18 +557,22 @@ def remind_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
     }
 
 
-def expire_assignment(assignment_configuration, assignment, content_metadata, modify_assignment=True):
+def expire_assignment(assignment, content_metadata, modify_assignment=True):
     """
     If applicable, retires the given assignment, returning an expiration reason.
     Otherwise, returns `None` as a reason.
     """
-    subsidy_access_policy = assignment_configuration.subsidy_access_policy
-    subsidy_expiration_datetime = parse_datetime_string(subsidy_access_policy.subsidy_expiration_datetime)
+    if assignment.state not in LearnerContentAssignmentStateChoices.EXPIRABLE_STATES:
+        logger.info('Cannot expire accepted assignment %s', assignment.uuid)
+        return None
+
+    assignment_configuration = assignment.assignment_configuration
+    subsidy_expiration_datetime = parse_datetime_string(assignment_configuration.policy.subsidy_expiration_datetime)
     if subsidy_expiration_datetime:
         subsidy_expiration_datetime = subsidy_expiration_datetime.replace(tzinfo=UTC)
 
     enrollment_end_date = _get_enrollment_end_date(content_metadata)
-    auto_cancellation_date = assignment.created + timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION)
+    auto_cancellation_date = assignment.get_auto_expiration_date()
 
     message = (
         'Checking expirability for AssignmentUUID: [%s], ContentKey: [%s], AssignmentExpiry: [%s], '
@@ -590,7 +590,7 @@ def expire_assignment(assignment_configuration, assignment, content_metadata, mo
     assignment_expiry_reason = None
     current_date = now()
 
-    if current_date > auto_cancellation_date:
+    if auto_cancellation_date and current_date > auto_cancellation_date:
         assignment_expiry_reason = AssignmentAutomaticExpiredReason.NIENTY_DAYS_PASSED
     elif enrollment_end_date and enrollment_end_date < current_date:
         assignment_expiry_reason = AssignmentAutomaticExpiredReason.ENROLLMENT_DATE_PASSED
@@ -608,6 +608,11 @@ def expire_assignment(assignment_configuration, assignment, content_metadata, mo
         if modify_assignment:
             logger.info('Modifying assignment %s to expired', assignment.uuid)
             assignment.state = LearnerContentAssignmentStateChoices.CANCELLED
+
+            if assignment_expiry_reason == AssignmentAutomaticExpiredReason.NIENTY_DAYS_PASSED:
+                assignment.clear_pii()
+                assignment.clear_historical_pii()
+
             assignment.save()
             send_assignment_automatically_expired_email.delay(assignment.uuid)
 

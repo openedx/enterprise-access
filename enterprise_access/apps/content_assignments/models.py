@@ -14,6 +14,8 @@ from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_create_with_history, bulk_update_with_history
 
 from .constants import (
+    NUM_DAYS_BEFORE_AUTO_CANCELLATION,
+    RETIRED_EMAIL_ADDRESS,
     AssignmentActionErrors,
     AssignmentActions,
     AssignmentLearnerStates,
@@ -95,7 +97,8 @@ class LearnerContentAssignment(TimeStampedModel):
     are allowed, and we can use the history table of this model to ascertain
     when/why such state transitions occurred.
 
-    .. pii: The learner_email field stores PII, which is to be scrubbed after 90 days via management command.
+    .. pii: The learner_email field stores PII,
+       which is to be scrubbed after 90 days via management command.
     .. pii_types: email_address
     .. pii_retirement: local_api
     """
@@ -234,30 +237,38 @@ class LearnerContentAssignment(TimeStampedModel):
             batch_size=BULK_OPERATION_BATCH_SIZE,
         )
 
-    def get_successful_linked_action(self):
+    def get_auto_expiration_date(self):
         """
-        Returns the first successful "linked" LearnerContentAssignmentActions for this assignment,
+        Returns the date at which this assignment expires due to
+        waiting too long to move into the "accepted" state.  Note that
+        sending a reminder notification for an assignment does not
+        reset the auto-expiration date.
+        """
+        last_notification = self.get_last_successful_notified_action()
+        if not last_notification:
+            return None
+        return last_notification.completed_at + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION)
+
+    def get_last_successful_linked_action(self):
+        """
+        Returns the last successful "linked" LearnerContentAssignmentActions for this assignment,
         or None if no such record exists.
         """
         return self.actions.filter(
             action_type=AssignmentActions.LEARNER_LINKED,
             error_reason=None,
-        ).first()
+        ).order_by('-completed_at').first()
 
     def add_successful_linked_action(self):
         """
-        Adds a successful "linked" LearnerContentAssignmentAction for this assignment record.
-        If a successful linked action already exists for this assignment, returns
-        that linked action record instead.
+        Adds a successful "linked" LearnerContentAssignmentAction for this assignment record,
+        regardless of if one such action record already exists.
         """
-        record, was_created = self.actions.get_or_create(
+        return self.actions.create(
             action_type=AssignmentActions.LEARNER_LINKED,
             error_reason=None,
-            defaults={
-                'completed_at': timezone.now(),
-            },
+            completed_at=timezone.now(),
         )
-        return record, was_created
 
     def add_errored_linked_action(self, exc):
         """
@@ -269,15 +280,16 @@ class LearnerContentAssignment(TimeStampedModel):
             traceback=format_traceback(exc),
         )
 
-    def get_successful_notified_action(self):
+    def get_last_successful_notified_action(self):
         """
-        Returns the first successful "notified" LearnerContentAssignmentActions for this assignment,
-        or None if no such record exists.
+        Returns the last successful "notified" LearnerContentAssignmentActions for this assignment,
+        or None if no such record exists. Can be used as a proxy for understanding
+        when the learner was most recently allocated this assignment.
         """
         return self.actions.filter(
             action_type=AssignmentActions.NOTIFIED,
             error_reason=None,
-        ).first()
+        ).order_by('-completed_at').first()
 
     def add_successful_notified_action(self):
         """
@@ -285,14 +297,11 @@ class LearnerContentAssignment(TimeStampedModel):
         If a successful notified action already exists for this assignment, returns
         that linked action record instead.
         """
-        record, was_created = self.actions.get_or_create(
+        return self.actions.create(
             action_type=AssignmentActions.NOTIFIED,
             error_reason=None,
-            defaults={
-                'completed_at': timezone.now(),
-            },
+            completed_at=timezone.now(),
         )
-        return record, was_created
 
     def add_errored_notified_action(self, exc):
         """
@@ -390,6 +399,18 @@ class LearnerContentAssignment(TimeStampedModel):
             error_reason=AssignmentActionErrors.ENROLLMENT_ERROR,
             traceback=format_traceback(exc),
         )
+
+    def clear_pii(self):
+        """
+        Removes PII field values from this assignment.
+        """
+        self.learner_email = RETIRED_EMAIL_ADDRESS
+
+    def clear_historical_pii(self):
+        """
+        Removes PII values from this assignment's historical records.
+        """
+        self.history.update(learner_email=RETIRED_EMAIL_ADDRESS)  # pylint: disable=no-member
 
     @classmethod
     def annotate_dynamic_fields_onto_queryset(cls, queryset):
