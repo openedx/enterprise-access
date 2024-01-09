@@ -28,6 +28,9 @@ class LearnerContentAssignmentStateChoices:
     # States which allow reminders by an admin.
     REMINDABLE_STATES = (ALLOCATED,)
 
+    # States from which an assignment can be expired
+    EXPIRABLE_STATES = (ALLOCATED,)
+
 
 class AssignmentActions:
     """
@@ -107,3 +110,5 @@ class AssignmentAutomaticExpiredReason:
 
 
 NUM_DAYS_BEFORE_AUTO_CANCELLATION = 90
+
+RETIRED_EMAIL_ADDRESS = 'retired_user@retired.invalid'

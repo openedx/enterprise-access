@@ -156,7 +156,7 @@ class CRUDViewTestMixin:
             error_reason='Phony error reason.',
             traceback=None,
         )
-        linked_action, _ = self.assignment_cancelled.add_successful_linked_action()
+        linked_action = self.assignment_cancelled.add_successful_linked_action()
         linked_action.error_reason = 'Phony error reason.'
         linked_action.save()
 

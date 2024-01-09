@@ -5,25 +5,38 @@ from unittest import mock
 
 import ddt
 from django.test import TestCase
+from django.utils import timezone
 
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.core.tests.factories import UserFactory
+from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
 
 from ..api import (
     AllocationException,
     _try_populate_assignments_lms_user_id,
     allocate_assignments,
     cancel_assignments,
+    expire_assignment,
     get_allocated_quantity_for_configuration,
     get_assignment_for_learner,
     get_assignments_for_configuration
 )
-from ..constants import LearnerContentAssignmentStateChoices
+from ..constants import NUM_DAYS_BEFORE_AUTO_CANCELLATION, RETIRED_EMAIL_ADDRESS, LearnerContentAssignmentStateChoices
 from ..models import AssignmentConfiguration, LearnerContentAssignment
 from .factories import LearnerContentAssignmentFactory
 
 # This is normally much larger (350), but that blows up the test duration.
 TEST_USER_EMAIL_READ_BATCH_SIZE = 4
+
+
+def delta_t(as_string=False, **kwargs):
+    """
+    Convenience function for getting a datetime different from the current time.
+    """
+    datetime_obj = timezone.now() + timezone.timedelta(**kwargs)
+    if as_string:
+        return datetime_obj.strftime('%Y-%m-%d %H:%M:%SZ')
+    return datetime_obj
 
 
 @ddt.ddt
@@ -571,3 +584,190 @@ class TestContentAssignmentApi(TestCase):
         # We should have updated the lms_user_id of the assignment if a user existed.
         for assignment in assignments_for_existing_users:
             assert assignment.lms_user_id == User.objects.get(email=assignment.learner_email).lms_user_id
+
+
+@ddt.ddt
+class TestAssignmentExpiration(TestCase):
+    """
+    Tests of the ``api.expire_assignment()`` function.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.assignment_configuration = AssignmentConfiguration.objects.create()
+        cls.policy = AssignedLearnerCreditAccessPolicyFactory.create(
+            assignment_configuration=cls.assignment_configuration,
+            spend_limit=1000000,
+        )
+
+    def mock_content_metadata(self, enroll_by_date):
+        """
+        Helper to produce content metadata with a given enroll_by_date.
+        """
+        return {
+            'normalized_metadata': {
+                'enroll_by_date': enroll_by_date,
+            },
+        }
+
+    def test_dont_expire_accepted_assignment(self):
+        """
+        Don't expire an accepted assignment, even if one of the key dates has passed.
+        """
+        assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            state=LearnerContentAssignmentStateChoices.ACCEPTED,
+        )
+        original_modified_time = assignment.modified
+
+        # set a policy-subsidy expiration date in the past
+        mock_subsidy_record = {'expiration_datetime': delta_t(days=-100, as_string=True)}
+        with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
+            expire_assignment(
+                assignment,
+                self.mock_content_metadata(None),
+                modify_assignment=True,
+            )
+
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.ACCEPTED)
+        self.assertEqual(assignment.modified, original_modified_time)
+
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
+    @ddt.data(
+        *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
+    )
+    def test_dont_expire_assignments_with_future_expiration_dates(self, assignment_state, mock_expired_email):
+        """
+        Tests that we don't expire assignments with all types of expiration dates in the future.
+        """
+        assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            state=assignment_state,
+            learner_email='larry@stooges.com',
+            lms_user_id=12345,
+        )
+        original_modified_time = assignment.modified
+        assignment.add_successful_notified_action()
+
+        # set a policy-subsidy expiration date in the future
+        mock_subsidy_record = {'expiration_datetime': delta_t(days=100, as_string=True)}
+        with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
+            expire_assignment(
+                assignment,
+                self.mock_content_metadata(delta_t(days=100, as_string=True)),
+                modify_assignment=True,
+            )
+
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.state, assignment_state)
+        self.assertFalse(mock_expired_email.delay.called)
+        self.assertEqual(assignment.modified, original_modified_time)
+
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
+    @ddt.data(
+        *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
+    )
+    def test_expire_one_assignment_automatically(self, assignment_state, mock_expired_email):
+        """
+        Test that we expire an assignment and clear
+        its PII, as long the state is not "accepted".
+        """
+        assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            state=assignment_state,
+            learner_email='larry@stooges.com',
+            lms_user_id=12345,
+        )
+        action = assignment.add_successful_notified_action()
+        # set the last notified action to be more than the threshold number of days ago
+        enough_days_to_be_cancelled = NUM_DAYS_BEFORE_AUTO_CANCELLATION + 1
+        action.completed_at = delta_t(days=-enough_days_to_be_cancelled)
+        action.save()
+
+        # set a policy-subsidy expiration date in the future
+        mock_subsidy_record = {'expiration_datetime': delta_t(days=100, as_string=True)}
+        with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
+            expire_assignment(
+                assignment,
+                self.mock_content_metadata(None),
+                modify_assignment=True,
+            )
+
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
+        self.assertEqual(12345, assignment.lms_user_id)
+        self.assertEqual(assignment.learner_email, RETIRED_EMAIL_ADDRESS)
+
+        for historical_record in assignment.history.all():
+            self.assertEqual(12345, historical_record.lms_user_id)
+            self.assertEqual(historical_record.learner_email, RETIRED_EMAIL_ADDRESS)
+
+        mock_expired_email.delay.assert_called_once_with(assignment.uuid)
+
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
+    @ddt.data(
+        *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
+    )
+    def test_expire_assignments_with_passed_enroll_by_date(self, assignment_state, mock_expired_email):
+        """
+        Tests that we expire assignments with a passed enroll_by_date
+        """
+        assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            state=assignment_state,
+            learner_email='larry@stooges.com',
+            lms_user_id=12345,
+        )
+        assignment.add_successful_notified_action()
+
+        # set a policy-subsidy expiration date in the future
+        mock_subsidy_record = {'expiration_datetime': delta_t(days=100, as_string=True)}
+        with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
+            expire_assignment(
+                assignment,
+                self.mock_content_metadata(delta_t(days=-1, as_string=True)),
+                modify_assignment=True,
+            )
+
+        assignment.refresh_from_db()
+
+        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
+        # we don't clear PII in this case
+        self.assertEqual(assignment.learner_email, 'larry@stooges.com')
+        self.assertEqual(assignment.lms_user_id, 12345)
+        mock_expired_email.delay.assert_called_once_with(assignment.uuid)
+
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
+    @ddt.data(
+        *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
+    )
+    def test_expire_assignments_with_expired_subsidy(self, assignment_state, mock_expired_email):
+        """
+        Tests that we expire assignments with an underlying subsidy that has expired.
+        """
+        assignment = LearnerContentAssignmentFactory.create(
+            assignment_configuration=self.assignment_configuration,
+            state=assignment_state,
+            learner_email='larry@stooges.com',
+            lms_user_id=12345,
+        )
+        assignment.add_successful_notified_action()
+
+        # set a policy-subsidy expiration date in the future
+        mock_subsidy_record = {'expiration_datetime': delta_t(days=-1, as_string=True)}
+        with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
+            expire_assignment(
+                assignment,
+                self.mock_content_metadata(delta_t(days=100, as_string=True)),
+                modify_assignment=True,
+            )
+
+        assignment.refresh_from_db()
+
+        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
+        # we don't clear PII in this case
+        self.assertEqual(assignment.learner_email, 'larry@stooges.com')
+        self.assertEqual(assignment.lms_user_id, 12345)
+        mock_expired_email.delay.assert_called_once_with(assignment.uuid)

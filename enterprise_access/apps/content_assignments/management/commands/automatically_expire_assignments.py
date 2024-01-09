@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
     """
-    Automatically expire assignment records and then send email to learners
+    Automatically expire certain assignment records and then send a cancellation email to learners.
+    Also removes PII from some assignments under certain conditions.
+    See: ``docs/decisions/0016_automatic_expiration.rst`` for more details.
     """
     help = (
         'Spin off celery tasks to automatically expire assignment records and then send email to learners'
@@ -71,11 +73,11 @@ class Command(BaseCommand):
                 dry_run,
             )
 
-            allocated_assignments = assignment_configuration.assignments.filter(
-                state=LearnerContentAssignmentStateChoices.ALLOCATED
+            assignments_to_possibly_expire = assignment_configuration.assignments.filter(
+                state__in=LearnerContentAssignmentStateChoices.EXPIRABLE_STATES,
             )
 
-            paginator = Paginator(allocated_assignments, 100)
+            paginator = Paginator(assignments_to_possibly_expire, 100)
             for page_number in paginator.page_range:
                 assignments = paginator.page(page_number)
 
@@ -87,7 +89,6 @@ class Command(BaseCommand):
                 for assignment in assignments:
                     content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
                     expire_assignment(
-                        assignment_configuration,
                         assignment,
                         content_metadata,
                         modify_assignment=not dry_run,
