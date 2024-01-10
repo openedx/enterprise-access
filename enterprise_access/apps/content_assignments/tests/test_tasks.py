@@ -7,6 +7,8 @@ from uuid import uuid4
 import ddt
 from celery import states as celery_states
 from django.conf import settings
+from django.utils.timezone import now, timedelta
+from edx_django_utils.cache import TieredCache
 from requests.exceptions import HTTPError
 from rest_framework import status
 
@@ -17,7 +19,9 @@ from enterprise_access.apps.content_assignments.constants import (
     AssignmentActions,
     LearnerContentAssignmentStateChoices
 )
+from enterprise_access.apps.content_assignments.content_metadata_api import format_datetime_obj
 from enterprise_access.apps.content_assignments.tasks import (
+    BrazeCampaignSender,
     create_pending_enterprise_learner_for_assignment_task,
     send_assignment_automatically_expired_email,
     send_cancel_email_for_pending_assignment,
@@ -28,10 +32,9 @@ from enterprise_access.apps.content_assignments.tests.factories import (
     AssignmentConfigurationFactory,
     LearnerContentAssignmentFactory
 )
-from enterprise_access.apps.subsidy_access_policy.tests.factories import (
-    AssignedLearnerCreditAccessPolicyFactory,
-    PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory
-)
+from enterprise_access.apps.subsidy_access_policy.models import REQUEST_CACHE_NAMESPACE
+from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
+from enterprise_access.cache_utils import request_cache
 from test_utils import APITestWithMocks
 
 TEST_ENTERPRISE_UUID = uuid4()
@@ -206,6 +209,10 @@ class TestBrazeEmailTasks(APITestWithMocks):
             enterprise_customer_uuid=TEST_ENTERPRISE_UUID,
             uuid=TEST_ASSIGNMENT_UUID,
         )
+        cls.policy = AssignedLearnerCreditAccessPolicyFactory(
+            assignment_configuration=cls.assignment_configuration,
+            spend_limit=10000000,
+        )
 
     def setUp(self):
         super().setUp()
@@ -217,7 +224,13 @@ class TestBrazeEmailTasks(APITestWithMocks):
             lms_user_id=TEST_LMS_USER_ID,
             assignment_configuration=self.assignment_configuration,
         )
-        self.policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
+
+    def tearDown(self):
+        super().tearDown()
+        # Clear the subsidy record from the subsidy_access_policy request cache
+        # and the tiered/django-memcached cache.
+        request_cache(namespace=REQUEST_CACHE_NAMESPACE).clear()
+        TieredCache.dangerous_clear_all_tiers()
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.objects')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
@@ -264,14 +277,14 @@ class TestBrazeEmailTasks(APITestWithMocks):
         )
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
 
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.objects')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     @ddt.data(True, False)
     def test_send_reminder_email_for_pending_assignment(
-        self, is_logistrated, mock_braze_client_class, mock_lms_client, mock_get_metadata,
-        mock_policy_model,  # pylint: disable=unused-argument
+        self, is_logistrated, mock_braze_client_class, mock_lms_client,
+        mock_get_metadata, mock_subsidy_client,
     ):
         """
         Verify send_reminder_email_for_pending_assignment hits braze client with expected args
@@ -307,6 +320,13 @@ class TestBrazeEmailTasks(APITestWithMocks):
             'card_image_url': 'https://itsanimage.com'
         }
         mock_get_metadata.return_value = {self.assignment.content_key: mock_metadata}
+
+        # Set the subsidy expiration time to tomorrow
+        mock_subsidy = {
+            'uuid': self.policy.subsidy_uuid,
+            'expiration_datetime': (now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%SZ'),
+        }
+        mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
         mock_braze_client.generate_mailto_link.return_value = f'mailto:{admin_email}'
 
         send_reminder_email_for_pending_assignment(self.assignment.uuid)
@@ -338,11 +358,12 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'start_date': 'Jan 01, 2020',
                 'course_partner': 'Smart Folks, Good People, and Fast Learners',
                 'course_card_image': 'https://itsanimage.com',
-                'learner_portal_link': 'http://enterprise-learner-portal.example.com/test-slug'
+                'learner_portal_link': 'http://enterprise-learner-portal.example.com/test-slug',
+                'action_required_by': 'Jan 01, 2021',
             },
         )
 
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.objects')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
@@ -351,7 +372,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
         mock_braze_client,
         mock_lms_client,
         mock_get_metadata,
-        mock_policy_model   # pylint: disable=unused-argument
+        mock_subsidy_client,
     ):
         """
         Verify send_email_for_new_assignment hits braze client with expected args
@@ -385,9 +406,17 @@ class TestBrazeEmailTasks(APITestWithMocks):
         }
         mock_get_metadata.return_value = {self.assignment.content_key: mock_metadata}
 
+        # Set the subsidy expiration time to tomorrow
+        mock_subsidy = {
+            'uuid': self.policy.subsidy_uuid,
+            'expiration_datetime': (now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%SZ'),
+        }
+        mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+
         mock_admin_mailto = f'mailto:{admin_email}'
         mock_braze_client.return_value.create_recipient.return_value = mock_recipient
         mock_braze_client.return_value.generate_mailto_link.return_value = mock_admin_mailto
+
         send_email_for_new_assignment(self.assignment.uuid)
 
         # Make sure our LMS client got called correct times and with what we expected
@@ -407,6 +436,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'course_partner': 'Smart Folks and Good People',
                 'course_card_image': 'https://itsanimage.com',
                 'learner_portal_link': '{}/{}'.format(settings.ENTERPRISE_LEARNER_PORTAL_URL, 'test-slug'),
+                'action_required_by': 'Jan 01, 2021',
             },
         )
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
@@ -451,3 +481,116 @@ class TestBrazeEmailTasks(APITestWithMocks):
             },
         )
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
+
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
+    def test_get_action_required_by_subsidy_expires_soonest(
+        # pylint: disable=unused-argument
+        self, mock_get_metadata, mock_subsidy_client, mock_braze_client_class, mock_lms_client_class
+    ):
+        """
+        Tests that the subsidy_expiration time is returned as the earliest action required by time.
+        """
+        # Set the metadata enroll_by_date to tomorrow
+        mock_metadata = {
+            'key': self.assignment.content_key,
+            'normalized_metadata': {
+                'start_date': '2020-01-01 12:00:00Z',
+                'end_date': '2022-01-01 12:00:00Z',
+                'enroll_by_date': (now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%SZ'),
+            },
+        }
+        mock_get_metadata.return_value = {self.assignment.content_key: mock_metadata}
+
+        # Set the subsidy expiration time to yesterday
+        yesterday = now() - timedelta(days=1)
+        mock_subsidy = {
+            'uuid': self.policy.subsidy_uuid,
+            'expiration_datetime': yesterday.strftime('%Y-%m-%d %H:%M:%SZ'),
+        }
+        mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+
+        # Add a successful notification action of now-ish
+        self.assignment.add_successful_notified_action()
+
+        sender = BrazeCampaignSender(self.assignment)
+        action_required_by = sender.get_action_required_by()
+
+        self.assertEqual(format_datetime_obj(yesterday), action_required_by)
+
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
+    def test_get_action_required_by_enrollment_deadline_soonest(
+        # pylint: disable=unused-argument
+        self, mock_get_metadata, mock_subsidy_client, mock_braze_client_class, mock_lms_client_class
+    ):
+        """
+        Tests that the enroll_by_date is returned as the earliest action required by time.
+        """
+        yesterday = now() - timedelta(days=1)
+        # Set the metadata enroll_by_date to yesterday
+        mock_metadata = {
+            'key': self.assignment.content_key,
+            'normalized_metadata': {
+                'start_date': '2020-01-01 12:00:00Z',
+                'end_date': '2022-01-01 12:00:00Z',
+                'enroll_by_date': yesterday.strftime('%Y-%m-%d %H:%M:%SZ'),
+            },
+        }
+        mock_get_metadata.return_value = {self.assignment.content_key: mock_metadata}
+
+        # Set the subsidy expiration time to tomorrow
+        mock_subsidy = {
+            'uuid': self.policy.subsidy_uuid,
+            'expiration_datetime': (now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%SZ'),
+        }
+        mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+
+        # Add a successful notification action of now-ish
+        self.assignment.add_successful_notified_action()
+
+        sender = BrazeCampaignSender(self.assignment)
+        action_required_by = sender.get_action_required_by()
+
+        self.assertEqual(format_datetime_obj(yesterday), action_required_by)
+
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
+    def test_get_action_required_by_auto_cancellation_soonest(  # pylint: disable=unused-argument
+        self, mock_get_metadata, mock_subsidy_client, mock_braze_client_class, mock_lms_client_class
+    ):
+        """
+        Tests that the auto-cancellation date is returned as the earliest action required by time.
+        """
+        the_future = now() + timedelta(days=120)
+        # Set the metadata enroll_by_date to far in the future
+        mock_metadata = {
+            'key': self.assignment.content_key,
+            'normalized_metadata': {
+                'start_date': '2020-01-01 12:00:00Z',
+                'end_date': '2022-01-01 12:00:00Z',
+                'enroll_by_date': the_future.strftime('%Y-%m-%d %H:%M:%SZ'),
+            },
+        }
+        mock_get_metadata.return_value = {self.assignment.content_key: mock_metadata}
+
+        # Set the subsidy expiration time to far in the future
+        mock_subsidy = {
+            'uuid': self.policy.subsidy_uuid,
+            'expiration_datetime': the_future.strftime('%Y-%m-%d %H:%M:%SZ'),
+        }
+        mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+
+        # Add a successful notification action of now-ish
+        self.assignment.add_successful_notified_action()
+
+        sender = BrazeCampaignSender(self.assignment)
+        action_required_by = sender.get_action_required_by()
+
+        self.assertEqual(format_datetime_obj(self.assignment.get_auto_expiration_date()), action_required_by)

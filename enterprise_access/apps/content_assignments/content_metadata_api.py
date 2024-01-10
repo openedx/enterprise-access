@@ -12,6 +12,7 @@ DATE_INPUT_PATTERNS = [
     '%Y-%m-%d %H:%M:%SZ',
     '%Y-%m-%d %H:%M:%S.%fZ',
 ]
+DEFAULT_STRFTIME_PATTERN = '%b %d, %Y'
 
 
 def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
@@ -48,7 +49,7 @@ def get_card_image_url(content_metadata):
     return None
 
 
-def get_human_readable_date(datetime_string, output_pattern='%b %d, %Y'):
+def get_human_readable_date(datetime_string, output_pattern=DEFAULT_STRFTIME_PATTERN):
     """
     Given a datetime string value from some content metadata record,
     convert it to the provided pattern.
@@ -77,6 +78,10 @@ def parse_datetime_string(datetime_string):
     if last_exception is not None:
         raise last_exception
     return None
+
+
+def format_datetime_obj(datetime_obj, output_pattern=DEFAULT_STRFTIME_PATTERN):
+    return datetime_obj.strftime(output_pattern)
 
 
 def get_course_partners(course_metadata):
