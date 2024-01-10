@@ -50,7 +50,12 @@ from .exceptions import (
     SubsidyAccessPolicyLockAttemptFailed,
     SubsidyAPIHTTPError
 )
-from .subsidy_api import get_and_cache_transactions_for_learner
+from .subsidy_api import (
+    CACHE_MISS,
+    get_and_cache_transactions_for_learner,
+    get_tiered_cache_subsidy_record,
+    set_tiered_cache_subsidy_record
+)
 from .utils import ProxyAwareHistoricalRecords, create_idempotency_key_for_transaction, get_versioned_subsidy_client
 
 REQUEST_CACHE_NAMESPACE = 'subsidy_access_policy'
@@ -214,8 +219,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
     @property
     def is_subsidy_active(self):
         """
-        Returns true if the localized current time is
-        between ``subsidy_active_datetime`` and ``subsidy_expiration_datetime``.
+        Returns true if the related subsidy record is still active.
         """
         return self.subsidy_record().get('is_active')
 
@@ -316,6 +320,19 @@ class SubsidyAccessPolicy(TimeStampedModel):
         request_cache(namespace=REQUEST_CACHE_NAMESPACE).set(cache_key, result)
 
         return result
+
+    def subsidy_record_from_tiered_cache(self, *cache_key_args):
+        """
+        Retrieve this policy's corresponding subsidy record from TieredCache.
+        Should only be used in contexts that are ok with reading slow-moving,
+        possibly stale fields.
+        """
+        cached_value = get_tiered_cache_subsidy_record(self.subsidy_uuid, *cache_key_args)
+        if cached_value is not CACHE_MISS:
+            return cached_value
+        record = self.subsidy_record()
+        set_tiered_cache_subsidy_record(record, *cache_key_args)
+        return record
 
     def subsidy_balance(self):
         """

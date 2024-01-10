@@ -7,6 +7,8 @@ import logging
 from collections import defaultdict
 
 import requests
+from django.conf import settings
+from edx_django_utils.cache import TieredCache
 
 from enterprise_access.cache_utils import request_cache, versioned_cache_key
 
@@ -16,6 +18,8 @@ from .utils import get_versioned_subsidy_client
 logger = logging.getLogger(__name__)
 
 REQUEST_CACHE_NAMESPACE = 'subsidy_access_policy'
+
+CACHE_MISS = object()
 
 
 class TransactionPolicyMismatchError(Exception):
@@ -119,3 +123,30 @@ def get_redemptions_by_content_and_policy_for_learner(policies, lms_user_id):
                 )
 
     return result
+
+
+def get_tiered_cache_subsidy_record(subsidy_uuid, *cache_key_args):
+    """
+    Gets the subsidy record (a dictionary) with the given ``subsidy_uuid``
+    from the TieredCache (meaning memcache) if present.
+    If not present, returns a ``CACHE_MISS`` object.
+    """
+    cache_key = versioned_cache_key('get_subsidy_record', subsidy_uuid, *cache_key_args)
+    cached_response = TieredCache.get_cached_response(cache_key)
+    if cached_response.is_found:
+        logger.info(f"cache hit for subsidy record {subsidy_uuid} record")
+        return cached_response.value
+
+    logger.info(f"cache miss for subsidy record {subsidy_uuid}")
+    return CACHE_MISS
+
+
+def set_tiered_cache_subsidy_record(subsidy_record, *cache_key_args):
+    """
+    Sets the given subsidy_record in the TieredCache by uuid and any additional
+    provided args.
+    """
+    subsidy_uuid = subsidy_record['uuid']
+    cache_key = versioned_cache_key('get_subsidy_record', subsidy_uuid, *cache_key_args)
+    logger.info(f"cache set for subsidy record {subsidy_uuid}")
+    TieredCache.set_all_tiers(cache_key, subsidy_record, settings.SUBSIDY_RECORD_CACHE_TIMEOUT)

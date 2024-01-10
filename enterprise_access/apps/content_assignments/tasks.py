@@ -3,19 +3,23 @@ Tasks for content_assignments app.
 """
 
 import logging
+from datetime import datetime
 
 from braze.exceptions import BrazeBadRequestError
 from celery import shared_task
 from django.apps import apps
 from django.conf import settings
+from pytz import UTC
 
 from enterprise_access.apps.api_client.braze_client import ENTERPRISE_BRAZE_ALIAS_LABEL, BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments.content_metadata_api import (
+    format_datetime_obj,
     get_card_image_url,
     get_content_metadata_for_assignments,
     get_course_partners,
-    get_human_readable_date
+    get_human_readable_date,
+    parse_datetime_string
 )
 from enterprise_access.tasks import LoggedTaskWithRetry
 
@@ -55,7 +59,8 @@ class BrazeCampaignSender:
         'start_date',
         'course_partner',
         'course_card_image',
-        'learner_portal_link'
+        'learner_portal_link',
+        'action_required_by',
     }
 
     def __init__(self, assignment):
@@ -154,6 +159,15 @@ class BrazeCampaignSender:
                 raise Exception(msg)
         return self._course_metadata
 
+    @property
+    def subsidy_record(self):
+        """
+        Returns a cached subsidy record for the policy related to this assignment.
+        """
+        # send an extra cache arg so that cache keys are scoped
+        # to the context of braze campaign-sending.
+        return self.policy.subsidy_record_from_tiered_cache('braze_campaign_sender')
+
     def get_properties(self, *property_names):
         """
         Looks for instance methods on ``self`` that match "get_{property_name}"
@@ -180,15 +194,47 @@ class BrazeCampaignSender:
     def get_course_title(self):
         return self.assignment.content_title
 
+    def _enrollment_deadline_raw(self):
+        return self.course_metadata.get('normalized_metadata', {}).get('enroll_by_date')
+
     def get_enrollment_deadline(self):
-        return get_human_readable_date(
-            self.course_metadata.get('normalized_metadata', {}).get('enroll_by_date')
-        )
+        return get_human_readable_date(self._enrollment_deadline_raw())
 
     def get_start_date(self):
         return get_human_readable_date(
             self.course_metadata.get('normalized_metadata', {}).get('start_date')
         )
+
+    def get_action_required_by(self):
+        """
+        Returns the minimum of this assignment's auto-cancellation date,
+        the content's enrollment deadline, and the related policy's expiration datetime.
+        """
+        if subsidy_record := self.subsidy_record:
+            subsidy_expiration = parse_datetime_string(subsidy_record.get('expiration_datetime')) or datetime.max
+            subsidy_expiration = subsidy_expiration.replace(tzinfo=UTC)
+        else:
+            subsidy_expiration = datetime.max.replace(tzinfo=UTC)
+
+        enrollment_deadline = parse_datetime_string(self._enrollment_deadline_raw()) or datetime.max
+        enrollment_deadline = enrollment_deadline.replace(tzinfo=UTC)
+
+        auto_cancellation_date = self.assignment.get_auto_expiration_date() or datetime.max
+        auto_cancellation_date = auto_cancellation_date.replace(tzinfo=UTC)
+
+        message = (
+            'action_required_by assignment=%s: subsidy_expiration=%s, enrollment_deadline=%s, '
+            'auto_cancellation_date=%s'
+        )
+        logger.info(
+            message,
+            self.assignment.uuid,
+            subsidy_expiration,
+            enrollment_deadline,
+            auto_cancellation_date,
+        )
+        action_required_by = min(subsidy_expiration, enrollment_deadline, auto_cancellation_date)
+        return format_datetime_obj(action_required_by)
 
     def get_course_partner(self):
         return get_course_partners(self.course_metadata)
@@ -348,6 +394,7 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         'course_partner',
         'course_card_image',
         'learner_portal_link',
+        'action_required_by',
     )
     campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN
     if assignment.lms_user_id is not None:
@@ -390,6 +437,7 @@ def send_email_for_new_assignment(new_assignment_uuid):
         'course_partner',
         'course_card_image',
         'learner_portal_link',
+        'action_required_by',
     )
     campaign_uuid = settings.BRAZE_ASSIGNMENT_NOTIFICATION_CAMPAIGN
     campaign_sender.send_campaign_message(
