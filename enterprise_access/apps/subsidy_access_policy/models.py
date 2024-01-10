@@ -298,16 +298,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Retrieve this policy's corresponding subsidy record
         """
-        # don't utilize the cache unless this experimental feature is enabled
-        if not getattr(settings, 'MULTI_POLICY_RESOLUTION_ENABLED', False):
-            logger.info('subsidy_record MULTI_POLICY_RESOLUTION_ENABLED disabled')
-            try:
-                return self.subsidy_client.retrieve_subsidy(subsidy_uuid=self.subsidy_uuid)
-            except requests.exceptions.HTTPError as exc:
-                # when associated subsidy is soft-deleted, the subsidy retrieve API raises an exception.
-                logger.warning('SubsidyAccessPolicy.subsidy_record() raised HTTPError: %s', exc)
-                return {}
-
         cache_key = versioned_cache_key(
             'get_subsidy_record',
             self.enterprise_customer_uuid,
@@ -315,11 +305,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
         )
         cached_response = request_cache(namespace=REQUEST_CACHE_NAMESPACE).get_cached_response(cache_key)
         if cached_response.is_found:
-            logger.info(
-                'subsidy_record cache hit '
-                f'enterprise_customer_uuid={self.enterprise_customer_uuid}, '
-                f'subsidy_uuid={self.subsidy_uuid}'
-            )
             return cached_response.value
 
         try:
@@ -330,11 +315,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         request_cache(namespace=REQUEST_CACHE_NAMESPACE).set(cache_key, result)
 
-        logger.info(
-            'subsidy_record cache miss '
-            f'enterprise_customer_uuid={self.enterprise_customer_uuid}, '
-            f'subsidy_uuid={self.subsidy_uuid}'
-        )
         return result
 
     def subsidy_balance(self):
