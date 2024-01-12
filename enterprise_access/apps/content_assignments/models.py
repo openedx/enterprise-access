@@ -245,9 +245,14 @@ class LearnerContentAssignment(TimeStampedModel):
         reset the auto-expiration date.
         """
         last_notification = self.get_last_successful_notified_action()
+        # If we're currently sending the first notification message,
+        # we won't yet have a successful action, so use the creation time of
+        # the assignment as the starting_point
         if not last_notification:
-            return None
-        return last_notification.completed_at + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION)
+            starting_point = self.created
+        else:
+            starting_point = last_notification.completed_at
+        return starting_point + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION)
 
     def get_last_successful_linked_action(self):
         """
