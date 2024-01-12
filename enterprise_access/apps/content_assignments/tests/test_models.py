@@ -141,14 +141,20 @@ class TestAssignmentActions(TestCase):
 
     def test_get_auto_expiration_date_no_action(self):
         """
-        Test that this method returns None if there is no last successful
+        Test that this method returns a date 90 days from the assignment
+        creation time if there is no last successful
         notified action.
         """
-        self.assertIsNone(self.assignment.get_auto_expiration_date())
-
+        self.assertEqual(
+            self.assignment.get_auto_expiration_date(),
+            self.assignment.created + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION),
+        )
         self.assignment.add_errored_notified_action(Exception('foo'))
 
-        self.assertIsNone(self.assignment.get_auto_expiration_date())
+        self.assertEqual(
+            self.assignment.get_auto_expiration_date(),
+            self.assignment.created + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION),
+        )
 
     def test_get_auto_expiration_date(self):
         """
