@@ -119,6 +119,10 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             per_learner_enrollment_limit=5,
             active=False,
         )
+        cls.active_non_redeemable_per_learner_enroll_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            per_learner_enrollment_limit=5,
+            retired=True,
+        )
         cls.per_learner_spend_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             uuid=ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID,
             per_learner_spend_limit=500,
@@ -127,6 +131,10 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         cls.inactive_per_learner_spend_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             per_learner_spend_limit=500,
             active=False,
+        )
+        cls.active_non_redeemable_per_learner_spend_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            per_learner_spend_limit=500,
+            retired=True,
         )
 
     def tearDown(self):
@@ -197,7 +205,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Happy path: content in catalog, learner in enterprise, subsidy has value,
             # existing transactions for learner and policy below the policy limits.
             # Expected can_redeem result: True
-            'policy_is_active': True,
+            'policy_active_type': 'active',
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
@@ -208,7 +216,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         {
             # Content not in catalog, every other check would succeed.
             # Expected can_redeem result: False
-            'policy_is_active': True,
+            'policy_active_type': 'active',
             'catalog_contains_content': False,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
@@ -221,7 +229,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         {
             # Learner is not in the enterprise, every other check would succeed.
             # Expected can_redeem result: False
-            'policy_is_active': True,
+            'policy_active_type': 'active',
             'catalog_contains_content': True,
             'enterprise_contains_learner': False,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
@@ -234,7 +242,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         {
             # The subsidy is not redeemable, every other check would succeed.
             # Expected can_redeem result: False
-            'policy_is_active': True,
+            'policy_active_type': 'active',
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': False, 'active': True},
@@ -246,7 +254,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # The subsidy is redeemable, but the learner has already enrolled more than the limit.
             # Every other check would succeed.
             # Expected can_redeem result: False
-            'policy_is_active': True,
+            'policy_active_type': 'active',
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
@@ -266,7 +274,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # The subsidy is redeemable, but another redemption would exceed the policy-wide ``spend_limit``.
             # Every other check would succeed.
             # Expected can_redeem result: False
-            'policy_is_active': True,
+            'policy_active_type': 'active',
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
@@ -285,7 +293,20 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         {
             # The subsidy access policy is not active, every other check would succeed.
             # Expected can_redeem result: False
-            'policy_is_active': False,
+            'policy_active_type': 'inactive',
+            'catalog_contains_content': True,
+            'enterprise_contains_learner': True,
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
+            'expected_policy_can_redeem': (False, REASON_POLICY_EXPIRED, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
+        },
+        {
+            # The subsidy access policy is not redeemable, every other check would succeed.
+            # Expected can_redeem result: False
+            'policy_active_type': 'non_redeemable',
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
@@ -298,7 +319,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         {
             # The subsidy is not active, every other check would succeed.
             # Expected can_redeem result: False
-            'policy_is_active': True,
+            'policy_active_type': 'active',
             'catalog_contains_content': True,
             'enterprise_contains_learner': True,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': False},
@@ -310,7 +331,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
     @ddt.unpack
     def test_learner_enrollment_cap_policy_can_redeem(
         self,
-        policy_is_active,
+        policy_active_type,
         catalog_contains_content,
         enterprise_contains_learner,
         subsidy_is_redeemable,
@@ -333,8 +354,10 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         self.mock_subsidy_client.list_subsidy_transactions.return_value = transactions_for_policy
 
         policy_record = self.inactive_per_learner_enroll_policy
-        if policy_is_active:
+        if policy_active_type == 'active':
             policy_record = self.per_learner_enroll_policy
+        elif policy_active_type == 'non_redeemable':
+            policy_record = self.active_non_redeemable_per_learner_enroll_policy
 
         can_redeem_result = policy_record.can_redeem(self.lms_user_id, self.course_id)
 

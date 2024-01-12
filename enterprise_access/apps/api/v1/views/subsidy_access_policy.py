@@ -388,12 +388,11 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
     def get_queryset(self):
         """
-        Base queryset that returns all active policies associated
+        Base queryset that returns all active & redeemable policies associated
         with the customer uuid requested by the client.
         """
-        return SubsidyAccessPolicy.objects.filter(
+        return SubsidyAccessPolicy.policies_with_redemption_enabled().filter(
             enterprise_customer_uuid=self.enterprise_customer_uuid,
-            active=True,
         ).order_by('-created')
 
     def evaluate_policies(self, enterprise_customer_uuid, lms_user_id, content_key):
