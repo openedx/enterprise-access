@@ -6,6 +6,7 @@ from __future__ import annotations  # needed for using QuerySet in type hinting.
 
 import logging
 from typing import Iterable
+from uuid import uuid4
 
 from django.db import transaction
 from django.db.models import Q, Sum
@@ -437,6 +438,7 @@ def _create_new_assignments(assignment_configuration, learner_emails, content_ke
     # First, prepare assignment objects using data available in-memory only.
     content_title = _get_content_title(assignment_configuration, content_key)
     assignments_to_create = []
+    allocation_batch_id = uuid4()
     for learner_email in learner_emails:
         assignment = LearnerContentAssignment(
             assignment_configuration=assignment_configuration,
@@ -445,6 +447,7 @@ def _create_new_assignments(assignment_configuration, learner_emails, content_ke
             content_title=content_title,
             content_quantity=content_quantity,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
+            allocation_batch_id=allocation_batch_id,
         )
         assignments_to_create.append(assignment)
 
