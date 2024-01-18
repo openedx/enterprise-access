@@ -60,12 +60,12 @@ historical spend exists. The desired outcome is that content should NOT redeemab
 Decision
 ========
 
-We will add configuration flexibility by adding a new field ``redeemability_disabled_at`` to the policy model which
+We will add configuration flexibility by adding a new field ``retired`` to the policy model which
 signals that it is not redeemable BUT should remain visible to enterprise admins:
 
 +------------------+-----------------+---------------------+-----------------------------+-------------------------------+-----------------------+
 | Subsidy expired? | Subsidy         | SubsidyAccessPolicy | **SubsidyAccessPolicy       | Budget visibility on “Learner | Content redeemability |
-|                  | is_soft_deleted | active              | redeemability_disabled_at** | Credit Management” page       | via budget            |
+|                  | is_soft_deleted | active              | retired**                   | Credit Management” page       | via budget            |
 +==================+=================+=====================+=============================+===============================+=======================+
 | No               | FALSE           | TRUE                | null                        | ✅ visible                    | ✅ redeemable         |
 +------------------+-----------------+---------------------+-----------------------------+-------------------------------+-----------------------+
@@ -78,21 +78,20 @@ In summary:
 
 * The budget/policy is ALWAYS VISIBLE to enterprise admins when subsidy is not deleted and the policy is active.
 * The budget/policy is ONLY REDEEMABLE when the subsidy is not expired, the subsidy is not deleted, the policy is
-  active, **and the policy does not have redeemability disabled**.
+  active, **and the policy is not retired**.
 
 Impacted use cases:
 
 +-----------------------------------------------------+----------------------------------------------------------------+
 | Use Case                                            | Actions                                                        |
 +=====================================================+================================================================+
-| Need to change learner credit plan from 2 to 1      | 1. Set ``SubsidyAccessPolicy.redeemability_disabled_at`` =     |
-| budgets. Spend exists.                              |    ``now()`` on unwanted budget.                               |
+| Need to change learner credit plan from 2 to 1      | 1. Set ``SubsidyAccessPolicy.retired`` = ``TRUE``              |
+| budgets. Spend exists.                              |    on unwanted budget.                                         |
 |                                                     | 2. Update ``SubsidyAccessPolicy.spend_limit`` on remaining     |
 |                                                     |    budget(s) as needed.                                        |
 +-----------------------------------------------------+----------------------------------------------------------------+
-| Need to change the distribution mode of one budget. | 1. Set ``SubsidyAccessPolicy.redeemability_disabled_at`` =     |
-| Spend exists.                                       |    ``now()``.                                                  |
-|                                                     | 2. Create a new SubsidyAccessPolicy with a different           |
+| Need to change the distribution mode of one budget. | 1. Set ``SubsidyAccessPolicy.retired`` = ``TRUE``              |
+| Spend exists.                                       | 2. Create a new SubsidyAccessPolicy with a different           |
 |                                                     |    distribution mode.                                          |
 +-----------------------------------------------------+----------------------------------------------------------------+
 | Need to change learner credit plan from 2 to 1      | 1. Set ``SubsidyAccessPolicy.active`` = ``FALSE`` on unwanted  |
@@ -117,7 +116,7 @@ their behavior is not fully described by their name.
 Rejected Alternatives
 =====================
 
-Renaming ``active`` -> ``is_soft_deleted`` in addition to adding ``redeemability_disabled_at``
+Renaming ``active`` -> ``is_soft_deleted`` in addition to adding ``retired``
 ----------------------------------------------------------------------------------------------
 
 This ADR reinforces the concept that ``SubsidyAccessPolicy.active`` mirrors the intended behavior of an "is soft deleted"

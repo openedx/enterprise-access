@@ -137,7 +137,18 @@ class SubsidyAccessPolicy(TimeStampedModel):
     )
     active = models.BooleanField(
         default=False,
-        help_text='Whether this policy is active, defaults to false.',
+        help_text=(
+            'Set to FALSE to deactivate and hide this policy. Use this when you want to disable redemption and make '
+            'it disappear from all frontends, effectively soft-deleting it. Default is False (deactivated).'
+        ),
+    )
+    retired = models.BooleanField(
+        default=False,
+        help_text=(
+            "True means redeemability of content using this policy has been enabled. "
+            "Set this to False to deactivate the policy but keep it visible from an admin's perspective "
+            "(useful when you want to just expire a policy without expiring the whole plan)."
+        ),
     )
     catalog_uuid = models.UUIDField(
         db_index=True,
@@ -199,6 +210,23 @@ class SubsidyAccessPolicy(TimeStampedModel):
     # Customized version of HistoricalRecords to enable history tracking on child proxy models.  See
     # ProxyAwareHistoricalRecords docstring for more info.
     history = ProxyAwareHistoricalRecords(inherit=True)
+
+    @classmethod
+    def policies_with_redemption_enabled(cls):
+        """
+        Return all policies which have redemption enabled.
+        """
+        return cls.objects.filter(
+            active=True,
+            retired=False,
+        )
+
+    @property
+    def is_redemption_enabled(self):
+        """
+        Return True if this policy has redemption enabled.
+        """
+        return self.active and not self.retired
 
     @property
     def subsidy_active_datetime(self):
@@ -543,7 +571,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 * third a list of any transactions representing existing redemptions (any state).
         """
         # inactive policy
-        if not self.active:
+        if not self.is_redemption_enabled:
             return (False, REASON_POLICY_EXPIRED, [])
 
         # learner not associated to enterprise
@@ -622,7 +650,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             * Whether the transactions associated with policy have exceeded the policy-wide spend limit.
         """
         # inactive policy
-        if not self.active:
+        if not self.is_redemption_enabled:
             logger.info('[credit_available] policy %s inactive', self.uuid)
             return False
 
@@ -1244,7 +1272,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         self.validate_requested_allocation_price(content_key, content_price_cents)
 
         # inactive policy
-        if not self.active:
+        if not self.is_redemption_enabled:
             return (False, REASON_POLICY_EXPIRED)
 
         # no content key in catalog

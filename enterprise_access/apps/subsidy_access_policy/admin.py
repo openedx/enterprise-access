@@ -10,6 +10,7 @@ from djangoql.admin import DjangoQLSearchMixin
 from pygments import highlight
 from pygments.formatters import HtmlFormatter  # pylint: disable=no-name-in-module
 from pygments.lexers import JsonLexer  # pylint: disable=no-name-in-module
+from simple_history.admin import SimpleHistoryAdmin
 
 from enterprise_access.apps.api.serializers.subsidy_access_policy import SubsidyAccessPolicyResponseSerializer
 from enterprise_access.apps.subsidy_access_policy import constants, models
@@ -39,7 +40,7 @@ def cents_to_usd_string(cents):
     return "${:,.2f}".format(float(cents) / constants.CENTS_PER_DOLLAR)
 
 
-class BaseSubsidyAccessPolicyMixin(admin.ModelAdmin):
+class BaseSubsidyAccessPolicyMixin(SimpleHistoryAdmin):
     """
     Mixin for common admin properties on subsidy access policy models.
     """
@@ -47,11 +48,18 @@ class BaseSubsidyAccessPolicyMixin(admin.ModelAdmin):
         'uuid',
         'modified',
         'active',
+        'retired',
         'display_name_or_short_description',
         'policy_spend_limit_dollars',
     )
+    history_list_display = (
+        'active',
+        'retired',
+        'spend_limit',
+    )
     list_filter = (
         'active',
+        'retired',
         'access_method',
     )
     ordering = ['-modified']
@@ -123,6 +131,9 @@ class PerLearnerEnrollmentCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcc
     list_display = BaseSubsidyAccessPolicyMixin.list_display + (
         'per_learner_enrollment_limit',
     )
+    history_list_display = BaseSubsidyAccessPolicyMixin.history_list_display + (
+        'per_learner_enrollment_limit',
+    )
     search_fields = (
         'uuid',
         'display_name',
@@ -140,6 +151,7 @@ class PerLearnerEnrollmentCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcc
                     'display_name',
                     'description',
                     'active',
+                    'retired',
                     'catalog_uuid',
                     'subsidy_uuid',
                     'created',
@@ -168,6 +180,9 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
     list_display = BaseSubsidyAccessPolicyMixin.list_display + (
         'per_learner_spend_limit_dollars',
     )
+    history_list_display = BaseSubsidyAccessPolicyMixin.history_list_display + (
+        'per_learner_spend_limit_dollars',
+    )
     readonly_fields = BaseSubsidyAccessPolicyMixin.readonly_fields + (
         'per_learner_spend_limit_dollars',
     )
@@ -188,6 +203,7 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
                     'display_name',
                     'description',
                     'active',
+                    'retired',
                     'catalog_uuid',
                     'subsidy_uuid',
                     'created',
@@ -244,6 +260,7 @@ class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcces
                     'display_name',
                     'description',
                     'active',
+                    'retired',
                     'catalog_uuid',
                     'subsidy_uuid',
                     'assignment_configuration',

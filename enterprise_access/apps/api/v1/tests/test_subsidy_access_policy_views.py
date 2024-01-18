@@ -270,6 +270,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         self.assertEqual({
             'access_method': 'direct',
             'active': True,
+            'retired': False,
             'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
             'display_name': self.redeemable_policy.display_name,
             'description': 'A generic description',
@@ -361,6 +362,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             {
                 'access_method': 'direct',
                 'active': True,
+                'retired': False,
                 'catalog_uuid': str(self.non_redeemable_policy.catalog_uuid),
                 'display_name': self.non_redeemable_policy.display_name,
                 'description': 'A generic description',
@@ -387,6 +389,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             {
                 'access_method': 'direct',
                 'active': True,
+                'retired': False,
                 'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
                 'display_name': self.redeemable_policy.display_name,
                 'description': 'A generic description',
@@ -480,6 +483,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         expected_response = {
             'access_method': 'direct',
             'active': False,
+            'retired': False,
             'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
             'display_name': self.redeemable_policy.display_name,
             'description': 'A generic description',
@@ -526,6 +530,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'description': 'the new description',
                 'display_name': 'new display_name',
                 'active': True,
+                'retired': True,
                 'catalog_uuid': str(uuid4()),
                 'subsidy_uuid': str(uuid4()),
                 'access_method': AccessMethods.ASSIGNED,
@@ -540,6 +545,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'description': 'the new description',
                 'display_name': 'new display_name',
                 'active': True,
+                'retired': True,
                 'catalog_uuid': str(uuid4()),
                 'subsidy_uuid': str(uuid4()),
                 'access_method': AccessMethods.ASSIGNED,
@@ -586,6 +592,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             # Fields that we officially support PATCHing.
             'access_method': policy_for_edit.access_method,
             'active': policy_for_edit.active,
+            'retired': policy_for_edit.retired,
             'catalog_uuid': str(policy_for_edit.catalog_uuid),
             'display_name': policy_for_edit.display_name,
             'description': policy_for_edit.description,
@@ -802,12 +809,13 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             },
         ])
 
-        # Test the retrieve endpoint
+        # Test the create endpoint
         payload = {
             'policy_type': policy_type,
             'display_name': 'created policy',
             'description': 'test description',
             'active': True,
+            'retired': False,
             'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
             'catalog_uuid': str(uuid4()),
             'subsidy_uuid': str(uuid4()),
@@ -863,6 +871,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             'display_name': 'new policy',
             'description': 'test description',
             'active': True,
+            'retired': False,
             'enterprise_customer_uuid': enterprise_customer_uuid,
             'catalog_uuid': catalog_uuid,
             'subsidy_uuid': subsidy_uuid,
@@ -1287,6 +1296,11 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
             active=False,
+        )
+        # The following policy should never be returned as it has redeemability disabled.
+        PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            retired=True,
         )
         # The following policy should never be returned as it's had more spend than the `spend_limit`.
         PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
