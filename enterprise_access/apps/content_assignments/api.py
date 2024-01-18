@@ -594,7 +594,7 @@ def expire_assignment(assignment, content_metadata, modify_assignment=True):
     current_date = now()
 
     if auto_cancellation_date and current_date > auto_cancellation_date:
-        assignment_expiry_reason = AssignmentAutomaticExpiredReason.NIENTY_DAYS_PASSED
+        assignment_expiry_reason = AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
     elif enrollment_end_date and enrollment_end_date < current_date:
         assignment_expiry_reason = AssignmentAutomaticExpiredReason.ENROLLMENT_DATE_PASSED
     elif subsidy_expiration_datetime and subsidy_expiration_datetime < current_date:
@@ -612,7 +612,7 @@ def expire_assignment(assignment, content_metadata, modify_assignment=True):
             logger.info('Modifying assignment %s to expired', assignment.uuid)
             assignment.state = LearnerContentAssignmentStateChoices.CANCELLED
 
-            if assignment_expiry_reason == AssignmentAutomaticExpiredReason.NIENTY_DAYS_PASSED:
+            if assignment_expiry_reason == AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED:
                 assignment.clear_pii()
                 assignment.clear_historical_pii()
 
