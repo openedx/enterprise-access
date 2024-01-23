@@ -367,6 +367,52 @@ def send_cancel_email_for_pending_assignment(cancelled_assignment_uuid):
 
 
 # pylint: disable=abstract-method
+class SendExecutiveEducationNudgeTask(BaseAssignmentRetryAndErrorActionTask):
+    """
+    Base class for the ``send_exec_ed_enrollment_warmer`` task.
+    """
+    def add_errored_action(self, assignment, exc):
+        assignment.add_errored_reminded_action(exc)
+
+
+@shared_task(base=SendExecutiveEducationNudgeTask)
+def send_exec_ed_enrollment_warmer(assignment_uuid, days_before_course_start_date):
+    """
+    Send email via braze for nudging users of their pending accepted assignments
+    Args:
+        assignment_uuid: (string) the subsidy request uuid
+    """
+    assignment = _get_assignment_or_raise(assignment_uuid)
+
+    campaign_sender = BrazeCampaignSender(assignment)
+    braze_trigger_properties = campaign_sender.get_properties(
+        'contact_admin_link',
+        'organization',
+        'course_title',
+        'enrollment_deadline',
+        'start_date',
+        'course_partner',
+        'course_card_image',
+        'learner_portal_link',
+        'action_required_by',
+    )
+
+    braze_trigger_properties['days_before_course_start_date'] = days_before_course_start_date
+
+    campaign_uuid = settings.BRAZE_ASSIGNMENT_NUDGE_EXEC_ED_ACCEPTED_ASSIGNMENT_CAMPAIGN
+
+    campaign_sender.send_campaign_message(
+        braze_trigger_properties,
+        campaign_uuid,
+    )
+    logger.info(
+        f'Sent braze campaign nudge reminder at '
+        f'days_before_course_start_date={days_before_course_start_date} '
+        f'uuid={campaign_uuid} message for assignment {assignment}'
+    )
+
+
+# pylint: disable=abstract-method
 class SendReminderEmailTask(BaseAssignmentRetryAndErrorActionTask):
     """
     Base class for the ``send_reminder_email_for_pending_assignment`` task.

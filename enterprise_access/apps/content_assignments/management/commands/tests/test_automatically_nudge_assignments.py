@@ -102,7 +102,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
         )
 
     @mock.patch(COMMAND_PATH + '.get_content_metadata_for_assignments')
-    @mock.patch('enterprise_access.apps.content_assignments.api.send_reminder_email_for_pending_assignment.delay')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.send_exec_ed_enrollment_warmer.delay')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     def test_command_dry_run(
             self,
@@ -113,14 +113,10 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
         """
         Verify that management command work as expected in dry run mode.
         """
-        enrollment_end = timezone.now() - timezone.timedelta(days=5)
-        enrollment_end = enrollment_end.replace(microsecond=0)
-        subsidy_expiry = timezone.now() + timezone.timedelta(days=5)
-        subsidy_expiry = subsidy_expiry.replace(microsecond=0)
-        start_date = timezone.now() + timezone.timedelta(days=30)
-        start_date = start_date.replace(microsecond=0)
-        end_date = timezone.now() + timezone.timedelta(days=180)
-        end_date = end_date.replace(microsecond=0)
+        enrollment_end = timezone.now().replace(microsecond=0) - timezone.timedelta(days=5)
+        subsidy_expiry = timezone.now().replace(microsecond=0) + timezone.timedelta(days=5)
+        start_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=30)
+        end_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=180)
 
         mock_subsidy_client.retrieve_subsidy.return_value = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),
@@ -194,25 +190,21 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
         mock_send_reminder_email_for_pending_assignment_task.assert_not_called()
 
     @mock.patch(COMMAND_PATH + '.get_content_metadata_for_assignments')
-    @mock.patch('enterprise_access.apps.content_assignments.api.send_reminder_email_for_pending_assignment.delay')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.send_exec_ed_enrollment_warmer.delay')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     def test_command(
             self,
             mock_subsidy_client,
-            mock_send_reminder_email_for_pending_assignment_task,
+            mock_send_exec_ed_enrollment_warmer_task,
             mock_content_metadata_for_assignments,
     ):
         """
         Verify that management command work as expected.
         """
-        enrollment_end = timezone.now() + timezone.timedelta(days=5)
-        enrollment_end = enrollment_end.replace(microsecond=0)
-        subsidy_expiry = timezone.now() - timezone.timedelta(days=5)
-        subsidy_expiry = subsidy_expiry.replace(microsecond=0)
-        start_date = timezone.now() + timezone.timedelta(days=14)
-        start_date = start_date.replace(microsecond=0)
-        end_date = timezone.now() + timezone.timedelta(days=180)
-        end_date = end_date.replace(microsecond=0)
+        enrollment_end = timezone.now().replace(microsecond=0) + timezone.timedelta(days=5)
+        subsidy_expiry = timezone.now().replace(microsecond=0) - timezone.timedelta(days=5)
+        start_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=14)
+        end_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=180)
 
         mock_subsidy_client.retrieve_subsidy.return_value = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),
@@ -237,7 +229,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                     'enroll_by_date': enrollment_end.strftime("%Y-%m-%d %H:%M"),
                     'content_price': 321,
                 },
-                'course_type': 'executive-education',
+                'course_type': 'executive-education-2u',
             },
             'edX+edXTesseract4D': {
                 'key': 'edX+edXTesseract4D',
@@ -283,31 +275,29 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
 
         call_command(self.command, days_before_course_start_date=14)
 
-        mock_send_reminder_email_for_pending_assignment_task.assert_has_calls([
-            call(self.alice_assignment.uuid),
-            call(self.bob_assignment.uuid),
+        mock_send_exec_ed_enrollment_warmer_task.assert_has_calls([
+            call(self.alice_assignment.uuid, 14),
+            call(self.bob_assignment.uuid, 14),
+            call(self.rob_assignment.uuid, 14),
+            call(self.richard_assignment.uuid, 14)
         ])
 
     @mock.patch(COMMAND_PATH + '.get_content_metadata_for_assignments')
-    @mock.patch('enterprise_access.apps.content_assignments.api.send_reminder_email_for_pending_assignment.delay')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.send_exec_ed_enrollment_warmer.delay')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     def test_command_multiple_assignment_dates(
             self,
             mock_subsidy_client,
-            mock_send_reminder_email_for_pending_assignment_task,
+            mock_send_exec_ed_enrollment_warmer_task,
             mock_content_metadata_for_assignments,
     ):
         """
         Verify that management command work as expected given multiple dates have been mocked.
         """
-        enrollment_end = timezone.now() + timezone.timedelta(days=5)
-        enrollment_end = enrollment_end.replace(microsecond=0)
-        subsidy_expiry = timezone.now() - timezone.timedelta(days=5)
-        subsidy_expiry = subsidy_expiry.replace(microsecond=0)
-        start_date = timezone.now() + timezone.timedelta(days=14)
-        start_date = start_date.replace(microsecond=0)
-        end_date = timezone.now() + timezone.timedelta(days=180)
-        end_date = end_date.replace(microsecond=0)
+        enrollment_end = timezone.now().replace(microsecond=0) + timezone.timedelta(days=5)
+        subsidy_expiry = timezone.now().replace(microsecond=0) - timezone.timedelta(days=5)
+        start_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=14)
+        end_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=180)
 
         # Three nonpassing dates for assignments
         start_date_beyond_30_days = timezone.now() + timezone.timedelta(days=90)
@@ -388,30 +378,26 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
 
         call_command(self.command, days_before_course_start_date=14)
 
-        mock_send_reminder_email_for_pending_assignment_task.assert_has_calls([
-            call(self.alice_assignment.uuid),
+        mock_send_exec_ed_enrollment_warmer_task.assert_has_calls([
+            call(self.alice_assignment.uuid, 14),
         ])
 
     @mock.patch(COMMAND_PATH + '.get_content_metadata_for_assignments')
-    @mock.patch('enterprise_access.apps.content_assignments.api.send_reminder_email_for_pending_assignment.delay')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.send_exec_ed_enrollment_warmer.delay')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     def test_command_multiple_assignment_course_types(
             self,
             mock_subsidy_client,
-            mock_send_reminder_email_for_pending_assignment_task,
+            mock_send_exec_ed_enrollment_warmer_task,
             mock_content_metadata_for_assignments,
     ):
         """
         Verify that management command work as expected given a course_type is not executive-education.
         """
-        enrollment_end = timezone.now() + timezone.timedelta(days=5)
-        enrollment_end = enrollment_end.replace(microsecond=0)
-        subsidy_expiry = timezone.now() - timezone.timedelta(days=5)
-        subsidy_expiry = subsidy_expiry.replace(microsecond=0)
-        start_date = timezone.now() + timezone.timedelta(days=14)
-        start_date = start_date.replace(microsecond=0)
-        end_date = timezone.now() + timezone.timedelta(days=180)
-        end_date = end_date.replace(microsecond=0)
+        enrollment_end = timezone.now().replace(microsecond=0) + timezone.timedelta(days=5)
+        subsidy_expiry = timezone.now().replace(microsecond=0) - timezone.timedelta(days=5)
+        start_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=14)
+        end_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=180)
 
         mock_subsidy_client.retrieve_subsidy.return_value = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),
@@ -484,31 +470,27 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
 
         call_command(self.command, days_before_course_start_date=14)
 
-        mock_send_reminder_email_for_pending_assignment_task.assert_has_calls([
-            call(self.alice_assignment.uuid),
+        mock_send_exec_ed_enrollment_warmer_task.assert_has_calls([
+            call(self.alice_assignment.uuid, 14),
         ])
 
     @mock.patch(COMMAND_PATH + '.get_content_metadata_for_assignments')
-    @mock.patch('enterprise_access.apps.content_assignments.api.send_reminder_email_for_pending_assignment.delay')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.send_exec_ed_enrollment_warmer.delay')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     def test_command_multiple_assignment_states(
             self,
             mock_subsidy_client,
-            mock_send_reminder_email_for_pending_assignment_task,
+            mock_send_exec_ed_enrollment_warmer_task,
             mock_content_metadata_for_assignments,
     ):
         """
         Verify that management command work as expected given the state of the course is allocated,
         cancelled or errored state.
         """
-        enrollment_end = timezone.now() + timezone.timedelta(days=5)
-        enrollment_end = enrollment_end.replace(microsecond=0)
-        subsidy_expiry = timezone.now() - timezone.timedelta(days=5)
-        subsidy_expiry = subsidy_expiry.replace(microsecond=0)
-        start_date = timezone.now() + timezone.timedelta(days=14)
-        start_date = start_date.replace(microsecond=0)
-        end_date = timezone.now() + timezone.timedelta(days=180)
-        end_date = end_date.replace(microsecond=0)
+        enrollment_end = timezone.now().replace(microsecond=0) + timezone.timedelta(days=5)
+        subsidy_expiry = timezone.now().replace(microsecond=0) - timezone.timedelta(days=5)
+        start_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=14)
+        end_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=180)
 
         # Update bobs assignment state
         self.bob_assignment.state = LearnerContentAssignmentStateChoices.ERRORED
@@ -582,6 +564,6 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
 
         call_command(self.command, days_before_course_start_date=14)
 
-        mock_send_reminder_email_for_pending_assignment_task.assert_has_calls([
-            call(self.alice_assignment.uuid),
+        mock_send_exec_ed_enrollment_warmer_task.assert_has_calls([
+            call(self.alice_assignment.uuid, 14),
         ])

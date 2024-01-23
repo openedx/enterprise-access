@@ -7,13 +7,15 @@ import logging
 
 from django.core.management.base import BaseCommand
 from django.core.paginator import Paginator
-from django.utils import timezone
 
-from enterprise_access.apps.content_assignments.api import send_reminder_email_for_pending_assignment
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
-from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
+from enterprise_access.apps.content_assignments.content_metadata_api import (
+    get_content_metadata_for_assignments,
+    is_date_n_days_from_now,
+    parse_datetime_string
+)
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
-from enterprise_access.apps.content_assignments.utils import are_dates_matching_with_day_offset
+from enterprise_access.apps.content_assignments.tasks import send_exec_ed_enrollment_warmer
 
 logger = logging.getLogger(__name__)
 
@@ -102,17 +104,15 @@ class Command(BaseCommand):
                     start_date = content_metadata.get('normalized_metadata', {}).get('start_date')
                     course_type = content_metadata.get('course_type')
 
-                    is_executive_education_course_type = course_type in (
-                        'executive-education-2u', 'executive-education')
+                    is_executive_education_course_type = course_type == 'executive-education-2u'
 
                     # Determine if the date from today + days_before_course_state_date is
                     # equal to the date of the start date
                     # If they are equal, then send the nudge email, otherwise continue
-                    datetime_start_date = self.to_datetime(start_date)
-                    can_send_nudge_notification_in_advance = are_dates_matching_with_day_offset(
-                        days_offset=days_before_course_start_date,
-                        target_date=datetime_start_date,
-                        date_to_offset=timezone.now(),
+                    datetime_start_date = parse_datetime_string(start_date, set_to_utc=True)
+                    can_send_nudge_notification_in_advance = is_date_n_days_from_now(
+                        target_datetime=datetime_start_date,
+                        num_days=days_before_course_start_date
                     )
 
                     if is_executive_education_course_type and can_send_nudge_notification_in_advance:
@@ -122,14 +122,15 @@ class Command(BaseCommand):
                             'days_before_course_start_date: [%s], can_send_nudge_notification_in_advance: [%s], '
                             'course_type: [%s], dry_run [%s]'
                         )
-                        logger.info(message,
-                                    assignment_configuration.uuid,
-                                    start_date,
-                                    datetime_start_date,
-                                    days_before_course_start_date,
-                                    can_send_nudge_notification_in_advance,
-                                    course_type,
-                                    dry_run,
-                                    )
+                        logger.info(
+                            message,
+                            assignment_configuration.uuid,
+                            start_date,
+                            datetime_start_date,
+                            days_before_course_start_date,
+                            can_send_nudge_notification_in_advance,
+                            course_type,
+                            dry_run,
+                        )
                         if not dry_run:
-                            send_reminder_email_for_pending_assignment.delay(assignment.uuid)
+                            send_exec_ed_enrollment_warmer.delay(assignment.uuid, days_before_course_start_date)

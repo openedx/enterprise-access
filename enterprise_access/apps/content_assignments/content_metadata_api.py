@@ -2,7 +2,9 @@
 API file interacting with assignment metadata (created to avoid a circular
 import error)
 """
-from datetime import datetime
+import datetime
+
+from django.utils import timezone
 
 from enterprise_access.apps.content_metadata.api import get_and_cache_catalog_content_metadata
 
@@ -60,7 +62,7 @@ def get_human_readable_date(datetime_string, output_pattern=DEFAULT_STRFTIME_PAT
     return None
 
 
-def parse_datetime_string(datetime_string):
+def parse_datetime_string(datetime_string, **set_to_utc):
     """
     Given a datetime string value from some content metadata record,
     parse it into a datetime object.
@@ -71,7 +73,10 @@ def parse_datetime_string(datetime_string):
     last_exception = None
     for input_pattern in DATE_INPUT_PATTERNS:
         try:
-            return datetime.strptime(datetime_string, input_pattern)
+            formatted_date = datetime.datetime.strptime(datetime_string, input_pattern)
+            if set_to_utc:
+                return formatted_date.replace(tzinfo=datetime.timezone.utc)
+            return formatted_date
         except ValueError as exc:
             last_exception = exc
 
@@ -97,3 +102,14 @@ def get_course_partners(course_metadata):
     if len(names) == 2:
         return ' and '.join(names)
     return ', '.join(names[:-1]) + ', and ' + names[-1]
+
+
+def is_date_n_days_from_now(target_datetime, num_days):
+    """
+    Takes an integer number of days to offset from the date_to_offset to determine if
+    the target_date matches the date_to_offset + days_offset date
+
+    The target_date and date_to_offset arguments are UTC timezone objects
+    """
+    future_datetime = timezone.now() + timezone.timedelta(days=num_days)
+    return target_datetime.date() == future_datetime.date()
