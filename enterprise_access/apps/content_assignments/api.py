@@ -275,12 +275,16 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     # different this time. It's technically possible some learners have registered since the last request.
     assignments_with_updated_lms_user_id = _try_populate_assignments_lms_user_id(existing_assignments)
 
+    # Set a batch ID to track assignments updated and/or created together.
+    allocation_batch_id = uuid4()
+
     # Split up the existing assignment records by state
     for assignment in existing_assignments:
         learner_emails_with_existing_assignments.add(assignment.learner_email.lower())
         if assignment.state in LearnerContentAssignmentStateChoices.REALLOCATE_STATES:
             assignment.content_quantity = content_quantity
             assignment.state = LearnerContentAssignmentStateChoices.ALLOCATED
+            assignment.allocation_batch_id = allocation_batch_id
             assignment.full_clean()
             cancelled_or_errored_to_update.append(assignment)
         else:
@@ -298,8 +302,8 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
             [
                 # `lms_user_id` is updated via the _try_populate_assignments_lms_user_id() function.
                 'lms_user_id',
-                # `content_quantity` and `state` are updated via the for-loop above.
-                'content_quantity', 'state',
+                # 'allocation_batch_id', `content_quantity` and `state` are updated via the for-loop above.
+                'allocation_batch_id', 'content_quantity', 'state',
             ]
         )
 
@@ -315,6 +319,7 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
             learner_emails_for_assignment_creation,
             content_key,
             content_quantity,
+            allocation_batch_id,
         )
 
     # Enqueue an asynchronous task to link assigned learners to the customer
@@ -431,14 +436,19 @@ def _try_populate_assignments_lms_user_id(assignments):
     return assignments_to_save
 
 
-def _create_new_assignments(assignment_configuration, learner_emails, content_key, content_quantity):
+def _create_new_assignments(
+    assignment_configuration,
+    learner_emails,
+    content_key,
+    content_quantity,
+    allocation_batch_id
+):
     """
     Helper to bulk save new LearnerContentAssignment instances.
     """
     # First, prepare assignment objects using data available in-memory only.
     content_title = _get_content_title(assignment_configuration, content_key)
     assignments_to_create = []
-    allocation_batch_id = uuid4()
     for learner_email in learner_emails:
         assignment = LearnerContentAssignment(
             assignment_configuration=assignment_configuration,
