@@ -1,6 +1,8 @@
 """
 Models for content_assignments
 """
+
+import logging
 from uuid import UUID, uuid4
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
@@ -10,19 +12,24 @@ from django.db.models.fields import BooleanField, CharField, DateTimeField, Inte
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
+from pytz import UTC
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_create_with_history, bulk_update_with_history
 
 from .constants import (
-    NUM_DAYS_BEFORE_AUTO_CANCELLATION,
+    NUM_DAYS_BEFORE_AUTO_EXPIRATION,
     RETIRED_EMAIL_ADDRESS,
     AssignmentActionErrors,
     AssignmentActions,
+    AssignmentAutomaticExpiredReason,
     AssignmentLearnerStates,
     AssignmentRecentActionTypes,
     LearnerContentAssignmentStateChoices
 )
+from .content_metadata_api import get_content_metadata_for_assignments, parse_datetime_string
 from .utils import format_traceback
+
+logger = logging.getLogger(__name__)
 
 BULK_OPERATION_BATCH_SIZE = 50
 
@@ -84,6 +91,142 @@ class AssignmentConfiguration(TimeStampedModel):
             return self.subsidy_access_policy  # pylint: disable=no-member
         except ObjectDoesNotExist:
             return None
+
+    # @property
+    # def unacknowledged_assignments(self):
+    #     """ Helper to fetch all unacknowledged assignments for this configuration. """
+    #     return self.assignments.all()
+
+    def _should_acknowledge_expired_assignment(self, assignment):
+        """
+        Returns a tuple of booleans indicating whether the given assignment should be acknowledged and
+        whether the assignment has already been acknowledged.
+        """
+        if assignment.state != LearnerContentAssignmentStateChoices.EXPIRED:
+            return False, False
+
+        last_expiration = assignment.get_last_successful_expiration_action()
+        expiration_last_acknowledged = assignment.get_last_successful_acknowledged_expired_action()
+        if not last_expiration:
+            logger.error(
+                'Assignment %s is in state %s but has no successful expiration action.',
+                assignment.uuid,
+                LearnerContentAssignmentStateChoices.EXPIRED,
+            )
+
+        # Check whether expiration has ever been acknowledged; if not, acknowledge it.
+        if not expiration_last_acknowledged:
+            return True, False
+
+        # If it has been acknowledged before, check whether last expiration action is newer
+        # than the last acknowledged expiration action.
+        if last_expiration and last_expiration.completed_at > expiration_last_acknowledged.completed_at:
+            return True, True
+
+        # Otherwise, the expiration has already been acknowledged and should not be acknowledged again.
+        return False, True
+
+    def _should_acknowledge_cancelled_assignment(self, assignment):
+        """
+        Returns a tuple of booleans indicating whether the given assignment should be acknowledged and
+        whether the assignment has already been acknowledged.
+        """
+        if assignment.state != LearnerContentAssignmentStateChoices.CANCELLED:
+            return False, False
+
+        last_cancellation = assignment.get_last_successful_cancel_action()
+        cancellation_last_acknowledged = assignment.get_last_successful_acknowledged_cancelled_action()
+        if not last_cancellation:
+            logger.error(
+                'Assignment %s is in state %s but has no successful expiration action.',
+                assignment.uuid,
+                LearnerContentAssignmentStateChoices.EXPIRED,
+            )
+
+        # Check whether cancellation has ever been acknowledged; if not, acknowledge it.
+        if not cancellation_last_acknowledged:
+            return True, False
+
+        # If it has been acknowledged before, check whether last camcellation action is newer
+        # than the last acknowledged cancellation action.
+        if last_cancellation and last_cancellation.completed_at > cancellation_last_acknowledged.completed_at:
+            return True, True
+
+        # Otherwise, the cancellation has already been acknowledged and should not be acknowledged again.
+        return False, True
+
+    def acknowledge_assignments(self, assignment_uuids, lms_user_id):
+        """
+        Acknowledges the given assignment UUIDs, related to this AssignmentConfiguration.
+
+        Returns a tuple of lists of assignments:
+
+        * acknowledged_assignments: assignments that were successfully acknowledged
+        * already_acknowledged_assignments: assignments that were already acknowledged
+        * unacknowledged_assignments: assignments that could not be acknowledged, and were
+          not already acknowledged
+
+        Raises a ValidationError if no assignments were found for the given assignment_uuids and
+        the requesting user's lms_user_id.
+        """
+        assignments_to_acknowledge = self.assignments.filter(
+            uuid__in=assignment_uuids,
+            lms_user_id=lms_user_id,
+        )
+        if not assignments_to_acknowledge:
+            raise ValidationError(
+                f'No assignments found for assignment_uuids={assignment_uuids} and lms_user_id={lms_user_id}.'
+            )
+
+        acknowledged_assignments = []
+        already_acknowledged_assignments = []
+        unacknowledged_assignments = []
+
+        for assignment in assignments_to_acknowledge:
+            acknowledge_expiration, already_acknowledged_expiration = self._should_acknowledge_expired_assignment(
+                assignment
+            )
+            acknowledge_cancellation, already_acknowledged_cancellation = self._should_acknowledge_cancelled_assignment(
+                assignment
+            )
+
+            # Acknowledge the expiration, if necessary.
+            if acknowledge_expiration:
+                assignment.add_successful_acknowledged_expired_action()
+                acknowledged_assignments.append(assignment)
+
+            # Acknowledge the cancellation, if necessary.
+            if acknowledge_cancellation:
+                assignment.add_successful_acknowledged_cancelled_action()
+                acknowledged_assignments.append(assignment)
+
+            # Learner has already acknowledged this expiration or cancellation, so add it to
+            # the returned already acknowledged list.
+            has_already_acknowledged_expiration = not acknowledge_expiration and already_acknowledged_expiration
+            has_already_acknowledged_cancellation = not acknowledge_cancellation and already_acknowledged_cancellation
+            if has_already_acknowledged_expiration or has_already_acknowledged_cancellation:
+                already_acknowledged_assignments.append(assignment)
+
+            # If we didn't acknowledge the assignment (e.g., assignment isn't expired or cancelled),
+            # add it to returned unacknowledged list. This is a defensive check / safegaurd, and provides
+            # feedback to the caller that some assignments were not acknowledged.
+            if (
+                not acknowledge_expiration and
+                not acknowledge_cancellation and
+                assignment not in already_acknowledged_assignments
+            ):
+                unacknowledged_assignments.append(assignment)
+
+        # Given any unacknowledged assignments (e.g., assignments that aren't
+        # expired or cancelled), log an error as this is unexpected.
+        if unacknowledged_assignments:
+            logger.error(
+                'Attempted to acknowledge assignments %s but assignments could not be acknowledged: %s',
+                assignment_uuids,
+                unacknowledged_assignments,
+            )
+
+        return acknowledged_assignments, already_acknowledged_assignments, unacknowledged_assignments
 
 
 class LearnerContentAssignment(TimeStampedModel):
@@ -171,6 +314,31 @@ class LearnerContentAssignment(TimeStampedModel):
             f"{[choice[0] for choice in LearnerContentAssignmentStateChoices.CHOICES]}"
         ),
     )
+    allocated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="The last time the assignment was allocated. Null means the assignment is not allocated.",
+    )
+    accepted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="The last time this assignment was accepted. Null means the assignment is not accepted.",
+    )
+    cancelled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="The last time this assignment was cancelled. Null means the assignment is not cancelled.",
+    )
+    expired_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="The last time this assignment was expired. Null means the assignment is not expired.",
+    )
+    errored_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="The last time this assignment was in an error state. Null means the assignment is not errored.",
+    )
     transaction_uuid = models.UUIDField(
         blank=True,
         null=True,
@@ -179,15 +347,6 @@ class LearnerContentAssignment(TimeStampedModel):
             f"null if state != {LearnerContentAssignmentStateChoices.ACCEPTED}."
         ),
     )
-    last_notification_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text=(
-            "The last time the learner was notified or reminded about this assignment.  Null means the learner has not "
-            "been notified."
-        ),
-    )
-
     allocation_batch_id = models.UUIDField(
         null=True,
         blank=True,
@@ -246,7 +405,66 @@ class LearnerContentAssignment(TimeStampedModel):
             batch_size=BULK_OPERATION_BATCH_SIZE,
         )
 
-    def get_auto_expiration_date(self):
+    def learner_acknowledged(self):
+        """
+        Returns whether or not the learner has acknowledged the assignment.
+        """
+        if self.state == LearnerContentAssignmentStateChoices.EXPIRED:
+            last_expired_action = self.get_last_successful_expiration_action()
+            if not last_expired_action:
+                logger.warning(
+                    'LearnerContentAssignment with UUID %s is in an expired state, but has no related '
+                    'actions in an expired state.',
+                    self.uuid,
+                )
+                return False
+            return last_expired_action.learner_acknowledged()
+
+        if self.state == LearnerContentAssignmentStateChoices.CANCELLED:
+            last_cancelled_action = self.get_last_successful_cancel_action()
+            if not last_cancelled_action:
+                logger.warning(
+                    'LearnerContentAssignment with UUID %s is in a cancelled state, but has no related '
+                    'actions in a cancelled state.',
+                    self.uuid,
+                )
+                return False
+            return last_cancelled_action.learner_acknowledged()
+
+        # Fallback to None, in case the assignment is in a state that may not be acknowledged.
+        return None
+
+    def _get_enrollment_deadline_date(self, content_metadata):
+        """
+        Helper to get the enrollment end date from a content metadata record.
+        """
+        if content_metadata is not None:
+            normalized_metadata = content_metadata.get('normalized_metadata') or {}
+            enrollment_end_date_str = normalized_metadata.get('enroll_by_date')
+            try:
+                datetime_obj = parse_datetime_string(enrollment_end_date_str)
+                if datetime_obj:
+                    return datetime_obj.replace(tzinfo=UTC)
+            except ValueError:
+                logger.warning(
+                    'Bad datetime format for %s, value: %s',
+                    content_metadata.get('key'),
+                    enrollment_end_date_str,
+                )
+        return None
+
+    def get_subsidy_expiration(self):
+        """
+        Returns the datetime at which the subsidy for this assignment expires.
+        """
+        subsidy_expiration_datetime = parse_datetime_string(
+            self.assignment_configuration.policy.subsidy_expiration_datetime
+        )
+        if subsidy_expiration_datetime:
+            subsidy_expiration_datetime = subsidy_expiration_datetime.replace(tzinfo=UTC)
+        return subsidy_expiration_datetime
+
+    def get_allocation_timeout_expiration(self):
         """
         Returns the date at which this assignment expires due to
         waiting too long to move into the "accepted" state.  Note that
@@ -255,13 +473,79 @@ class LearnerContentAssignment(TimeStampedModel):
         """
         last_notification = self.get_last_successful_notified_action()
         # If we're currently sending the first notification message,
-        # we won't yet have a successful action, so use the creation time of
+        # we won't yet have a successful action, so use the created time of
         # the assignment as the starting_point
         if not last_notification:
             starting_point = self.created
         else:
             starting_point = last_notification.completed_at
-        return starting_point + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION)
+        allocation_timeout_expiration = starting_point + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+        allocation_timeout_expiration = allocation_timeout_expiration.replace(tzinfo=UTC)
+        return allocation_timeout_expiration
+
+    def get_automatic_expiration_date_and_reason(self):
+        """
+        For the given assignment, returns the date at which this assignment expires due to:
+        * subsidy expiration
+        * content enrollment deadline
+        * 90-day timeout from allocation
+
+        Whichever of the three above dates is the earliest is returned, along with the reason
+        for the expiration as a dictionary.
+        """
+        assignment_configuration = self.assignment_configuration
+        subsidy_access_policy = assignment_configuration.subsidy_access_policy  # pylint: disable=no-member
+
+        # subsidy expiration
+        subsidy_expiration_datetime = self.get_subsidy_expiration()
+
+        # content enrollment deadline
+        content_key = self.content_key
+        content_metadata_by_key = get_content_metadata_for_assignments(
+            enterprise_catalog_uuid=subsidy_access_policy.catalog_uuid,
+            assignments=[self],
+        )
+        content_metadata = content_metadata_by_key.get(content_key)
+        enrollment_deadline_datetime = self._get_enrollment_deadline_date(content_metadata)
+        if enrollment_deadline_datetime:
+            enrollment_deadline_datetime = enrollment_deadline_datetime.replace(tzinfo=UTC)
+
+        # 90-day timeout from allocation
+        timeout_expiration_datetime = self.get_allocation_timeout_expiration()
+
+        # Determine which of the three expiration dates is the earliest
+        subsidy_expiration = {
+            'date': subsidy_expiration_datetime,
+            'reason': AssignmentAutomaticExpiredReason.SUBSIDY_EXPIRED,
+        }
+        enrollment_deadline = {
+            'date': enrollment_deadline_datetime,
+            'reason': AssignmentAutomaticExpiredReason.ENROLLMENT_DATE_PASSED,
+        }
+        timeout_expiration = {
+            'date': timeout_expiration_datetime,
+            'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED,
+        }
+        expiration_dates = [subsidy_expiration, enrollment_deadline, timeout_expiration]
+        sorted_available_expiration_dates = sorted(
+            filter(lambda x: x['date'] is not None, expiration_dates),
+            key=lambda x: x['date'],
+        )
+        action_required_by = sorted_available_expiration_dates[0]
+        message = (
+            'action_required_by assignment=%s: subsidy_expiration=%s, enrollment_deadline=%s, '
+            'timeout_expiration_date=%s, action_required_by_datetime=%s, action_required_by_reason=%s',
+        )
+        logger.info(
+            message,
+            self.uuid,
+            subsidy_expiration_datetime,
+            enrollment_deadline_datetime,
+            timeout_expiration_datetime,
+            action_required_by['date'],
+            action_required_by['reason'],
+        )
+        return action_required_by
 
     def get_last_successful_linked_action(self):
         """
@@ -357,12 +641,22 @@ class LearnerContentAssignment(TimeStampedModel):
             traceback=format_traceback(exc),
         )
 
+    def get_last_successful_cancel_action(self):
+        """
+        Returns all successful "cancelled" LearnerContentAssignmentActions for this assignment,
+        or None if no such record exists.
+        """
+        return self.actions.filter(
+            action_type=AssignmentActions.CANCELLED,
+            error_reason=None,
+        ).order_by('-completed_at').first()
+
     def add_successful_cancel_action(self):
         """
         Adds a successful "cancel" LearnerContentAssignmentAction for this assignment record.
         """
         return self.actions.create(
-            action_type=AssignmentActions.CANCELLED_NOTIFICATION,
+            action_type=AssignmentActions.CANCELLED,
             completed_at=timezone.now(),
         )
 
@@ -371,17 +665,27 @@ class LearnerContentAssignment(TimeStampedModel):
         Adds an errored "cancel" LearnerContentAssignmentAction for this assignment record.
         """
         return self.actions.create(
-            action_type=AssignmentActions.CANCELLED_NOTIFICATION,
+            action_type=AssignmentActions.CANCELLED,
             error_reason=AssignmentActionErrors.EMAIL_ERROR,
             traceback=format_traceback(exc),
         )
+
+    def get_last_successful_expiration_action(self):
+        """
+        Returns all successful "expired" LearnerContentAssignmentActions for this assignment,
+        or None if no such record exists.
+        """
+        return self.actions.filter(
+            action_type=AssignmentActions.EXPIRED,
+            error_reason=None,
+        ).order_by('-completed_at').first()
 
     def add_successful_expiration_action(self):
         """
         Adds a successful expiration LearnerContentAssignmentAction for this assignment record.
         """
         return self.actions.create(
-            action_type=AssignmentActions.AUTOMATIC_CANCELLATION_NOTIFICATION,
+            action_type=AssignmentActions.EXPIRED,
             completed_at=timezone.now(),
         )
 
@@ -390,10 +694,20 @@ class LearnerContentAssignment(TimeStampedModel):
         Adds an errored expiration LearnerContentAssignmentAction for this assignment record.
         """
         return self.actions.create(
-            action_type=AssignmentActions.AUTOMATIC_CANCELLATION_NOTIFICATION,
+            action_type=AssignmentActions.EXPIRED,
             error_reason=AssignmentActionErrors.EMAIL_ERROR,
             traceback=format_traceback(exc),
         )
+
+    def get_last_successful_redeemed_action(self):
+        """
+        Returns all successful "redeemed" LearnerContentAssignmentActions for this assignment,
+        or None if no such record exists.
+        """
+        return self.actions.filter(
+            action_type=AssignmentActions.REDEEMED,
+            error_reason=None,
+        ).order_by('-completed_at').first()
 
     def add_successful_redeemed_action(self):
         """
@@ -412,6 +726,44 @@ class LearnerContentAssignment(TimeStampedModel):
             action_type=AssignmentActions.REDEEMED,
             error_reason=AssignmentActionErrors.ENROLLMENT_ERROR,
             traceback=format_traceback(exc),
+        )
+
+    def get_last_successful_acknowledged_cancelled_action(self):
+        """
+        Returns the last successful "acknowledged" cancellation LearnerContentAssignmentActions for this assignment,
+        or None if no such record exists.
+        """
+        return self.actions.filter(
+            action_type=AssignmentActions.CANCELLED_ACKNOWLEDGED,
+            error_reason=None,
+        ).order_by('-completed_at').first()
+
+    def add_successful_acknowledged_cancelled_action(self):
+        """
+        Adds a successful acknowledged LearnerContentAssignmentAction for this assignment record.
+        """
+        return self.actions.create(
+            action_type=AssignmentActions.CANCELLED_ACKNOWLEDGED,
+            completed_at=timezone.now(),
+        )
+
+    def get_last_successful_acknowledged_expired_action(self):
+        """
+        Returns the last successful "acknowledged" expiration LearnerContentAssignmentActions for this assignment,
+        or None if no such record exists.
+        """
+        return self.actions.filter(
+            action_type=AssignmentActions.EXPIRED_ACKNOWLEDGED,
+            error_reason=None,
+        ).order_by('-completed_at').first()
+
+    def add_successful_acknowledged_expired_action(self):
+        """
+        Adds a successful acknowledged LearnerContentAssignmentAction for this assignment record.
+        """
+        return self.actions.create(
+            action_type=AssignmentActions.EXPIRED_ACKNOWLEDGED,
+            completed_at=timezone.now(),
         )
 
     def clear_pii(self):
@@ -502,6 +854,10 @@ class LearnerContentAssignment(TimeStampedModel):
                     then=Value(AssignmentLearnerStates.WAITING),
                 ),
                 When(
+                    Q(state=LearnerContentAssignmentStateChoices.EXPIRED),
+                    then=Value(AssignmentLearnerStates.EXPIRED),
+                ),
+                When(
                     Q(state=LearnerContentAssignmentStateChoices.ERRORED),
                     then=Value(AssignmentLearnerStates.FAILED),
                 ),
@@ -586,3 +942,24 @@ class LearnerContentAssignmentAction(TimeStampedModel):
         return (
             f'uuid={self.uuid}, action_type={self.action_type}, error_reason={self.error_reason}'
         )
+
+    def learner_acknowledged(self):
+        """
+        Returns True if this action has been acknowledged, False otherwise. If
+        the action cannot be acknowledged, returns None.
+        """
+        # Check whether user has acknowledged the expiration.
+        if self.action_type == AssignmentActions.EXPIRED:
+            last_acknowledged_expiration = self.assignment.get_last_successful_acknowledged_expired_action()
+            if not last_acknowledged_expiration:
+                return False
+            return last_acknowledged_expiration.completed_at > self.completed_at
+
+        # Check whether user has acknowledged the cancellation.
+        if self.action_type == AssignmentActions.CANCELLED:
+            last_acknowledged_cancellation = self.assignment.get_last_successful_acknowledged_cancelled_action()
+            if not last_acknowledged_cancellation:
+                return False
+            return last_acknowledged_cancellation.completed_at > self.completed_at
+
+        return None

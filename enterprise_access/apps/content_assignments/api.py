@@ -11,8 +11,6 @@ from uuid import uuid4
 from django.db import transaction
 from django.db.models import Q, Sum
 from django.db.models.functions import Lower
-from django.utils.timezone import now
-from pytz import UTC
 
 from enterprise_access.apps.content_assignments.content_metadata_api import (
     get_content_metadata_for_assignments,
@@ -25,9 +23,9 @@ from enterprise_access.apps.content_assignments.tasks import (
 )
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
+from enterprise_access.utils import localized_utcnow
 
 from .constants import AssignmentAutomaticExpiredReason, LearnerContentAssignmentStateChoices
-from .content_metadata_api import parse_datetime_string
 from .models import AssignmentConfiguration, LearnerContentAssignment
 from .tasks import (
     create_pending_enterprise_learner_for_assignment_task,
@@ -293,6 +291,11 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
             assignment.content_quantity = content_quantity
             assignment.state = LearnerContentAssignmentStateChoices.ALLOCATED
             assignment.allocation_batch_id = allocation_batch_id
+            assignment.allocated_at = localized_utcnow()
+            assignment.accepted_at = None
+            assignment.cancelled_at = None
+            assignment.expired_at = None
+            assignment.errored_at = None
             assignment.full_clean()
             cancelled_or_errored_to_update.append(assignment)
         else:
@@ -310,8 +313,8 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
             [
                 # `lms_user_id` is updated via the _try_populate_assignments_lms_user_id() function.
                 'lms_user_id',
-                # 'allocation_batch_id', `content_quantity` and `state` are updated via the for-loop above.
-                'allocation_batch_id', 'content_quantity', 'state',
+                # The following fields are updated via the for-loop above.
+                'allocation_batch_id', 'allocated_at', 'content_quantity', 'state',
             ]
         )
 
@@ -466,6 +469,7 @@ def _create_new_assignments(
             content_quantity=content_quantity,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
             allocation_batch_id=allocation_batch_id,
+            allocated_at=localized_utcnow(),
         )
         assignments_to_create.append(assignment)
 
@@ -709,74 +713,31 @@ def expire_assignment(assignment, content_metadata, modify_assignment=True):
         logger.info('Cannot expire accepted assignment %s', assignment.uuid)
         return None
 
-    assignment_configuration = assignment.assignment_configuration
-    subsidy_expiration_datetime = parse_datetime_string(assignment_configuration.policy.subsidy_expiration_datetime)
-    if subsidy_expiration_datetime:
-        subsidy_expiration_datetime = subsidy_expiration_datetime.replace(tzinfo=UTC)
+    automatic_expiration_date_and_reason = assignment.get_automatic_expiration_date_and_reason()
+    automatic_expiration_date = automatic_expiration_date_and_reason['date']
+    automatic_expiration_reason = automatic_expiration_date_and_reason['reason']
 
-    enrollment_end_date = _get_enrollment_end_date(content_metadata)
-    auto_cancellation_date = assignment.get_auto_expiration_date()
+    if not automatic_expiration_date or automatic_expiration_date > localized_utcnow():
+        logger.info('Assignment %s is not expired yet', assignment.uuid)
+        return None
 
-    message = (
-        'Checking expirability for AssignmentUUID: [%s], ContentKey: [%s], AssignmentExpiry: [%s], '
-        'EnrollmentEnd: [%s], SubsidyExpiry: [%s]',
-    )
     logger.info(
-        message,
+        'Assignment should be expired. AssignmentConfigUUID: [%s], AssignmentUUID: [%s], Reason: [%s]',
+        assignment.assignment_configuration.uuid,
         assignment.uuid,
-        assignment.content_key,
-        auto_cancellation_date,
-        enrollment_end_date,
-        subsidy_expiration_datetime,
+        automatic_expiration_reason,
     )
 
-    assignment_expiry_reason = None
-    current_date = now()
+    if modify_assignment:
+        logger.info('Modifying assignment %s to expired', assignment.uuid)
+        assignment.state = LearnerContentAssignmentStateChoices.EXPIRED
+        assignment.expired_at = localized_utcnow()
 
-    if auto_cancellation_date and current_date > auto_cancellation_date:
-        assignment_expiry_reason = AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
-    elif enrollment_end_date and enrollment_end_date < current_date:
-        assignment_expiry_reason = AssignmentAutomaticExpiredReason.ENROLLMENT_DATE_PASSED
-    elif subsidy_expiration_datetime and subsidy_expiration_datetime < current_date:
-        assignment_expiry_reason = AssignmentAutomaticExpiredReason.SUBSIDY_EXPIRED
+        if automatic_expiration_reason == AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED:
+            assignment.clear_pii()
+            assignment.clear_historical_pii()
 
-    if assignment_expiry_reason:
-        logger.info(
-            'Assignment should be expired. AssignmentConfigUUID: [%s], AssignmentUUID: [%s], Reason: [%s]',
-            assignment_configuration.uuid,
-            assignment.uuid,
-            assignment_expiry_reason,
-        )
+        assignment.save()
+        send_assignment_automatically_expired_email.delay(assignment.uuid)
 
-        if modify_assignment:
-            logger.info('Modifying assignment %s to expired', assignment.uuid)
-            assignment.state = LearnerContentAssignmentStateChoices.CANCELLED
-
-            if assignment_expiry_reason == AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED:
-                assignment.clear_pii()
-                assignment.clear_historical_pii()
-
-            assignment.save()
-            send_assignment_automatically_expired_email.delay(assignment.uuid)
-
-    return assignment_expiry_reason
-
-
-def _get_enrollment_end_date(content_metadata):
-    """
-    Helper to get the enrollment end date from a content metadata record.
-    """
-    if content_metadata is not None:
-        normalized_metadata = content_metadata.get('normalized_metadata') or {}
-        enrollment_end_date_str = normalized_metadata.get('enroll_by_date')
-        try:
-            datetime_obj = parse_datetime_string(enrollment_end_date_str)
-            if datetime_obj:
-                return datetime_obj.replace(tzinfo=UTC)
-        except ValueError:
-            logger.warning(
-                'Bad datetime format for %s, value: %s',
-                content_metadata.get('key'),
-                enrollment_end_date_str,
-            )
-    return None
+    return automatic_expiration_reason

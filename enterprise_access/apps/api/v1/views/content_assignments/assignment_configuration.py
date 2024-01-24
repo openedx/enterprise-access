@@ -3,11 +3,13 @@ REST API views for the content_assignments app.
 """
 import logging
 
+from django.core.exceptions import ValidationError
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from rest_framework import authentication, mixins, permissions, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from enterprise_access.apps.api import filters, serializers, utils
@@ -15,7 +17,8 @@ from enterprise_access.apps.api.v1.views.utils import PaginationWithPageCount
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 from enterprise_access.apps.core.constants import (
     CONTENT_ASSIGNMENT_CONFIGURATION_READ_PERMISSION,
-    CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION
+    CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION,
+    CONTENT_ASSIGNMENTS_ACKNOWLEDGE_PERMISSION
 )
 
 logger = logging.getLogger(__name__)
@@ -222,3 +225,62 @@ class AssignmentConfigurationViewSet(
 
         response_serializer = serializers.AssignmentConfigurationResponseSerializer(assignment_config_to_soft_delete)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=['Assignment Acknowledgement'],
+        summary='Acknowledge assignments for the given AssignmentConfiguration.',
+        request=serializers.AssignmentConfigurationAcknowledgeAssignmentsRequestSerializer,
+        responses={
+            status.HTTP_200_OK: serializers.AssignmentConfigurationAcknowledgeAssignmentsResponseSerializer,
+            status.HTTP_201_CREATED: serializers.AssignmentConfigurationAcknowledgeAssignmentsResponseSerializer,
+            status.HTTP_403_FORBIDDEN: None,
+        },
+    )
+    @permission_required(CONTENT_ASSIGNMENTS_ACKNOWLEDGE_PERMISSION, fn=assignment_config_permission_detail_fn)
+    @action(detail=True, methods=['post'], url_path='acknowledge-assignments')
+    def acknowledge_assignments(self, request, **kwargs):  # pylint: disable=unused-argument
+        """
+        POST API endpoint that allows the authenticated user to acknowledge cancelled and/or expired assignments
+        for the specified AssignmentConfiguration. By acknowledging the assignments in an expired
+        and/or cancelled state, the user is indicating they have seen the assignments and have
+        opted to dismiss them from the UI.
+
+        This endpoint will return an object containing:
+        - assignments successfully acknowledged
+        - assignments already acknowledged
+        - assignments not acknowledged
+        """
+        # Collect the "assignment_uuids" query parameter from request body.
+        request_serializer = serializers.AssignmentConfigurationAcknowledgeAssignmentsRequestSerializer(
+            data=request.data,
+        )
+        request_serializer.is_valid(raise_exception=True)
+        assignment_uuids_to_acknowledge = request_serializer.data.get('assignment_uuids', None)
+
+        assignment_configuration = self.get_object()
+        try:
+            acknowledged_assignments, already_acknowledged_assignments, unacknowledged_assignments = \
+                assignment_configuration.acknowledge_assignments(
+                    assignment_uuids=assignment_uuids_to_acknowledge,
+                    lms_user_id=request.user.lms_user_id,
+                )
+        except ValidationError as err:
+            return Response(
+                {"error": err.message},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Inline helper function to extract the UUIDs from a list of assignments.
+        def _extract_uuid_from_assignment(assignments):
+            return [assignment.uuid for assignment in assignments]
+
+        response_serializer = serializers.AssignmentConfigurationAcknowledgeAssignmentsResponseSerializer({
+            "acknowledged_assignments": _extract_uuid_from_assignment(acknowledged_assignments),
+            "already_acknowledged_assignments": _extract_uuid_from_assignment(already_acknowledged_assignments),
+            "unacknowledged_assignments": _extract_uuid_from_assignment(unacknowledged_assignments),
+        })
+        response_status_code = status.HTTP_201_CREATED if acknowledged_assignments else status.HTTP_200_OK
+        return Response(
+            response_serializer.data,
+            status=response_status_code,
+        )

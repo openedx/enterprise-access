@@ -60,5 +60,6 @@ class AssignedLearnerCreditAccessPolicyFactory(SubsidyAccessPolicyFactory):
         model = AssignedLearnerCreditAccessPolicy
 
     access_method = AccessMethods.ASSIGNED
+    spend_limit = factory.LazyAttribute(lambda _: FAKER.pyint())
     per_learner_spend_limit = None
     per_learner_enrollment_limit = None

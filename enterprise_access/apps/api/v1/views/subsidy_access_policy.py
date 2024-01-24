@@ -458,6 +458,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         """
         Return a list of all redeemable policies for given `enterprise_customer_uuid`, `lms_user_id` that have
         redeemable credit available.
+
         Note that, for each redeemable policy that is *assignable*, the policy record
         in the response payload will also contain a list of `learner_content_assignments`
         associated with the requested `lms_user_id`.
@@ -831,6 +832,7 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
                         {reason: [policy]}
                     )
                     raise AllocationRequestException(detail=non_allocatable_reason_list)
+
             # we may not have hit the `if` block, so just get a time on the
             # entire policy lock context.  We can infer the difference between
             # that value and `serialization_time` if the latter is available in logs.

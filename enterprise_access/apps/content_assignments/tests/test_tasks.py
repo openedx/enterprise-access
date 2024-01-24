@@ -278,13 +278,13 @@ class TestBrazeEmailTasks(APITestWithMocks):
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
-    @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     @ddt.data(True, False)
     def test_send_reminder_email_for_pending_assignment(
         self, is_logistrated, mock_braze_client_class, mock_lms_client,
-        mock_get_metadata, mock_subsidy_client,
+        mock_catalog_client, mock_subsidy_client,
     ):
         """
         Verify send_reminder_email_for_pending_assignment hits braze client with expected args
@@ -319,7 +319,10 @@ class TestBrazeEmailTasks(APITestWithMocks):
             ],
             'card_image_url': 'https://itsanimage.com'
         }
-        mock_get_metadata.return_value = {self.assignment.content_key: mock_metadata}
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
+            'count': 1,
+            'results': [mock_metadata]
+        }
 
         # Set the subsidy expiration time to tomorrow
         mock_subsidy = {
@@ -364,14 +367,14 @@ class TestBrazeEmailTasks(APITestWithMocks):
         )
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
-    @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     def test_send_email_for_new_assignment(
         self,
         mock_braze_client,
         mock_lms_client,
-        mock_get_metadata,
+        mock_catalog_client,
         mock_subsidy_client,
     ):
         """
@@ -404,7 +407,10 @@ class TestBrazeEmailTasks(APITestWithMocks):
             ],
             'card_image_url': 'https://itsanimage.com',
         }
-        mock_get_metadata.return_value = {self.assignment.content_key: mock_metadata}
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
+            'count': 1,
+            'results': [mock_metadata]
+        }
 
         # Set the subsidy expiration time to tomorrow
         mock_subsidy = {
@@ -485,10 +491,10 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
-    @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     def test_get_action_required_by_subsidy_expires_soonest(
         # pylint: disable=unused-argument
-        self, mock_get_metadata, mock_subsidy_client, mock_braze_client_class, mock_lms_client_class
+        self, mock_catalog_client, mock_subsidy_client, mock_braze_client_class, mock_lms_client_class
     ):
         """
         Tests that the subsidy_expiration time is returned as the earliest action required by time.
@@ -502,7 +508,10 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'enroll_by_date': (now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%SZ'),
             },
         }
-        mock_get_metadata.return_value = {self.assignment.content_key: mock_metadata}
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
+            'count': 1,
+            'results': [mock_metadata]
+        }
 
         # Set the subsidy expiration time to yesterday
         yesterday = now() - timedelta(days=1)
@@ -523,10 +532,10 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
-    @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     def test_get_action_required_by_enrollment_deadline_soonest(
         # pylint: disable=unused-argument
-        self, mock_get_metadata, mock_subsidy_client, mock_braze_client_class, mock_lms_client_class
+        self, mock_catalog_client, mock_subsidy_client, mock_braze_client_class, mock_lms_client_class
     ):
         """
         Tests that the enroll_by_date is returned as the earliest action required by time.
@@ -541,7 +550,10 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'enroll_by_date': yesterday.strftime('%Y-%m-%d %H:%M:%SZ'),
             },
         }
-        mock_get_metadata.return_value = {self.assignment.content_key: mock_metadata}
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
+            'count': 1,
+            'results': [mock_metadata]
+        }
 
         # Set the subsidy expiration time to tomorrow
         mock_subsidy = {
@@ -561,9 +573,9 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
-    @mock.patch('enterprise_access.apps.content_assignments.tasks.get_content_metadata_for_assignments')
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     def test_get_action_required_by_auto_cancellation_soonest(  # pylint: disable=unused-argument
-        self, mock_get_metadata, mock_subsidy_client, mock_braze_client_class, mock_lms_client_class
+        self, mock_catalog_client, mock_subsidy_client, mock_braze_client_class, mock_lms_client_class,
     ):
         """
         Tests that the auto-cancellation date is returned as the earliest action required by time.
@@ -578,7 +590,10 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'enroll_by_date': the_future.strftime('%Y-%m-%d %H:%M:%SZ'),
             },
         }
-        mock_get_metadata.return_value = {self.assignment.content_key: mock_metadata}
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
+            'count': 1,
+            'results': [mock_metadata]
+        }
 
         # Set the subsidy expiration time to far in the future
         mock_subsidy = {
@@ -593,4 +608,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
         sender = BrazeCampaignSender(self.assignment)
         action_required_by = sender.get_action_required_by()
 
-        self.assertEqual(format_datetime_obj(self.assignment.get_auto_expiration_date()), action_required_by)
+        self.assertEqual(
+            format_datetime_obj(self.assignment.get_automatic_expiration_date_and_reason()['date']),
+            action_required_by
+        )

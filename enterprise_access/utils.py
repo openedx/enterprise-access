@@ -1,7 +1,10 @@
 """
 Utils for any app in the enterprise-access project.
 """
+from datetime import datetime
+
 from django.apps import apps
+from pytz import UTC
 
 from enterprise_access.apps.subsidy_request.constants import SubsidyTypeChoices
 
@@ -31,3 +34,8 @@ def is_not_none(thing):
 
 def is_none(thing):
     return thing is None
+
+
+def localized_utcnow():
+    """Helper function to return localized utcnow()."""
+    return datetime.now().replace(tzinfo=UTC)

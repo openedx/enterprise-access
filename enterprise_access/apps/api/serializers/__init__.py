@@ -3,10 +3,14 @@ API serializers module.
 """
 from .content_assignments.assignment import (
     ContentMetadataForAssignmentSerializer,
+    LearnerContentAssignmentActionLearnerAcknowledgedSerializer,
     LearnerContentAssignmentAdminResponseSerializer,
+    LearnerContentAssignmentEarliestExpirationSerializer,
     LearnerContentAssignmentResponseSerializer
 )
 from .content_assignments.assignment_configuration import (
+    AssignmentConfigurationAcknowledgeAssignmentsRequestSerializer,
+    AssignmentConfigurationAcknowledgeAssignmentsResponseSerializer,
     AssignmentConfigurationCreateRequestSerializer,
     AssignmentConfigurationDeleteRequestSerializer,
     AssignmentConfigurationResponseSerializer,

@@ -1,10 +1,15 @@
 """
 Tests for the ``api.py`` module of the content_assignments app.
 """
+from unittest import mock
+
 from django.test import TestCase
 from django.utils import timezone
 
-from ..constants import NUM_DAYS_BEFORE_AUTO_CANCELLATION, RETIRED_EMAIL_ADDRESS, AssignmentActions
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
+
+from ..constants import NUM_DAYS_BEFORE_AUTO_EXPIRATION, RETIRED_EMAIL_ADDRESS, AssignmentActions
 from ..models import AssignmentConfiguration
 from .factories import LearnerContentAssignmentFactory
 
@@ -21,6 +26,9 @@ class TestAssignmentActions(TestCase):
         """
         super().setUpClass()
         cls.assignment_configuration = AssignmentConfiguration.objects.create()
+        cls.subsidy_access_policy = AssignedLearnerCreditAccessPolicyFactory.create(
+            assignment_configuration=cls.assignment_configuration,
+        )
         cls.assignment = LearnerContentAssignmentFactory.create(
             assignment_configuration=cls.assignment_configuration,
         )
@@ -139,40 +147,70 @@ class TestAssignmentActions(TestCase):
             reminded_action_again,
         )
 
-    def test_get_auto_expiration_date_no_action(self):
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_get_automatic_expiration_date_and_reason_no_action(self, mock_subsidy_record):
         """
         Test that this method returns a date 90 days from the assignment
         creation time if there is no last successful
         notified action.
         """
+        mock_subsidy_record.return_value = {
+            'uuid': 'test-uuid',
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': 'test-enterprise-customer-uuid',
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': '5000',
+            'is_active': True,
+        }
+
+        result = self.assignment.get_automatic_expiration_date_and_reason()
         self.assertEqual(
-            self.assignment.get_auto_expiration_date(),
-            self.assignment.created + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION),
+            result['date'],
+            self.assignment.created + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION),
         )
         self.assignment.add_errored_notified_action(Exception('foo'))
 
+        result = self.assignment.get_automatic_expiration_date_and_reason()
         self.assertEqual(
-            self.assignment.get_auto_expiration_date(),
-            self.assignment.created + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION),
+            result['date'],
+            self.assignment.created + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION),
         )
 
-    def test_get_auto_expiration_date(self):
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_get_automatic_expiration_date_and_reason_date(self, mock_subsidy_record, mock_catalog_client):
         """
         Test that this method returns None if there is no last successful
         notified action.
         """
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
+            'count': 1,
+            'results': [{
+                'key': self.assignment.content_key,
+            }],
+        }
+        mock_subsidy_record.return_value = {
+            'uuid': 'test-uuid',
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': 'test-enterprise-customer-uuid',
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': '5000',
+            'is_active': True,
+        }
         first_notification = self.assignment.add_successful_notified_action()
-
+        result = self.assignment.get_automatic_expiration_date_and_reason()
         self.assertEqual(
-            self.assignment.get_auto_expiration_date(),
-            first_notification.completed_at + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION),
+            result['date'],
+            first_notification.completed_at + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION),
         )
 
         second_notification = self.assignment.add_successful_notified_action()
-
+        result = self.assignment.get_automatic_expiration_date_and_reason()
         self.assertEqual(
-            self.assignment.get_auto_expiration_date(),
-            second_notification.completed_at + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION),
+            result['date'],
+            second_notification.completed_at + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION),
         )
 
     def test_clear_pii(self):

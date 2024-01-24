@@ -20,7 +20,7 @@ from enterprise_access.apps.subsidy_request.constants import (
     SubsidyTypeChoices
 )
 from enterprise_access.apps.subsidy_request.tasks import update_course_info_for_subsidy_request_task
-from enterprise_access.apps.subsidy_request.utils import localized_utcnow
+from enterprise_access.utils import localized_utcnow
 
 
 class SubsidyRequest(TimeStampedModel, SoftDeletableModel):

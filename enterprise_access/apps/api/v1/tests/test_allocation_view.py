@@ -1,6 +1,7 @@
 """
 Tests for Subsidy Access Policy Assignment Allocation view(s).
 """
+from datetime import timedelta
 from unittest import mock
 from uuid import UUID, uuid4
 
@@ -10,7 +11,11 @@ from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.serializers import ValidationError
 
-from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.content_assignments.constants import (
+    NUM_DAYS_BEFORE_AUTO_EXPIRATION,
+    AssignmentAutomaticExpiredReason,
+    LearnerContentAssignmentStateChoices
+)
 from enterprise_access.apps.content_assignments.tests.factories import (
     AssignmentConfigurationFactory,
     LearnerContentAssignmentFactory
@@ -29,7 +34,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     MissingSubsidyAccessReasonUserMessages
 )
 from enterprise_access.apps.subsidy_access_policy.exceptions import PriceValidationError
-from enterprise_access.apps.subsidy_access_policy.models import AssignedLearnerCreditAccessPolicy
+from enterprise_access.apps.subsidy_access_policy.models import AssignedLearnerCreditAccessPolicy, SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
 from test_utils import APITest, APITestWithMocks
 
@@ -109,6 +114,15 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
             'context': str(self.enterprise_uuid),
         }])
+
+        # Mock results from the catalog content metadata API endpoint.
+        self.mock_catalog_result = {
+            'count': 2,
+            'results': [
+                {'key': 'course+A', 'data': 'things'}, {'key': 'course+B', 'data': 'stuff'},
+            ],
+        }
+
         self.addCleanup(django_cache.clear)  # clear any leftover allocation locks
 
     @ddt.data(
@@ -163,11 +177,13 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             self.assertTrue(serializer.is_valid())
 
     @mock.patch.object(AssignedLearnerCreditAccessPolicy, 'can_allocate', autospec=True)
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
     @mock.patch(
         'enterprise_access.apps.subsidy_access_policy.models.assignments_api.allocate_assignments',
         autospec=True,
     )
-    def test_allocate_happy_path(self, mock_allocate, mock_can_allocate):
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
+    def test_allocate_happy_path(self, mock_catalog_client, mock_allocate, mock_subsidy_record, mock_can_allocate):
         """
         Tests that we can successfully call the allocate view
         and that policy-level allocation occurs.
@@ -177,6 +193,20 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             'updated': [self.alice_assignment],
             'created': [self.bob_assignment],
             'no_change': [self.carol_assignment],
+        }
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = {
+            'uuid': str(uuid4()),
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': '5000',
+            'is_active': True,
         }
 
         allocate_url = _allocation_url(self.assigned_learner_credit_policy.uuid)
@@ -198,11 +228,16 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'content_key': self.content_key,
                     'content_title': self.content_title,
                     'content_quantity': -123,
-                    'last_notification_at': None,
                     'state': LearnerContentAssignmentStateChoices.ERRORED,
                     'transaction_uuid': None,
                     'uuid': str(self.alice_assignment.uuid),
                     'actions': [],
+                    'earliest_possible_expiration': {
+                        'date': (
+                            self.alice_assignment.created + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                        ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                        'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
+                    }
                 },
             ],
             'created': [
@@ -213,11 +248,16 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'content_key': self.content_key,
                     'content_title': self.content_title,
                     'content_quantity': -456,
-                    'last_notification_at': None,
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
                     'transaction_uuid': None,
                     'uuid': str(self.bob_assignment.uuid),
                     'actions': [],
+                    'earliest_possible_expiration': {
+                        'date': (
+                            self.bob_assignment.created + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                        ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                        'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
+                    }
                 },
             ],
             'no_change': [
@@ -228,11 +268,16 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'content_key': self.content_key,
                     'content_title': self.content_title,
                     'content_quantity': -789,
-                    'last_notification_at': None,
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
                     'transaction_uuid': None,
                     'uuid': str(self.carol_assignment.uuid),
                     'actions': [],
+                    'earliest_possible_expiration': {
+                        'date': (
+                            self.carol_assignment.created + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                        ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                        'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
+                    }
                 },
             ],
         }
@@ -405,6 +450,14 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         def delete_assignments():
             return self.assignment_configuration.assignments.all().delete()
 
+        # Mock results from the catalog content metadata API endpoint.
+        self.mock_catalog_result = {
+            'count': 2,
+            'results': [
+                {'key': 'course+A', 'data': 'things'}, {'key': 'course+B', 'data': 'stuff'},
+            ],
+        }
+
         self.addCleanup(delete_assignments)
 
     @mock.patch.object(
@@ -422,19 +475,25 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     @mock.patch.object(
         AssignedLearnerCreditAccessPolicy, 'get_content_price', autospec=True,
     )
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
     @mock.patch(
         'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
         return_value=mock.MagicMock(),
+        autospec=True,
     )
     @mock.patch(
-        'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task'
+        'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task',
+        autospec=True,
     )
-    @mock.patch('enterprise_access.apps.content_assignments.api.send_email_for_new_assignment')
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_email_for_new_assignment', autospec=True)
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
     def test_allocate_happy_path_e2e(
         self,
+        mock_catalog_client,
         mock_email,   # pylint: disable=unused-argument
         mock_pending_learner_task,
         mock_get_and_cache_content_metadata,
+        mock_subsidy_record,
         mock_get_content_price,
         mock_aggregates_for_policy,
         mock_subsidy_balance,
@@ -453,6 +512,21 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'total_quantity': -100 * 100,
         }
         mock_subsidy_balance.return_value = 10000 * 100
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = {
+            'uuid': str(uuid4()),
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': '5000',
+            'is_active': True,
+        }
+
         allocate_url = _allocation_url(self.assigned_learner_credit_policy.uuid)
         allocate_payload = {
             'learner_emails': ['new@foo.com'],
@@ -479,11 +553,16 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
                     'content_key': self.content_key,
                     'content_title': self.content_title,
                     'content_quantity': -123.45 * 100,
-                    'last_notification_at': None,
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
                     'transaction_uuid': None,
                     'uuid': str(new_allocation.uuid),
                     'actions': [],
+                    'earliest_possible_expiration': {
+                        'date': (
+                            new_allocation.created + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                        ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                        'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
+                    }
                 },
             ],
             'no_change': [],
@@ -766,6 +845,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     @mock.patch.object(
         AssignedLearnerCreditAccessPolicy, 'get_content_price', autospec=True, return_value=1,
     )
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
     @mock.patch(
         'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
         return_value={'content_title': 'the-title'},
@@ -774,11 +854,14 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         'enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task'
     )
     @mock.patch('enterprise_access.apps.content_assignments.api.send_email_for_new_assignment')
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
     def test_allocate_too_much_existing_allocation_e2e(
         self,
+        mock_catalog_client,
         mock_email,   # pylint: disable=unused-argument
         mock_pending_learner_task,
         mock_get_and_cache_content_metadata,  # pylint: disable=unused-argument
+        mock_subsidy_record,
         mock_get_content_price,  # pylint: disable=unused-argument
         mock_lms_api_client,
         mock_is_subsidy_active,  # pylint: disable=unused-argument
@@ -802,6 +885,19 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         mock_aggregates_for_policy.return_value = {
             'total_quantity': 0,
         }
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = {
+            'uuid': str(uuid4()),
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': subsidy_balance,
+            'is_active': True,
+        }
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
 
         allocate_url = _allocation_url(self.assigned_learner_credit_policy.uuid)
         allocate_payload = {

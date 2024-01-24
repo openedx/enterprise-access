@@ -5,6 +5,9 @@ import logging
 
 from rest_framework import serializers
 
+from enterprise_access.apps.api.serializers.content_assignments.assignment import (
+    LearnerContentAssignmentResponseSerializer
+)
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 
 logger = logging.getLogger(__name__)
@@ -116,3 +119,51 @@ class AssignmentConfigurationUpdateRequestSerializer(serializers.ModelSerializer
         """
         read_serializer = AssignmentConfigurationResponseSerializer(instance)
         return read_serializer.data
+
+
+class AssignmentConfigurationAcknowledgeAssignmentsRequestSerializer(serializers.Serializer):
+    """
+    Request Serializer for POST parameters to an API call to acknowledge assignments.
+
+    For view: AssignmentConfigurationViewSet.acknowledge_assignments
+    """
+    assignment_uuids = serializers.ListField(
+        required=True,
+        child=serializers.UUIDField(),
+        help_text="List of LearnerContentAssignment UUIDs to acknowledge.",
+    )
+
+
+class AcknowledgedLearnerContentAssignmentResponseSerializer(serializers.Serializer):
+    """
+    Serializer for the assignments to an acknowledge assignments request.
+    """
+    uuid = serializers.UUIDField(
+        required=True,
+        help_text="The UUID of the LearnerContentAssignment.",
+    )
+
+
+class AssignmentConfigurationAcknowledgeAssignmentsResponseSerializer(serializers.Serializer):
+    """
+    Request Serializer for POST parameters to an API call to acknowledge assignments.
+
+    For view: AssignmentConfigurationViewSet.acknowledge_assignments
+    """
+    acknowledged_assignments = serializers.ListField(
+        required=False,
+        child=serializers.UUIDField(),
+        help_text="List of acknowledged LearnerContentAssignment UUIDs.",
+    )
+
+    already_acknowledged_assignments = serializers.ListField(
+        required=False,
+        child=serializers.UUIDField(),
+        help_text="List of already acknowledged LearnerContentAssignment UUIDs.",
+    )
+
+    unacknowledged_assignments = serializers.ListField(
+        required=False,
+        child=serializers.UUIDField(),
+        help_text="List of unacknowledged LearnerContentAssignment UUIDs.",
+    )

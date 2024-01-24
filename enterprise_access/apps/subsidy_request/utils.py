@@ -1,20 +1,13 @@
 """ Utils for subsidy_requests. """
 
 import logging
-from datetime import datetime
 
 from django.conf import settings
 from edx_rest_framework_extensions.auth.jwt.decoder import configured_jwt_decode_handler
-from pytz import UTC
 
 from enterprise_access.apps.core.models import User
 
 logger = logging.getLogger(__name__)
-
-
-def localized_utcnow():
-    """Helper function to return localized utcnow()."""
-    return UTC.localize(datetime.utcnow())  # pylint: disable=no-value-for-parameter
 
 
 def get_user_from_request_session(request):
