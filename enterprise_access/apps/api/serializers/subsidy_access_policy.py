@@ -161,6 +161,7 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
             'display_name',
             'description',
             'active',
+            'retired',
             'enterprise_customer_uuid',
             'catalog_uuid',
             'subsidy_uuid',
@@ -194,6 +195,7 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
             'display_name',
             'description',
             'active',
+            'retired',
             'enterprise_customer_uuid',
             'catalog_uuid',
             'subsidy_uuid',
@@ -395,6 +397,7 @@ class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
             'display_name',
             'description',
             'active',
+            'retired',
             'catalog_uuid',
             'subsidy_uuid',
             'access_method',
@@ -420,6 +423,10 @@ class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
             },
             'active': {
                 'allow_null': False,
+                'required': False,
+            },
+            'retired': {
+                'allow_null': True,
                 'required': False,
             },
             'catalog_uuid': {
