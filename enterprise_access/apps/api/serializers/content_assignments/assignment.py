@@ -173,6 +173,35 @@ class LearnerContentAssignmentActionRequestSerializer(serializers.Serializer):
     )
 
 
+class LearnerContentAssignmentNudgeRequestSerializer(serializers.Serializer):
+    """
+    Request serializer to validate nudge endpoint query params.
+
+    For view: LearnerContentAssignmentAdminViewSet.nudge
+    """
+    assignment_uuids = serializers.ListField(
+        child=serializers.UUIDField(),
+        allow_empty=False
+    )
+    days_before_course_start_date = serializers.IntegerField(
+        min_value=1
+    )
+
+
+class LearnerContentAssignmentNudgeResponseSerializer(serializers.Serializer):
+    """
+    Response serializer for nudge endpoint.
+
+    For view: LearnerContentAssignmentAdminViewSet.nudge
+    """
+    nudged_assignment_uuids = serializers.ListField(
+        child=serializers.UUIDField(),
+    )
+    unnudged_assignment_uuids = serializers.ListField(
+        child=serializers.UUIDField(),
+    )
+
+
 class ContentMetadataForAssignmentSerializer(serializers.Serializer):
     """
     Serializer to help return additional content metadata for assignments.  These fields should
