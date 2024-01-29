@@ -644,7 +644,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             lms_user_id,
             skip_customer_user_check=False,
             skip_inactive_subsidy_check=False,
-        ):
+    ):
         """
         Perform generic checks to determine if a learner has credit available for a given
         subsidy access policy. The generic checks performed include:
