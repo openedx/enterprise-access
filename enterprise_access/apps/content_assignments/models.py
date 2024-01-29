@@ -92,11 +92,6 @@ class AssignmentConfiguration(TimeStampedModel):
         except ObjectDoesNotExist:
             return None
 
-    # @property
-    # def unacknowledged_assignments(self):
-    #     """ Helper to fetch all unacknowledged assignments for this configuration. """
-    #     return self.assignments.all()
-
     def _should_acknowledge_expired_assignment(self, assignment):
         """
         Returns a tuple of booleans indicating whether the given assignment should be acknowledged and
@@ -147,7 +142,7 @@ class AssignmentConfiguration(TimeStampedModel):
         if not cancellation_last_acknowledged:
             return True, False
 
-        # If it has been acknowledged before, check whether last camcellation action is newer
+        # If it has been acknowledged before, check whether last cancellation action is newer
         # than the last acknowledged cancellation action.
         if last_cancellation and last_cancellation.completed_at > cancellation_last_acknowledged.completed_at:
             return True, True

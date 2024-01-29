@@ -603,7 +603,6 @@ class TestAssignmentExpiration(TestCase):
         )
 
     def tearDown(self):
-        # super().tearDown()
         cache.clear()
 
     def mock_content_metadata(self, content_key, enroll_by_date):

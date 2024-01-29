@@ -639,7 +639,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         return True
 
-    def credit_available(self, lms_user_id, skip_customer_user_check=False):
+    def credit_available(
+            self,
+            lms_user_id,
+            skip_customer_user_check=False,
+            skip_inactive_subsidy_check=False,
+        ):
         """
         Perform generic checks to determine if a learner has credit available for a given
         subsidy access policy. The generic checks performed include:
@@ -666,7 +671,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # verify associated subsidy is current (non-expired)
         try:
-            if not self.is_subsidy_active:
+            if not skip_inactive_subsidy_check and not self.is_subsidy_active:
                 logger.info('[credit_available] SubsidyAccessPolicy.subsidy_record() returned inactive subsidy')
                 return False
         except requests.exceptions.HTTPError as exc:
@@ -949,11 +954,11 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
         # learner can redeem the subsidy access policy
         return (True, None, existing_redemptions)
 
-    def credit_available(self, lms_user_id, skip_customer_user_check=False):
+    def credit_available(self, lms_user_id, *args, **kwargs):  # pylint: disable=unused-argument
         """
         Determine whether a learner has credit available for the subsidy access policy.
         """
-        is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
+        is_credit_available = super().credit_available(lms_user_id)
         if not is_credit_available:
             return False
 
@@ -1023,11 +1028,11 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         # learner can redeem the subsidy access policy
         return (True, None, existing_redemptions)
 
-    def credit_available(self, lms_user_id, skip_customer_user_check=False):
+    def credit_available(self, lms_user_id, *args, **kwargs):  # pylint: disable=unused-argument
         """
         Determine whether a learner has credit available for the subsidy access policy.
         """
-        is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
+        is_credit_available = super().credit_available(lms_user_id)
         if not is_credit_available:
             return False
 
@@ -1194,8 +1199,14 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         # Learner can redeem the subsidy access policy
         return (True, None, existing_redemptions)
 
-    def credit_available(self, lms_user_id, skip_customer_user_check=False):
-        is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
+    def credit_available(self, lms_user_id, *args, **kwargs):  # pylint: disable=unused-argument
+        """
+        Determine whether a learner has credit available for the subsidy access policy, determined
+        based on the presence of unacknowledged assignments.
+        """
+        # Perform generic checks for credit availability; skip the check for inactive subsidies in order
+        # to continue returning expired/cancelled assignments for the purposes of displaying them in the UI.
+        is_credit_available = super().credit_available(lms_user_id, skip_inactive_subsidy_check=True)
         if not is_credit_available:
             return False
 
