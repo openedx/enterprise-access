@@ -13,6 +13,7 @@ from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
 
+from enterprise_access.apps.api_client.tests.test_utils import MockResponse
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
 from enterprise_access.apps.content_assignments.tests.factories import (
     AssignmentConfigurationFactory,
@@ -2005,13 +2006,17 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         query_params = {'content_key': test_content_key}
 
         mock_client = mock_get_client.return_value
-        mock_client.list_subsidy_transactions.side_effect = HTTPError
+        mock_client.list_subsidy_transactions.side_effect = HTTPError(
+            'Fake HTTP Error Message',
+            response=MockResponse({'detail': 'foobar'}, status.HTTP_503_SERVICE_UNAVAILABLE),
+        )
 
         response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         assert response.json() == {
-            'detail': 'Subsidy Transaction API error: HTTPError occurred in Subsidy API request.',
+            'detail': 'Subsidy Transaction API error: foobar',
+            'subsidy_status_code': str(status.HTTP_503_SERVICE_UNAVAILABLE),
         }
 
 

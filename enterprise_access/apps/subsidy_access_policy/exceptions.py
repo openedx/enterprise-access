@@ -42,12 +42,24 @@ class SubsidyAPIHTTPError(requests.exceptions.HTTPError):
     """
     @property
     def error_response(self):
-        """ Fetch the response object from the HTTPError that caused this exception. """
+        """
+        Fetch the response object from the HTTPError that caused this exception.
+
+        Returns:
+            requests.models.Response or None.
+        """
         return self.__cause__.response  # pylint: disable=no-member
 
     def error_payload(self):
-        if self.error_response:
-            return self.error_response.json()
+        """
+        Generate a useful error payload for logging purposes.
+        """
+        # requests.models.Response is falsey for HTTP status codes greater than or equal to 400!  We must explicitly
+        # check if the response object is not None before giving up on it.
+        if self.error_response is not None:
+            error_payload = self.error_response.json()
+            error_payload['subsidy_status_code'] = self.error_response.status_code
+            return error_payload
         return {
             'detail': str(self),
         }
