@@ -401,6 +401,11 @@ def send_exec_ed_enrollment_warmer(assignment_uuid, days_before_course_start_dat
 
     campaign_uuid = settings.BRAZE_ASSIGNMENT_NUDGE_EXEC_ED_ACCEPTED_ASSIGNMENT_CAMPAIGN
 
+    logger.info(
+        f'Sending braze campaign nudge reminder at '
+        f'days_before_course_start_date={days_before_course_start_date} '
+        f'uuid={campaign_uuid} message for assignment {assignment}'
+    )
     campaign_sender.send_campaign_message(
         braze_trigger_properties,
         campaign_uuid,

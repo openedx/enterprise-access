@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.serializers.content_assignments.assignment import (
     LearnerContentAssignmentActionRequestSerializer,
+    LearnerContentAssignmentNudgeHTTP422ErrorSerializer,
     LearnerContentAssignmentNudgeRequestSerializer,
     LearnerContentAssignmentNudgeResponseSerializer
 )
@@ -357,7 +358,7 @@ class LearnerContentAssignmentAdminViewSet(
         parameters=None,
         responses={
             status.HTTP_200_OK: LearnerContentAssignmentNudgeResponseSerializer,
-            status.HTTP_422_UNPROCESSABLE_ENTITY: None,
+            status.HTTP_422_UNPROCESSABLE_ENTITY: LearnerContentAssignmentNudgeHTTP422ErrorSerializer,
         }
     )
     @permission_required(CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION, fn=assignment_admin_permission_fn)
@@ -382,6 +383,14 @@ class LearnerContentAssignmentAdminViewSet(
         )
         days_before_course_start_date = serializer.data['days_before_course_start_date']
         try:
+            if len(assignments) == 0:
+                error_message = (
+                    "The list of assignments provided are not associated to the assignment_configuration_uuid: {0}"
+                    .format(assignment_configuration_uuid)
+                )
+                return Response(
+                    data={"error_message": error_message}, status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
             result = assignments_api.nudge_assignments(
                 assignments,
                 assignment_configuration_uuid,
@@ -391,4 +400,11 @@ class LearnerContentAssignmentAdminViewSet(
             response_serializer.is_valid(raise_exception=True)
             return Response(data=response_serializer.data, status=status.HTTP_200_OK)
         except Exception:  # pylint: disable=broad-except
-            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            error_message = (
+                "Could not process the nudge email(s) for assignment_configuration_uuid: {0}"
+                .format(assignment_configuration_uuid)
+            )
+            return Response(
+                data={"error_message": error_message},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY
+            )

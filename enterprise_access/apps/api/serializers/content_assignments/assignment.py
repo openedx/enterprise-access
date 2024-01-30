@@ -21,6 +21,7 @@ class LearnerContentAssignmentActionSerializer(serializers.ModelSerializer):
     """
     A read-only Serializer for responding to requests for ``LearnerContentAssignmentAction`` records.
     """
+
     class Meta:
         model = LearnerContentAssignmentAction
         fields = [
@@ -181,10 +182,12 @@ class LearnerContentAssignmentNudgeRequestSerializer(serializers.Serializer):
     """
     assignment_uuids = serializers.ListField(
         child=serializers.UUIDField(),
-        allow_empty=False
+        allow_empty=False,
+        help_text="A list of executive education assignment uuids associated with an assignment configuration"
     )
     days_before_course_start_date = serializers.IntegerField(
-        min_value=1
+        min_value=1,
+        help_text="The number days ahead of a course start_date we want to send a nudge email for"
     )
 
 
@@ -196,12 +199,23 @@ class LearnerContentAssignmentNudgeResponseSerializer(serializers.Serializer):
     """
     nudged_assignment_uuids = serializers.ListField(
         child=serializers.UUIDField(),
-        allow_empty=False
+        allow_empty=False,
+        help_text="A list of uuids that have been sent to the celery task to nudge"
     )
     unnudged_assignment_uuids = serializers.ListField(
         child=serializers.UUIDField(),
-        allow_empty=True
+        allow_empty=True,
+        help_text="A list of uuids that have not been sent to the celery task to nudge"
     )
+
+
+class LearnerContentAssignmentNudgeHTTP422ErrorSerializer(serializers.Serializer):
+    """
+    Response serializer for nudge endpoint 422 errors.
+
+    For view: LearnerContentAssignmentAdminViewSet.nudge
+    """
+    error_message = serializers.CharField()
 
 
 class ContentMetadataForAssignmentSerializer(serializers.Serializer):

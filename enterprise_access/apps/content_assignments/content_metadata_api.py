@@ -62,7 +62,7 @@ def get_human_readable_date(datetime_string, output_pattern=DEFAULT_STRFTIME_PAT
     return None
 
 
-def parse_datetime_string(datetime_string, **set_to_utc):
+def parse_datetime_string(datetime_string, set_to_utc=False):
     """
     Given a datetime string value from some content metadata record,
     parse it into a datetime object.

@@ -647,7 +647,7 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
     @mock.patch('enterprise_access.apps.content_assignments.tasks.send_exec_ed_enrollment_warmer.delay')
     def test_nudge_happy_path(self, mock_send_nudge_email, mock_content_metadata_for_assignments):
         """
-        Test that the cancel view cancels the assignment and returns an appropriate response with 200 status code and
+        Test that the nudge view nudges the assignment and returns an appropriate response with 200 status code and
         the expected results of serialization.
         """
         # Set the JWT-based auth to an operator.
@@ -682,18 +682,24 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             'days_before_course_start_date': 14
         }
 
+        expected_response = {
+            "nudged_assignment_uuids": [str(self.assignment_accepted.uuid)],
+            "unnudged_assignment_uuids": []
+        }
+
         response = self.client.post(nudge_url, query_params)
 
         # Verify the API response.
         assert response.status_code == status.HTTP_200_OK
+        assert response.json() == expected_response
 
         mock_send_nudge_email.assert_called_once_with(self.assignment_accepted.uuid, 14)
 
-    @mock.patch('enterprise_access.apps.content_assignments.api.get_content_metadata_for_assignments')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.send_exec_ed_enrollment_warmer.delay')
-    def test_nudge_allocated_assignment(self, mock_send_nudge_email, mock_content_metadata_for_assignments):
+    def test_nudge_allocated_assignment(self, mock_send_nudge_email):
         """
-        Test that the cancel view cancels the assignment and returns an appropriate response with 200 status code and
+        Test that the nudge view doesn't nudge the assignment and
+        returns an appropriate response with 422 status code and
         the expected results of serialization.
         """
         # Set the JWT-based auth to an operator.
@@ -701,23 +707,6 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
         ])
 
-        start_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=14)
-        end_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=180)
-        enrollment_end = timezone.now().replace(microsecond=0) - timezone.timedelta(days=5)
-
-        # Mock content metadata for assignment
-        mock_content_metadata_for_assignments.return_value = {
-            'edX+edXPrivacy101': {
-                'key': 'edX+edXAccessibility101',
-                'normalized_metadata': {
-                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    'end_date': end_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    'enroll_by_date': enrollment_end.strftime("%Y-%m-%d %H:%M"),
-                    'content_price': 321,
-                },
-                'course_type': 'executive-education-2u',
-            }
-        }
         # Call the nudge endpoint.
         nudge_kwargs = {
             'assignment_configuration_uuid': self.assignment_configuration.uuid,
@@ -730,8 +719,51 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
 
         response = self.client.post(nudge_url, query_params)
 
+        expected_response = {
+            "error_message": "Could not process the nudge email(s) for assignment_configuration_uuid: {0}"
+            .format(self.assignment_configuration.uuid),
+        }
+
         # Verify the API response.
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.json() == expected_response
+
+        mock_send_nudge_email.assert_not_called()
+
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.send_exec_ed_enrollment_warmer.delay')
+    def test_nudge_no_assignments(self, mock_send_nudge_email):
+        """
+        Test that the nudge view doesn't nudge the assignment and
+        returns an appropriate response with 422 status code and
+        the expected results of serialization.
+        """
+        # Set the JWT-based auth to an operator.
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        # Call the nudge endpoint.
+        nudge_kwargs = {
+            'assignment_configuration_uuid': self.assignment_configuration.uuid,
+        }
+        nudge_url = reverse('api:v1:admin-assignments-nudge', kwargs=nudge_kwargs)
+
+        query_params = {
+            'assignment_uuids': [str(uuid4())],
+            'days_before_course_start_date': 14
+        }
+
+        response = self.client.post(nudge_url, query_params)
+
+        expected_response = {
+            "error_message": "The list of assignments provided are not "
+                             "associated to the assignment_configuration_uuid: {0}"
+            .format(self.assignment_configuration.uuid)
+        }
+
+        # Verify the API response.
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.json() == expected_response
 
         mock_send_nudge_email.assert_not_called()
 

@@ -596,6 +596,7 @@ def nudge_assignments(assignments, assignment_configuration_uuid, days_before_co
     # Declare our expected response output
     nudged_assignment_uuids = []
     unnudged_assignment_uuids = []
+
     # Isolate assignment configuration metadata and associated assignments
     assignment_configuration = AssignmentConfiguration.objects.get(uuid=assignment_configuration_uuid)
     subsidy_access_policy = assignment_configuration.subsidy_access_policy
