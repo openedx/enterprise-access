@@ -16,9 +16,9 @@ from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.v1.views.utils import PaginationWithPageCount
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 from enterprise_access.apps.core.constants import (
+    CONTENT_ASSIGNMENT_ACKNOWLEDGE_PERMISSION,
     CONTENT_ASSIGNMENT_CONFIGURATION_READ_PERMISSION,
-    CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION,
-    CONTENT_ASSIGNMENT_ACKNOWLEDGE_PERMISSION
+    CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION
 )
 
 logger = logging.getLogger(__name__)
