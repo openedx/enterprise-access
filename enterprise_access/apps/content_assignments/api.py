@@ -578,7 +578,7 @@ def remind_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
     }
 
 
-def nudge_assignments(assignments, days_before_course_start_date):
+def nudge_assignments(assignments, assignment_configuration_uuid, days_before_course_start_date):
     """
     Nudge assignments.
 
@@ -587,85 +587,115 @@ def nudge_assignments(assignments, days_before_course_start_date):
 
 
     Args:
-        assignment: An assignment to nudge
+        assignments: An iterable of assignments associated to the payloads assignment_uuids and
+        associated assignment_configuration_uuid
+        assignment_configuration_uuid: Uuid of the assignment configuration from the api path
         days_before_course_start_date: Number of days prior to start date to nudge individual assignment
-        content_metadata: Content metadata of the assigned course to be nudged
     """
+
+    # Declare our expected response output
     nudged_assignment_uuids = []
     unnudged_assignment_uuids = []
-    
+    # Isolate assignment configuration metadata and associated assignments
+    assignment_configuration = AssignmentConfiguration.objects.get(uuid=assignment_configuration_uuid)
+    subsidy_access_policy = assignment_configuration.subsidy_access_policy
+    enterprise_catalog_uuid = subsidy_access_policy.catalog_uuid
+    # Check each assignment to validate its state and retreive its content metadata
     for assignment in assignments:
-        if assignment.state == LearnerContentAssignmentStateChoices.ACCEPTED:
-            assignment_configuration = AssignmentConfiguration.objects.filter(uuid=assignment.assignment_configuration)
-            subsidy_access_policy = assignment_configuration.subsidy_access_policy
-            enterprise_catalog_uuid = subsidy_access_policy.catalog_uuid
-
-            message = (
-                '[API_BRAZE_EMAIL_CAMPAIGN_NUDGING_1] '
-                'Assignment Configuration. UUID: [%s], '
-                'Policy: [%s], Catalog: [%s], Enterprise: [%s]',
-            )
+        # Send a log and append to the unnudged_assignment_uuids response
+        # list assignments states that are not 'accepted'
+        # Then continue to the next assignment without sending a nudge email
+        if assignment.state != LearnerContentAssignmentStateChoices.ACCEPTED:
             logger.info(
-                message,
-                assignment_configuration.uuid,
-                subsidy_access_policy.uuid,
-                enterprise_catalog_uuid,
-                assignment_configuration.enterprise_customer_uuid,
-            )
-
-            content_metadata_for_assignments = get_content_metadata_for_assignments(
-                enterprise_catalog_uuid,
-                [assignment],
-            )
-            content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
-            start_date = content_metadata.get('normalized_metadata', {}).get('start_date')
-            course_type = content_metadata.get('course_type')
-
-            is_executive_education_course_type = course_type == 'executive-education-2u'
-
-            # Determine if the date from today + days_before_course_state_date is
-            # equal to the date of the start date
-            # If they are equal, then send the nudge email, otherwise continue
-            datetime_start_date = parse_datetime_string(start_date, set_to_utc=True)
-            can_send_nudge_notification_in_advance = is_date_n_days_from_now(
-                target_datetime=datetime_start_date,
-                num_days=days_before_course_start_date
-            )
-
-            if is_executive_education_course_type and can_send_nudge_notification_in_advance:
-                message = (
-                    '[API_BRAZE_EMAIL_CAMPAIGN_NUDGING_2] ',
-                    'assignment_configuration_uuid: [%s], start_date: [%s], datetime_start_date: [%s], '
-                    'days_before_course_start_date: [%s], can_send_nudge_notification_in_advance: [%s], '
-                    'course_type: [%s]'
-                )
-                logger.info(
-                    message,
-                    assignment.assignment_configuration,
-                    start_date,
-                    datetime_start_date,
-                    days_before_course_start_date,
-                    can_send_nudge_notification_in_advance,
-                    course_type,
-                )
-                send_exec_ed_enrollment_warmer.delay(assignment.uuid, days_before_course_start_date)
-                nudged_assignment_uuids.append(assignment.uuid)
-            else:
-                unnudged_assignment_uuids.append(assignment.uuid)
-        else:
-            message = (
-                '[API_BRAZE_EMAIL_CAMPAIGN_NUDGING_ERROR] '
-                'assignment: [%s], '
-                'days_before_course_start_date: [%s]'
-            )
-            logger.info(
-                message,
-                assignment, days_before_course_start_date
+                '[API_BRAZE_EMAIL_CAMPAIGN_NUDGING_ERROR_1] assignment: [%s]',
+                assignment
             )
             unnudged_assignment_uuids.append(assignment.uuid)
+            continue
+
+        # log metadata for observability relating to the assignment configuration
+        message = (
+            '[API_BRAZE_EMAIL_CAMPAIGN_NUDGING_1] '
+            'Assignment Configuration uuid: [%s], assignmnet_uuid: [%s], '
+            'subsidy_access_policy_uuid: [%s], enterprise_catalog_uuid: [%s], '
+            'enterprise_customer_uuid: [%s] '
+        )
+        logger.info(
+            message,
+            assignment_configuration.uuid,
+            assignment.uuid,
+            subsidy_access_policy.uuid,
+            enterprise_catalog_uuid,
+            assignment_configuration.enterprise_customer_uuid,
+        )
+
+        # retrieve content_metadata for the assignment, and isolate the necessary fields
+        content_metadata_for_assignments = get_content_metadata_for_assignments(
+            enterprise_catalog_uuid,
+            [assignment],
+        )
+        content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
+        start_date = content_metadata.get('normalized_metadata', {}).get('start_date')
+        course_type = content_metadata.get('course_type')
+
+        # check if the course_type is an executive-education course
+        is_executive_education_course_type = course_type == 'executive-education-2u'
+
+        # Determine if the date from today + days_before_course_state_date is
+        # equal to the date of the start date
+        # If they are equal, then send the nudge email, otherwise continue
+        datetime_start_date = parse_datetime_string(start_date, set_to_utc=True)
+        can_send_nudge_notification_in_advance = is_date_n_days_from_now(
+            target_datetime=datetime_start_date,
+            num_days=days_before_course_start_date
+        )
+
+        # Determine if we can nudge a user, if we can nudge, log a message, send the nudge,
+        # and append to the nudged_assignment_uuids response list
+        # Otherwise, log a message, and append to the nudged_assignment_uuids response list
+        if is_executive_education_course_type and can_send_nudge_notification_in_advance:
+            message = (
+                '[API_BRAZE_EMAIL_CAMPAIGN_NUDGING_2] assignment_configuration_uuid: [%s], '
+                'assignment_uuid: [%s], start_date: [%s], datetime_start_date: [%s], '
+                'days_before_course_start_date: [%s], can_send_nudge_notification_in_advance: [%s], '
+                'course_type: [%s], is_executive_education_course_type: [%s]'
+            )
+            logger.info(
+                message,
+                assignment_configuration_uuid,
+                assignment.uuid,
+                start_date,
+                datetime_start_date,
+                days_before_course_start_date,
+                can_send_nudge_notification_in_advance,
+                course_type,
+                is_executive_education_course_type
+            )
+            send_exec_ed_enrollment_warmer.delay(assignment.uuid, days_before_course_start_date)
+            nudged_assignment_uuids.append(assignment.uuid)
+        else:
+            message = (
+                '[API_BRAZE_EMAIL_CAMPAIGN_NUDGING_ERROR_2] assignment_configuration_uuid: [%s], '
+                'assignment_uuid: [%s], start_date: [%s], datetime_start_date: [%s], '
+                'days_before_course_start_date: [%s], can_send_nudge_notification_in_advance: [%s], '
+                'course_type: [%s], is_executive_education_course_type: [%s]'
+            )
+            logger.info(
+                message,
+                assignment_configuration_uuid,
+                assignment.uuid,
+                start_date,
+                datetime_start_date,
+                days_before_course_start_date,
+                can_send_nudge_notification_in_advance,
+                course_type,
+                is_executive_education_course_type
+            )
+            unnudged_assignment_uuids.append(assignment.uuid)
+    # returns the lists as an object to the response
     return {
         'nudged_assignment_uuids': nudged_assignment_uuids,
-        'unnudged_assignment_uuids': unnudged_assignment_uuids,
+        'unnudged_assignment_uuids': unnudged_assignment_uuids
     }
 
 

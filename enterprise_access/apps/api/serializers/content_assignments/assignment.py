@@ -196,9 +196,11 @@ class LearnerContentAssignmentNudgeResponseSerializer(serializers.Serializer):
     """
     nudged_assignment_uuids = serializers.ListField(
         child=serializers.UUIDField(),
+        allow_empty=False
     )
     unnudged_assignment_uuids = serializers.ListField(
         child=serializers.UUIDField(),
+        allow_empty=True
     )
 
 

@@ -77,6 +77,7 @@ class Command(BaseCommand):
                 '[AUTOMATICALLY_REMIND_ACCEPTED_ASSIGNMENTS_1] Assignment Configuration. UUID: [%s], '
                 'Policy: [%s], Catalog: [%s], Enterprise: [%s], dry_run [%s]',
             )
+
             logger.info(
                 message,
                 assignment_configuration.uuid,

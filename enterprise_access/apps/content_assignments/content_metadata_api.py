@@ -106,10 +106,16 @@ def get_course_partners(course_metadata):
 
 def is_date_n_days_from_now(target_datetime, num_days):
     """
-    Takes an integer number of days to offset from the date_to_offset to determine if
-    the target_date matches the date_to_offset + days_offset date
+    Determine if the target_datetime is exactly num_days from the current
+    UTC date and time.
 
-    The target_date and date_to_offset arguments are UTC timezone objects
+        Args:
+            target_datetime (datetime): A datetime object in UTC that is to be compared.
+            num_days (int): The number of days from the current date to check against the
+                        target datetime
+
+        Returns:
+            bool: True if target_datetime is num_days away from now, otherwise False.
     """
     future_datetime = timezone.now() + timezone.timedelta(days=num_days)
     return target_datetime.date() == future_datetime.date()

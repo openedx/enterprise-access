@@ -369,19 +369,26 @@ class LearnerContentAssignmentAdminViewSet(
 
         ```
         Raises:
-            400 If ``assignment_uuids`` list length is 0 or the value for ``days_before_course_start_date`` is less than 1
+            400 If assignment_uuids list length is 0 or the value for days_before_course_start_date is less than 1
             422 If the nudge_assignments call fails for any other reason
         ```
         """
         serializer = LearnerContentAssignmentNudgeRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        assignment_configuration_uuid = self.requested_assignment_configuration_uuid
         assignments = self.get_queryset().filter(
-            assignment_configuration__uuid=self.requested_assignment_configuration_uuid,
+            assignment_configuration__uuid=assignment_configuration_uuid,
             uuid__in=serializer.data['assignment_uuids'],
         )
         days_before_course_start_date = serializer.data['days_before_course_start_date']
         try:
-            response = assignments_api.nudge_assignments(assignments, days_before_course_start_date)
-            return Response(data=response, status=status.HTTP_200_OK)
+            result = assignments_api.nudge_assignments(
+                assignments,
+                assignment_configuration_uuid,
+                days_before_course_start_date
+            )
+            response_serializer = LearnerContentAssignmentNudgeResponseSerializer(data=result)
+            response_serializer.is_valid(raise_exception=True)
+            return Response(data=response_serializer.data, status=status.HTTP_200_OK)
         except Exception:  # pylint: disable=broad-except
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
