@@ -18,7 +18,7 @@ from enterprise_access.apps.content_assignments.models import AssignmentConfigur
 from enterprise_access.apps.core.constants import (
     CONTENT_ASSIGNMENT_CONFIGURATION_READ_PERMISSION,
     CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION,
-    CONTENT_ASSIGNMENTS_ACKNOWLEDGE_PERMISSION
+    CONTENT_ASSIGNMENT_ACKNOWLEDGE_PERMISSION
 )
 
 logger = logging.getLogger(__name__)
@@ -236,7 +236,7 @@ class AssignmentConfigurationViewSet(
             status.HTTP_403_FORBIDDEN: None,
         },
     )
-    @permission_required(CONTENT_ASSIGNMENTS_ACKNOWLEDGE_PERMISSION, fn=assignment_config_permission_detail_fn)
+    @permission_required(CONTENT_ASSIGNMENT_ACKNOWLEDGE_PERMISSION, fn=assignment_config_permission_detail_fn)
     @action(detail=True, methods=['post'], url_path='acknowledge-assignments')
     def acknowledge_assignments(self, request, **kwargs):  # pylint: disable=unused-argument
         """

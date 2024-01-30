@@ -134,19 +134,9 @@ class AssignmentConfigurationAcknowledgeAssignmentsRequestSerializer(serializers
     )
 
 
-class AcknowledgedLearnerContentAssignmentResponseSerializer(serializers.Serializer):
-    """
-    Serializer for the assignments to an acknowledge assignments request.
-    """
-    uuid = serializers.UUIDField(
-        required=True,
-        help_text="The UUID of the LearnerContentAssignment.",
-    )
-
-
 class AssignmentConfigurationAcknowledgeAssignmentsResponseSerializer(serializers.Serializer):
     """
-    Request Serializer for POST parameters to an API call to acknowledge assignments.
+    Response Serializer for POST API call to acknowledge assignments.
 
     For view: AssignmentConfigurationViewSet.acknowledge_assignments
     """

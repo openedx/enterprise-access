@@ -26,7 +26,7 @@ CONTENT_ASSIGNMENT_CONFIGURATION_WRITE_PERMISSION = 'content_assignment_configur
 CONTENT_ASSIGNMENT_ADMIN_READ_PERMISSION = 'content_assignment.has_admin_read_access'
 CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION = 'content_assignment.has_admin_write_access'
 CONTENT_ASSIGNMENT_LEARNER_READ_PERMISSION = 'content_assignment.has_learner_read_access'
-CONTENT_ASSIGNMENTS_ACKNOWLEDGE_PERMISSION = 'content_assignment_configuration.has_acknowledge_assignments_access'
+CONTENT_ASSIGNMENT_ACKNOWLEDGE_PERMISSION = 'content_assignment.has_acknowledge_access'
 
 ALL_ACCESS_CONTEXT = '*'
 

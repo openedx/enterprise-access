@@ -45,22 +45,11 @@ class LearnerContentAssignmentActionLearnerAcknowledgedSerializer(LearnerContent
     serialized with an additional field for whether or not the action has been acknowledged by the learner.
     """
 
-    learner_acknowledged = serializers.SerializerMethodField(
-        help_text='Whether or not the action has been acknowledged by the learner.',
-    )
-
     class Meta(LearnerContentAssignmentActionSerializer.Meta):
         """
         Adds the ``learner_acknowledged`` field to the serializer.
         """
         fields = LearnerContentAssignmentActionSerializer.Meta.fields + ['learner_acknowledged']
-
-    @extend_schema_field(serializers.BooleanField)
-    def get_learner_acknowledged(self, action):
-        """
-        Returns whether or not the action has been acknowledged by the learner.
-        """
-        return action.learner_acknowledged()
 
 
 class LearnerContentAssignmentRecentActionSerializer(serializers.Serializer):
@@ -360,9 +349,6 @@ class LearnerContentAssignmentWithLearnerAcknowledgedResponseSerializer(
     Read-only serializer for LearnerContentAssignment records that also includes whether or not the learner has
     acknowledged the assignment.
     """
-    learner_acknowledged = serializers.SerializerMethodField(
-        help_text='Whether or not the learner has acknowledged the assignment.',
-    )
 
     actions = LearnerContentAssignmentActionLearnerAcknowledgedSerializer(
         help_text='All actions associated with this assignment.',
@@ -372,10 +358,3 @@ class LearnerContentAssignmentWithLearnerAcknowledgedResponseSerializer(
     class Meta(LearnerContentAssignmentWithContentMetadataResponseSerializer.Meta):
         fields = LearnerContentAssignmentWithContentMetadataResponseSerializer.Meta.fields + ['learner_acknowledged']
         read_only_fields = fields
-
-    @extend_schema_field(serializers.BooleanField)
-    def get_learner_acknowledged(self, assignment):
-        """
-        Returns whether or not the learner has acknowledged the assignment.
-        """
-        return assignment.learner_acknowledged()

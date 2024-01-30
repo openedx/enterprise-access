@@ -1218,7 +1218,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         unacknowledged_assignments_uuids = [
             assignment.uuid
             for assignment in assignments
-            if not assignment.learner_acknowledged()
+            if not assignment.learner_acknowledged
         ]
         return len(unacknowledged_assignments_uuids) > 0
 

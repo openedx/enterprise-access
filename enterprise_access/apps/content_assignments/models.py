@@ -96,6 +96,10 @@ class AssignmentConfiguration(TimeStampedModel):
         """
         Returns a tuple of booleans indicating whether the given assignment should be acknowledged and
         whether the assignment has already been acknowledged.
+
+        Example: (False, False) means that the assignment should not be acknowledged, and has not yet been acknowledged.
+        Example: (True, False) means that the assignment should be acknowledged, and has not yet been acknowledged.
+        Example: (False, True) means that the assignment should not be acknowledged, and has already been acknowledged.
         """
         if assignment.state != LearnerContentAssignmentStateChoices.EXPIRED:
             return False, False
@@ -109,14 +113,15 @@ class AssignmentConfiguration(TimeStampedModel):
                 LearnerContentAssignmentStateChoices.EXPIRED,
             )
 
-        # Check whether expiration has ever been acknowledged; if not, acknowledge it.
-        if not expiration_last_acknowledged:
-            return True, False
-
-        # If it has been acknowledged before, check whether last expiration action is newer
+        # Check whether expiration has ever been acknowledged; if not, acknowledge it. If
+        # it has been acknowledged before, check whether last expiration action is newer
         # than the last acknowledged expiration action.
-        if last_expiration and last_expiration.completed_at > expiration_last_acknowledged.completed_at:
-            return True, True
+        has_acknowledged_recent_expiration = (
+            expiration_last_acknowledged and last_expiration and
+            last_expiration.completed_at > expiration_last_acknowledged.completed_at
+        )
+        if not has_acknowledged_recent_expiration:
+            return True, False
 
         # Otherwise, the expiration has already been acknowledged and should not be acknowledged again.
         return False, True
@@ -125,6 +130,10 @@ class AssignmentConfiguration(TimeStampedModel):
         """
         Returns a tuple of booleans indicating whether the given assignment should be acknowledged and
         whether the assignment has already been acknowledged.
+
+        Example: (False, False) means that the assignment should not be acknowledged, and has not yet been acknowledged.
+        Example: (True, False) means that the assignment should be acknowledged, and has not yet been acknowledged.
+        Example: (False, True) means that the assignment should not be acknowledged, and has already been acknowledged.
         """
         if assignment.state != LearnerContentAssignmentStateChoices.CANCELLED:
             return False, False
@@ -138,16 +147,17 @@ class AssignmentConfiguration(TimeStampedModel):
                 LearnerContentAssignmentStateChoices.EXPIRED,
             )
 
-        # Check whether cancellation has ever been acknowledged; if not, acknowledge it.
-        if not cancellation_last_acknowledged:
+        # Check whether cancelation has ever been acknowledged; if not, acknowledge it. If
+        # it has been acknowledged before, check whether last cancelation action is newer
+        # than the last acknowledged cancelation action.
+        has_acknowledged_recent_cancelation = (
+            cancellation_last_acknowledged and last_cancellation and
+            last_cancellation.completed_at > cancellation_last_acknowledged.completed_at
+        )
+        if not has_acknowledged_recent_cancelation:
             return True, False
 
-        # If it has been acknowledged before, check whether last cancellation action is newer
-        # than the last acknowledged cancellation action.
-        if last_cancellation and last_cancellation.completed_at > cancellation_last_acknowledged.completed_at:
-            return True, True
-
-        # Otherwise, the cancellation has already been acknowledged and should not be acknowledged again.
+        # Otherwise, the cancelation has already been acknowledged and should not be acknowledged again.
         return False, True
 
     def acknowledge_assignments(self, assignment_uuids, lms_user_id):
@@ -178,36 +188,34 @@ class AssignmentConfiguration(TimeStampedModel):
         unacknowledged_assignments = []
 
         for assignment in assignments_to_acknowledge:
-            acknowledge_expiration, already_acknowledged_expiration = self._should_acknowledge_expired_assignment(
+            should_ack_expiration, already_acknowledged_expiration = self._should_acknowledge_expired_assignment(
                 assignment
             )
-            acknowledge_cancellation, already_acknowledged_cancellation = self._should_acknowledge_cancelled_assignment(
+            should_ack_cancellation, already_acknowledged_cancellation = self._should_acknowledge_cancelled_assignment(
                 assignment
             )
 
             # Acknowledge the expiration, if necessary.
-            if acknowledge_expiration:
+            if should_ack_expiration:
                 assignment.add_successful_acknowledged_expired_action()
                 acknowledged_assignments.append(assignment)
 
             # Acknowledge the cancellation, if necessary.
-            if acknowledge_cancellation:
+            if should_ack_cancellation:
                 assignment.add_successful_acknowledged_cancelled_action()
                 acknowledged_assignments.append(assignment)
 
             # Learner has already acknowledged this expiration or cancellation, so add it to
             # the returned already acknowledged list.
-            has_already_acknowledged_expiration = not acknowledge_expiration and already_acknowledged_expiration
-            has_already_acknowledged_cancellation = not acknowledge_cancellation and already_acknowledged_cancellation
-            if has_already_acknowledged_expiration or has_already_acknowledged_cancellation:
+            if already_acknowledged_expiration or already_acknowledged_cancellation:
                 already_acknowledged_assignments.append(assignment)
 
             # If we didn't acknowledge the assignment (e.g., assignment isn't expired or cancelled),
             # add it to returned unacknowledged list. This is a defensive check / safegaurd, and provides
             # feedback to the caller that some assignments were not acknowledged.
             if (
-                not acknowledge_expiration and
-                not acknowledge_cancellation and
+                not should_ack_expiration and
+                not should_ack_cancellation and
                 assignment not in already_acknowledged_assignments
             ):
                 unacknowledged_assignments.append(assignment)
@@ -400,6 +408,7 @@ class LearnerContentAssignment(TimeStampedModel):
             batch_size=BULK_OPERATION_BATCH_SIZE,
         )
 
+    @property
     def learner_acknowledged(self):
         """
         Returns whether or not the learner has acknowledged the assignment.
@@ -413,7 +422,7 @@ class LearnerContentAssignment(TimeStampedModel):
                     self.uuid,
                 )
                 return False
-            return last_expired_action.learner_acknowledged()
+            return last_expired_action.learner_acknowledged
 
         if self.state == LearnerContentAssignmentStateChoices.CANCELLED:
             last_cancelled_action = self.get_last_successful_cancel_action()
@@ -424,7 +433,7 @@ class LearnerContentAssignment(TimeStampedModel):
                     self.uuid,
                 )
                 return False
-            return last_cancelled_action.learner_acknowledged()
+            return last_cancelled_action.learner_acknowledged
 
         # Fallback to None, in case the assignment is in a state that may not be acknowledged.
         return None
@@ -938,6 +947,7 @@ class LearnerContentAssignmentAction(TimeStampedModel):
             f'uuid={self.uuid}, action_type={self.action_type}, error_reason={self.error_reason}'
         )
 
+    @property
     def learner_acknowledged(self):
         """
         Returns True if this action has been acknowledged, False otherwise. If

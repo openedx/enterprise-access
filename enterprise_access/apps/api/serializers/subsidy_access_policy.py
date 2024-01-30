@@ -555,7 +555,7 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
         unacknowledged_assignments_uuids = [
             assignment.uuid
             for assignment in assignments
-            if not assignment.learner_acknowledged()
+            if not assignment.learner_acknowledged
         ]
         unacknowledged_assignments = assignments.filter(uuid__in=unacknowledged_assignments_uuids)
         content_metadata_lookup = get_content_metadata_for_assignments(obj.catalog_uuid, unacknowledged_assignments)
