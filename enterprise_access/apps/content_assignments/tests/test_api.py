@@ -590,7 +590,10 @@ class TestContentAssignmentApi(TestCase):
 @ddt.ddt
 class TestAssignmentExpiration(TestCase):
     """
-    Tests of the ``api.expire_assignment()`` function.
+    Tests of the following API methods:
+      - ``api.expire_assignment()``
+      - ``api.get_automatic_expiration_date_and_reason()``
+      - ``api.get_subsidy_expiration()``
     """
 
     @classmethod
@@ -601,9 +604,6 @@ class TestAssignmentExpiration(TestCase):
             assignment_configuration=cls.assignment_configuration,
             spend_limit=1000000,
         )
-
-    def tearDown(self):
-        cache.clear()
 
     def mock_content_metadata(self, content_key, enroll_by_date):
         """
@@ -631,6 +631,7 @@ class TestAssignmentExpiration(TestCase):
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
+                content_metadata=self.mock_content_metadata('edX+DemoX', None),
                 modify_assignment=True,
             )
 
@@ -642,13 +643,7 @@ class TestAssignmentExpiration(TestCase):
     @ddt.data(
         *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
     )
-    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
-    def test_dont_expire_assignments_with_future_expiration_dates(
-        self,
-        assignment_state,
-        mock_expired_email,
-        mock_catalog_client,
-    ):
+    def test_dont_expire_assignments_with_future_expiration_dates(self, assignment_state, mock_expired_email):
         """
         Tests that we don't expire assignments with all types of expiration dates in the future.
         """
@@ -661,22 +656,12 @@ class TestAssignmentExpiration(TestCase):
         original_modified_time = assignment.modified
         assignment.add_successful_notified_action()
 
-        # Mock results from the catalog content metadata API endpoint.
-        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
-            'count': 1,
-            'results': [
-                self.mock_content_metadata(
-                    content_key='demoX',
-                    enroll_by_date=delta_t(days=100, as_string=True),
-                ),
-            ],
-        }
-
         # set a policy-subsidy expiration date in the future
         mock_subsidy_record = {'expiration_datetime': delta_t(days=100, as_string=True)}
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
+                content_metadata=self.mock_content_metadata('edX+DemoX', delta_t(days=100, as_string=True)),
                 modify_assignment=True,
             )
 
@@ -689,11 +674,9 @@ class TestAssignmentExpiration(TestCase):
         *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
     )
     @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
-    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     def test_expire_one_assignment_automatically(
         self,
         assignment_state,
-        mock_catalog_client,
         mock_expired_email,
     ):
         """
@@ -712,17 +695,12 @@ class TestAssignmentExpiration(TestCase):
         action.completed_at = delta_t(days=-enough_days_to_be_cancelled)
         action.save()
 
-        # Mock results from the catalog content metadata API endpoint.
-        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
-            'count': 0,
-            'results': [],
-        }
-
         # set a policy-subsidy expiration date in the future
         mock_subsidy_record = {'expiration_datetime': delta_t(days=100, as_string=True)}
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
+                content_metadata=self.mock_content_metadata('edX+DemoX', None),
                 modify_assignment=True,
             )
 
@@ -741,11 +719,9 @@ class TestAssignmentExpiration(TestCase):
         *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
     )
     @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
-    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     def test_expire_assignments_with_passed_enroll_by_date(
         self,
         assignment_state,
-        mock_catalog_client,
         mock_expired_email,
     ):
         """
@@ -761,21 +737,18 @@ class TestAssignmentExpiration(TestCase):
         )
         assignment.add_successful_notified_action()
 
-        # Mock results from the catalog content metadata API endpoint.
+        # create expired content metadata
         mock_content_metadata = self.mock_content_metadata(
             content_key=content_key,
             enroll_by_date=delta_t(days=-1, as_string=True),
         )
-        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
-            'count': 1,
-            'results': [mock_content_metadata],
-        }
 
         # set a policy-subsidy expiration date in the future
         mock_subsidy_record = {'expiration_datetime': delta_t(days=100, as_string=True)}
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
+                content_metadata=mock_content_metadata,
                 modify_assignment=True,
             )
 
@@ -791,11 +764,9 @@ class TestAssignmentExpiration(TestCase):
         *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
     )
     @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
-    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     def test_expire_assignments_with_expired_subsidy(
         self,
         assignment_state,
-        mock_catalog_client,
         mock_expired_email,
     ):
         """
@@ -811,21 +782,18 @@ class TestAssignmentExpiration(TestCase):
         )
         assignment.add_successful_notified_action()
 
-        # Mock results from the catalog content metadata API endpoint.
+        # create non-expired content metadata
         mock_content_metadata = self.mock_content_metadata(
             content_key=content_key,
             enroll_by_date=delta_t(days=100, as_string=True),
         )
-        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
-            'count': 1,
-            'results': [mock_content_metadata],
-        }
 
         # set a policy-subsidy expiration date in the past
         mock_subsidy_record = {'expiration_datetime': delta_t(days=-1, as_string=True)}
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
+                content_metadata=mock_content_metadata,
                 modify_assignment=True,
             )
 

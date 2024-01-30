@@ -14,6 +14,7 @@ from rest_framework import status
 
 from enterprise_access.apps.api_client.braze_client import ENTERPRISE_BRAZE_ALIAS_LABEL
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
+from enterprise_access.apps.content_assignments.api import get_automatic_expiration_date_and_reason
 from enterprise_access.apps.content_assignments.constants import (
     AssignmentActionErrors,
     AssignmentActions,
@@ -283,8 +284,12 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     @ddt.data(True, False)
     def test_send_reminder_email_for_pending_assignment(
-        self, is_logistrated, mock_braze_client_class, mock_lms_client,
-        mock_catalog_client, mock_subsidy_client,
+        self,
+        is_logistrated,
+        mock_braze_client_class,
+        mock_lms_client,
+        mock_catalog_client,
+        mock_subsidy_client,
     ):
         """
         Verify send_reminder_email_for_pending_assignment hits braze client with expected args
@@ -572,10 +577,14 @@ class TestBrazeEmailTasks(APITestWithMocks):
 
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     def test_get_action_required_by_auto_cancellation_soonest(  # pylint: disable=unused-argument
-        self, mock_catalog_client, mock_subsidy_client, mock_braze_client_class, mock_lms_client_class,
+        self,
+        mock_subsidy_client,
+        mock_catalog_client,
+        mock_braze_client_class,
+        mock_lms_client_class,
     ):
         """
         Tests that the auto-cancellation date is returned as the earliest action required by time.
@@ -608,7 +617,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
         sender = BrazeCampaignSender(self.assignment)
         action_required_by = sender.get_action_required_by()
 
-        self.assertEqual(
-            format_datetime_obj(self.assignment.get_automatic_expiration_date_and_reason()['date']),
-            action_required_by
+        expected_result = format_datetime_obj(
+            get_automatic_expiration_date_and_reason(self.assignment)['date']
         )
+        self.assertEqual(expected_result, action_required_by)

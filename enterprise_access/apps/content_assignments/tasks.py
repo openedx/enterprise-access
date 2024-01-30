@@ -208,7 +208,8 @@ class BrazeCampaignSender:
         Returns the minimum of this assignment's auto-expiration date,
         the content's enrollment deadline, and the related policy's expiration datetime.
         """
-        action_required_by = self.assignment.get_automatic_expiration_date_and_reason()
+        from enterprise_access.apps.content_assignments.api import get_automatic_expiration_date_and_reason  # pylint: disable=import-outside-toplevel
+        action_required_by = get_automatic_expiration_date_and_reason(self.assignment)
         if not action_required_by:
             return None
         return format_datetime_obj(action_required_by['date'])

@@ -11,6 +11,7 @@ from uuid import uuid4
 from django.db import transaction
 from django.db.models import Q, Sum
 from django.db.models.functions import Lower
+from pytz import UTC
 
 from enterprise_access.apps.content_assignments.content_metadata_api import (
     get_content_metadata_for_assignments,
@@ -26,6 +27,7 @@ from enterprise_access.apps.subsidy_access_policy.content_metadata_api import ge
 from enterprise_access.utils import localized_utcnow
 
 from .constants import AssignmentAutomaticExpiredReason, LearnerContentAssignmentStateChoices
+from .content_metadata_api import get_content_metadata_for_assignments, parse_datetime_string
 from .models import AssignmentConfiguration, LearnerContentAssignment
 from .tasks import (
     create_pending_enterprise_learner_for_assignment_task,
@@ -713,7 +715,7 @@ def expire_assignment(assignment, content_metadata, modify_assignment=True):
         logger.info('Cannot expire accepted assignment %s', assignment.uuid)
         return None
 
-    automatic_expiration_date_and_reason = assignment.get_automatic_expiration_date_and_reason()
+    automatic_expiration_date_and_reason = get_automatic_expiration_date_and_reason(assignment, content_metadata)
     automatic_expiration_date = automatic_expiration_date_and_reason['date']
     automatic_expiration_reason = automatic_expiration_date_and_reason['reason']
 

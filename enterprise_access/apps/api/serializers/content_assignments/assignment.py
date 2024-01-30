@@ -13,6 +13,7 @@ from enterprise_access.apps.content_assignments.constants import (
     LearnerContentAssignmentStateChoices
 )
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment, LearnerContentAssignmentAction
+from enterprise_access.apps.content_assignments.api import get_automatic_expiration_date_and_reason
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +134,7 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
         """
         Returns the earliest possible expiration date for the assignment.
         """
-        return assignment.get_automatic_expiration_date_and_reason()
+        return get_automatic_expiration_date_and_reason(assignment)
 
 
 class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentResponseSerializer):

@@ -10,6 +10,7 @@ from django.core.paginator import Paginator
 
 from enterprise_access.apps.content_assignments.api import expire_assignment
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 
 logger = logging.getLogger(__name__)
@@ -83,8 +84,16 @@ class Command(BaseCommand):
             paginator = Paginator(assignments_to_possibly_expire, 100)
             for page_number in paginator.page_range:
                 assignments = paginator.page(page_number)
+
+                content_metadata_for_assignments = get_content_metadata_for_assignments(
+                    enterprise_catalog_uuid,
+                    assignments
+                )
+
                 for assignment in assignments:
+                    content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
                     expire_assignment(
                         assignment,
+                        content_metadata,
                         modify_assignment=not dry_run,
                     )
