@@ -14,7 +14,10 @@ from rest_framework.response import Response
 
 from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.serializers.content_assignments.assignment import (
-    LearnerContentAssignmentActionRequestSerializer
+    LearnerContentAssignmentActionRequestSerializer,
+    LearnerContentAssignmentNudgeHTTP422ErrorSerializer,
+    LearnerContentAssignmentNudgeRequestSerializer,
+    LearnerContentAssignmentNudgeResponseSerializer
 )
 from enterprise_access.apps.api.v1.views.utils import PaginationWithPageCount
 from enterprise_access.apps.content_assignments import api as assignments_api
@@ -347,3 +350,61 @@ class LearnerContentAssignmentAdminViewSet(
             return Response(status=status.HTTP_202_ACCEPTED)
         except Exception:  # pylint: disable=broad-except
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    @extend_schema(
+        tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
+        summary='Nudge assignments by UUID.',
+        request=LearnerContentAssignmentNudgeRequestSerializer,
+        parameters=None,
+        responses={
+            status.HTTP_200_OK: LearnerContentAssignmentNudgeResponseSerializer,
+            status.HTTP_422_UNPROCESSABLE_ENTITY: LearnerContentAssignmentNudgeHTTP422ErrorSerializer,
+        }
+    )
+    @permission_required(CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION, fn=assignment_admin_permission_fn)
+    @action(detail=False, methods=['post'])
+    def nudge(self, request, *args, **kwargs):
+        """
+        Send nudges to a list of learners with associated ``LearnerContentAssignment``
+        record by list of uuids.
+
+        ```
+        Raises:
+            400 If assignment_uuids list length is 0 or the value for days_before_course_start_date is less than 1
+            422 If the nudge_assignments call fails for any other reason
+        ```
+        """
+        serializer = LearnerContentAssignmentNudgeRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        assignment_configuration_uuid = self.requested_assignment_configuration_uuid
+        assignments = self.get_queryset().filter(
+            assignment_configuration__uuid=assignment_configuration_uuid,
+            uuid__in=serializer.data['assignment_uuids'],
+        )
+        days_before_course_start_date = serializer.data['days_before_course_start_date']
+        try:
+            if len(assignments) == 0:
+                error_message = (
+                    "The list of assignments provided are not associated to the assignment_configuration_uuid: {0}"
+                    .format(assignment_configuration_uuid)
+                )
+                return Response(
+                    data={"error_message": error_message}, status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+            result = assignments_api.nudge_assignments(
+                assignments,
+                assignment_configuration_uuid,
+                days_before_course_start_date
+            )
+            response_serializer = LearnerContentAssignmentNudgeResponseSerializer(data=result)
+            response_serializer.is_valid(raise_exception=True)
+            return Response(data=response_serializer.data, status=status.HTTP_200_OK)
+        except Exception:  # pylint: disable=broad-except
+            error_message = (
+                "Could not process the nudge email(s) for assignment_configuration_uuid: {0}"
+                .format(assignment_configuration_uuid)
+            )
+            return Response(
+                data={"error_message": error_message},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY
+            )

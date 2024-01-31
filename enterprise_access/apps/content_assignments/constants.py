@@ -104,7 +104,7 @@ class AssignmentAutomaticExpiredReason:
     """
     Reason for assignment automatic expiry.
     """
-    NIENTY_DAYS_PASSED = 'NIENTY_DAYS_PASSED'
+    NINETY_DAYS_PASSED = 'NINETY_DAYS_PASSED'
     ENROLLMENT_DATE_PASSED = 'ENROLLMENT_DATE_PASSED'
     SUBSIDY_EXPIRED = 'SUBSIDY_EXPIRED'
 
