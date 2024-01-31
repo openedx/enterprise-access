@@ -705,9 +705,10 @@ def nudge_assignments(assignments, assignment_configuration_uuid, days_before_co
 
 
 def expire_assignment(
-        assignment: LearnerContentAssignment,
-        content_metadata: dict,
-        modify_assignment: bool = True):
+    assignment: LearnerContentAssignment,
+    content_metadata: dict,
+    modify_assignment: bool = True
+):
     """
     If applicable, retires the given assignment, returning an expiration reason.
     Otherwise, returns `None` as a reason.
