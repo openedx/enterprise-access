@@ -14,7 +14,6 @@ from rest_framework import status
 from rest_framework.reverse import reverse
 
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
-from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
 from enterprise_access.apps.content_assignments.constants import (
     AssignmentAutomaticExpiredReason,
     LearnerContentAssignmentStateChoices
