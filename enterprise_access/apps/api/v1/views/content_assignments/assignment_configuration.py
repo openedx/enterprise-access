@@ -237,7 +237,10 @@ class AssignmentConfigurationViewSet(
             status.HTTP_403_FORBIDDEN: None,
         },
     )
-    @permission_required(CONTENT_ASSIGNMENT_CONFIGURATION_ACKNOWLEDGE_PERMISSION, fn=assignment_config_permission_detail_fn)
+    @permission_required(
+        CONTENT_ASSIGNMENT_CONFIGURATION_ACKNOWLEDGE_PERMISSION,
+        fn=assignment_config_permission_detail_fn
+    )
     @action(detail=True, methods=['post'], url_path='acknowledge-assignments')
     def acknowledge_assignments(self, request, **kwargs):  # pylint: disable=unused-argument
         """
