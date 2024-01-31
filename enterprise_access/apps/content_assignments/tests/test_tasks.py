@@ -14,7 +14,6 @@ from rest_framework import status
 
 from enterprise_access.apps.api_client.braze_client import ENTERPRISE_BRAZE_ALIAS_LABEL
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
-from enterprise_access.apps.content_assignments.api import get_automatic_expiration_date_and_reason
 from enterprise_access.apps.content_assignments.constants import (
     AssignmentActionErrors,
     AssignmentActions,
@@ -36,6 +35,7 @@ from enterprise_access.apps.content_assignments.tests.factories import (
 from enterprise_access.apps.subsidy_access_policy.models import REQUEST_CACHE_NAMESPACE
 from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
 from enterprise_access.cache_utils import request_cache
+from enterprise_access.utils import get_automatic_expiration_date_and_reason
 from test_utils import APITestWithMocks
 
 TEST_ENTERPRISE_UUID = uuid4()

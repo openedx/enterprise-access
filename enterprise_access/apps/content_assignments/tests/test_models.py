@@ -1,15 +1,13 @@
 """
 Tests for the ``api.py`` module of the content_assignments app.
 """
-from unittest import mock
 
 from django.test import TestCase
 from django.utils import timezone
 
-from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
 
-from ..constants import NUM_DAYS_BEFORE_AUTO_EXPIRATION, RETIRED_EMAIL_ADDRESS, AssignmentActions
+from ..constants import RETIRED_EMAIL_ADDRESS, AssignmentActions
 from ..models import AssignmentConfiguration
 from .factories import LearnerContentAssignmentFactory
 

@@ -21,12 +21,10 @@ from .constants import (
     RETIRED_EMAIL_ADDRESS,
     AssignmentActionErrors,
     AssignmentActions,
-    AssignmentAutomaticExpiredReason,
     AssignmentLearnerStates,
     AssignmentRecentActionTypes,
     LearnerContentAssignmentStateChoices
 )
-from .content_metadata_api import get_content_metadata_for_assignments, parse_datetime_string
 from .utils import format_traceback
 
 logger = logging.getLogger(__name__)

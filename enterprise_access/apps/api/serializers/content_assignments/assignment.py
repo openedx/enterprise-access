@@ -13,7 +13,7 @@ from enterprise_access.apps.content_assignments.constants import (
     LearnerContentAssignmentStateChoices
 )
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment, LearnerContentAssignmentAction
-from enterprise_access.apps.content_assignments.api import get_automatic_expiration_date_and_reason
+from enterprise_access.utils import get_automatic_expiration_date_and_reason
 
 logger = logging.getLogger(__name__)
 

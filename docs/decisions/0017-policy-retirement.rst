@@ -3,7 +3,7 @@
 
 Status
 ======
-Proposed - January 2024
+Accepted - January 2024
 
 Context
 =======

@@ -11,7 +11,6 @@ from uuid import uuid4
 from django.db import transaction
 from django.db.models import Q, Sum
 from django.db.models.functions import Lower
-from pytz import UTC
 
 from enterprise_access.apps.content_assignments.content_metadata_api import (
     get_content_metadata_for_assignments,
@@ -24,10 +23,9 @@ from enterprise_access.apps.content_assignments.tasks import (
 )
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
-from enterprise_access.utils import localized_utcnow
+from enterprise_access.utils import get_automatic_expiration_date_and_reason, localized_utcnow
 
 from .constants import AssignmentAutomaticExpiredReason, LearnerContentAssignmentStateChoices
-from .content_metadata_api import get_content_metadata_for_assignments, parse_datetime_string
 from .models import AssignmentConfiguration, LearnerContentAssignment
 from .tasks import (
     create_pending_enterprise_learner_for_assignment_task,

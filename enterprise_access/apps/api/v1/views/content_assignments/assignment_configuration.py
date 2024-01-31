@@ -13,6 +13,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from enterprise_access.apps.api import filters, serializers, utils
+from enterprise_access.apps.api.utils import get_assignment_config_customer_uuid
 from enterprise_access.apps.api.v1.views.utils import PaginationWithPageCount
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 from enterprise_access.apps.core.constants import (
@@ -40,7 +41,7 @@ def assignment_config_permission_detail_fn(request, *args, uuid=None, **kwargs):
     Args:
         uuid (str): UUID representing an AssignmentConfiguration object.
     """
-    return utils.get_assignment_config_customer_uuid(uuid)
+    return get_assignment_config_customer_uuid(uuid)
 
 
 class AssignmentConfigurationViewSet(

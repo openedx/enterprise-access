@@ -4,7 +4,6 @@ Tests for the ``api.py`` module of the content_assignments app.
 from unittest import mock
 
 import ddt
-from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
 

@@ -19,7 +19,7 @@ from enterprise_access.apps.content_assignments.content_metadata_api import (
     get_human_readable_date
 )
 from enterprise_access.tasks import LoggedTaskWithRetry
-from enterprise_access.utils import localized_utcnow
+from enterprise_access.utils import get_automatic_expiration_date_and_reason, localized_utcnow
 
 from .constants import LearnerContentAssignmentStateChoices
 
@@ -208,7 +208,6 @@ class BrazeCampaignSender:
         Returns the minimum of this assignment's auto-expiration date,
         the content's enrollment deadline, and the related policy's expiration datetime.
         """
-        from enterprise_access.apps.content_assignments.api import get_automatic_expiration_date_and_reason  # pylint: disable=import-outside-toplevel
         action_required_by = get_automatic_expiration_date_and_reason(self.assignment)
         if not action_required_by:
             return None

@@ -1,14 +1,22 @@
 """
 Utils for any app in the enterprise-access project.
 """
+import logging
 from datetime import datetime
 
 from django.apps import apps
 from pytz import UTC
 
+from enterprise_access.apps.content_assignments.constants import AssignmentAutomaticExpiredReason
+from enterprise_access.apps.content_assignments.content_metadata_api import (
+    get_content_metadata_for_assignments,
+    parse_datetime_string
+)
 from enterprise_access.apps.subsidy_request.constants import SubsidyTypeChoices
 
 _MEMO_MISS = object()
+
+logger = logging.getLogger(__name__)
 
 
 def get_subsidy_model(subsidy_type):
@@ -39,3 +47,112 @@ def is_none(thing):
 def localized_utcnow():
     """Helper function to return localized utcnow()."""
     return datetime.now().replace(tzinfo=UTC)
+
+
+def _get_subsidy_expiration(assignment):
+    """
+    Returns the datetime at which the subsidy for this assignment expires.
+    """
+    subsidy_expiration_datetime = (
+        assignment.assignment_configuration.policy.subsidy_expiration_datetime
+    )
+    if not subsidy_expiration_datetime:
+        return None
+    subsidy_expiration_datetime = parse_datetime_string(subsidy_expiration_datetime).replace(tzinfo=UTC)
+    return subsidy_expiration_datetime
+
+
+def _get_enrollment_deadline_date(content_metadata):
+    """
+    Helper to get the enrollment end date from a content metadata record.
+    """
+    if not content_metadata:
+        return None
+
+    normalized_metadata = content_metadata.get('normalized_metadata') or {}
+    enrollment_end_date_str = normalized_metadata.get('enroll_by_date')
+    try:
+        datetime_obj = parse_datetime_string(enrollment_end_date_str)
+        if datetime_obj:
+            return datetime_obj.replace(tzinfo=UTC)
+    except ValueError:
+        logger.warning(
+            'Bad datetime format for %s, value: %s',
+            content_metadata.get('key'),
+            enrollment_end_date_str,
+        )
+    return None
+
+
+def get_automatic_expiration_date_and_reason(
+    assignment,
+    content_metadata: dict = None
+):
+    """
+    For the given assignment, returns the date at which this assignment expires due to:
+    * subsidy expiration
+    * content enrollment deadline
+    * 90-day timeout from allocation
+
+    Whichever of the three above dates is the earliest is returned, along with the reason
+    for the expiration as a dictionary.
+
+    Arguments:
+        assignment (LearnerContentAssignment): The assignment to check for expiration.
+        [content_metadata] (dict): Content metadata for the assignment's content key. If not provided, it will be
+            fetched and subsequently cached from the content metadata API.
+    """
+    assignment_configuration = assignment.assignment_configuration
+    subsidy_access_policy = assignment_configuration.subsidy_access_policy  # pylint: disable=no-member
+
+    # subsidy expiration
+    subsidy_expiration_datetime = _get_subsidy_expiration(assignment)
+
+    # content enrollment deadline
+    if not content_metadata:
+        content_key = assignment.content_key
+        content_metadata_by_key = get_content_metadata_for_assignments(
+            enterprise_catalog_uuid=subsidy_access_policy.catalog_uuid,
+            assignments=[assignment],
+        )
+        content_metadata = content_metadata_by_key.get(content_key)
+    enrollment_deadline_datetime = _get_enrollment_deadline_date(content_metadata)
+    if enrollment_deadline_datetime:
+        enrollment_deadline_datetime = enrollment_deadline_datetime.replace(tzinfo=UTC)
+
+    # 90-day timeout from allocation
+    timeout_expiration_datetime = assignment.get_allocation_timeout_expiration()
+
+    # Determine which of the three expiration dates is the earliest
+    subsidy_expiration = {
+        'date': subsidy_expiration_datetime,
+        'reason': AssignmentAutomaticExpiredReason.SUBSIDY_EXPIRED,
+    }
+    enrollment_deadline = {
+        'date': enrollment_deadline_datetime,
+        'reason': AssignmentAutomaticExpiredReason.ENROLLMENT_DATE_PASSED,
+    }
+    timeout_expiration = {
+        'date': timeout_expiration_datetime,
+        'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED,
+    }
+    expiration_dates = [subsidy_expiration, enrollment_deadline, timeout_expiration]
+    sorted_available_expiration_dates = sorted(
+        filter(lambda x: x['date'] is not None, expiration_dates),
+        key=lambda x: x['date'],
+    )
+    action_required_by = sorted_available_expiration_dates[0]
+    message = (
+        'action_required_by assignment=%s: subsidy_expiration=%s, enrollment_deadline=%s, '
+        'timeout_expiration_date=%s, action_required_by_datetime=%s, action_required_by_reason=%s',
+    )
+    logger.info(
+        message,
+        assignment.uuid,
+        subsidy_expiration_datetime,
+        enrollment_deadline_datetime,
+        timeout_expiration_datetime,
+        action_required_by['date'],
+        action_required_by['reason'],
+    )
+    return action_required_by
