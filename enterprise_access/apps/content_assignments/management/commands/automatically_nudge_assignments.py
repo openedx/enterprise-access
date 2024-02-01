@@ -44,6 +44,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             '--days_before_course_start_date',
+            type="int",
             action='store_true',
             dest='days_before_course_start_date',
             default=30,

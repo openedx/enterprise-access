@@ -116,7 +116,7 @@ class AssignmentConfiguration(TimeStampedModel):
         # than the last acknowledged expiration action.
         has_acknowledged_recent_expiration = (
             expiration_last_acknowledged and last_expiration and
-            last_expiration.completed_at > expiration_last_acknowledged.completed_at
+            last_expiration.completed_at <= expiration_last_acknowledged.completed_at
         )
         if not has_acknowledged_recent_expiration:
             return True, False
@@ -150,7 +150,7 @@ class AssignmentConfiguration(TimeStampedModel):
         # than the last acknowledged cancelation action.
         has_acknowledged_recent_cancelation = (
             cancellation_last_acknowledged and last_cancellation and
-            last_cancellation.completed_at > cancellation_last_acknowledged.completed_at
+            last_cancellation.completed_at <= cancellation_last_acknowledged.completed_at
         )
         if not has_acknowledged_recent_cancelation:
             return True, False
