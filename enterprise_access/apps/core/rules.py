@@ -340,3 +340,14 @@ rules.add_perm(
         has_subsidy_access_policy_operator_access
     ),
 )
+
+# Grants permission to acknowledge assignments if the user is linked to the enterprise customer
+# associated with the content assignment configuration.
+rules.add_perm(
+    constants.CONTENT_ASSIGNMENT_CONFIGURATION_ACKNOWLEDGE_PERMISSION,
+    (
+        has_content_assignments_operator_access |
+        has_content_assignments_admin_access |
+        has_content_assignments_learner_access
+    ),
+)

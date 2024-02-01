@@ -13,6 +13,7 @@ from enterprise_access.apps.content_assignments.constants import (
     LearnerContentAssignmentStateChoices
 )
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment, LearnerContentAssignmentAction
+from enterprise_access.utils import get_automatic_expiration_date_and_reason
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,19 @@ class LearnerContentAssignmentActionSerializer(serializers.ModelSerializer):
             # 'traceback',
         ]
         read_only_fields = fields
+
+
+class LearnerContentAssignmentActionLearnerAcknowledgedSerializer(LearnerContentAssignmentActionSerializer):
+    """
+    A read-only Serializer for responding to requests for ``LearnerContentAssignmentAction`` records,
+    serialized with an additional field for whether or not the action has been acknowledged by the learner.
+    """
+
+    class Meta(LearnerContentAssignmentActionSerializer.Meta):
+        """
+        Adds the ``learner_acknowledged`` field to the serializer.
+        """
+        fields = LearnerContentAssignmentActionSerializer.Meta.fields + ['learner_acknowledged']
 
 
 class LearnerContentAssignmentRecentActionSerializer(serializers.Serializer):
@@ -69,6 +83,19 @@ class LearnerContentErrorReasonSerializer(serializers.Serializer):
     )
 
 
+class LearnerContentAssignmentEarliestExpirationSerializer(serializers.Serializer):
+    """
+    Structured data about the earliest possible expiration associated with this assignment, returning
+    the expiration date and the expiration reason.
+    """
+    date = serializers.DateTimeField(
+        help_text='The earliest possible expiration date for this assignment.',
+    )
+    reason = serializers.CharField(
+        help_text='The reason for the earliest possible expiration date for this assignment.',
+    )
+
+
 class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
     """
     A read-only Serializer for responding to requests for ``LearnerContentAssignment`` records.
@@ -79,6 +106,10 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
     actions = LearnerContentAssignmentActionSerializer(
         help_text='All actions associated with this assignment.',
         many=True,
+    )
+
+    earliest_possible_expiration = serializers.SerializerMethodField(
+        help_text='The earliest possible expiration date for this assignment.',
     )
 
     class Meta:
@@ -93,10 +124,27 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
             'content_quantity',
             'state',
             'transaction_uuid',
-            'last_notification_at',
             'actions',
+            'earliest_possible_expiration',
         ]
         read_only_fields = fields
+
+    def get_content_metadata_from_context(self, content_key):
+        """
+        Returns content metadata from the Serializer context, if available.
+        """
+        metadata_lookup = self.context.get('content_metadata')
+        if not metadata_lookup:
+            return None
+        return metadata_lookup.get(content_key)
+
+    @extend_schema_field(LearnerContentAssignmentEarliestExpirationSerializer)
+    def get_earliest_possible_expiration(self, assignment):
+        """
+        Returns the earliest possible expiration date for the assignment.
+        """
+        assignment_content_metadata = self.get_content_metadata_from_context(assignment.content_key)
+        return get_automatic_expiration_date_and_reason(assignment, content_metadata=assignment_content_metadata)
 
 
 class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentResponseSerializer):
@@ -299,7 +347,25 @@ class LearnerContentAssignmentWithContentMetadataResponseSerializer(LearnerConte
         """
         Serializers content metadata for the assignment, if available.
         """
-        metadata_lookup = self.context.get('content_metadata')
-        if metadata_lookup and (assignment_content_metadata := metadata_lookup.get(obj.content_key)):
-            return ContentMetadataForAssignmentSerializer(assignment_content_metadata).data
-        return None
+        assignment_content_metadata = self.get_content_metadata_from_context(obj.content_key)
+        if not assignment_content_metadata:
+            return None
+        return ContentMetadataForAssignmentSerializer(assignment_content_metadata).data
+
+
+class LearnerContentAssignmentWithLearnerAcknowledgedResponseSerializer(
+    LearnerContentAssignmentWithContentMetadataResponseSerializer
+):
+    """
+    Read-only serializer for LearnerContentAssignment records that also includes whether or not the learner has
+    acknowledged the assignment.
+    """
+
+    actions = LearnerContentAssignmentActionLearnerAcknowledgedSerializer(
+        help_text='All actions associated with this assignment.',
+        many=True,
+    )
+
+    class Meta(LearnerContentAssignmentWithContentMetadataResponseSerializer.Meta):
+        fields = LearnerContentAssignmentWithContentMetadataResponseSerializer.Meta.fields + ['learner_acknowledged']
+        read_only_fields = fields

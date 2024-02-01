@@ -1,6 +1,7 @@
 """
 Tests for LearnerContentAssignment API views.
 """
+from datetime import timedelta
 from unittest import mock
 from uuid import UUID, uuid4
 
@@ -10,7 +11,9 @@ from rest_framework import status
 from rest_framework.reverse import reverse
 
 from enterprise_access.apps.content_assignments.constants import (
+    NUM_DAYS_BEFORE_AUTO_EXPIRATION,
     AssignmentActions,
+    AssignmentAutomaticExpiredReason,
     AssignmentLearnerStates,
     AssignmentRecentActionTypes,
     LearnerContentAssignmentStateChoices
@@ -25,7 +28,9 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
+from enterprise_access.utils import localized_utcnow
 from test_utils import TEST_EMAIL, TEST_USER_ID, APITest
 
 TEST_ENTERPRISE_UUID = uuid4()
@@ -41,6 +46,21 @@ ASSIGNMENTS_LIST_ENDPOINT = reverse(
     'api:v1:assignments-list',
     kwargs={'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID)}
 )
+MOCK_CATALOG_RESULT = {
+    'count': 2,
+    'results': [
+        {'key': 'course+A', 'data': 'things'}, {'key': 'course+B', 'data': 'stuff'},
+    ],
+}
+MOCK_SUBSIDY_RECORD = {
+    'uuid': str(uuid4()),
+    'title': 'Test Subsidy',
+    'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
+    'expiration_datetime': '2030-01-01 12:00:00Z',
+    'active_datetime': '2020-01-01 12:00:00Z',
+    'current_balance': '5000',
+    'is_active': True,
+}
 
 
 # pylint: disable=missing-function-docstring
@@ -82,6 +102,9 @@ class CRUDViewTestMixin:
         super().setUp()
         # Start in an unauthenticated state.
         self.client.logout()
+
+        self.now = localized_utcnow()
+
         # This assignment has just been allocated, so its lms_user_id is null.
         self.assignment_allocated_pre_link = LearnerContentAssignmentFactory(
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
@@ -105,6 +128,7 @@ class CRUDViewTestMixin:
 
         # This assignment has been accepted by the learner (state=accepted), AND the assigned learner is the requester.
         self.requester_assignment_accepted = LearnerContentAssignmentFactory(
+            created=self.now,
             state=LearnerContentAssignmentStateChoices.ACCEPTED,
             learner_email=TEST_EMAIL,
             lms_user_id=TEST_USER_ID,
@@ -341,18 +365,36 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
     """
     Test the Admin-facing Assignment API views while successfully authenticated/authorized.
     """
+
+    def setUp(self):
+        super().setUp()
+
+        # Mock results from the catalog content metadata API endpoint.
+        self.mock_catalog_result = MOCK_CATALOG_RESULT
+
+        # Mock results from the subsidy record.
+        self.mock_subsidy_record = MOCK_SUBSIDY_RECORD
+
     @ddt.data(
         # A good admin role, and with a context matching the main testing customer.
         {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
         # A good operator role, and with a context matching the main testing customer.
         {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
     )
-    def test_retrieve(self, role_context_dict):
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_retrieve(self, role_context_dict, mock_subsidy_record, mock_catalog_client):
         """
         Test that the retrieve view returns a 200 response code and the expected results of serialization.
         """
         # Set the JWT-based auth that we'll use for every request.
         self.set_jwt_cookie([role_context_dict])
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = self.mock_subsidy_record
 
         # Setup and call the retrieve endpoint.
         detail_kwargs = {
@@ -369,7 +411,6 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             'content_key': self.assignment_allocated_pre_link.content_key,
             'content_title': self.assignment_allocated_pre_link.content_title,
             'content_quantity': self.assignment_allocated_pre_link.content_quantity,
-            'last_notification_at': None,
             'learner_email': self.assignment_allocated_pre_link.learner_email,
             'lms_user_id': None,
             'state': LearnerContentAssignmentStateChoices.ALLOCATED,
@@ -391,6 +432,12 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
                 'timestamp': self.assignment_allocated_pre_link.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
             },
             'learner_state': AssignmentLearnerStates.NOTIFYING,
+            'earliest_possible_expiration': {
+                'date': (
+                    self.assignment_allocated_pre_link.created + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED,
+            },
         }
 
     @ddt.data(
@@ -399,13 +446,21 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # A good operator role, and with a context matching the main testing customer.
         {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
     )
-    def test_retrieve_errored_state(self, role_context_dict):
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_retrieve_errored_state(self, role_context_dict, mock_subsidy_record, mock_catalog_client):
         """
         Test that the retrieve view returns a 200 response code and the expected results of serialization
         when there is a recent error.
         """
         # Set the JWT-based auth that we'll use for every request.
         self.set_jwt_cookie([role_context_dict])
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = self.mock_subsidy_record
 
         # Setup and call the retrieve endpoint.
         detail_kwargs = {
@@ -427,7 +482,9 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # A good operator role, and with a context matching the main testing customer.
         {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
     )
-    def test_list(self, role_context_dict):
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_list(self, role_context_dict, mock_subsidy_record, mock_catalog_client):
         """
         Test that the list view returns a 200 response code and the expected (list) results of serialization, including
         the `learner_state_counts` overview metadata. It should also allow system-wide admins and operators.
@@ -436,6 +493,12 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         """
         # Set the JWT-based auth that we'll use for every request.
         self.set_jwt_cookie([role_context_dict])
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = self.mock_subsidy_record
 
         # Send a list request for all Assignments for the main test customer.
         response = self.client.get(ADMIN_ASSIGNMENTS_LIST_ENDPOINT)
@@ -461,7 +524,9 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         'recent_action_time',
         '-recent_action_time',
     )
-    def test_list_ordering_recent_action_time(self, ordering_key):
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_list_ordering_recent_action_time(self, ordering_key, mock_subsidy_record, mock_catalog_client):
         """
         Test that the list view returns objects in the correct order when recent_action_time is the ordering key.  Also
         check that when no ordering parameter is supplied, the default ordering uses recent_action_time.
@@ -470,6 +535,12 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
             'context': str(TEST_ENTERPRISE_UUID),
         }])
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = self.mock_subsidy_record
 
         # Add reminder action to perturb the output ordering:
         self.assignment_allocated_post_link.add_successful_reminded_action()
@@ -514,7 +585,9 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         'learner_state_sort_order',
         '-learner_state_sort_order',
     )
-    def test_list_ordering_learner_state_sort_order(self, ordering_key):
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_list_ordering_learner_state_sort_order(self, ordering_key, mock_subsidy_record, mock_catalog_client):
         """
         Test that the list view returns objects in the correct order when learner_state_sort_order is the ordering key.
         """
@@ -522,6 +595,12 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
             'context': str(TEST_ENTERPRISE_UUID),
         }])
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = self.mock_subsidy_record
 
         query_params = None
         if ordering_key:
@@ -795,12 +874,20 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         [AssignmentLearnerStates.WAITING, AssignmentLearnerStates.FAILED],
         [AssignmentLearnerStates.WAITING],
     )
-    def test_learner_state_query_param_filter(self, learner_states_to_query):
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_learner_state_query_param_filter(self, learner_states_to_query, mock_subsidy_record, mock_catalog_client):
         """
         Test that the list view supports filtering on one or more ``learner_state`` values via a query parameter.
         """
         # Set the JWT-based auth that we'll use for every request.
         self.set_jwt_cookie([{'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}])
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = self.mock_subsidy_record
 
         # Fetch our list of assignments associated with the test enterprise.
         assignments_for_enterprise_customer = LearnerContentAssignment.objects.filter(
@@ -822,12 +909,20 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         [LearnerContentAssignmentStateChoices.ALLOCATED, LearnerContentAssignmentStateChoices.ERRORED],
         [LearnerContentAssignmentStateChoices.ALLOCATED],
     )
-    def test_multi_state_query_param_filter(self, states_to_query):
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_multi_state_query_param_filter(self, states_to_query, mock_subsidy_record, mock_catalog_client):
         """
         Test that the list view supports filtering on one or more ``state`` values via a query parameter.
         """
         # Set the JWT-based auth that we'll use for every request.
         self.set_jwt_cookie([{'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}])
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = self.mock_subsidy_record
 
         # Fetch our list of assignments associated with the test enterprise.
         assignments_for_enterprise_customer = LearnerContentAssignment.objects.filter(
@@ -845,11 +940,19 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         for assignment in response.json().get('results'):
             assert assignment.get('state') in states_to_query
 
-    def test_assignment_search_query_param(self):
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_assignment_search_query_param(self, mock_subsidy_record, mock_catalog_client):
         """
         Test that the list view follows the default Django API filtering with the usage of the ``search`` query param.
         Currently the only two defined look up fields are ``content_title`` and ``learner_email``.
         """
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = self.mock_subsidy_record
+
         # Set the JWT-based auth that we'll use for every request.
         self.set_jwt_cookie([{'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}])
 
@@ -890,6 +993,16 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
     """
     Test the Learner-facing Assignment API views while successfully authenticated/authorized.
     """
+
+    def setUp(self):
+        super().setUp()
+
+        # Mock results from the catalog content metadata API endpoint.
+        self.mock_catalog_result = MOCK_CATALOG_RESULT
+
+        # Mock results from the subsidy record.
+        self.mock_subsidy_record = MOCK_SUBSIDY_RECORD
+
     @ddt.data(
         # A good learner role, and with a context matching the main testing customer.
         {'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
@@ -898,12 +1011,20 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # A good operator role, and with a context matching the main testing customer.
         {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
     )
-    def test_retrieve(self, role_context_dict):
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_retrieve(self, role_context_dict, mock_subsidy_record, mock_catalog_client):
         """
         Test that the retrieve view returns a 200 response code and the expected results of serialization.
         """
         # Set the JWT-based auth that we'll use for every request.
         self.set_jwt_cookie([role_context_dict])
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = self.mock_subsidy_record
 
         # Setup and call the retrieve endpoint.
         detail_kwargs = {
@@ -914,13 +1035,13 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         response = self.client.get(detail_url)
 
         assert response.status_code == status.HTTP_200_OK
+        last_notified_action = self.requester_assignment_accepted.get_last_successful_notified_action()
         assert response.json() == {
             'uuid': str(self.requester_assignment_accepted.uuid),
             'assignment_configuration': str(self.requester_assignment_accepted.assignment_configuration.uuid),
             'content_key': self.requester_assignment_accepted.content_key,
             'content_title': self.requester_assignment_accepted.content_title,
             'content_quantity': self.requester_assignment_accepted.content_quantity,
-            'last_notification_at': None,
             'learner_email': self.requester_assignment_accepted.learner_email,
             'lms_user_id': self.requester_assignment_accepted.lms_user_id,
             'state': LearnerContentAssignmentStateChoices.ACCEPTED,
@@ -936,6 +1057,12 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
                 }
                 for action in self.requester_assignment_accepted.actions.order_by('created')
             ],
+            'earliest_possible_expiration': {
+                'date': (
+                    last_notified_action.completed_at + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED,
+            }
         }
 
     def test_retrieve_other_assignment_not_found(self):
@@ -965,7 +1092,9 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # A good operator role, and with a context matching the main testing customer.
         {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
     )
-    def test_list(self, role_context_dict):
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_list(self, role_context_dict, mock_subsidy_record, mock_catalog_client):
         """
         Test that the list view returns a 200 response code and the expected (list) results of serialization.
 
@@ -973,6 +1102,12 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         """
         # Set the JWT-based auth that we'll use for every request.
         self.set_jwt_cookie([role_context_dict])
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = self.mock_subsidy_record
 
         # Send a list request for all Assignments for the requesting user.
         response = self.client.get(ASSIGNMENTS_LIST_ENDPOINT)

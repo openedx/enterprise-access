@@ -1,10 +1,13 @@
 """
 Tests for the ``api.py`` module of the content_assignments app.
 """
+
 from django.test import TestCase
 from django.utils import timezone
 
-from ..constants import NUM_DAYS_BEFORE_AUTO_CANCELLATION, RETIRED_EMAIL_ADDRESS, AssignmentActions
+from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
+
+from ..constants import RETIRED_EMAIL_ADDRESS, AssignmentActions
 from ..models import AssignmentConfiguration
 from .factories import LearnerContentAssignmentFactory
 
@@ -21,6 +24,9 @@ class TestAssignmentActions(TestCase):
         """
         super().setUpClass()
         cls.assignment_configuration = AssignmentConfiguration.objects.create()
+        cls.subsidy_access_policy = AssignedLearnerCreditAccessPolicyFactory.create(
+            assignment_configuration=cls.assignment_configuration,
+        )
         cls.assignment = LearnerContentAssignmentFactory.create(
             assignment_configuration=cls.assignment_configuration,
         )
@@ -137,42 +143,6 @@ class TestAssignmentActions(TestCase):
         self.assertEqual(
             self.assignment.get_last_successful_reminded_action(),
             reminded_action_again,
-        )
-
-    def test_get_auto_expiration_date_no_action(self):
-        """
-        Test that this method returns a date 90 days from the assignment
-        creation time if there is no last successful
-        notified action.
-        """
-        self.assertEqual(
-            self.assignment.get_auto_expiration_date(),
-            self.assignment.created + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION),
-        )
-        self.assignment.add_errored_notified_action(Exception('foo'))
-
-        self.assertEqual(
-            self.assignment.get_auto_expiration_date(),
-            self.assignment.created + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION),
-        )
-
-    def test_get_auto_expiration_date(self):
-        """
-        Test that this method returns None if there is no last successful
-        notified action.
-        """
-        first_notification = self.assignment.add_successful_notified_action()
-
-        self.assertEqual(
-            self.assignment.get_auto_expiration_date(),
-            first_notification.completed_at + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION),
-        )
-
-        second_notification = self.assignment.add_successful_notified_action()
-
-        self.assertEqual(
-            self.assignment.get_auto_expiration_date(),
-            second_notification.completed_at + timezone.timedelta(days=NUM_DAYS_BEFORE_AUTO_CANCELLATION),
         )
 
     def test_clear_pii(self):

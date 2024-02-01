@@ -1,9 +1,9 @@
-0016 Policy Retirement
+0017 Policy Retirement
 **********************
 
 Status
 ======
-Proposed - January 2024
+Accepted - January 2024
 
 Context
 =======

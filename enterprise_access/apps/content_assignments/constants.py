@@ -11,16 +11,18 @@ class LearnerContentAssignmentStateChoices:
     ACCEPTED = 'accepted'
     CANCELLED = 'cancelled'
     ERRORED = 'errored'
+    EXPIRED = 'expired'
 
     CHOICES = (
         (ALLOCATED, 'Allocated'),
         (ACCEPTED, 'Accepted'),
         (CANCELLED, 'Cancelled'),
         (ERRORED, 'Errored'),
+        (EXPIRED, 'Expired'),
     )
 
     # States which allow reallocation by an admin.
-    REALLOCATE_STATES = (CANCELLED, ERRORED)
+    REALLOCATE_STATES = (CANCELLED, ERRORED, EXPIRED)
 
     # States which allow cancellation by an admin.
     CANCELABLE_STATES = (ALLOCATED, ERRORED)
@@ -40,16 +42,20 @@ class AssignmentActions:
     NOTIFIED = 'notified'
     REMINDED = 'reminded'
     REDEEMED = 'redeemed'
-    CANCELLED_NOTIFICATION = 'cancelled'
-    AUTOMATIC_CANCELLATION_NOTIFICATION = 'automatic_cancellation'
+    CANCELLED = 'cancelled'
+    CANCELLED_ACKNOWLEDGED = 'cancelled_acknowledged'
+    EXPIRED = 'expired'
+    EXPIRED_ACKNOWLEDGED = 'expired_acknowledged'
 
     CHOICES = (
         (LEARNER_LINKED, 'Learner linked to customer'),
         (NOTIFIED, 'Learner notified of assignment'),
         (REMINDED, 'Learner reminded about assignment'),
         (REDEEMED, 'Learner redeemed the assigned content'),
-        (CANCELLED_NOTIFICATION, 'Learner assignment cancelled'),
-        (AUTOMATIC_CANCELLATION_NOTIFICATION, 'Learner assignment cancelled automatically'),
+        (CANCELLED, 'Learner assignment cancelled'),
+        (CANCELLED_ACKNOWLEDGED, 'Learner assignment cancellation acknowledged by learner'),
+        (EXPIRED, 'Learner assignment expired'),
+        (EXPIRED_ACKNOWLEDGED, 'Learner assignment expiration acknowledged by learner'),
     )
 
 
@@ -88,14 +94,17 @@ class AssignmentLearnerStates:
     NOTIFYING = 'notifying'
     WAITING = 'waiting'
     FAILED = 'failed'
+    EXPIRED = 'expired'
     CHOICES = (
         (NOTIFYING, 'Sending assignment notification message to learner.'),
         (WAITING, 'Waiting on learner to accept assignment.'),
         (FAILED, 'Assignment unexpectedly failed creation or acceptance.'),
+        (EXPIRED, 'Assignment expired due to 90-day timeout, subsidy expiration, or content enrollment deadline.'),
     )
     SORT_ORDER = (
         NOTIFYING,
         WAITING,
+        EXPIRED,
         FAILED,
     )
 
@@ -109,6 +118,6 @@ class AssignmentAutomaticExpiredReason:
     SUBSIDY_EXPIRED = 'SUBSIDY_EXPIRED'
 
 
-NUM_DAYS_BEFORE_AUTO_CANCELLATION = 90
+NUM_DAYS_BEFORE_AUTO_EXPIRATION = 90
 
 RETIRED_EMAIL_ADDRESS = 'retired_user@retired.invalid'

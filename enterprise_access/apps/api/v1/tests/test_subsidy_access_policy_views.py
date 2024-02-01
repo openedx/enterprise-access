@@ -14,7 +14,10 @@ from rest_framework import status
 from rest_framework.reverse import reverse
 
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
-from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.content_assignments.constants import (
+    AssignmentAutomaticExpiredReason,
+    LearnerContentAssignmentStateChoices
+)
 from enterprise_access.apps.content_assignments.tests.factories import (
     AssignmentConfigurationFactory,
     LearnerContentAssignmentFactory
@@ -1398,19 +1401,20 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             # with an inactive (i.e., expired, not yet started) subsidy, we should get no records back.
             assert len(response_json) == 0
 
-    @mock.patch('enterprise_access.apps.api.serializers.subsidy_access_policy.get_content_metadata_for_assignments')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_record')
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     def test_credits_available_endpoint_with_content_assignments(
         self,
+        mock_catalog_client,
         mock_subsidy_record,
         mock_transactions_cache_for_learner,  # pylint: disable=unused-argument
-        mock_get_metadata,
     ):
         """
         Verify that SubsidyAccessPolicyViewset credits_available returns learner content assignments for assigned
         learner credit access policies.
         """
+        self.maxDiff = None
         content_key = 'demoX'
         content_title = 'edx: Demo 101'
         content_price_cents = 100
@@ -1460,22 +1464,25 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'enterprise_customer_uuid': str(self.enterprise_uuid),
             'lms_user_id': 1234,
         }
-        # See LearnerContentAssignmentWithContentMetadataResponseSerializer
+
+        # Mock catalog content metadata results. See LearnerContentAssignmentWithContentMetadataResponseSerializer
         # for what we expect to be in the response payload w.r.t. content metadata.
-        mock_get_metadata.return_value = {
-            content_key: {
-                'key': content_key,
-                'normalized_metadata': {
-                    'start_date': '2020-01-01 12:00:00Z',
-                    'end_date': '2022-01-01 12:00:00Z',
-                    'enroll_by_date': '2021-01-01 12:00:00Z',
-                    'content_price': 123,
-                },
-                'course_type': 'verified-audit',
-                'owners': [
-                    {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
-                ],
+        mock_content_metadata = {
+            'key': content_key,
+            'normalized_metadata': {
+                'start_date': '2020-01-01T12:00:00Z',
+                'end_date': '2022-01-01T12:00:00Z',
+                'enroll_by_date': '2021-01-01T12:00:00Z',
+                'content_price': content_price_cents,
             },
+            'course_type': 'verified-audit',
+            'owners': [
+                {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
+            ],
+        }
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
+            'count': 1,
+            'results': [mock_content_metadata],
         }
 
         response = self.client.get(self.subsidy_access_policy_credits_available_endpoint, query_params)
@@ -1492,7 +1499,6 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'content_quantity': -content_price_cents,
             'state': LearnerContentAssignmentStateChoices.ALLOCATED,
             'transaction_uuid': None,
-            'last_notification_at': None,
             'actions': [
                 {
                     'created': action.created.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
@@ -1500,19 +1506,25 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
                     'uuid': str(action.uuid),
                     'action_type': 'learner_linked',
                     'completed_at': action.completed_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    'error_reason': None
+                    'error_reason': None,
+                    'learner_acknowledged': None,
                 }
             ],
             'content_metadata': {
-                'start_date': '2020-01-01 12:00:00Z',
-                'end_date': '2022-01-01 12:00:00Z',
-                'enroll_by_date': '2021-01-01 12:00:00Z',
-                'content_price': 123,
+                'start_date': '2020-01-01T12:00:00Z',
+                'end_date': '2022-01-01T12:00:00Z',
+                'enroll_by_date': '2021-01-01T12:00:00Z',
+                'content_price': content_price_cents,
                 'course_type': 'verified-audit',
                 'partners': [
                     {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
                 ],
             },
+            'earliest_possible_expiration': {
+                'date': '2021-01-01T12:00:00Z',
+                'reason': AssignmentAutomaticExpiredReason.ENROLLMENT_DATE_PASSED,
+            },
+            'learner_acknowledged': None,
         }
         self.assertEqual(response_json[0]['learner_content_assignments'][0], expected_learner_content_assignment)
 

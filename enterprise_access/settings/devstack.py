@@ -102,7 +102,7 @@ ENTERPRISE_ACCESS_URL = 'http://localhost:18270'
 SHELL_PLUS_IMPORTS = [
     'from enterprise_access.apps.api.serializers import *',
     'from enterprise_access.apps.api_client import *',
-    'from enterprise_access.apps.subsidy_request.utils import localized_utcnow',
+    'from enterprise_access.utils import localized_utcnow',
     'from enterprise_access.apps.content_assignments import api as assignments_api',
     'from pprint import pprint',
     'from enterprise_access.apps.content_assignments import tasks as assignments_tasks',

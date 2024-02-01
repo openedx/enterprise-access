@@ -19,7 +19,7 @@ from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPol
 
 from .content_assignments.assignment import (
     LearnerContentAssignmentResponseSerializer,
-    LearnerContentAssignmentWithContentMetadataResponseSerializer
+    LearnerContentAssignmentWithLearnerAcknowledgedResponseSerializer
 )
 from .content_assignments.assignment_configuration import AssignmentConfigurationResponseSerializer
 
@@ -541,7 +541,7 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
     )
     learner_content_assignments = serializers.SerializerMethodField('get_assignments_serializer')
 
-    @extend_schema_field(LearnerContentAssignmentWithContentMetadataResponseSerializer)
+    @extend_schema_field(LearnerContentAssignmentWithLearnerAcknowledgedResponseSerializer)
     def get_assignments_serializer(self, obj):
         """
         Return serialized assignments if the policy access method is of the 'assigned' type
@@ -552,10 +552,16 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
         assignments = obj.assignment_configuration.assignments.prefetch_related('actions').filter(
             lms_user_id=self.context.get('lms_user_id')
         )
-        content_metadata_lookup = get_content_metadata_for_assignments(obj.catalog_uuid, assignments)
+        unacknowledged_assignments_uuids = [
+            assignment.uuid
+            for assignment in assignments
+            if not assignment.learner_acknowledged
+        ]
+        unacknowledged_assignments = assignments.filter(uuid__in=unacknowledged_assignments_uuids)
+        content_metadata_lookup = get_content_metadata_for_assignments(obj.catalog_uuid, unacknowledged_assignments)
         context = {'content_metadata': content_metadata_lookup}
-        serializer = LearnerContentAssignmentWithContentMetadataResponseSerializer(
-            assignments,
+        serializer = LearnerContentAssignmentWithLearnerAcknowledgedResponseSerializer(
+            unacknowledged_assignments,
             many=True,
             context=context,
         )

@@ -21,7 +21,7 @@ from ..api import (
     get_assignment_for_learner,
     get_assignments_for_configuration
 )
-from ..constants import NUM_DAYS_BEFORE_AUTO_CANCELLATION, RETIRED_EMAIL_ADDRESS, LearnerContentAssignmentStateChoices
+from ..constants import NUM_DAYS_BEFORE_AUTO_EXPIRATION, RETIRED_EMAIL_ADDRESS, LearnerContentAssignmentStateChoices
 from ..models import AssignmentConfiguration, LearnerContentAssignment
 from .factories import LearnerContentAssignmentFactory
 
@@ -589,7 +589,10 @@ class TestContentAssignmentApi(TestCase):
 @ddt.ddt
 class TestAssignmentExpiration(TestCase):
     """
-    Tests of the ``api.expire_assignment()`` function.
+    Tests of the following API methods:
+      - ``api.expire_assignment()``
+      - ``api.get_automatic_expiration_date_and_reason()``
+      - ``api.get_subsidy_expiration()``
     """
 
     @classmethod
@@ -601,11 +604,12 @@ class TestAssignmentExpiration(TestCase):
             spend_limit=1000000,
         )
 
-    def mock_content_metadata(self, enroll_by_date):
+    def mock_content_metadata(self, content_key, enroll_by_date):
         """
         Helper to produce content metadata with a given enroll_by_date.
         """
         return {
+            'key': content_key,
             'normalized_metadata': {
                 'enroll_by_date': enroll_by_date,
             },
@@ -626,7 +630,7 @@ class TestAssignmentExpiration(TestCase):
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
-                self.mock_content_metadata(None),
+                content_metadata=self.mock_content_metadata('edX+DemoX', None),
                 modify_assignment=True,
             )
 
@@ -656,7 +660,7 @@ class TestAssignmentExpiration(TestCase):
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
-                self.mock_content_metadata(delta_t(days=100, as_string=True)),
+                content_metadata=self.mock_content_metadata('edX+DemoX', delta_t(days=100, as_string=True)),
                 modify_assignment=True,
             )
 
@@ -665,11 +669,15 @@ class TestAssignmentExpiration(TestCase):
         self.assertFalse(mock_expired_email.delay.called)
         self.assertEqual(assignment.modified, original_modified_time)
 
-    @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
     @ddt.data(
         *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
     )
-    def test_expire_one_assignment_automatically(self, assignment_state, mock_expired_email):
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
+    def test_expire_one_assignment_automatically(
+        self,
+        assignment_state,
+        mock_expired_email,
+    ):
         """
         Test that we expire an assignment and clear
         its PII, as long the state is not "accepted".
@@ -682,7 +690,7 @@ class TestAssignmentExpiration(TestCase):
         )
         action = assignment.add_successful_notified_action()
         # set the last notified action to be more than the threshold number of days ago
-        enough_days_to_be_cancelled = NUM_DAYS_BEFORE_AUTO_CANCELLATION + 1
+        enough_days_to_be_cancelled = NUM_DAYS_BEFORE_AUTO_EXPIRATION + 1
         action.completed_at = delta_t(days=-enough_days_to_be_cancelled)
         action.save()
 
@@ -691,12 +699,12 @@ class TestAssignmentExpiration(TestCase):
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
-                self.mock_content_metadata(None),
+                content_metadata=self.mock_content_metadata('edX+DemoX', None),
                 modify_assignment=True,
             )
 
         assignment.refresh_from_db()
-        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
+        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.EXPIRED)
         self.assertEqual(12345, assignment.lms_user_id)
         self.assertEqual(assignment.learner_email, RETIRED_EMAIL_ADDRESS)
 
@@ -706,67 +714,91 @@ class TestAssignmentExpiration(TestCase):
 
         mock_expired_email.delay.assert_called_once_with(assignment.uuid)
 
-    @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
     @ddt.data(
         *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
     )
-    def test_expire_assignments_with_passed_enroll_by_date(self, assignment_state, mock_expired_email):
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
+    def test_expire_assignments_with_passed_enroll_by_date(
+        self,
+        assignment_state,
+        mock_expired_email,
+    ):
         """
         Tests that we expire assignments with a passed enroll_by_date
         """
+        content_key = 'demoX'
         assignment = LearnerContentAssignmentFactory.create(
+            content_key='demoX',
             assignment_configuration=self.assignment_configuration,
             state=assignment_state,
             learner_email='larry@stooges.com',
             lms_user_id=12345,
         )
         assignment.add_successful_notified_action()
+
+        # create expired content metadata
+        mock_content_metadata = self.mock_content_metadata(
+            content_key=content_key,
+            enroll_by_date=delta_t(days=-1, as_string=True),
+        )
 
         # set a policy-subsidy expiration date in the future
         mock_subsidy_record = {'expiration_datetime': delta_t(days=100, as_string=True)}
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
-                self.mock_content_metadata(delta_t(days=-1, as_string=True)),
+                content_metadata=mock_content_metadata,
                 modify_assignment=True,
             )
 
         assignment.refresh_from_db()
 
-        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
+        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.EXPIRED)
         # we don't clear PII in this case
         self.assertEqual(assignment.learner_email, 'larry@stooges.com')
         self.assertEqual(assignment.lms_user_id, 12345)
         mock_expired_email.delay.assert_called_once_with(assignment.uuid)
 
-    @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
     @ddt.data(
         *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
     )
-    def test_expire_assignments_with_expired_subsidy(self, assignment_state, mock_expired_email):
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
+    def test_expire_assignments_with_expired_subsidy(
+        self,
+        assignment_state,
+        mock_expired_email,
+    ):
         """
         Tests that we expire assignments with an underlying subsidy that has expired.
         """
+        content_key = 'demoX'
         assignment = LearnerContentAssignmentFactory.create(
             assignment_configuration=self.assignment_configuration,
+            content_key=content_key,
             state=assignment_state,
             learner_email='larry@stooges.com',
             lms_user_id=12345,
         )
         assignment.add_successful_notified_action()
 
-        # set a policy-subsidy expiration date in the future
+        # create non-expired content metadata
+        mock_content_metadata = self.mock_content_metadata(
+            content_key=content_key,
+            enroll_by_date=delta_t(days=100, as_string=True),
+        )
+
+        # set a policy-subsidy expiration date in the past
         mock_subsidy_record = {'expiration_datetime': delta_t(days=-1, as_string=True)}
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
-                self.mock_content_metadata(delta_t(days=100, as_string=True)),
+                content_metadata=mock_content_metadata,
                 modify_assignment=True,
             )
 
         assignment.refresh_from_db()
 
-        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.CANCELLED)
+        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.EXPIRED)
         # we don't clear PII in this case
         self.assertEqual(assignment.learner_email, 'larry@stooges.com')
         self.assertEqual(assignment.lms_user_id, 12345)

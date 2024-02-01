@@ -18,7 +18,7 @@ from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
 from enterprise_access.cache_utils import request_cache, versioned_cache_key
-from enterprise_access.utils import is_none, is_not_none
+from enterprise_access.utils import is_none, is_not_none, localized_utcnow
 
 from ..content_assignments.models import AssignmentConfiguration
 from .constants import (
@@ -639,7 +639,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         return True
 
-    def credit_available(self, lms_user_id, skip_customer_user_check=False):
+    def credit_available(
+            self,
+            lms_user_id,
+            skip_customer_user_check=False,
+            skip_inactive_subsidy_check=False,
+    ):
         """
         Perform generic checks to determine if a learner has credit available for a given
         subsidy access policy. The generic checks performed include:
@@ -666,7 +671,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # verify associated subsidy is current (non-expired)
         try:
-            if not self.is_subsidy_active:
+            if not skip_inactive_subsidy_check and not self.is_subsidy_active:
                 logger.info('[credit_available] SubsidyAccessPolicy.subsidy_record() returned inactive subsidy')
                 return False
         except requests.exceptions.HTTPError as exc:
@@ -949,11 +954,11 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
         # learner can redeem the subsidy access policy
         return (True, None, existing_redemptions)
 
-    def credit_available(self, lms_user_id, skip_customer_user_check=False):
+    def credit_available(self, lms_user_id, *args, **kwargs):  # pylint: disable=unused-argument
         """
         Determine whether a learner has credit available for the subsidy access policy.
         """
-        is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
+        is_credit_available = super().credit_available(lms_user_id)
         if not is_credit_available:
             return False
 
@@ -1023,11 +1028,11 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         # learner can redeem the subsidy access policy
         return (True, None, existing_redemptions)
 
-    def credit_available(self, lms_user_id, skip_customer_user_check=False):
+    def credit_available(self, lms_user_id, *args, **kwargs):  # pylint: disable=unused-argument
         """
         Determine whether a learner has credit available for the subsidy access policy.
         """
-        is_credit_available = super().credit_available(lms_user_id, skip_customer_user_check)
+        is_credit_available = super().credit_available(lms_user_id)
         if not is_credit_available:
             return False
 
@@ -1194,6 +1199,29 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         # Learner can redeem the subsidy access policy
         return (True, None, existing_redemptions)
 
+    def credit_available(self, lms_user_id, *args, **kwargs):  # pylint: disable=unused-argument
+        """
+        Determine whether a learner has credit available for the subsidy access policy, determined
+        based on the presence of unacknowledged assignments.
+        """
+        # Perform generic checks for credit availability; skip the check for inactive subsidies in order
+        # to continue returning expired/cancelled assignments for the purposes of displaying them in the UI.
+        is_credit_available = super().credit_available(lms_user_id, skip_inactive_subsidy_check=True)
+        if not is_credit_available:
+            return False
+
+        # Validate whether learner has assignments available for this policy.
+        assignments = assignments_api.get_assignments_for_configuration(
+            self.assignment_configuration,
+            lms_user_id=lms_user_id,
+        )
+        unacknowledged_assignments_uuids = [
+            assignment.uuid
+            for assignment in assignments
+            if not assignment.learner_acknowledged
+        ]
+        return len(unacknowledged_assignments_uuids) > 0
+
     def redeem(self, lms_user_id, content_key, all_transactions, metadata=None, **kwargs):
         """
         Redeem content, but only if there's a matching assignment.  On successful redemption, the assignment state will
@@ -1230,11 +1258,16 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         except SubsidyAPIHTTPError as exc:
             # Migrate assignment to errored if the subsidy API call errored.
             found_assignment.state = LearnerContentAssignmentStateChoices.ERRORED
+            found_assignment.errored_at = localized_utcnow()
             found_assignment.save()
             found_assignment.add_errored_redeemed_action(exc)
             raise
         # Migrate assignment to accepted.
         found_assignment.state = LearnerContentAssignmentStateChoices.ACCEPTED
+        found_assignment.accepted_at = localized_utcnow()
+        found_assignment.errored_at = None
+        found_assignment.cancelled_at = None
+        found_assignment.expired_at = None
         found_assignment.transaction_uuid = ledger_transaction.get('uuid')  # uuid should always be in the API response.
         found_assignment.save()
         found_assignment.add_successful_redeemed_action()

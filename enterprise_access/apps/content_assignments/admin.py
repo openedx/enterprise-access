@@ -85,7 +85,6 @@ class LearnerContentAssignmentAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
     )
     list_filter = ('state',)
     readonly_fields = (
-        'last_notification_at',
         'created',
         'modified',
         'lms_user_id',

@@ -54,6 +54,10 @@ class Command(BaseCommand):
         return value
 
     def handle(self, *args, **options):
+        """
+        Performs the command by retrieving expirable assignments, determining whether they should be
+        expired, and then expiring them if so.
+        """
         dry_run = options['dry_run']
 
         for assignment_configuration in AssignmentConfiguration.objects.filter(active=True):
@@ -75,7 +79,7 @@ class Command(BaseCommand):
 
             assignments_to_possibly_expire = assignment_configuration.assignments.filter(
                 state__in=LearnerContentAssignmentStateChoices.EXPIRABLE_STATES,
-            )
+            ).order_by('created')
 
             paginator = Paginator(assignments_to_possibly_expire, 100)
             for page_number in paginator.page_range:

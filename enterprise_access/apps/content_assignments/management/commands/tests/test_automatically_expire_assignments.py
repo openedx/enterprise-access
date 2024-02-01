@@ -23,7 +23,7 @@ COMMAND_PATH = 'enterprise_access.apps.content_assignments.management.commands.a
 
 
 @pytest.mark.django_db
-class TesAutomaticallyExpireAssignmentCommand(TestCase):
+class TestAutomaticallyExpireAssignmentCommand(TestCase):
     """
     Tests `automatically_expire_assignments` management command.
     """
@@ -64,14 +64,14 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )
 
-    @mock.patch(COMMAND_PATH + '.get_content_metadata_for_assignments')
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email.delay')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     def test_command_dry_run(
         self,
         mock_subsidy_client,
         mock_send_assignment_automatically_expired_email_task,
-        mock_content_metadata_for_assignments,
+        mock_catalog_client,
     ):
         """
         Verify that management command work as expected in dry run mode.
@@ -90,16 +90,19 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
             'expiration_datetime': subsidy_expiry.strftime("%Y-%m-%dT%H:%M:%SZ"),
             'is_active': True,
         }
-        mock_content_metadata_for_assignments.return_value = {
-            'edX+edXAccessibility101': {
-                'key': 'edX+edXAccessibility101',
-                'normalized_metadata': {
-                    'start_date': '2020-01-01 12:00:00Z',
-                    'end_date': '2022-01-01 12:00:00Z',
-                    'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    'content_price': 123,
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
+            'count': 1,
+            'results': [
+                {
+                    'key': 'edX+edXAccessibility101',
+                    'normalized_metadata': {
+                        'start_date': '2020-01-01 12:00:00Z',
+                        'end_date': '2022-01-01 12:00:00Z',
+                        'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'content_price': 123,
+                    },
                 },
-            },
+            ],
         }
 
         all_assignment = LearnerContentAssignment.objects.all()
@@ -120,17 +123,17 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
         # verify that state has not changed for any assignment
         assert all_assignment.count() == allocated_assignments.count()
 
-    @mock.patch(COMMAND_PATH + '.get_content_metadata_for_assignments')
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email.delay')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     def test_command(
         self,
         mock_subsidy_client,
         mock_send_assignment_automatically_expired_email_task,
-        mock_content_metadata_for_assignments,
+        mock_catalog_client,
     ):
         """
-        Verify that management command work as expected in dry run mode.
+        Verify that management command work as expected.
         """
         enrollment_end = timezone.now() + timezone.timedelta(days=5)
         enrollment_end = enrollment_end.replace(microsecond=0)
@@ -142,22 +145,26 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
             'expiration_datetime': subsidy_expiry.strftime("%Y-%m-%dT%H:%M:%SZ"),
             'is_active': True,
         }
-        mock_content_metadata_for_assignments.return_value = {
-            'edX+edXAccessibility101': {
-                'key': 'edX+edXAccessibility101',
-                'normalized_metadata': {
-                    'start_date': '2020-01-01 12:00:00Z',
-                    'end_date': '2022-01-01 12:00:00Z',
-                    'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    'content_price': 123,
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
+            'count': 1,
+            'results': [
+                {
+                    'key': 'edX+edXAccessibility101',
+                    'normalized_metadata': {
+                        'start_date': '2020-01-01 12:00:00Z',
+                        'end_date': '2022-01-01 12:00:00Z',
+                        'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'content_price': 123,
+                    },
                 },
-            },
-            'edX+edXPrivacy101': {
-                'normalized_metadata': {
-                    # test that some other datetime format is handled gracefully
-                    'enroll_by_date': enrollment_end.strftime("%Y-%m-%d %H:%M"),
+                {
+                    'key': 'edX+edXPrivacy101',
+                    'normalized_metadata': {
+                        # test that some other datetime format is handled gracefully
+                        'enroll_by_date': enrollment_end.strftime("%Y-%m-%d %H:%M"),
+                    }
                 }
-            }
+            ],
         }
 
         all_assignment = LearnerContentAssignment.objects.all()
@@ -176,7 +183,7 @@ class TesAutomaticallyExpireAssignmentCommand(TestCase):
 
         all_assignment = LearnerContentAssignment.objects.all()
         cancelled_assignments = LearnerContentAssignment.objects.filter(
-            state=LearnerContentAssignmentStateChoices.CANCELLED
+            state=LearnerContentAssignmentStateChoices.EXPIRED
         )
         # verify that state has not changed for any assignment
         assert all_assignment.count() == cancelled_assignments.count()

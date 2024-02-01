@@ -3,13 +3,11 @@ Tasks for content_assignments app.
 """
 
 import logging
-from datetime import datetime
 
 from braze.exceptions import BrazeBadRequestError
 from celery import shared_task
 from django.apps import apps
 from django.conf import settings
-from pytz import UTC
 
 from enterprise_access.apps.api_client.braze_client import ENTERPRISE_BRAZE_ALIAS_LABEL, BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
@@ -18,10 +16,10 @@ from enterprise_access.apps.content_assignments.content_metadata_api import (
     get_card_image_url,
     get_content_metadata_for_assignments,
     get_course_partners,
-    get_human_readable_date,
-    parse_datetime_string
+    get_human_readable_date
 )
 from enterprise_access.tasks import LoggedTaskWithRetry
+from enterprise_access.utils import get_automatic_expiration_date_and_reason, localized_utcnow
 
 from .constants import LearnerContentAssignmentStateChoices
 
@@ -207,34 +205,13 @@ class BrazeCampaignSender:
 
     def get_action_required_by(self):
         """
-        Returns the minimum of this assignment's auto-cancellation date,
+        Returns the minimum of this assignment's auto-expiration date,
         the content's enrollment deadline, and the related policy's expiration datetime.
         """
-        if subsidy_record := self.subsidy_record:
-            subsidy_expiration = parse_datetime_string(subsidy_record.get('expiration_datetime')) or datetime.max
-            subsidy_expiration = subsidy_expiration.replace(tzinfo=UTC)
-        else:
-            subsidy_expiration = datetime.max.replace(tzinfo=UTC)
-
-        enrollment_deadline = parse_datetime_string(self._enrollment_deadline_raw()) or datetime.max
-        enrollment_deadline = enrollment_deadline.replace(tzinfo=UTC)
-
-        auto_cancellation_date = self.assignment.get_auto_expiration_date() or datetime.max
-        auto_cancellation_date = auto_cancellation_date.replace(tzinfo=UTC)
-
-        message = (
-            'action_required_by assignment=%s: subsidy_expiration=%s, enrollment_deadline=%s, '
-            'auto_cancellation_date=%s'
-        )
-        logger.info(
-            message,
-            self.assignment.uuid,
-            subsidy_expiration,
-            enrollment_deadline,
-            auto_cancellation_date,
-        )
-        action_required_by = min(subsidy_expiration, enrollment_deadline, auto_cancellation_date)
-        return format_datetime_obj(action_required_by)
+        action_required_by = get_automatic_expiration_date_and_reason(self.assignment)
+        if not action_required_by:
+            return None
+        return format_datetime_obj(action_required_by['date'])
 
     def get_course_partner(self):
         return get_course_partners(self.course_metadata)
@@ -284,6 +261,7 @@ class BaseAssignmentRetryAndErrorActionTask(LoggedTaskWithRetry):
         assignment = _get_assignment_or_raise(args[0])
 
         assignment.state = LearnerContentAssignmentStateChoices.ERRORED
+        assignment.errored_at = localized_utcnow()
         assignment.save()
         self.add_errored_action(assignment, exc)
         if self.request.retries == settings.TASK_MAX_RETRIES:
@@ -499,7 +477,6 @@ def send_email_for_new_assignment(new_assignment_uuid):
     logger.info(f'Sent braze campaign notification uuid={campaign_uuid} message for assignment {assignment}')
 
 
-# pylint: disable=abstract-method
 class SendExpirationEmailTask(BaseAssignmentRetryAndErrorActionTask):
     """
     Base class for the ``send_assignment_automatically_expired_email`` task.

@@ -2,12 +2,15 @@
 Utility functions for Enterprise Access API.
 """
 
+import logging
 from uuid import UUID
 
 from rest_framework.exceptions import ParseError
 
 from enterprise_access.apps.content_assignments.api import get_assignment_configuration
 from enterprise_access.apps.subsidy_access_policy.api import get_subsidy_access_policy
+
+logger = logging.getLogger(__name__)
 
 
 def get_enterprise_uuid_from_query_params(request):

@@ -157,6 +157,24 @@ client-provided allocation prices.
 *******************************************
 *Feature: Assigned Learner Credit*
 
-Proposed December 2023, this ADR proposes an improved approach
+Accepted December 2023, this ADR proposes an improved approach
 around assignment lifecycle and business logic related to expiration (and
 to a lesser degree, cancellation).
+
+`<0016-automatic-expiration>`_
+********************************
+*Feature: Assigned Learner Credit*
+
+Accepted January 2024, this ADR describes an approach to automatically
+expire assignments based on the earliest of three possible dates (i.e.,
+course enrollment deadline, subsidy expiration date, 90 days after
+allocation).
+
+`<0017-policy-retirement.rst>`_
+********************************
+*Feature: Subsidy Access Policy (Learner Credit)*
+
+Accepted January 2024, this ADR describes an approach to retiring
+policies. Retired policies are no longer usable by learners for redemption,
+but are still visible to enterprise administrators for historical reporting
+purposes.
