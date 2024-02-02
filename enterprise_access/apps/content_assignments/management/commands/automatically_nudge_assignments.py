@@ -70,7 +70,22 @@ class Command(BaseCommand):
         days_before_course_start_date = options['days_before_course_start_date']
 
         for assignment_configuration in AssignmentConfiguration.objects.filter(active=True):
+            if not assignment_configuration.subsidy_access_policy:
+                logger.info(
+                    "Skipping nudge for AssignmentConfiguration: [%s], no subsidy_access_policy found",
+                    assignment_configuration.uuid,
+                )
+                continue
+
             subsidy_access_policy = assignment_configuration.subsidy_access_policy
+
+            if not subsidy_access_policy.catalog_uuid:
+                logger.info(
+                    "Skipping nudge for AssignmentConfiguration: [%s], no catalog_uuid found",
+                    assignment_configuration.uuid,
+                )
+                continue
+
             enterprise_catalog_uuid = subsidy_access_policy.catalog_uuid
 
             message = (
@@ -90,6 +105,13 @@ class Command(BaseCommand):
             accepted_assignments = assignment_configuration.assignments.filter(
                 state=LearnerContentAssignmentStateChoices.ACCEPTED
             )
+
+            if not accepted_assignments.exists():
+                logger.info(
+                    "Skipping nudge for AssignmentConfiguration: [%s], no accepted assignments found",
+                    assignment_configuration.uuid,
+                )
+                continue
 
             paginator = Paginator(accepted_assignments, 100)
             for page_number in paginator.page_range:
