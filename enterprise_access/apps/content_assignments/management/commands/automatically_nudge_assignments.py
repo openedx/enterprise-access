@@ -44,9 +44,10 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             '--days_before_course_start_date',
-            action='store_true',
+            type=int,
             dest='days_before_course_start_date',
             default=30,
+            metavar='NUM_DAYS',
             help='The amount of days before the course start date to send a nudge email through braze',
         )
 
