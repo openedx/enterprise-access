@@ -71,7 +71,7 @@ class Command(BaseCommand):
         days_before_course_start_date = options['days_before_course_start_date']
 
         for assignment_configuration in AssignmentConfiguration.objects.filter(active=True):
-            if not assignment_configuration.subsidy_access_policy:
+            if not hasattr(assignment_configuration, 'subsidy_access_policy'):
                 logger.info(
                     "Skipping nudge for AssignmentConfiguration: [%s], no subsidy_access_policy found",
                     assignment_configuration.uuid,
@@ -80,7 +80,7 @@ class Command(BaseCommand):
 
             subsidy_access_policy = assignment_configuration.subsidy_access_policy
 
-            if not subsidy_access_policy.catalog_uuid:
+            if not hasattr(subsidy_access_policy, 'catalog_uuid'):
                 logger.info(
                     "Skipping nudge for AssignmentConfiguration: [%s], no catalog_uuid found",
                     assignment_configuration.uuid,
