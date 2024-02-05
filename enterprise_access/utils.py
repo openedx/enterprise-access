@@ -103,7 +103,8 @@ def get_automatic_expiration_date_and_reason(
             fetched and subsequently cached from the content metadata API.
     """
     assignment_configuration = assignment.assignment_configuration
-    subsidy_access_policy = assignment_configuration.subsidy_access_policy  # pylint: disable=no-member
+    # pylint: disable=no-member,useless-suppression
+    subsidy_access_policy = assignment_configuration.subsidy_access_policy
 
     # subsidy expiration
     subsidy_expiration_datetime = _get_subsidy_expiration(assignment)

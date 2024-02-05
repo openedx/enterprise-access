@@ -554,6 +554,16 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         return self.content_would_exceed_limit(self.total_redeemed, self.spend_limit, content_price)
 
+    def _log_redeemability(self, is_redeemable, reason, lms_user_id, content_key, extra=None):
+        """
+        Helper to log decision points in the can_redeem() function.
+        """
+        message = (
+            '[POLICY REDEEMABILITY]: policy: %s, is_redeemable: %s, reason: %s'
+            'lms_user_id: %s, content_key: %s, extra=%s'
+        )
+        logger.info(message, self.uuid, is_redeemable, reason, lms_user_id, content_key, extra)
+
     def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
         """
         Check that a given learner can redeem the given content.
@@ -570,17 +580,24 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 * second element contains a reason code if the content is not redeemable,
                 * third a list of any transactions representing existing redemptions (any state).
         """
+        logger.info(
+            '[POLICY REDEEMABILITY] Checking for policy: %s, lms_user_id: %s, content_key: %s',
+            self.uuid, lms_user_id, content_key,
+        )
         # inactive policy
         if not self.is_redemption_enabled:
+            self._log_redeemability(False, REASON_POLICY_EXPIRED, lms_user_id, content_key)
             return (False, REASON_POLICY_EXPIRED, [])
 
         # learner not associated to enterprise
         if not skip_customer_user_check:
             if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
+                self._log_redeemability(False, REASON_LEARNER_NOT_IN_ENTERPRISE, lms_user_id, content_key)
                 return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
 
         # no content key in catalog
         if not self.catalog_contains_content_key(content_key):
+            self._log_redeemability(False, REASON_CONTENT_NOT_IN_CATALOG, lms_user_id, content_key)
             return (False, REASON_CONTENT_NOT_IN_CATALOG, [])
 
         # Wait to fetch content metadata with a call to the enterprise-subsidy
@@ -589,6 +606,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # no content key in content metadata
         if not content_metadata:
+            self._log_redeemability(False, REASON_CONTENT_NOT_IN_CATALOG, lms_user_id, content_key)
             return (False, REASON_CONTENT_NOT_IN_CATALOG, [])
 
         # TODO: Add Course Upgrade/Registration Deadline Passed Error here
@@ -608,16 +626,24 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # inactive subsidy?
         if not active_subsidy:
+            self._log_redeemability(False, REASON_SUBSIDY_EXPIRED, lms_user_id, content_key)
             return (False, REASON_SUBSIDY_EXPIRED, [])
 
         # can_redeem false from subsidy
         if not subsidy_can_redeem_payload.get('can_redeem', False):
+            self._log_redeemability(
+                False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, lms_user_id, content_key, extra=existing_transactions,
+            )
             return (False, REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY, existing_transactions)
 
         # not enough funds on policy
         if self.will_exceed_spend_limit(content_key, content_metadata=content_metadata):
+            self._log_redeemability(
+                False, REASON_POLICY_SPEND_LIMIT_REACHED, lms_user_id, content_key, extra=existing_transactions
+            )
             return (False, REASON_POLICY_SPEND_LIMIT_REACHED, existing_transactions)
 
+        self._log_redeemability(True, None, lms_user_id, content_key)
         return (True, None, existing_transactions)
 
     def has_credit_available_with_spend_limit(self):
@@ -954,7 +980,7 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
         # learner can redeem the subsidy access policy
         return (True, None, existing_redemptions)
 
-    def credit_available(self, lms_user_id, *args, **kwargs):  # pylint: disable=unused-argument
+    def credit_available(self, lms_user_id, *args, **kwargs):
         """
         Determine whether a learner has credit available for the subsidy access policy.
         """
@@ -1014,6 +1040,7 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             skip_customer_user_check,
         )
         if not should_attempt_redemption:
+            self._log_redeemability(False, reason, lms_user_id, content_key, extra=existing_redemptions)
             return (False, reason, existing_redemptions)
 
         has_per_learner_spend_limit = self.per_learner_spend_limit is not None
@@ -1023,12 +1050,16 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             spent_amount = existing_learner_transaction_aggregates.get('total_quantity') or 0
             content_price = self.get_content_price(content_key)
             if self.content_would_exceed_limit(spent_amount, self.per_learner_spend_limit, content_price):
+                self._log_redeemability(
+                    False, REASON_LEARNER_MAX_SPEND_REACHED, lms_user_id, content_key, extra=existing_redemptions,
+                )
                 return (False, REASON_LEARNER_MAX_SPEND_REACHED, existing_redemptions)
 
         # learner can redeem the subsidy access policy
+        self._log_redeemability(True, None, lms_user_id, content_key)
         return (True, None, existing_redemptions)
 
-    def credit_available(self, lms_user_id, *args, **kwargs):  # pylint: disable=unused-argument
+    def credit_available(self, lms_user_id, *args, **kwargs):
         """
         Determine whether a learner has credit available for the subsidy access policy.
         """
@@ -1181,25 +1212,39 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             skip_customer_user_check,
         )
         if not should_attempt_redemption:
+            self._log_redeemability(False, reason, lms_user_id, content_key, extra=existing_redemptions)
             return (False, reason, existing_redemptions)
         # Now that the default checks are complete, proceed with the custom checks for this assignment policy type.
         found_assignment = self.get_assignment(lms_user_id, content_key)
         if not found_assignment:
+            self._log_redeemability(
+                False, REASON_LEARNER_NOT_ASSIGNED_CONTENT, lms_user_id, content_key, extra=existing_redemptions,
+            )
             return (False, REASON_LEARNER_NOT_ASSIGNED_CONTENT, existing_redemptions)
         elif found_assignment.state == LearnerContentAssignmentStateChoices.CANCELLED:
+            self._log_redeemability(
+                False, REASON_LEARNER_ASSIGNMENT_CANCELLED, lms_user_id, content_key, extra=existing_redemptions,
+            )
             return (False, REASON_LEARNER_ASSIGNMENT_CANCELLED, existing_redemptions)
         elif found_assignment.state == LearnerContentAssignmentStateChoices.ERRORED:
+            self._log_redeemability(
+                False, REASON_LEARNER_ASSIGNMENT_FAILED, lms_user_id, content_key, extra=existing_redemptions,
+            )
             return (False, REASON_LEARNER_ASSIGNMENT_FAILED, existing_redemptions)
         elif found_assignment.state == LearnerContentAssignmentStateChoices.ACCEPTED:
             # This should never happen.  Even if the frontend had a bug that called the redemption endpoint for already
             # redeemed content, we already check for existing redemptions at the beginning of this function and fail
             # fast.  Reaching this block would be extremely weird.
+            self._log_redeemability(
+                False, REASON_LEARNER_NOT_ASSIGNED_CONTENT, lms_user_id, content_key, extra=existing_redemptions,
+            )
             return (False, REASON_LEARNER_NOT_ASSIGNED_CONTENT, existing_redemptions)
 
         # Learner can redeem the subsidy access policy
+        self._log_redeemability(True, None, lms_user_id, content_key)
         return (True, None, existing_redemptions)
 
-    def credit_available(self, lms_user_id, *args, **kwargs):  # pylint: disable=unused-argument
+    def credit_available(self, lms_user_id, *args, **kwargs):
         """
         Determine whether a learner has credit available for the subsidy access policy, determined
         based on the presence of unacknowledged assignments.
