@@ -1,8 +1,6 @@
 """
 Factoryboy factories.
 """
-from uuid import uuid4
-
 import factory
 from faker import Faker
 
@@ -17,9 +15,9 @@ class UserFactory(factory.django.DjangoModelFactory):
     """
     Test factory for the `User` model.
     """
-    id = factory.Sequence(lambda n: n + 1)
+    id = factory.Faker('bothify', text='#########')
     # make this pretty random to avoid flaky tests.
-    username = factory.Sequence(lambda n: f'fake-username-{n}-{str(uuid4())[:8]}')
+    username = factory.Faker('bothify', text='fake-username-???###')
     password = factory.PostGenerationMethodCall('set_password', USER_PASSWORD)
     email = factory.Faker('email')
     first_name = factory.Faker('first_name')
