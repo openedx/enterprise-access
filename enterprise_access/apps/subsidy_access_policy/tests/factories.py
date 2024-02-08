@@ -28,6 +28,7 @@ class SubsidyAccessPolicyFactory(factory.django.DjangoModelFactory):
     subsidy_uuid = factory.LazyFunction(uuid4)
     access_method = AccessMethods.DIRECT
     description = 'A generic description'
+    spend_limit = factory.LazyAttribute(lambda _: FAKER.pyint())
     active = True
 
 
