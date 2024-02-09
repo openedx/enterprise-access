@@ -251,6 +251,18 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
       ```
 
     """
+    # Set a batch ID to track assignments updated and/or created together.
+    allocation_batch_id = uuid4()
+
+    message = (
+        'Allocating assignments: assignment_configuration=%s, batch_id=%s, '
+        'learner_emails=%s, content_key=%s, content_price_cents=%s'
+    )
+    logger.info(
+        message, assignment_configuration.uuid, allocation_batch_id,
+        learner_emails, content_key, content_price_cents
+    )
+
     if content_price_cents < 0:
         raise AllocationException('Allocation price must be >= 0')
 
@@ -280,9 +292,6 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     # assignments (when they were created in a prior request), but time has passed since then so the outcome might be
     # different this time. It's technically possible some learners have registered since the last request.
     assignments_with_updated_lms_user_id = _try_populate_assignments_lms_user_id(existing_assignments)
-
-    # Set a batch ID to track assignments updated and/or created together.
-    allocation_batch_id = uuid4()
 
     # Split up the existing assignment records by state
     for assignment in existing_assignments:
@@ -457,6 +466,15 @@ def _create_new_assignments(
     """
     Helper to bulk save new LearnerContentAssignment instances.
     """
+    message = (
+        'Allocation starting to create records: assignment_configuration=%s, batch_id=%s, '
+        'learner_emails=%s, content_key=%s'
+    )
+    logger.info(
+        message, assignment_configuration.uuid, allocation_batch_id,
+        learner_emails, content_key,
+    )
+
     # First, prepare assignment objects using data available in-memory only.
     content_title = _get_content_title(assignment_configuration, content_key)
     assignments_to_create = []
