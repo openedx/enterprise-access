@@ -1,4 +1,4 @@
-0018 Access Policy Grouping
+\0018 Access Policy Grouping
 ###########################
 
 Status
@@ -15,21 +15,33 @@ existence of related subsets when determining if a subsidy is redeemable by an i
 
 Decision
 ********
-The ``SubsidyAccessPolicy`` model will adopt a new, nullable UUID field: `enterprise_group_uuid`. This field will be
-read and factored in at time of calculating redeemability of an individual policy for a learner. The intention is for
-every new access policy to have an assigned group.
+The enterprise access service will adopt a new table ``PolicyGroupAssociation``. Apart from boilerplate, this table
+will define two fields: a non nullable FK `subsidy_access_policy` with related name `groups` and a non nullable UUID
+char field: `enterprise_group_uuid`. A ``SubsidyAccessPolicy``'s `groups` will be read and factored in at time of
+calculating redeemability of an individual policy for a learner. The intention is for every new access policy to have
+at least one assigned group.
+
+PolicyGroupAssociation
+*********************
+**Model properties**
+------
+- created, modified (boilerplate)
+- subsidy_access_policy (NOT NULL, FK to SubsidyAccessPolicy, related_name=”groups”)
+- enterprise_group_uuid (NOT NULL, char UUID)
 
 How the systems will interact with one another
 ++++++++++++++++++++++++++++++++++++++++++++++
 Upon provisioning a new access policy budget for a customer, the service will make a POST request to edx-platform to
 create a new ``EnterpriseGroup`` record. On successful response, the enterprise-access service will write the returned
-UUID of the newly created group to the access policy `enterprise_group_uuid` field.
+UUID of the newly created group to the new table ``PolicyGroupAssociation`` with the associated policy's UUID.
 
-``SubsidyAccessPolicy``'s `can_redeem()` method already makes a request to edx-platform for
+``SubsidyAccessPolicy``'s `can_redeem()` method already makes a request to edx-platform for 
 `enterprise_contains_learner()` in which `lms_user_id` and `enterprise_customer_uuid` are provided to confirm
-a learner's membership with the associated organization. Now, `enterprise_group_uuid` will be optionally supplied by
-`can_redeem()` if it exists on the individual policy record. This value will further filter down the list of learners
-that have access to the subsidy linked to a policy. 
+a learner's membership with the associated organization. Now, instead returning `True` or `False` as a signature, the
+`enterprise_contains_learner()` method will return the learner's serialized EnterpriseCustomerUsers record from the
+`/enterprise-learner/` API or `None` if the user is not a part of the enterprise. This will retain any truthy based
+logic dependent on the old functionality of `enterprise_contains_learner()` but will surface more information usable by
+new consumers, namely `can_redeem()`.
 
 Consequences
 ************
