@@ -836,6 +836,7 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
             # we may not have hit the `if` block, so just get a time on the
             # entire policy lock context.  We can infer the difference between
             # that value and `serialization_time` if the latter is available in logs.
+            # this is fine
             lock_release_time = time.process_time() - start_time
             logger.info('allocate timing: policy lock release %s', lock_release_time)
         except SubsidyAccessPolicyLockAttemptFailed as exc:
