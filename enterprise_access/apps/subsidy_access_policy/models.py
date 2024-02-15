@@ -1426,3 +1426,32 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             content_key,
             content_price_cents,
         )
+
+
+class PolicyGroupAssociation(TimeStampedModel):
+    """
+    This model ties together a policy and a group.
+
+    .. no_pii: This model has no PII
+    """
+
+    class Meta:
+        unique_together = [
+            ('subsidy_access_policy', 'enterprise_group_uuid'),
+        ]
+
+    subsidy_access_policy = models.ForeignKey(
+        SubsidyAccessPolicy,
+        related_name="groups",
+        on_delete=models.CASCADE,
+        null=False,
+        help_text="The SubsidyAccessPolicy that this group is tied to.",
+    )
+
+    enterprise_group_uuid = models.UUIDField(
+        default=uuid4,
+        editable=False,
+        unique=True,
+        null=False,
+        help_text='The uuid that uniquely identifies the associated group.',
+    )
