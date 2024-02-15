@@ -29,6 +29,7 @@ edx-rest-api-client
 jsonfield2
 mysqlclient
 openedx-events
+pygments
 pymemcache
 pytz
 redis

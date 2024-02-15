@@ -111,7 +111,7 @@ django-filter==23.5
     # via -r requirements/base.in
 django-log-request-id==2.1.0
     # via -r requirements/base.in
-django-model-utils==4.3.1
+django-model-utils==4.4.0
     # via
     #   edx-celeryutils
     #   edx-rbac
@@ -156,6 +156,7 @@ edx-django-utils==5.10.1
     #   -r requirements/base.in
     #   edx-drf-extensions
     #   edx-rest-api-client
+    #   openedx-events
 edx-drf-extensions==10.2.0
     # via
     #   -r requirements/base.in
@@ -172,7 +173,7 @@ edx-rest-api-client==5.6.1
     # via
     #   -r requirements/base.in
     #   edx-enterprise-subsidy-client
-fastavro==1.9.3
+fastavro==1.9.4
     # via
     #   -r requirements/base.in
     #   openedx-events
@@ -204,7 +205,7 @@ markupsafe==2.1.5
     # via jinja2
 monotonic==1.6
     # via analytics-python
-mysqlclient==2.2.3
+mysqlclient==2.2.4
     # via -r requirements/base.in
 newrelic==9.6.0
     # via edx-django-utils
@@ -214,7 +215,7 @@ oauthlib==3.2.2
     #   social-auth-core
 openapi-codec==1.3.2
     # via django-rest-swagger
-openedx-events==9.4.0
+openedx-events==9.5.1
     # via -r requirements/base.in
 packaging==23.2
     # via drf-yasg
@@ -230,6 +231,8 @@ psutil==5.9.8
     # via edx-django-utils
 pycparser==2.21
     # via cffi
+pygments==2.17.2
+    # via -r requirements/base.in
 pyjwt[crypto]==2.8.0
     # via
     #   drf-jwt
@@ -277,7 +280,7 @@ requests==2.31.0
     #   social-auth-core
 requests-oauthlib==1.3.1
     # via social-auth-core
-rpds-py==0.17.1
+rpds-py==0.18.0
     # via
     #   jsonschema
     #   referencing
@@ -298,7 +301,7 @@ slumber==0.7.1
     # via edx-rest-api-client
 social-auth-app-django==5.4.0
     # via edx-auth-backends
-social-auth-core==4.5.2
+social-auth-core==4.5.3
     # via
     #   edx-auth-backends
     #   social-auth-app-django
@@ -314,7 +317,7 @@ typing-extensions==4.9.0
     #   drf-spectacular
     #   edx-opaque-keys
     #   kombu
-tzdata==2023.4
+tzdata==2024.1
     # via
     #   backports-zoneinfo
     #   celery
