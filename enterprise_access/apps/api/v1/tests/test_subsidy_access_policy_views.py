@@ -638,7 +638,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
     def test_update_views_fields_disallowed_for_update(self, request_payload):
         """
         Test that the update and partial_update views can NOT modify fields
-        of a policy record that are not included in the update request serializer fields defintion.
+        of a policy record that are not included in the update request serializer fields definition.
         """
         # Set the JWT-based auth to an operator.
         self.set_jwt_cookie([
