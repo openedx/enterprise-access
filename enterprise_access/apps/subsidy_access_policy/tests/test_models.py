@@ -45,7 +45,8 @@ from enterprise_access.apps.subsidy_access_policy.models import (
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
-    PerLearnerSpendCapLearnerCreditAccessPolicyFactory
+    PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
+    PolicyGroupAssociationFactory,
 )
 from enterprise_access.cache_utils import request_cache
 
@@ -1269,3 +1270,41 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         }
         with self.assertRaisesRegex(PriceValidationError, 'outside of acceptable interval'):
             self.active_policy.can_allocate(1, self.course_key, requested_price)
+
+
+@ddt.ddt
+class PolicyGroupAssociationTests(MockPolicyDependenciesMixin, TestCase):
+    """ Tests specific to the policy group association model. """
+
+    lms_user_id = 12345
+    group_uuid = uuid4()
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.access_policy = AssignedLearnerCreditAccessPolicyFactory()
+
+    def tearDown(self):
+        """
+        Clears any cached data for the test policy instances between test runs.
+        """
+        super().tearDown()
+        request_cache(namespace=REQUEST_CACHE_NAMESPACE).clear()
+
+    def test_save(self):
+        """
+        Test that the model-level validation of this model works as expected.
+        Should be saved with a unique combination of SubsidyAccessPolicy
+        and group uuid (enterprise_customer_uuid).
+        """
+
+        policy = PolicyGroupAssociationFactory(
+            enterprise_group_uuid=self.group_uuid,
+            subsidy_access_policy=self.access_policy,
+        )
+
+        policy.save()
+        policy.refresh_from_db()
+
+        self.assertEqual(policy.enterprise_group_uuid, self.group_uuid)
+        self.assertIsNotNone(policy.subsidy_access_policy)

@@ -1430,7 +1430,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
 
 class PolicyGroupAssociation(TimeStampedModel):
     """
-    This model ties together a policy and a group.
+    This model ties together a policy (SubsidyAccessPolicy) and a group (EnterpriseGroup in edx-enterprise).
 
     .. no_pii: This model has no PII
     """
