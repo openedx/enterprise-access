@@ -45,7 +45,8 @@ from enterprise_access.apps.subsidy_access_policy.models import (
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
-    PerLearnerSpendCapLearnerCreditAccessPolicyFactory
+    PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
+    PolicyGroupAssociationFactory
 )
 from enterprise_access.cache_utils import request_cache
 
@@ -695,34 +696,34 @@ class SubsidyAccessPolicyResolverTests(TestCase):
         self.policy_three = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
         self.policy_four = PerLearnerSpendCapLearnerCreditAccessPolicyFactory.create()
 
-        policy_one_subsity_patcher = patch.object(
+        policy_one_subsidy_patcher = patch.object(
             self.policy_one, 'subsidy_record'
         )
-        self.mock_policy_one_subsidy_record = policy_one_subsity_patcher.start()
+        self.mock_policy_one_subsidy_record = policy_one_subsidy_patcher.start()
         self.mock_policy_one_subsidy_record.return_value = self.mock_subsidy_one
 
-        policy_two_subsity_patcher = patch.object(
+        policy_two_subsidy_patcher = patch.object(
             self.policy_two, 'subsidy_record'
         )
-        self.mock_policy_two_subsidy_record = policy_two_subsity_patcher.start()
+        self.mock_policy_two_subsidy_record = policy_two_subsidy_patcher.start()
         self.mock_policy_two_subsidy_record.return_value = self.mock_subsidy_two
 
-        policy_three_subsity_patcher = patch.object(
+        policy_three_subsidy_patcher = patch.object(
             self.policy_three, 'subsidy_record'
         )
-        self.mock_policy_three_subsidy_record = policy_three_subsity_patcher.start()
+        self.mock_policy_three_subsidy_record = policy_three_subsidy_patcher.start()
         self.mock_policy_three_subsidy_record.return_value = self.mock_subsidy_three
 
-        policy_four_subsity_patcher = patch.object(
+        policy_four_subsidy_patcher = patch.object(
             self.policy_four, 'subsidy_record'
         )
-        self.mock_policy_four_subsidy_record = policy_four_subsity_patcher.start()
+        self.mock_policy_four_subsidy_record = policy_four_subsidy_patcher.start()
         self.mock_policy_four_subsidy_record.return_value = self.mock_subsidy_four
 
-        self.addCleanup(policy_one_subsity_patcher.stop)
-        self.addCleanup(policy_two_subsity_patcher.stop)
-        self.addCleanup(policy_three_subsity_patcher.stop)
-        self.addCleanup(policy_four_subsity_patcher.stop)
+        self.addCleanup(policy_one_subsidy_patcher.stop)
+        self.addCleanup(policy_two_subsidy_patcher.stop)
+        self.addCleanup(policy_three_subsidy_patcher.stop)
+        self.addCleanup(policy_four_subsidy_patcher.stop)
 
     def test_setup(self):
         """
@@ -752,7 +753,7 @@ class SubsidyAccessPolicyResolverTests(TestCase):
     @override_settings(MULTI_POLICY_RESOLUTION_ENABLED=True)
     def test_resolve_two_policies_by_expiration(self):
         """
-        Test resolve given a two policies with different balances, differet expiration
+        Test resolve given a two policies with different balances, different expiration
         the sooner expiration policy should be returned.
         """
         policies = [self.policy_one, self.policy_three]
@@ -765,7 +766,7 @@ class SubsidyAccessPolicyResolverTests(TestCase):
         but different type-priority.
         """
         policies = [self.policy_four, self.policy_one]
-        # artificially set the priority attribute higher on one of the policies (lower priority takes precident)
+        # artificially set the priority attribute higher on one of the policies (lower priority takes precedent)
         with patch.object(PerLearnerSpendCreditAccessPolicy, 'priority', new_callable=PropertyMock) as mock:
             mock.return_value = 100
             assert SubsidyAccessPolicy.resolve_policy(policies) == self.policy_one
@@ -1079,7 +1080,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
                 assert redeemed_action.action_type == AssignmentActions.REDEEMED
                 assert not redeemed_action.error_reason
             if fail_subsidy_create_transaction:
-                # sad path should generate a failed redeememd action with populated error_reason and traceback.
+                # sad path should generate a failed redeemed action with populated error_reason and traceback.
                 redeemed_action = assignment.actions.last()
                 assert redeemed_action.action_type == AssignmentActions.REDEEMED
                 assert redeemed_action.error_reason == AssignmentActionErrors.ENROLLMENT_ERROR
@@ -1234,7 +1235,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         self.mock_assignments_api.get_allocated_quantity_for_configuration.return_value = -1000
 
         # Request a price just slightly different from the canonical price
-        # the subidy remaining balance and the spend limit are both 10,000
+        # the subsidy remaining balance and the spend limit are both 10,000
         # ((7 * 1000) + 1000 + 1000) < 10000
         can_allocate, _ = self.active_policy.can_allocate(7, self.course_key, 1000)
 
@@ -1269,3 +1270,41 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         }
         with self.assertRaisesRegex(PriceValidationError, 'outside of acceptable interval'):
             self.active_policy.can_allocate(1, self.course_key, requested_price)
+
+
+@ddt.ddt
+class PolicyGroupAssociationTests(MockPolicyDependenciesMixin, TestCase):
+    """ Tests specific to the policy group association model. """
+
+    lms_user_id = 12345
+    group_uuid = uuid4()
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.access_policy = AssignedLearnerCreditAccessPolicyFactory()
+
+    def tearDown(self):
+        """
+        Clears any cached data for the test policy instances between test runs.
+        """
+        super().tearDown()
+        request_cache(namespace=REQUEST_CACHE_NAMESPACE).clear()
+
+    def test_save(self):
+        """
+        Test that the model-level validation of this model works as expected.
+        Should be saved with a unique combination of SubsidyAccessPolicy
+        and group uuid (enterprise_customer_uuid).
+        """
+
+        policy = PolicyGroupAssociationFactory(
+            enterprise_group_uuid=self.group_uuid,
+            subsidy_access_policy=self.access_policy,
+        )
+
+        policy.save()
+        policy.refresh_from_db()
+
+        self.assertEqual(policy.enterprise_group_uuid, self.group_uuid)
+        self.assertIsNotNone(policy.subsidy_access_policy)

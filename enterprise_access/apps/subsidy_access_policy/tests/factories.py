@@ -11,7 +11,8 @@ from enterprise_access.apps.subsidy_access_policy.constants import AccessMethods
 from enterprise_access.apps.subsidy_access_policy.models import (
     AssignedLearnerCreditAccessPolicy,
     PerLearnerEnrollmentCreditAccessPolicy,
-    PerLearnerSpendCreditAccessPolicy
+    PerLearnerSpendCreditAccessPolicy,
+    PolicyGroupAssociation
 )
 
 FAKER = Faker()
@@ -64,3 +65,15 @@ class AssignedLearnerCreditAccessPolicyFactory(SubsidyAccessPolicyFactory):
     spend_limit = factory.LazyAttribute(lambda _: FAKER.pyint())
     per_learner_spend_limit = None
     per_learner_enrollment_limit = None
+
+
+class PolicyGroupAssociationFactory(factory.django.DjangoModelFactory):
+    """
+    Test factory for the `PolicyGroupAssociation` model.
+    """
+
+    class Meta:
+        model = PolicyGroupAssociation
+
+    enterprise_group_uuid = factory.LazyFunction(uuid4)
+    subsidy_access_policy = factory.SubFactory(SubsidyAccessPolicyFactory)
