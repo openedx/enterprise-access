@@ -82,6 +82,10 @@ class SubsidyRequestCustomerConfigurationFilterBackend(filters.BaseFilterBackend
             request, [constants.REQUESTS_LEARNER_ROLE]
         )
 
+        # do a similar check for edge-case learners that might have access to all enterprises
+        if constants.ALL_ACCESS_CONTEXT in accessible_enterprises_as_learner:
+            return queryset
+
         return queryset.filter(
             Q(enterprise_customer_uuid__in=accessible_enterprises_as_admin.union(accessible_enterprises_as_learner))
         )
