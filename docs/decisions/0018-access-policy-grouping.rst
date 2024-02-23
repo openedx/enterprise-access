@@ -36,11 +36,11 @@ create a new ``EnterpriseGroup`` record. On successful response, the enterprise-
 UUID of the newly created group to the new table ``PolicyGroupAssociation`` with the associated policy's UUID.
 
 ``SubsidyAccessPolicy``'s `can_redeem()` method already makes a request to edx-platform for 
-`enterprise_contains_learner()` in which `lms_user_id` and `enterprise_customer_uuid` are provided to confirm
+`get_enterprise_user()` in which `lms_user_id` and `enterprise_customer_uuid` are provided to confirm
 a learner's membership with the associated organization. Now, instead returning `True` or `False` as a signature, the
-`enterprise_contains_learner()` method will return the learner's serialized EnterpriseCustomerUsers record from the
+`get_enterprise_user()` method will return the learner's serialized EnterpriseCustomerUsers record from the
 `/enterprise-learner/` API or `None` if the user is not a part of the enterprise. This will retain any truthy based
-logic dependent on the old functionality of `enterprise_contains_learner()` but will surface more information usable by
+logic dependent on the old functionality of `get_enterprise_user()` but will surface more information usable by
 new consumers, namely `can_redeem()`.
 
 Consequences

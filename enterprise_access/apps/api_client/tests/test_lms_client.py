@@ -13,8 +13,8 @@ from rest_framework import status
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
+from test_utils import TEST_ENTERPRISE_UUID, TEST_USER_ID, TEST_USER_RECORD
 
-TEST_ENTERPRISE_UUID = uuid4()
 TEST_USER_EMAILS = [
     'larry@stooges.com',
     'moe@stooges.com',
@@ -168,32 +168,22 @@ class TestLmsApiClient(TestCase):
 
     @mock.patch('requests.Response.json')
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
-    def test_enterprise_contains_learner(self, mock_oauth_client, mock_json):
+    def test_get_enterprise_user(self, mock_oauth_client, mock_json):
         """
-        Verify enterprise_contains_learner works as expected.
+        Verify get_enterprise_user works as expected.
         """
-        mock_enterprise_uuid = str(uuid4())
-        user_id = 1234
         mock_oauth_client.return_value.get.return_value = requests.Response()
         mock_oauth_client.return_value.get.return_value.status_code = 200
 
         mock_json.return_value = {
             'results': [
-                {
-                    'enterprise_customer': {
-                        'uuid': mock_enterprise_uuid
-                    },
-                    'user': {
-                        'id': user_id
-                    }
-                }
+                TEST_USER_RECORD
             ]
         }
-
-        query_params = {'enterprise_customer_uuid': mock_enterprise_uuid, 'user_ids': user_id}
+        query_params = {'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID), 'user_ids': TEST_USER_ID}
         client = LmsApiClient()
-        enterprise_contains_learner = client.enterprise_contains_learner(mock_enterprise_uuid, user_id)
-        assert enterprise_contains_learner
+        get_enterprise_user = client.get_enterprise_user(str(TEST_ENTERPRISE_UUID), TEST_USER_ID)
+        assert get_enterprise_user == TEST_USER_RECORD
 
         mock_oauth_client.return_value.get.assert_called_with(
             'http://edx-platform.example.com/enterprise/api/v1/enterprise-learner/',

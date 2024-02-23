@@ -591,7 +591,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # learner not associated to enterprise
         if not skip_customer_user_check:
-            if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
+            if self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id) is None:
                 self._log_redeemability(False, REASON_LEARNER_NOT_IN_ENTERPRISE, lms_user_id, content_key)
                 return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
 
@@ -687,7 +687,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # learner not linked to enterprise
         if not skip_customer_user_check:
-            if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
+            if self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id) is None:
                 logger.info(
                     '[credit_available] learner %s not linked to enterprise %s',
                     lms_user_id,
