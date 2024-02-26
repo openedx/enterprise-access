@@ -136,8 +136,6 @@ dmypy.json
 # mac Stuff
 .DS_Store
 
-.dev/
-
 # emacs
 *~
 .projectile
@@ -150,3 +148,7 @@ docs/generated/
 
 # private django settings
 enterprise_access/settings/private.py
+
+# devstack and assets
+.dev/
+enterprise_access/assets
