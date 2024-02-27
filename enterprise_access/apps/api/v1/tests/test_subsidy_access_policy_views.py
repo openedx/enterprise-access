@@ -41,7 +41,8 @@ from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPol
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
-    PerLearnerSpendCapLearnerCreditAccessPolicyFactory
+    PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
+    PolicyGroupAssociationFactory
 )
 from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
 from test_utils import APITestWithMocks
@@ -49,6 +50,43 @@ from test_utils import APITestWithMocks
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:subsidy-access-policies-list')
 
 TEST_ENTERPRISE_UUID = uuid4()
+TEST_GROUP_UUID = uuid4()
+
+MOCK_USER_RECORD = {
+    'enterprise_customer': {
+        'uuid': TEST_ENTERPRISE_UUID,
+    },
+    'user': {
+        'id': str(uuid4()),
+        'enterprise_customer': {
+            'uuid': TEST_ENTERPRISE_UUID,
+        },
+        'active': True,
+        'user_id': 1,
+        'user': {
+            'id': 1,
+            'username': 'billy_bob',
+            'first_name': 'billy',
+            'last_name': 'bob',
+            'email': 'billy@bobby.com',
+            'is_staff': False,
+            'is_active': True,
+            'date_joined': '2024-02-23T20:18:41Z',
+        },
+        'groups': [],
+        'role_assignments': [
+            'enterprise_learner',
+            'enterprise_admin',
+        ],
+        'enterprise_group': [{
+            'enterprise_customer': {
+                'uuid': TEST_ENTERPRISE_UUID,
+            },
+            'name': 'Wayne Enterprise',
+            'uuid': TEST_GROUP_UUID,
+        }],
+    },
+}
 
 
 # pylint: disable=missing-function-docstring
@@ -1059,7 +1097,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         lms_client_patcher = mock.patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
         lms_client = lms_client_patcher.start()
         self.lms_client_instance = lms_client.return_value
-        self.lms_client_instance.enterprise_contains_learner.return_value = True
+        self.lms_client_instance.enterprise_contains_learner.return_value = MOCK_USER_RECORD
 
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
@@ -1071,6 +1109,10 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         """
         Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint works as expected
         """
+        PolicyGroupAssociationFactory(
+            enterprise_group_uuid=TEST_GROUP_UUID,
+            subsidy_access_policy=self.redeemable_policy
+        )
         self.mock_get_content_metadata.return_value = {'content_price': 123}
         mock_transaction_record = {
             'uuid': str(uuid4()),
@@ -1590,7 +1632,7 @@ class BaseCanRedeemTestMixin:
         lms_client_patcher = mock.patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
         lms_client = lms_client_patcher.start()
         lms_client_instance = lms_client.return_value
-        lms_client_instance.enterprise_contains_learner.return_value = True
+        lms_client_instance.enterprise_contains_learner.return_value = MOCK_USER_RECORD
 
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
@@ -1613,6 +1655,12 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
             spend_limit=500000,
         )
         self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
+
+        group_uuid = uuid4()
+        PolicyGroupAssociationFactory(
+            enterprise_group_uuid=group_uuid,
+            subsidy_access_policy=self.redeemable_policy
+        )
 
     def test_can_redeem_policy_missing_params(self):
         """

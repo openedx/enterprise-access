@@ -122,10 +122,10 @@ class LmsApiClient(BaseOAuthClient):
             learner_id (int): LMS user id of a learner.
 
         Returns:
-            bool: True if learner is linked with enterprise else False
+            None or the enterprise customer user record
         """
 
-        result = False
+        result = None
         ec_uuid = str(enterprise_customer_uuid)
         query_params = {'enterprise_customer_uuid': ec_uuid, 'user_ids': learner_id}
 
@@ -137,7 +137,7 @@ class LmsApiClient(BaseOAuthClient):
             results = json_response.get('results')
             results = results and results[0]
             if results and results['enterprise_customer']['uuid'] == ec_uuid and results['user']['id'] == learner_id:
-                result = True
+                result = results
         except requests.exceptions.HTTPError:
             logger.exception('Failed to fetch data from LMS. URL: [%s].', url)
         except KeyError:

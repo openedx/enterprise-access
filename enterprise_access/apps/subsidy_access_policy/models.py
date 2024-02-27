@@ -30,6 +30,7 @@ from .constants import (
     REASON_LEARNER_MAX_SPEND_REACHED,
     REASON_LEARNER_NOT_ASSIGNED_CONTENT,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
+    REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     REASON_POLICY_EXPIRED,
     REASON_POLICY_SPEND_LIMIT_REACHED,
@@ -410,7 +411,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Total amount of assignments currently allocated via this policy.
 
-        Override this in sub-classess that use assignments.  Empty definition needed here in order to make serializer
+        Override this in sub-classes that use assignments.  Empty definition needed here in order to make serializer
         happy.
 
         Returns:
@@ -591,9 +592,24 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # learner not associated to enterprise
         if not skip_customer_user_check:
-            if not self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id):
+            learner_record = self.lms_api_client.enterprise_contains_learner(self.enterprise_customer_uuid, lms_user_id)
+            if not learner_record:
                 self._log_redeemability(False, REASON_LEARNER_NOT_IN_ENTERPRISE, lms_user_id, content_key)
                 return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
+
+            associated_group_uuids = set([str(group["uuid"]) for group in learner_record['user']['enterprise_group']])
+
+            policy_groups = PolicyGroupAssociation.objects.filter(subsidy_access_policy=self).all()
+            policy_groups_uuids = set([str(group.enterprise_group_uuid) for group in policy_groups])
+
+            # if there are groups associated with the policy, if not we want to be backwards compatible with
+            # enterprises who haven't implemented groups yet
+            if len(policy_groups) > 0:
+                uuid_overlap = associated_group_uuids.intersection(policy_groups_uuids)
+                # if any of the user's associated groups are connected to the policy
+                if len(uuid_overlap) == 0:
+                    self._log_redeemability(False, REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP, lms_user_id, content_key)
+                    return (False, REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP, [])
 
         # no content key in catalog
         if not self.catalog_contains_content_key(content_key):

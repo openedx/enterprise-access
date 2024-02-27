@@ -70,7 +70,7 @@ class TransactionStateChoices:
         is stored in the reference_id field of the transaction.
 
     FAILED
-        Indidcates that the attempt to redeem the content in the target LMS encountered an error.
+        Indicates that the attempt to redeem the content in the target LMS encountered an error.
     """
 
     CREATED = 'created'
@@ -105,6 +105,7 @@ REASON_POLICY_EXPIRED = "policy_expired"
 REASON_SUBSIDY_EXPIRED = "subsidy_expired"
 REASON_CONTENT_NOT_IN_CATALOG = "content_not_in_catalog"
 REASON_LEARNER_NOT_IN_ENTERPRISE = "learner_not_in_enterprise"
+REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP = "learner_not_in_enterprise_group"
 REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY = "not_enough_value_in_subsidy"
 REASON_LEARNER_MAX_SPEND_REACHED = "learner_max_spend_reached"
 REASON_POLICY_SPEND_LIMIT_REACHED = "policy_spend_limit_reached"
