@@ -113,7 +113,7 @@ class LmsApiClient(BaseOAuthClient):
             logger.exception(msg, enterprise_customer_uuid)
             raise
 
-    def enterprise_contains_learner(self, enterprise_customer_uuid, learner_id):
+    def get_enterprise_user(self, enterprise_customer_uuid, learner_id):
         """
         Verify if `learner_id` is a part of an enterprise represented by `enterprise_customer_uuid`.
 
@@ -122,10 +122,8 @@ class LmsApiClient(BaseOAuthClient):
             learner_id (int): LMS user id of a learner.
 
         Returns:
-            bool: True if learner is linked with enterprise else False
+            None or the enterprise customer user record
         """
-
-        result = False
         ec_uuid = str(enterprise_customer_uuid)
         query_params = {'enterprise_customer_uuid': ec_uuid, 'user_ids': learner_id}
 
@@ -134,16 +132,21 @@ class LmsApiClient(BaseOAuthClient):
             response = self.client.get(url, params=query_params, timeout=settings.LMS_CLIENT_TIMEOUT)
             response.raise_for_status()
             json_response = response.json()
-            results = json_response.get('results')
-            results = results and results[0]
-            if results and results['enterprise_customer']['uuid'] == ec_uuid and results['user']['id'] == learner_id:
-                result = True
+            results = json_response.get('results', [])
+            if isinstance(results, list):
+                for result in results:
+                    returned_customer = result.get('enterprise_customer', {})
+                    returned_user = result.get('user', {})
+                    if returned_customer.get('uuid') == ec_uuid and returned_user.get('id') == learner_id:
+                        return result
+            else:
+                logger.exception(f'get_enterprise_user got unexpected results: {results} from {url} ')
         except requests.exceptions.HTTPError:
             logger.exception('Failed to fetch data from LMS. URL: [%s].', url)
         except KeyError:
             logger.exception('Incorrect data received from LMS. [%s]', url)
 
-        return result
+        return None
 
     def create_pending_enterprise_users(self, enterprise_customer_uuid, user_emails):
         """
