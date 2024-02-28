@@ -10,7 +10,7 @@ Context
 The enterprise-access service needs to allow for the flexibility to control and distribute subsidy access policies to
 custom subsets of learners. The subdivision of access policies will improve user management and budgeting from an admin
 perspective, as well as add support for personalization to the learner experience down the line. While it is not
-the responsibility of the service to house the grouping of learners, an access policy must take into account the 
+the responsibility of the service to house the grouping of learners, an access policy must take into account the
 existence of related subsets when determining if a subsidy is redeemable by an individual learner.
 
 Decision
@@ -35,13 +35,27 @@ Upon provisioning a new access policy budget for a customer, the service will ma
 create a new ``EnterpriseGroup`` record. On successful response, the enterprise-access service will write the returned
 UUID of the newly created group to the new table ``PolicyGroupAssociation`` with the associated policy's UUID.
 
-``SubsidyAccessPolicy``'s `can_redeem()` method already makes a request to edx-platform for 
+``SubsidyAccessPolicy``'s `can_redeem()` method already makes a request to edx-platform for
 `get_enterprise_user()` in which `lms_user_id` and `enterprise_customer_uuid` are provided to confirm
 a learner's membership with the associated organization. Now, instead returning `True` or `False` as a signature, the
 `get_enterprise_user()` method will return the learner's serialized EnterpriseCustomerUsers record from the
 `/enterprise-learner/` API or `None` if the user is not a part of the enterprise. This will retain any truthy based
 logic dependent on the old functionality of `get_enterprise_user()` but will surface more information usable by
 new consumers, namely `can_redeem()`.
+
+Expected behavior of Access Policies by default
++++++++++++++++++++++++++++++++++++++++++++++++
+As stated in the decision, while backwards compatible, it is assumed that each policy is assigned a group.
+Groups, by definition, work to limit access to content or features within the greater set of an organization's
+members. As such this implementation changes the expected behavior of a policy/(now also group) after provisioning
+from the past assumption of universal learner access to policies connected to the enterprise. This presents an issue
+with policy implementations like Browse and Request as well as organizations with SSO integrations, as we want to
+streamline the onboarding process for enterprise customers, not requiring an additional step to add learners to groups/
+policies that we know will apply to the entire org. While the new, default policy/group associations does present
+a new level of filtering on availability of content, it will be left up to the group record contained in edx-platform
+to determine who it applies to and if it contains the entire org. For situations where we want to skip having customer
+admins manually associate all learners, the group will provide an ``all_context`` flag that can be set at the time of
+provisioning, based on subsidy type.
 
 Consequences
 ************
