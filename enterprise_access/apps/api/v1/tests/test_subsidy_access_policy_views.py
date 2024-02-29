@@ -1711,21 +1711,34 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient', return_value=mock.MagicMock())
     @ddt.data(
-        {"has_admin_users": True},
-        {"has_admin_users": False},
+        {"has_admin_users": True,
+         "contact_email": 'edx@example.org',
+         "admin_users": [{
+             "email": 'frodo@example.org',
+             "lms_user_id": 12
+         }]},
+        {"has_admin_users": True,
+         "contact_email": None,
+         "admin_users": [{
+             "email": 'frodo@example.org',
+             "lms_user_id": 12,
+         }]},
+        {"has_admin_users": False,
+         "contact_email": None,
+         "admin_users": None}
     )
     @ddt.unpack
     def test_can_redeem_policy_none_redeemable(
-        self, mock_lms_client, mock_transactions_cache_for_learner, has_admin_users
+        self, mock_lms_client, mock_transactions_cache_for_learner, has_admin_users, contact_email, admin_users
     ):
         """
         Test that the can_redeem endpoint returns reasons for why each non-redeemable policy failed.
         """
         slug = 'sluggy'
-        admin_email = 'edx@example.org'
         mock_lms_client().get_enterprise_customer_data.return_value = {
             'slug': slug,
-            'admin_users': [{'email': admin_email}] if has_admin_users else [],
+            'admin_users': admin_users if has_admin_users else [],
+            'contact_email': contact_email
         }
 
         mock_transactions_cache_for_learner.return_value = {
@@ -1791,10 +1804,17 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
 
         expected_user_message = (
             MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS
-            if has_admin_users
+            if contact_email is not None or has_admin_users
             else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS_NO_ADMINS
         )
-        expected_enterprise_admins = [{'email': admin_email}] if has_admin_users else []
+        expected_enterprise_admins = []
+        if contact_email is not None:
+            expected_enterprise_admins = [{
+                "email": contact_email,
+                "lms_user_id": None,
+            }]
+        elif has_admin_users:
+            expected_enterprise_admins = admin_users
 
         assert response_list[0]["reasons"] == [
             {
