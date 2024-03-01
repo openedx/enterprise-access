@@ -607,7 +607,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
             )
 
             # if there are groups associated with the policy, if not we want to be backwards compatible with
-            # enterprises who haven't implemented groups yet
+            # policies which haven't implemented groups yet
             if len(policy_groups) > 0:
                 uuid_overlap = associated_group_uuids.intersection(policy_groups_uuids)
                 # if any of the user's associated groups are connected to the policy

@@ -561,8 +561,6 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             subsidy_access_policy=policy_record
         )
 
-        # import pdb;
-        # pdb.set_trace()
         can_redeem_result = policy_record.can_redeem(self.lms_user_id, self.course_id)
 
         self.assertEqual(can_redeem_result, expected_policy_can_redeem)

@@ -95,19 +95,31 @@ def _get_reasons_for_no_redeemable_policies(enterprise_customer_uuid, non_redeem
     reasons = []
     lms_client = LmsApiClient()
     enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-    enterprise_admin_users = enterprise_customer_data.get('admin_users')
+    admin_contact = _get_admin_contact_email(enterprise_customer_data)
 
     for reason, policies in non_redeemable_policies_by_reason.items():
         reasons.append({
             "reason": reason,
-            "user_message": _get_user_message_for_reason(reason, enterprise_admin_users),
+            "user_message": _get_user_message_for_reason(reason, admin_contact),
             "metadata": {
-                "enterprise_administrators": enterprise_admin_users,
+                "enterprise_administrators": admin_contact,
             },
             "policy_uuids": [policy.uuid for policy in policies],
         })
 
     return reasons
+
+
+def _get_admin_contact_email(enterprise_customer_data):
+    """
+    Return the point of contact email for an enterprise customer.
+    """
+    if admin_contact_email := enterprise_customer_data.get('contact_email'):
+        return [{
+            "email": admin_contact_email,
+            "lms_user_id": None,
+        }]
+    return enterprise_customer_data.get('admin_users', [])
 
 
 def _get_user_message_for_reason(reason_slug, enterprise_admin_users):
