@@ -8,8 +8,10 @@ in multiple test modules (i.e. factoryboy factories, base test classes).
 
 So this package is the place to put them.
 """
+import copy
 import json
 from unittest import mock
+from uuid import uuid4
 
 from django.test import TestCase
 from django.test.client import RequestFactory
@@ -31,6 +33,46 @@ TEST_PARTNER_NAME = 'edX'
 TEST_USER_ID = 1
 COURSE_TITLE_ABOUT_PIE = 'How to Bake a Pie: A Slice of Heaven'
 COURSE_TITLE_ABOUT_CAKE = 'How to Bake a Cake: So Delicious It Should Be Illegal'
+TEST_ENTERPRISE_UUID = uuid4()
+TEST_ENTERPRISE_GROUP_UUID = uuid4()
+TEST_USER_RECORD = {
+    'enterprise_customer': {
+        'uuid': str(TEST_ENTERPRISE_UUID),
+    },
+    'user': {
+        'id': TEST_USER_ID,
+        'enterprise_customer': {
+            'uuid': str(TEST_ENTERPRISE_UUID),
+        },
+        'active': True,
+        'user_id': 1,
+        'user': {
+            'id': TEST_USER_ID,
+            'username': 'billy_bob',
+            'first_name': 'billy',
+            'last_name': 'bob',
+            'email': 'billy@bobby.com',
+            'is_staff': False,
+            'is_active': True,
+            'date_joined': '2024-02-23T20:18:41Z',
+        },
+        'groups': [],
+        'role_assignments': [
+            'enterprise_learner',
+            'enterprise_admin',
+        ],
+        'enterprise_group': [{
+            'enterprise_customer': {
+                'uuid': str(TEST_ENTERPRISE_UUID),
+            },
+            'name': 'Wayne Enterprise',
+            'uuid': str(TEST_ENTERPRISE_GROUP_UUID),
+        }],
+    },
+}
+
+TEST_USER_RECORD_NO_GROUPS = copy.deepcopy(TEST_USER_RECORD)
+TEST_USER_RECORD_NO_GROUPS['user']['enterprise_group'] = []
 
 
 @mark.django_db
@@ -65,7 +107,7 @@ class APITest(APITestCase):
         """
         Create a test user and set its password.
         """
-        self.user = UserFactory(username=username, is_active=True, is_staff=is_staff,  **kwargs)
+        self.user = UserFactory(username=username, is_active=True, is_staff=is_staff, **kwargs)
         self.user.set_password(password)
         self.user.save()
 
@@ -144,7 +186,7 @@ class APITestWithMocks(APITest):
         self.mock_discovery_client().get_course_data.return_value = {
             'title': COURSE_TITLE_ABOUT_PIE,
             'owners': [{'uuid': TEST_PARTER_UUID, 'name': TEST_PARTNER_NAME}],
-            "entitlements": [{'mode': 'verified', 'price': '199.00', 'currency': 'USD', 'sku': '3964E13',}]
+            "entitlements": [{'mode': 'verified', 'price': '199.00', 'currency': 'USD', 'sku': '3964E13'}]
         }
 
         self.analytics_patcher = mock.patch('analytics.track')

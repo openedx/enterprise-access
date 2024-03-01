@@ -29,7 +29,7 @@ class SubsidyAccessPolicyFactory(factory.django.DjangoModelFactory):
     subsidy_uuid = factory.LazyFunction(uuid4)
     access_method = AccessMethods.DIRECT
     description = 'A generic description'
-    spend_limit = factory.LazyAttribute(lambda _: FAKER.pyint())
+    spend_limit = factory.LazyAttribute(lambda _: FAKER.pyint(min_value=1))
     active = True
 
 
@@ -37,7 +37,7 @@ class PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(SubsidyAccessPolic
     """
     Test factory for the `PerLearnerEnrollmentCreditAccessPolicy` model.
     """
-    per_learner_enrollment_limit = factory.LazyAttribute(lambda _: FAKER.pyint())
+    per_learner_enrollment_limit = factory.LazyAttribute(lambda _: FAKER.pyint(min_value=1))
 
     class Meta:
         model = PerLearnerEnrollmentCreditAccessPolicy
@@ -47,7 +47,7 @@ class PerLearnerSpendCapLearnerCreditAccessPolicyFactory(SubsidyAccessPolicyFact
     """
     Test factory for the `PerLearnerSpendCreditAccessPolicy` model.
     """
-    per_learner_spend_limit = factory.LazyAttribute(lambda _: FAKER.pyint())
+    per_learner_spend_limit = factory.LazyAttribute(lambda _: FAKER.pyint(min_value=1))
 
     class Meta:
         model = PerLearnerSpendCreditAccessPolicy
@@ -62,7 +62,7 @@ class AssignedLearnerCreditAccessPolicyFactory(SubsidyAccessPolicyFactory):
         model = AssignedLearnerCreditAccessPolicy
 
     access_method = AccessMethods.ASSIGNED
-    spend_limit = factory.LazyAttribute(lambda _: FAKER.pyint())
+    spend_limit = factory.LazyAttribute(lambda _: FAKER.pyint(min_value=1))
     per_learner_spend_limit = None
     per_learner_enrollment_limit = None
 

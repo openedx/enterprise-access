@@ -45,48 +45,12 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PolicyGroupAssociationFactory
 )
 from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
-from test_utils import APITestWithMocks
+from test_utils import TEST_USER_RECORD, APITestWithMocks
 
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:subsidy-access-policies-list')
 
 TEST_ENTERPRISE_UUID = uuid4()
 TEST_GROUP_UUID = uuid4()
-
-MOCK_USER_RECORD = {
-    'enterprise_customer': {
-        'uuid': TEST_ENTERPRISE_UUID,
-    },
-    'user': {
-        'id': str(uuid4()),
-        'enterprise_customer': {
-            'uuid': TEST_ENTERPRISE_UUID,
-        },
-        'active': True,
-        'user_id': 1,
-        'user': {
-            'id': 1,
-            'username': 'billy_bob',
-            'first_name': 'billy',
-            'last_name': 'bob',
-            'email': 'billy@bobby.com',
-            'is_staff': False,
-            'is_active': True,
-            'date_joined': '2024-02-23T20:18:41Z',
-        },
-        'groups': [],
-        'role_assignments': [
-            'enterprise_learner',
-            'enterprise_admin',
-        ],
-        'enterprise_group': [{
-            'enterprise_customer': {
-                'uuid': TEST_ENTERPRISE_UUID,
-            },
-            'name': 'Wayne Enterprise',
-            'uuid': TEST_GROUP_UUID,
-        }],
-    },
-}
 
 
 # pylint: disable=missing-function-docstring
@@ -1097,7 +1061,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         lms_client_patcher = mock.patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
         lms_client = lms_client_patcher.start()
         self.lms_client_instance = lms_client.return_value
-        self.lms_client_instance.enterprise_contains_learner.return_value = MOCK_USER_RECORD
+        self.lms_client_instance.get_enterprise_user.return_value = TEST_USER_RECORD
 
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
@@ -1291,37 +1255,37 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         {
             'is_subsidy_active': True,
             'has_subsidy_balance_remaining': True,
-            'is_learned_linked': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'has_learner_exceed_spend_cap': False,
         },
         {
             'is_subsidy_active': True,
             'has_subsidy_balance_remaining': True,
-            'is_learned_linked': False,
+            'get_enterprise_user': None,
             'has_learner_exceed_spend_cap': False,
         },
         {
             'is_subsidy_active': True,
             'has_subsidy_balance_remaining': True,
-            'is_learned_linked': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'has_learner_exceed_spend_cap': True,
         },
         {
             'is_subsidy_active': False,
             'has_subsidy_balance_remaining': True,
-            'is_learned_linked': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'has_learner_exceed_spend_cap': False,
         },
         {
             'is_subsidy_active': True,
             'has_subsidy_balance_remaining': False,
-            'is_learned_linked': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'has_learner_exceed_spend_cap': False,
         },
         {
             'is_subsidy_active': False,
             'has_subsidy_balance_remaining': False,
-            'is_learned_linked': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'has_learner_exceed_spend_cap': False,
         },
     )
@@ -1332,7 +1296,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         mock_transactions_cache_for_learner,
         is_subsidy_active,
         has_subsidy_balance_remaining,
-        is_learned_linked,
+        get_enterprise_user,
         has_learner_exceed_spend_cap,
     ):
         """
@@ -1359,10 +1323,12 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         enroll_cap_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
             per_learner_enrollment_limit=5,
+            spend_limit=10000,
         )
         spend_cap_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
             per_learner_spend_limit=(5 if has_learner_exceed_spend_cap else 1000),
+            spend_limit=10000,
         )
 
         mock_transaction_record = {
@@ -1411,7 +1377,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'current_balance': '5000' if has_subsidy_balance_remaining else '0',
             'is_active': is_subsidy_active,
         }
-        self.lms_client_instance.enterprise_contains_learner.return_value = is_learned_linked
+        self.lms_client_instance.get_enterprise_user.return_value = get_enterprise_user
 
         query_params = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),
@@ -1421,7 +1387,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         response_json = response.json()
 
-        if is_subsidy_active and has_subsidy_balance_remaining and is_learned_linked:
+        if is_subsidy_active and has_subsidy_balance_remaining and get_enterprise_user is not None:
             # the above generic checks passed, now verify the specific policy-type specific checks.
             if has_learner_exceed_spend_cap:
                 # The spend cap policy should not be returned as the learner has exceeded the spend cap.
@@ -1501,7 +1467,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'current_balance': '5000',
             'is_active': True,
         }
-        self.lms_client_instance.enterprise_contains_learner.return_value = True
+        self.lms_client_instance.get_enterprise_user.return_value = TEST_USER_RECORD
         query_params = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),
             'lms_user_id': 1234,
@@ -1632,7 +1598,7 @@ class BaseCanRedeemTestMixin:
         lms_client_patcher = mock.patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
         lms_client = lms_client_patcher.start()
         lms_client_instance = lms_client.return_value
-        lms_client_instance.enterprise_contains_learner.return_value = MOCK_USER_RECORD
+        lms_client_instance.get_enterprise_user.return_value = TEST_USER_RECORD
 
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)

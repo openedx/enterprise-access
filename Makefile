@@ -206,11 +206,17 @@ dev.down: # Kills containers and all of their data that isn't in volumes
 dev.stop: # Stops containers so they can be restarted
 	docker-compose stop
 
-dev.backup: dev.up
-	docker run --rm --volumes-from enterprise_access.db -v $$(pwd)/.dev/backups:/backup debian:jessie tar zcvf /backup/mysql57.tar.gz /var/lib/mysql
+dev.backup:
+	docker-compose stop app worker
+	docker-compose up -d mysql80
+	sleep 10 # let mysql process get fully warmed up
+	docker compose exec mysql80 mysqldump --all-databases > .dev/enterprise_access_all.sql
 
-dev.restore: dev.up
-	docker run --rm --volumes-from enterprise_access.db -v $$(pwd)/.dev/backups:/backup debian:jessie tar zxvf /backup/mysql57.tar.gz
+dev.restore:
+	docker-compose stop app worker
+	docker-compose up -d mysql80
+	sleep 10 # let mysql process get fully warmed up
+	docker compose exec -T mysql80 mysql < .dev/enterprise_access_all.sql
 
 app-shell: # Run the app shell as root
 	docker exec -u 0 -it enterprise_access.app bash
@@ -241,6 +247,12 @@ app-restart-devserver:  # restart just the app Django dev server
 
 %-shell: # Run a shell, as root, on the specified service container
 	docker exec -u 0 -it enterprise_access.$* bash
+
+dev.static:
+	docker-compose exec -u 0 app python3 manage.py collectstatic --noinput
+
+dev.migrate:
+	docker-compose exec -u 0 app python manage.py migrate
 
 github_docker_build:
 	docker build . -f Dockerfile --target app -t openedx/enterprise-access
