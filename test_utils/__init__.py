@@ -8,6 +8,7 @@ in multiple test modules (i.e. factoryboy factories, base test classes).
 
 So this package is the place to put them.
 """
+import copy
 import json
 from unittest import mock
 from uuid import uuid4
@@ -33,6 +34,7 @@ TEST_USER_ID = 1
 COURSE_TITLE_ABOUT_PIE = 'How to Bake a Pie: A Slice of Heaven'
 COURSE_TITLE_ABOUT_CAKE = 'How to Bake a Cake: So Delicious It Should Be Illegal'
 TEST_ENTERPRISE_UUID = uuid4()
+TEST_ENTERPRISE_GROUP_UUID = uuid4()
 TEST_USER_RECORD = {
     'enterprise_customer': {
         'uuid': str(TEST_ENTERPRISE_UUID),
@@ -64,10 +66,13 @@ TEST_USER_RECORD = {
                 'uuid': str(TEST_ENTERPRISE_UUID),
             },
             'name': 'Wayne Enterprise',
-            'uuid': 'test-uuid',
+            'uuid': str(TEST_ENTERPRISE_GROUP_UUID),
         }],
     },
 }
+
+TEST_USER_RECORD_NO_GROUPS = copy.deepcopy(TEST_USER_RECORD)
+TEST_USER_RECORD_NO_GROUPS['user']['enterprise_group'] = []
 
 
 @mark.django_db
