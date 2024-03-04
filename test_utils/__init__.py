@@ -36,43 +36,38 @@ COURSE_TITLE_ABOUT_CAKE = 'How to Bake a Cake: So Delicious It Should Be Illegal
 TEST_ENTERPRISE_UUID = uuid4()
 TEST_ENTERPRISE_GROUP_UUID = uuid4()
 TEST_USER_RECORD = {
+    'id': TEST_USER_ID,
     'enterprise_customer': {
         'uuid': str(TEST_ENTERPRISE_UUID),
     },
+    'active': True,
+    'user_id': 1,
     'user': {
         'id': TEST_USER_ID,
+        'username': 'billy_bob',
+        'first_name': 'billy',
+        'last_name': 'bob',
+        'email': 'billy@bobby.com',
+        'is_staff': False,
+        'is_active': True,
+        'date_joined': '2024-02-23T20:18:41Z',
+    },
+    'groups': [],
+    'role_assignments': [
+        'enterprise_learner',
+        'enterprise_admin',
+    ],
+    'enterprise_group': [{
         'enterprise_customer': {
             'uuid': str(TEST_ENTERPRISE_UUID),
         },
-        'active': True,
-        'user_id': 1,
-        'user': {
-            'id': TEST_USER_ID,
-            'username': 'billy_bob',
-            'first_name': 'billy',
-            'last_name': 'bob',
-            'email': 'billy@bobby.com',
-            'is_staff': False,
-            'is_active': True,
-            'date_joined': '2024-02-23T20:18:41Z',
-        },
-        'groups': [],
-        'role_assignments': [
-            'enterprise_learner',
-            'enterprise_admin',
-        ],
-        'enterprise_group': [{
-            'enterprise_customer': {
-                'uuid': str(TEST_ENTERPRISE_UUID),
-            },
-            'name': 'Wayne Enterprise',
-            'uuid': str(TEST_ENTERPRISE_GROUP_UUID),
-        }],
-    },
+        'name': 'Wayne Enterprise',
+        'uuid': str(TEST_ENTERPRISE_GROUP_UUID),
+    }],
 }
 
 TEST_USER_RECORD_NO_GROUPS = copy.deepcopy(TEST_USER_RECORD)
-TEST_USER_RECORD_NO_GROUPS['user']['enterprise_group'] = []
+TEST_USER_RECORD_NO_GROUPS['enterprise_group'] = []
 
 
 @mark.django_db
