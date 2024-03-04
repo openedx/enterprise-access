@@ -41,8 +41,7 @@ from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPol
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
-    PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
-    PolicyGroupAssociationFactory
+    PerLearnerSpendCapLearnerCreditAccessPolicyFactory
 )
 from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
 from test_utils import TEST_USER_RECORD, APITestWithMocks
@@ -50,7 +49,6 @@ from test_utils import TEST_USER_RECORD, APITestWithMocks
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:subsidy-access-policies-list')
 
 TEST_ENTERPRISE_UUID = uuid4()
-TEST_GROUP_UUID = uuid4()
 
 
 # pylint: disable=missing-function-docstring
@@ -1073,10 +1071,6 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         """
         Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint works as expected
         """
-        PolicyGroupAssociationFactory(
-            enterprise_group_uuid=TEST_GROUP_UUID,
-            subsidy_access_policy=self.redeemable_policy
-        )
         self.mock_get_content_metadata.return_value = {'content_price': 123}
         mock_transaction_record = {
             'uuid': str(uuid4()),
@@ -1621,12 +1615,6 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
             spend_limit=500000,
         )
         self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
-
-        group_uuid = uuid4()
-        PolicyGroupAssociationFactory(
-            enterprise_group_uuid=group_uuid,
-            subsidy_access_policy=self.redeemable_policy
-        )
 
     def test_can_redeem_policy_missing_params(self):
         """
