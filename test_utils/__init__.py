@@ -57,13 +57,7 @@ TEST_USER_RECORD = {
         'enterprise_learner',
         'enterprise_admin',
     ],
-    'enterprise_group': [{
-        'enterprise_customer': {
-            'uuid': str(TEST_ENTERPRISE_UUID),
-        },
-        'name': 'Wayne Enterprise',
-        'uuid': str(TEST_ENTERPRISE_GROUP_UUID),
-    }],
+    'enterprise_group': [str(TEST_ENTERPRISE_GROUP_UUID)],
 }
 
 TEST_USER_RECORD_NO_GROUPS = copy.deepcopy(TEST_USER_RECORD)

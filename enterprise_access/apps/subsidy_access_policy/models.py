@@ -597,9 +597,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 self._log_redeemability(False, REASON_LEARNER_NOT_IN_ENTERPRISE, lms_user_id, content_key)
                 return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
 
-            associated_group_uuids = set(  # pylint: disable=consider-using-set-comprehension
-                [str(group.get('uuid')) for group in learner_record.get('enterprise_group')]
-            )
+            associated_group_uuids = set(learner_record.get('enterprise_group', []))
 
             policy_groups = PolicyGroupAssociation.objects.filter(subsidy_access_policy=self).all()
             policy_groups_uuids = set(  # pylint: disable=consider-using-set-comprehension
