@@ -152,6 +152,7 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
     assignment_configuration = AssignmentConfigurationResponseSerializer(
         help_text='AssignmentConfiguration object for this policy.',
     )
+    group_associations = serializers.SerializerMethodField()
 
     class Meta:
         model = SubsidyAccessPolicy
@@ -174,8 +175,12 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
             'is_subsidy_active',
             'aggregates',
             'assignment_configuration',
+            'group_associations',
         ]
         read_only_fields = fields
+
+    def get_group_associations(self, obj):
+        return obj.groups.values_list("enterprise_group_uuid", flat=True)
 
 
 class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
@@ -186,6 +191,7 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
     # Since the upstream model field has editable=False, we must redefine the field here because editable fields are
     # automatically skipped by validation, but we do actually want it to be validated.
     policy_type = serializers.ChoiceField(choices=PolicyTypes.CHOICES)
+    group_associations = serializers.SerializerMethodField()
 
     class Meta:
         model = SubsidyAccessPolicy
@@ -206,6 +212,7 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
             'subsidy_active_datetime',
             'subsidy_expiration_datetime',
             'is_subsidy_active',
+            'group_associations',
         ]
         read_only_fields = ['uuid']
         extra_kwargs = {
@@ -266,6 +273,9 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
         Return the view that called this serializer.
         """
         return self.context['view']
+
+    def get_group_associations(self, obj):
+        return obj.groups.values_list("enterprise_group_uuid", flat=True)
 
     def create(self, validated_data):
         policy_type = validated_data.get('policy_type')
