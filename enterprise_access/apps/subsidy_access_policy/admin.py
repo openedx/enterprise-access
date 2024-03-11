@@ -279,3 +279,19 @@ class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcces
             }
         ),
     ]
+
+
+@admin.register(models.PolicyGroupAssociation)
+class PolicyGroupAssociationAdmin(admin.ModelAdmin):
+    """
+    Admin configuration for PolicyGroupAssociation
+    """
+    search_fields = (
+        'subsidy_access_policy',
+        'enterprise_group_uuid',
+    )
+
+    list_display = (
+        'subsidy_access_policy',
+        'enterprise_group_uuid',
+    )
