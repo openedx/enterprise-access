@@ -41,7 +41,8 @@ from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPol
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
-    PerLearnerSpendCapLearnerCreditAccessPolicyFactory
+    PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
+    PolicyGroupAssociationFactory
 )
 from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
 from test_utils import TEST_USER_RECORD, APITestWithMocks
@@ -268,6 +269,12 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
 
         request_kwargs = {'uuid': str(self.redeemable_policy.uuid)}
 
+        enterprise_group_uuid = uuid4()
+        PolicyGroupAssociationFactory(
+            enterprise_group_uuid=enterprise_group_uuid,
+            subsidy_access_policy=self.redeemable_policy,
+        )
+
         # Test the retrieve endpoint
         response = self.client.get(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -297,6 +304,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'spend_available_usd': 0.02,
             },
             'assignment_configuration': None,
+            'group_associations': [str(enterprise_group_uuid)],
         }, response.json())
 
     @ddt.data(
@@ -389,6 +397,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                     'spend_available_usd': 0.00,
                 },
                 'assignment_configuration': None,
+                'group_associations': [],
             },
             {
                 'access_method': 'direct',
@@ -416,6 +425,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                     'spend_available_usd': 0.02,
                 },
                 'assignment_configuration': None,
+                'group_associations': [],
             },
         ]
 
@@ -446,7 +456,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             call(
                 subsidy_uuid=self.non_redeemable_policy.subsidy_uuid,
                 subsidy_access_policy_uuid=self.non_redeemable_policy.uuid,
-            )
+            ),
         ])
 
     @ddt.data(
@@ -510,6 +520,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'spend_available_usd': 0.02,
             },
             'assignment_configuration': None,
+            'group_associations': [],
         }
         self.assertEqual(expected_response, response.json())
 
@@ -621,6 +632,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'spend_available_usd': 0.04,
             },
             'assignment_configuration': None,
+            'group_associations': [],
         }
         expected_response.update(request_payload)
         self.assertEqual(expected_response, response.json())
@@ -828,6 +840,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             'subsidy_active_datetime': self.yesterday.isoformat(),
             'subsidy_expiration_datetime': self.tomorrow.isoformat(),
             'is_subsidy_active': True,
+            'group_associations': [],
         }
         payload.update(extra_fields)
         response = self.client.post(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, payload)
@@ -884,6 +897,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             'subsidy_active_datetime': self.yesterday.isoformat(),
             'subsidy_expiration_datetime': self.tomorrow.isoformat(),
             'is_subsidy_active': True,
+            'group_associations': [],
         }
         payload.update(extra_fields)
         response = self.client.post(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, payload)
