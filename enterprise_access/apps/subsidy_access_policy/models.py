@@ -1449,9 +1449,9 @@ class PolicyGroupAssociation(TimeStampedModel):
     )
 
     enterprise_group_uuid = models.UUIDField(
-        default=uuid4,
-        editable=False,
-        unique=True,
-        null=False,
+        editable=True,
+        unique=False,
+        null=True,
+        blank=True,
         help_text='The uuid that uniquely identifies the associated group.',
     )
