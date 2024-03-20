@@ -4,8 +4,11 @@ import logging
 
 from django.conf import settings
 from django.contrib import admin
+from django.http import HttpResponseRedirect
+from django.urls import re_path, reverse
 from django.utils.safestring import mark_safe
 from django.utils.text import Truncator  # for shortening a text
+from django_object_actions import DjangoObjectActions, action
 from djangoql.admin import DjangoQLSearchMixin
 from pygments import highlight
 from pygments.formatters import HtmlFormatter  # pylint: disable=no-name-in-module
@@ -14,6 +17,8 @@ from simple_history.admin import SimpleHistoryAdmin
 
 from enterprise_access.apps.api.serializers.subsidy_access_policy import SubsidyAccessPolicyResponseSerializer
 from enterprise_access.apps.subsidy_access_policy import constants, models
+from enterprise_access.apps.subsidy_access_policy.admin.utils import UrlNames
+from enterprise_access.apps.subsidy_access_policy.admin.views import SubsidyAccessPolicySetLateRedemptionView
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +45,7 @@ def cents_to_usd_string(cents):
     return "${:,.2f}".format(float(cents) / constants.CENTS_PER_DOLLAR)
 
 
-class BaseSubsidyAccessPolicyMixin(SimpleHistoryAdmin):
+class BaseSubsidyAccessPolicyMixin(DjangoObjectActions, SimpleHistoryAdmin):
     """
     Mixin for common admin properties on subsidy access policy models.
     """
@@ -68,8 +73,39 @@ class BaseSubsidyAccessPolicyMixin(SimpleHistoryAdmin):
         'created',
         'modified',
         'policy_spend_limit_dollars',
+        'late_redemption_allowed_until',
+        'is_late_redemption_allowed',
         'api_serialized_repr',
     )
+
+    change_actions = (
+        'set_late_redemption',
+    )
+
+    @action(
+        label='Set Late Redemption',
+        description='Enable/disable the "late redemption" feature for this policy'
+    )
+    def set_late_redemption(self, request, obj):
+        """
+        Object tool handler method - redirects to set_late_redemption view.
+        """
+        # url names coming from get_urls are prefixed with 'admin' namespace
+        set_late_redemption_url = reverse('admin:' + UrlNames.SET_LATE_REDEMPTION, args=(obj.uuid,))
+        return HttpResponseRedirect(set_late_redemption_url)
+
+    def get_urls(self):
+        """
+        Returns the additional urls used by the custom object tools.
+        """
+        additional_urls = [
+            re_path(
+                r"^([^/]+)/set_late_redemption",
+                self.admin_site.admin_view(SubsidyAccessPolicySetLateRedemptionView.as_view()),
+                name=UrlNames.SET_LATE_REDEMPTION,
+            ),
+        ]
+        return additional_urls + super().get_urls()
 
     @admin.display(description='REST API serialization')
     def api_serialized_repr(self, obj):
@@ -157,6 +193,7 @@ class PerLearnerEnrollmentCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcc
                     'retired',
                     'catalog_uuid',
                     'subsidy_uuid',
+                    'late_redemption_allowed_until',
                     'created',
                     'modified',
                 ]
@@ -209,6 +246,7 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
                     'retired',
                     'catalog_uuid',
                     'subsidy_uuid',
+                    'late_redemption_allowed_until',
                     'created',
                     'modified',
                 ]
@@ -266,6 +304,7 @@ class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcces
                     'retired',
                     'catalog_uuid',
                     'subsidy_uuid',
+                    'late_redemption_allowed_until',
                     'assignment_configuration',
                     'created',
                     'modified',

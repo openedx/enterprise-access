@@ -176,6 +176,8 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
             'aggregates',
             'assignment_configuration',
             'group_associations',
+            'late_redemption_allowed_until',
+            'is_late_redemption_allowed',
         ]
         read_only_fields = fields
 
@@ -213,8 +215,10 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
             'subsidy_expiration_datetime',
             'is_subsidy_active',
             'group_associations',
+            'late_redemption_allowed_until',
+            'is_late_redemption_allowed',
         ]
-        read_only_fields = ['uuid']
+        read_only_fields = ['uuid', 'is_late_redemption_allowed']
         extra_kwargs = {
             'uuid': {'read_only': True},
             'display_name': {
@@ -262,6 +266,10 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
                 'required': False,
             },
             'is_subsidy_active': {
+                'allow_null': True,
+                'required': False,
+            },
+            'late_redemption_allowed_until': {
                 'allow_null': True,
                 'required': False,
             },
@@ -417,6 +425,7 @@ class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
             'subsidy_active_datetime',
             'subsidy_expiration_datetime',
             'is_subsidy_active',
+            'late_redemption_allowed_until',
         )
         extra_kwargs = {
             'display_name': {
@@ -472,6 +481,10 @@ class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
                 'required': False,
             },
             'is_subsidy_active': {
+                'allow_null': True,
+                'required': False,
+            },
+            'late_redemption_allowed_until': {
                 'allow_null': True,
                 'required': False,
             },

@@ -59,6 +59,10 @@ from .subsidy_api import (
 )
 from .utils import ProxyAwareHistoricalRecords, create_idempotency_key_for_transaction, get_versioned_subsidy_client
 
+# Magic key that is used transaction metadata hint to the subsidy service and all downstream services that the
+# enrollment should be allowed even if the enrollment deadline has passed.
+ALLOW_LATE_ENROLLMENT_KEY = 'allow_late_enrollment'
+
 REQUEST_CACHE_NAMESPACE = 'subsidy_access_policy'
 POLICY_LOCK_RESOURCE_NAME = 'subsidy_access_policy'
 logger = logging.getLogger(__name__)
@@ -184,6 +188,11 @@ class SubsidyAccessPolicy(TimeStampedModel):
         null=True,
         blank=True,
     )
+    late_redemption_allowed_until = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Before this date, "late redemptions" will be allowed. If empty, late redemptions are disallowed.',
+    )
     per_learner_enrollment_limit = models.IntegerField(
         null=True,
         blank=True,
@@ -228,6 +237,15 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Return True if this policy has redemption enabled.
         """
         return self.active and not self.retired
+
+    @property
+    def is_late_redemption_allowed(self):
+        """
+        Return True if late redemption is currently allowed.
+        """
+        if not self.late_redemption_allowed_until:
+            return False
+        return localized_utcnow() < self.late_redemption_allowed_until
 
     @property
     def subsidy_active_datetime(self):
@@ -809,13 +827,18 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 subsidy_access_policy_uuid=str(self.uuid),
                 historical_redemptions_uuids=self._redemptions_for_idempotency_key(all_transactions),
             )
+            # If this policy has late redemptions currently enabled, tell that to the subsidy service.
+            metadata_for_tx = metadata
+            if self.is_late_redemption_allowed:
+                metadata_for_tx = metadata.copy() if metadata else {}
+                metadata_for_tx[ALLOW_LATE_ENROLLMENT_KEY] = True
             try:
                 creation_payload = {
                     'subsidy_uuid': str(self.subsidy_uuid),
                     'lms_user_id': lms_user_id,
                     'content_key': content_key,
                     'subsidy_access_policy_uuid': str(self.uuid),
-                    'metadata': metadata,
+                    'metadata': metadata_for_tx,
                     'idempotency_key': idempotency_key,
                 }
                 requested_price_cents = kwargs.get('requested_price_cents')
