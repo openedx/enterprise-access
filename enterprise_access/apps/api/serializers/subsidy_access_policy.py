@@ -180,7 +180,7 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_group_associations(self, obj):
-        return obj.groups.values_list("enterprise_group_uuid", flat=True)
+        return list(obj.groups.values_list("enterprise_group_uuid", flat=True))
 
 
 class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
@@ -275,7 +275,7 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
         return self.context['view']
 
     def get_group_associations(self, obj):
-        return obj.groups.values_list("enterprise_group_uuid", flat=True)
+        return list(obj.groups.values_list("enterprise_group_uuid", flat=True))
 
     def create(self, validated_data):
         policy_type = validated_data.get('policy_type')
