@@ -30,6 +30,7 @@ from .constants import (
     REASON_LEARNER_MAX_SPEND_REACHED,
     REASON_LEARNER_NOT_ASSIGNED_CONTENT,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
+    REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     REASON_POLICY_EXPIRED,
     REASON_POLICY_SPEND_LIMIT_REACHED,
@@ -460,6 +461,30 @@ class SubsidyAccessPolicy(TimeStampedModel):
             self.get_content_metadata(content_key),
         )
 
+    def includes_learner(self, lms_user_id):
+        """
+        Determine whether the lms user is associated properly with both the enterprise
+        and the policy's group(s).
+        """
+        learner_record = self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id)
+        if not learner_record:
+            return False, REASON_LEARNER_NOT_IN_ENTERPRISE
+
+        associated_group_uuids = set(learner_record.get('enterprise_group', []))
+        # if there are no policy groups, return early
+        if not PolicyGroupAssociation.objects.filter(subsidy_access_policy=self).exists():
+            return True, None
+
+        # if no association for this learner's group(s), return false
+        if not PolicyGroupAssociation.objects.filter(
+            subsidy_access_policy=self,
+            enterprise_group_uuid__in=associated_group_uuids,
+        ).exists():
+            return False, REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP
+
+        # otherwise, return true
+        return True, None
+
     def aggregates_for_policy(self):
         """
         Returns aggregate transaction data for this policy. The result is cached via ``RequestCache``
@@ -474,8 +499,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         cached_response = _cache.get_cached_response(cache_key)
         if cached_response.is_found:
             logger.info(
-                'aggregates_for_policy cache hit: subsidy %s, policy %s',
-                self.subsidy_uuid, self.uuid,
+                f'aggregates_for_policy cache hit: subsidy {self.subsidy_uuid}, policy {self.uuid}'
             )
             return cached_response.value
 
@@ -485,8 +509,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         )
         result = response_payload['aggregates']
         logger.info(
-            'aggregates_for_policy cache miss: subsidy %s, policy %s',
-            self.subsidy_uuid, self.uuid,
+            f'aggregates_for_policy cache miss: subsidy {self.subsidy_uuid}, policy {self.uuid}'
         )
         _cache.set(cache_key, result)
         return result
@@ -581,8 +604,8 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 * third a list of any transactions representing existing redemptions (any state).
         """
         logger.info(
-            '[POLICY REDEEMABILITY] Checking for policy: %s, lms_user_id: %s, content_key: %s',
-            self.uuid, lms_user_id, content_key,
+            f'[POLICY REDEEMABILITY] Checking for policy: {self.uuid},'
+            f'lms_user_id: {lms_user_id}, content_key: {content_key}'
         )
         # inactive policy
         if not self.is_redemption_enabled:
@@ -591,9 +614,16 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # learner not associated to enterprise
         if not skip_customer_user_check:
-            if self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id) is None:
+            learner_record = self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id)
+            if not learner_record:
                 self._log_redeemability(False, REASON_LEARNER_NOT_IN_ENTERPRISE, lms_user_id, content_key)
                 return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
+
+        if not skip_customer_user_check:
+            included_in_policy, reason = self.includes_learner(lms_user_id)
+            if not included_in_policy:
+                self._log_redeemability(False, reason, lms_user_id, content_key)
+                return (False, reason, [])
 
         # no content key in catalog
         if not self.catalog_contains_content_key(content_key):
@@ -676,23 +706,26 @@ class SubsidyAccessPolicy(TimeStampedModel):
         subsidy access policy. The generic checks performed include:
             * Whether the policy is active.
             * Whether the learner is associated to the enterprise.
+            * Whether the learner is associated to the policy's group.
             * Whether the subsidy is active (non-expired).
             * Whether the subsidy has remaining balance.
             * Whether the transactions associated with policy have exceeded the policy-wide spend limit.
         """
         # inactive policy
         if not self.is_redemption_enabled:
-            logger.info('[credit_available] policy %s inactive', self.uuid)
+            logger.info(f'[credit_available] policy {self.uuid} inactive', self.uuid)
             return False
 
         # learner not linked to enterprise
         if not skip_customer_user_check:
             if self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id) is None:
                 logger.info(
-                    '[credit_available] learner %s not linked to enterprise %s',
-                    lms_user_id,
-                    self.enterprise_customer_uuid
+                    f'[credit_available] learner {lms_user_id} not linked to enterprise {self.enterprise_customer_uuid}'
                 )
+                return False
+            included_in_policy, reason = self.includes_learner(lms_user_id)
+            if not included_in_policy:
+                logger.info(f'[credit_available] learner {lms_user_id} encountered error {reason}')
                 return False
 
         # verify associated subsidy is current (non-expired)
@@ -702,7 +735,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 return False
         except requests.exceptions.HTTPError as exc:
             # when associated subsidy is soft-deleted, the subsidy retrieve API raises an exception.
-            logger.info('[credit_available] SubsidyAccessPolicy.subsidy_record() raised HTTPError: %s', exc)
+            logger.info(f'[credit_available] SubsidyAccessPolicy.subsidy_record() raised HTTPError: {exc}')
             return False
 
         # verify associated subsidy has remaining balance
@@ -712,7 +745,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # verify spend against policy and configured spend limit
         if not self.has_credit_available_with_spend_limit():
-            logger.info('[credit_available] policy %s has exceeded spend limit', self.uuid)
+            logger.info(f'[credit_available] policy {self.uuid} has exceeded spend limit')
             return False
 
         return True
@@ -1162,8 +1195,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         cached_response = request_cache(namespace=REQUEST_CACHE_NAMESPACE).get_cached_response(cache_key)
         if cached_response.is_found:
             logger.info(
-                'get_assignment cache hit: policy %s lms_user_id %s content_key %s',
-                self.uuid, lms_user_id, content_key,
+                f'get_assignment cache hit: policy {self.uuid} lms_user_id {lms_user_id} content_key {content_key}',
             )
             return cached_response.value
 
@@ -1174,8 +1206,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         )
         request_cache(namespace=REQUEST_CACHE_NAMESPACE).set(cache_key, assignment)
         logger.info(
-            'get_assignment cache hit: policy %s lms_user_id %s content_key %s',
-            self.uuid, lms_user_id, content_key,
+            f'get_assignment cache hit: policy {self.uuid} lms_user_id {lms_user_id} content_key {content_key}',
         )
 
         return assignment
