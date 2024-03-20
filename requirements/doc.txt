@@ -19,7 +19,8 @@ asgiref==3.7.2
     #   -r requirements/test.txt
     #   django
     #   django-cors-headers
-astroid==3.0.3
+    #   django-simple-history
+astroid==3.1.0
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -45,7 +46,6 @@ backoff==1.10.0
 backports-zoneinfo[tzdata]==0.2.1
     # via
     #   -r requirements/test.txt
-    #   backports-zoneinfo
     #   celery
     #   django
     #   kombu
@@ -55,7 +55,7 @@ billiard==4.2.0
     # via
     #   -r requirements/test.txt
     #   celery
-cachetools==5.3.2
+cachetools==5.3.3
     # via
     #   -r requirements/test.txt
     #   tox
@@ -108,7 +108,7 @@ click-repl==0.3.0
     # via
     #   -r requirements/test.txt
     #   celery
-code-annotations==1.6.0
+code-annotations==1.7.0
     # via
     #   -r requirements/test.txt
     #   edx-lint
@@ -127,17 +127,16 @@ coreschema==0.0.4
     # via
     #   -r requirements/test.txt
     #   coreapi
-coverage[toml]==7.4.1
+coverage[toml]==7.4.4
     # via
     #   -r requirements/test.txt
-    #   coverage
     #   pytest-cov
-cryptography==42.0.2
+cryptography==42.0.5
     # via
     #   -r requirements/test.txt
     #   pyjwt
     #   social-auth-core
-ddt==1.7.1
+ddt==1.7.2
     # via -r requirements/test.txt
 defusedxml==0.8.0rc2
     # via
@@ -152,8 +151,9 @@ distlib==0.3.8
     # via
     #   -r requirements/test.txt
     #   virtualenv
-django==4.2.10
+django==4.2.11
     # via
+    #   -c requirements/common_constraints.txt
     #   -r requirements/test.txt
     #   django-celery-results
     #   django-cors-headers
@@ -191,7 +191,7 @@ django-dynamic-fixture==4.0.1
     # via -r requirements/test.txt
 django-extensions==3.2.3
     # via -r requirements/test.txt
-django-filter==23.5
+django-filter==24.1
     # via -r requirements/test.txt
 django-log-request-id==2.1.0
     # via -r requirements/test.txt
@@ -202,7 +202,7 @@ django-model-utils==4.4.0
     #   edx-rbac
 django-rest-swagger==2.2.0
     # via -r requirements/test.txt
-django-simple-history==3.4.0
+django-simple-history==3.5.0
     # via -r requirements/test.txt
 django-waffle==4.1.0
     # via
@@ -249,7 +249,7 @@ edx-celeryutils==1.2.5
     # via -r requirements/test.txt
 edx-django-release-util==1.3.0
     # via -r requirements/test.txt
-edx-django-utils==5.10.1
+edx-django-utils==5.11.0
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
@@ -267,7 +267,6 @@ edx-opaque-keys[django]==2.5.1
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
-    #   edx-opaque-keys
     #   openedx-events
 edx-rbac==1.8.0
     # via -r requirements/test.txt
@@ -281,7 +280,7 @@ exceptiongroup==1.2.0
     #   pytest
 factory-boy==3.3.0
     # via -r requirements/test.txt
-faker==23.2.0
+faker==24.2.0
     # via
     #   -r requirements/test.txt
     #   factory-boy
@@ -300,9 +299,11 @@ idna==3.6
     #   requests
 imagesize==1.4.1
     # via sphinx
-importlib-metadata==7.0.1
-    # via sphinx
-importlib-resources==6.1.1
+importlib-metadata==6.11.0
+    # via
+    #   -c requirements/common_constraints.txt
+    #   sphinx
+importlib-resources==6.3.0
     # via
     #   -r requirements/test.txt
     #   jsonschema
@@ -362,7 +363,7 @@ monotonic==1.6
     #   analytics-python
 mysqlclient==2.2.4
     # via -r requirements/test.txt
-newrelic==9.6.0
+newrelic==9.7.1
     # via
     #   -r requirements/test.txt
     #   edx-django-utils
@@ -377,9 +378,9 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==9.5.1
+openedx-events==9.5.2
     # via -r requirements/test.txt
-packaging==23.2
+packaging==24.0
     # via
     #   -r requirements/test.txt
     #   drf-yasg
@@ -440,9 +441,8 @@ pyjwt[crypto]==2.8.0
     #   edx-auth-backends
     #   edx-drf-extensions
     #   edx-rest-api-client
-    #   pyjwt
     #   social-auth-core
-pylint==3.0.3
+pylint==3.1.0
     # via
     #   -r requirements/test.txt
     #   edx-lint
@@ -476,7 +476,7 @@ pyproject-api==1.6.1
     # via
     #   -r requirements/test.txt
     #   tox
-pytest==8.0.0
+pytest==8.1.1
     # via
     #   -r requirements/test.txt
     #   pytest-cov
@@ -485,7 +485,7 @@ pytest-cov==4.1.0
     # via -r requirements/test.txt
 pytest-django==4.8.0
     # via -r requirements/test.txt
-python-dateutil==2.8.2
+python-dateutil==2.9.0.post0
     # via
     #   -r requirements/test.txt
     #   analytics-python
@@ -512,9 +512,9 @@ pyyaml==6.0.1
     #   drf-spectacular
     #   drf-yasg
     #   edx-django-release-util
-readme-renderer==42.0
+readme-renderer==43.0
     # via -r requirements/doc.in
-redis==5.0.1
+redis==5.0.3
     # via -r requirements/test.txt
 referencing==0.33.0
     # via
@@ -532,7 +532,7 @@ requests==2.31.0
     #   slumber
     #   social-auth-core
     #   sphinx
-requests-oauthlib==1.3.1
+requests-oauthlib==1.4.0
     # via
     #   -r requirements/test.txt
     #   social-auth-core
@@ -602,7 +602,7 @@ sqlparse==0.4.4
     # via
     #   -r requirements/test.txt
     #   django
-stevedore==5.1.0
+stevedore==5.2.0
     # via
     #   -r requirements/test.txt
     #   code-annotations
@@ -622,13 +622,13 @@ tomli==2.0.1
     #   pyproject-api
     #   pytest
     #   tox
-tomlkit==0.12.3
+tomlkit==0.12.4
     # via
     #   -r requirements/test.txt
     #   pylint
-tox==4.12.1
+tox==4.14.1
     # via -r requirements/test.txt
-typing-extensions==4.9.0
+typing-extensions==4.10.0
     # via
     #   -r requirements/test.txt
     #   asgiref
@@ -650,7 +650,7 @@ uritemplate==4.1.1
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.2.0
+urllib3==2.2.1
     # via
     #   -r requirements/test.txt
     #   requests
@@ -660,7 +660,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.25.0
+virtualenv==20.25.1
     # via
     #   -r requirements/test.txt
     #   tox
@@ -668,7 +668,7 @@ wcwidth==0.2.13
     # via
     #   -r requirements/test.txt
     #   prompt-toolkit
-zipp==3.17.0
+zipp==3.18.1
     # via
     #   -r requirements/test.txt
     #   importlib-metadata
