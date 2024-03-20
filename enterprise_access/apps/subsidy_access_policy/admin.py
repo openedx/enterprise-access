@@ -79,20 +79,23 @@ class BaseSubsidyAccessPolicyMixin(SimpleHistoryAdmin):
         https://daniel.feldroy.com/posts/pretty-formatting-json-django-admin
         for this styling idea.
         """
-        data = SubsidyAccessPolicyResponseSerializer(obj).data
-        json_string = json.dumps(data, indent=4, sort_keys=True)
+        try:
+            data = SubsidyAccessPolicyResponseSerializer(obj).data
+            json_string = json.dumps(data, indent=4, sort_keys=True)
 
-        # Get the Pygments formatter
-        formatter = HtmlFormatter(style='default')
+            # Get the Pygments formatter
+            formatter = HtmlFormatter(style='default')
 
-        # Highlight the data
-        response = highlight(json_string, JsonLexer(), formatter)
+            # Highlight the data
+            response = highlight(json_string, JsonLexer(), formatter)
 
-        # Get the stylesheet
-        style = "<style>" + formatter.get_style_defs() + "</style><br>"
+            # Get the stylesheet
+            style = "<style>" + formatter.get_style_defs() + "</style><br>"
 
-        # Safe the output
-        return mark_safe(style + response)
+            # Safe the output
+            return mark_safe(style + response)
+        except Exception:  # pylint: disable=broad-except
+            return ''
 
     def _short_description(self, obj):
         return Truncator(str(obj.description)).chars(255)
