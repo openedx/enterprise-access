@@ -964,6 +964,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 class CreditPolicyMixin:
     """
     Mixin class for credit type policies.
+    BB - Something in the docs about how to use this? Potentially remove?
     """
 
     @property
@@ -971,7 +972,7 @@ class CreditPolicyMixin:
         return CREDIT_POLICY_TYPE_PRIORITY
 
 
-class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
+class PerLearnerEnrollmentCreditAccessPolicy(SubsidyAccessPolicy):
     """
     Policy that limits the number of enrollments transactions for a learner in a subsidy.
 
@@ -1040,8 +1041,16 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
         existing_transaction_count = len(self.transactions_for_learner(lms_user_id)['transactions'])
         return self.per_learner_enrollment_limit - existing_transaction_count
 
+    @property
+    def priority(self):
+        """
+        Ensure that Per learner enrollment policies are evaluated before spend cap but after assignment
+        based policy types.
+        """
+        return CREDIT_POLICY_TYPE_PRIORITY + 1
 
-class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
+
+class PerLearnerSpendCreditAccessPolicy(SubsidyAccessPolicy):
     """
     Policy that limits the amount of learner spend for enrollment transactions.
 
@@ -1122,8 +1131,15 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         positive_spent_amount = spent_amount * -1
         return self.per_learner_spend_limit - positive_spent_amount
 
+    @property
+    def priority(self):
+        """
+        Ensure that Per leaner spend policies are evaluated last, after other similar policy types.
+        """
+        return CREDIT_POLICY_TYPE_PRIORITY + 2
 
-class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
+
+class AssignedLearnerCreditAccessPolicy(SubsidyAccessPolicy):
     """
     Policy based on LearnerContentAssignments, backed by a learner credit type of subsidy.
 
@@ -1458,6 +1474,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             content_price_cents,
         )
 
+<<<<<<< Updated upstream
 
 class PolicyGroupAssociation(TimeStampedModel):
     """
@@ -1486,3 +1503,11 @@ class PolicyGroupAssociation(TimeStampedModel):
         blank=True,
         help_text='The uuid that uniquely identifies the associated group.',
     )
+=======
+    @property
+    def priority(self):
+        """
+        Ensure that assignment policies are evaluated before other similar policy types
+        """
+        return CREDIT_POLICY_TYPE_PRIORITY + 0
+>>>>>>> Stashed changes
