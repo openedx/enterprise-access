@@ -11,3 +11,7 @@
 # Common constraints for edx repos
 -c common_constraints.txt
 
+# DRF 3.15.0 is providing some backwards-compatibility issues for us
+# around default model fields vs. the serializer field defs,
+# and the discontinued use of OrderedDict in serializers.
+djangorestframework<3.15
