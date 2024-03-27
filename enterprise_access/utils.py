@@ -2,6 +2,7 @@
 Utils for any app in the enterprise-access project.
 """
 import logging
+import traceback
 from datetime import datetime
 
 from django.apps import apps
@@ -47,6 +48,19 @@ def is_none(thing):
 def localized_utcnow():
     """Helper function to return localized utcnow()."""
     return datetime.now().replace(tzinfo=UTC)
+
+
+def chunks(a_list, chunk_size):
+    """
+    Helper to break a list up into chunks. Returns a generator of lists.
+    """
+    for i in range(0, len(a_list), chunk_size):
+        yield a_list[i:i + chunk_size]
+
+
+def format_traceback(exception):
+    trace = ''.join(traceback.format_tb(exception.__traceback__))
+    return f'{exception}\n{trace}'
 
 
 def _get_subsidy_expiration(assignment):
