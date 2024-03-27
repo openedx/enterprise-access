@@ -47,6 +47,8 @@ subsidy_request.HistoricalCouponCodeRequest:
   ".. no_pii:": "This model has no PII"
 subsidy_request.HistoricalSubsidyRequestCustomerConfiguration:
   ".. no_pii:": "This model has no PII"
+subsidy_access_policy.HistoricalForcedPolicyRedemption:
+  ".. no_pii:": "This model has no PII"
 subsidy_access_policy.HistoricalSubsidyAccessPolicy:
   ".. no_pii:": "This model has no PII"
 content_assignments.HistoricalAssignmentConfiguration:

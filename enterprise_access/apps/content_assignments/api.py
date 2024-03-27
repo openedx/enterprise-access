@@ -23,7 +23,7 @@ from enterprise_access.apps.content_assignments.tasks import (
 )
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
-from enterprise_access.utils import get_automatic_expiration_date_and_reason, localized_utcnow
+from enterprise_access.utils import chunks, get_automatic_expiration_date_and_reason, localized_utcnow
 
 from .constants import AssignmentAutomaticExpiredReason, LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
@@ -32,7 +32,6 @@ from .tasks import (
     send_assignment_automatically_expired_email,
     send_email_for_new_assignment
 )
-from .utils import chunks
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +145,7 @@ def get_assignments_for_admin(
 
 def _normalize_course_key_from_metadata(assignment_configuration, content_key):
     """
-    Helper method to take a course run key and normalize it into a coourse key
+    Helper method to take a course run key and normalize it into a course key
     utilizing the enterprise subsidy content metadata summary endpoint.
     """
 

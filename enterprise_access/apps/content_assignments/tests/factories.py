@@ -7,20 +7,11 @@ from uuid import uuid4
 import factory
 from faker import Faker
 
+from test_utils import random_content_key
+
 from ..models import AssignmentConfiguration, LearnerContentAssignment
 
 FAKER = Faker()
-
-
-def random_content_key():
-    """
-    Helper to craft a random content key.
-    """
-    fake_words = [
-        FAKER.word() + str(FAKER.random_int())
-        for _ in range(3)
-    ]
-    return 'course-v1:{}+{}+{}'.format(*fake_words)
 
 
 class AssignmentConfigurationFactory(factory.django.DjangoModelFactory):

@@ -16,6 +16,8 @@ from pytz import UTC
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_create_with_history, bulk_update_with_history
 
+from enterprise_access.utils import format_traceback
+
 from .constants import (
     NUM_DAYS_BEFORE_AUTO_EXPIRATION,
     RETIRED_EMAIL_ADDRESS,
@@ -25,7 +27,6 @@ from .constants import (
     AssignmentRecentActionTypes,
     LearnerContentAssignmentStateChoices
 )
-from .utils import format_traceback
 
 logger = logging.getLogger(__name__)
 
