@@ -337,3 +337,42 @@ class PolicyGroupAssociationAdmin(admin.ModelAdmin):
         'subsidy_access_policy',
         'enterprise_group_uuid',
     )
+
+
+@admin.register(models.SubsidyAccessPolicy)
+class SubsidAccessPolicyAdmin(admin.ModelAdmin):
+    """
+    We need this not-particularly-useful admin class
+    to let the ForcedPolicyRedemptionAdmin class refer
+    to subsidy access policies, of all types, via its
+    ``autocomplete_fields``.
+    It's hidden from the admin index page.
+    """
+    fields = []
+    search_fields = [
+        'uuid',
+        'display_name',
+    ]
+
+    def has_module_permission(self, request):
+        """
+        Hide this view from the admin index page.
+        """
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        """
+        For good measure, declare no change permissions on this admin class.
+        """
+        return False
+
+
+@admin.register(models.ForcedPolicyRedemption)
+class ForcedPolicyRedemptionAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
+    autocomplete_fields = [
+        'subsidy_access_policy',
+    ]
+    readonly_fields = [
+        'redeemed_at',
+        'errored_at',
+    ]

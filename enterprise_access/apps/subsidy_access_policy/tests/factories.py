@@ -10,10 +10,12 @@ from faker import Faker
 from enterprise_access.apps.subsidy_access_policy.constants import AccessMethods
 from enterprise_access.apps.subsidy_access_policy.models import (
     AssignedLearnerCreditAccessPolicy,
+    ForcedPolicyRedemption,
     PerLearnerEnrollmentCreditAccessPolicy,
     PerLearnerSpendCreditAccessPolicy,
     PolicyGroupAssociation
 )
+from test_utils import random_content_key
 
 FAKER = Faker()
 
@@ -77,3 +79,15 @@ class PolicyGroupAssociationFactory(factory.django.DjangoModelFactory):
 
     enterprise_group_uuid = factory.LazyFunction(uuid4)
     subsidy_access_policy = factory.SubFactory(SubsidyAccessPolicyFactory)
+
+
+class ForcedPolicyRedemptionFactory(factory.django.DjangoModelFactory):
+    """
+    Test factory for ForcedPolicyRedemptions.
+    """
+    class Meta:
+        model = ForcedPolicyRedemption
+
+    lms_user_id = factory.LazyAttribute(lambda _: FAKER.pyint(min_value=1))
+    course_run_key = factory.LazyAttribute(lambda _: random_content_key())
+    content_price_cents = factory.LazyAttribute(lambda _: FAKER.pytint(min_value=1, max_value=1000))

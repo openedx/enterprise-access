@@ -17,6 +17,7 @@ from django.test import TestCase
 from django.test.client import RequestFactory
 from edx_rest_framework_extensions.auth.jwt.cookies import jwt_cookie_name
 from edx_rest_framework_extensions.auth.jwt.tests.utils import generate_jwt_token, generate_unversioned_payload
+from faker import Faker
 from pytest import mark
 from rest_framework.test import APIClient, APITestCase
 
@@ -62,6 +63,19 @@ TEST_USER_RECORD = {
 
 TEST_USER_RECORD_NO_GROUPS = copy.deepcopy(TEST_USER_RECORD)
 TEST_USER_RECORD_NO_GROUPS['enterprise_group'] = []
+
+FAKER = Faker()
+
+
+def random_content_key():
+    """
+    Helper to craft a random content key.
+    """
+    fake_words = [
+        FAKER.word() + str(FAKER.random_int())
+        for _ in range(3)
+    ]
+    return 'course-v1:{}+{}+{}'.format(*fake_words)
 
 
 @mark.django_db
