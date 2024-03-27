@@ -178,3 +178,19 @@ Accepted January 2024, this ADR describes an approach to retiring
 policies. Retired policies are no longer usable by learners for redemption,
 but are still visible to enterprise administrators for historical reporting
 purposes.
+
+`<0018-access-policy-grouping.rst>`_
+********************************
+*Feature: Subsidy Access Policy and Groups (Learner Credit)*
+
+Accepted February 2024, this ADR describes an approach to associating
+learner-group membership within an Enterprise Customer with
+Subsidy Access Policy records.
+
+`<0019-forced-redemption.rst>`_
+********************************
+*Feature: Subsidy Access Policy Redemption*
+
+Accepted April 2024, this ADR describes a new ``ForcedPolicyRedemption``
+model and Django admin view for forcing redemption via a learner
+credit Subsidy Access Policy.
