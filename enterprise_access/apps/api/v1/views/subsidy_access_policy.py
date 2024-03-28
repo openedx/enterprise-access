@@ -58,6 +58,7 @@ from enterprise_access.apps.subsidy_access_policy.models import (
 )
 from enterprise_access.apps.subsidy_access_policy.subsidy_api import get_redemptions_by_content_and_policy_for_learner
 
+from enterprise_access.apps.api.tasks import send_group_membership_invitation_notification
 from .utils import PaginationWithPageCount
 
 logger = logging.getLogger(__name__)
@@ -333,6 +334,17 @@ class SubsidyAccessPolicyViewSet(
         response_serializer = serializers.SubsidyAccessPolicyResponseSerializer(policy_to_soft_delete)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
+    @permission_required(SUBSIDY_ACCESS_POLICY_READ_PERMISSION, fn=policy_permission_detail_fn)
+    def send_group_invitation(self, request, *args, uuid=None, **kwargs):
+        """
+        Send braze reminder emails to pending learners who have not accepted invitation
+        to a group membership.
+
+        """
+        enterprise_customer = request.data.get('enterprise_customer')
+        membership = request.data.get('enterprise_group_membership')
+
+        send_group_membership_invitation_notification.delay(enterprise_customer, membership)   
 
 class RedemptionRequestException(APIException):
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
