@@ -20,6 +20,7 @@ class LmsApiClient(BaseOAuthClient):
     enterprise_learner_endpoint = enterprise_api_base_url + 'enterprise-learner/'
     enterprise_customer_endpoint = enterprise_api_base_url + 'enterprise-customer/'
     pending_enterprise_learner_endpoint = enterprise_api_base_url + 'pending-enterprise-learner/'
+    enterprise_group_membership = enterprise_api_base_url + 'enterprise-group/'
 
     def get_enterprise_customer_data(self, enterprise_customer_uuid):
         """
@@ -195,3 +196,8 @@ class LmsApiClient(BaseOAuthClient):
                 response.text,
             )
             raise exc
+
+    def get_enterprise_group_memberships(self):
+        """
+        Gets all enterprise group memberships
+        """
