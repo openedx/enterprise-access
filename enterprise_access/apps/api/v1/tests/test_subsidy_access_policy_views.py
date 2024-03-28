@@ -305,6 +305,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             },
             'assignment_configuration': None,
             'group_associations': [str(enterprise_group_uuid)],
+            'late_redemption_allowed_until': None,
+            'is_late_redemption_allowed': False,
         }, response.json())
 
     @ddt.data(
@@ -398,6 +400,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 },
                 'assignment_configuration': None,
                 'group_associations': [],
+                'late_redemption_allowed_until': None,
+                'is_late_redemption_allowed': False,
             },
             {
                 'access_method': 'direct',
@@ -426,6 +430,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 },
                 'assignment_configuration': None,
                 'group_associations': [],
+                'late_redemption_allowed_until': None,
+                'is_late_redemption_allowed': False,
             },
         ]
 
@@ -521,6 +527,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             },
             'assignment_configuration': None,
             'group_associations': [],
+            'late_redemption_allowed_until': None,
+            'is_late_redemption_allowed': False,
         }
         self.assertEqual(expected_response, response.json())
 
@@ -615,6 +623,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'per_learner_enrollment_limit': policy_for_edit.per_learner_enrollment_limit,
             'spend_limit': policy_for_edit.spend_limit,
             'subsidy_uuid': str(policy_for_edit.subsidy_uuid),
+            'late_redemption_allowed_until': None,
 
             # All the rest of the fields that we do not support PATCHing.
             'uuid': str(policy_for_edit.uuid),
@@ -633,6 +642,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             },
             'assignment_configuration': None,
             'group_associations': [],
+            'is_late_redemption_allowed': False,
         }
         expected_response.update(request_payload)
         self.assertEqual(expected_response, response.json())
@@ -852,6 +862,8 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             expected_response = payload.copy()
             expected_response.setdefault("per_learner_enrollment_limit")
             expected_response.setdefault("per_learner_spend_limit")
+            expected_response["late_redemption_allowed_until"] = None
+            expected_response["is_late_redemption_allowed"] = False
             assert response_json == expected_response
         elif expected_response_code == status.HTTP_400_BAD_REQUEST:
             for expected_error_keyword in expected_error_keywords:
@@ -909,6 +921,8 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             expected_response = payload.copy()
             expected_response.setdefault("per_learner_enrollment_limit")
             expected_response.setdefault("per_learner_spend_limit")
+            expected_response["late_redemption_allowed_until"] = None
+            expected_response["is_late_redemption_allowed"] = False
             assert response_json == expected_response
 
         # Test idempotency
@@ -923,6 +937,8 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             expected_response = payload.copy()
             expected_response.setdefault("per_learner_enrollment_limit")
             expected_response.setdefault("per_learner_spend_limit")
+            expected_response["late_redemption_allowed_until"] = None
+            expected_response["is_late_redemption_allowed"] = False
             assert response_json == expected_response
 
 

@@ -200,6 +200,8 @@ django-model-utils==4.4.0
     #   -r requirements/test.txt
     #   edx-celeryutils
     #   edx-rbac
+django-object-actions==4.2.0
+    # via -r requirements/test.txt
 django-rest-swagger==2.2.0
     # via -r requirements/test.txt
 django-simple-history==3.5.0
