@@ -224,7 +224,7 @@ django-extensions==3.2.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-django-filter==24.1
+django-filter==24.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -368,6 +368,10 @@ filelock==3.13.3
     #   -r requirements/test.txt
     #   tox
     #   virtualenv
+freezegun==1.4.0
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
 idna==3.6
     # via
     #   -r requirements/quality.txt
@@ -447,7 +451,7 @@ keyring==25.0.0
     # via
     #   -r requirements/quality.txt
     #   twine
-kombu==5.3.5
+kombu==5.3.6
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -484,7 +488,7 @@ mysqlclient==2.2.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-newrelic==9.7.1
+newrelic==9.8.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -646,6 +650,7 @@ python-dateutil==2.9.0.post0
     #   analytics-python
     #   celery
     #   faker
+    #   freezegun
 python-slugify==8.0.4
     # via
     #   -r requirements/quality.txt
