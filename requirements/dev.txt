@@ -45,7 +45,7 @@ billiard==4.2.0
     # via
     #   -r requirements/validation.txt
     #   celery
-build==1.1.1
+build==1.2.1
     # via
     #   -r requirements/pip-tools.txt
     #   pip-tools
@@ -193,7 +193,7 @@ django-dynamic-fixture==4.0.1
     # via -r requirements/validation.txt
 django-extensions==3.2.3
     # via -r requirements/validation.txt
-django-filter==24.1
+django-filter==24.2
     # via -r requirements/validation.txt
 django-log-request-id==2.1.0
     # via -r requirements/validation.txt
@@ -294,6 +294,8 @@ filelock==3.13.3
     #   -r requirements/validation.txt
     #   tox
     #   virtualenv
+freezegun==1.4.0
+    # via -r requirements/validation.txt
 idna==3.6
     # via
     #   -r requirements/validation.txt
@@ -364,7 +366,7 @@ keyring==25.0.0
     # via
     #   -r requirements/validation.txt
     #   twine
-kombu==5.3.5
+kombu==5.3.6
     # via
     #   -r requirements/validation.txt
     #   celery
@@ -397,7 +399,7 @@ more-itertools==10.2.0
     #   jaraco-functools
 mysqlclient==2.2.4
     # via -r requirements/validation.txt
-newrelic==9.7.1
+newrelic==9.8.0
     # via
     #   -r requirements/validation.txt
     #   edx-django-utils
@@ -543,6 +545,7 @@ python-dateutil==2.9.0.post0
     #   analytics-python
     #   celery
     #   faker
+    #   freezegun
 python-slugify==8.0.4
     # via
     #   -r requirements/validation.txt

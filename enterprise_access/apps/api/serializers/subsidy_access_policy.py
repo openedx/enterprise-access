@@ -533,6 +533,9 @@ class SubsidyAccessPolicyRedeemableResponseSerializer(serializers.ModelSerialize
     """
 
     policy_redemption_url = serializers.SerializerMethodField()
+    is_late_redemption_allowed = serializers.BooleanField(
+        help_text="True if late redemption is currently allowed (i.e. late_redemption_allowed_until is in the future)."
+    )
 
     class Meta:
         model = SubsidyAccessPolicy

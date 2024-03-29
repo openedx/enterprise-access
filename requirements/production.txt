@@ -136,7 +136,7 @@ django-crum==0.7.9
     #   edx-rbac
 django-extensions==3.2.3
     # via -r requirements/base.txt
-django-filter==24.1
+django-filter==24.2
     # via -r requirements/base.txt
 django-log-request-id==2.1.0
     # via -r requirements/base.txt
@@ -256,7 +256,7 @@ jsonschema-specifications==2023.12.1
     # via
     #   -r requirements/base.txt
     #   jsonschema
-kombu==5.3.5
+kombu==5.3.6
     # via
     #   -r requirements/base.txt
     #   celery
@@ -272,7 +272,7 @@ mysqlclient==2.2.4
     # via
     #   -r requirements/base.txt
     #   -r requirements/production.in
-newrelic==9.7.1
+newrelic==9.8.0
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
