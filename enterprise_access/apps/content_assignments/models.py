@@ -340,6 +340,11 @@ class LearnerContentAssignment(TimeStampedModel):
         blank=True,
         help_text="The last time this assignment was in an error state. Null means the assignment is not errored.",
     )
+    reversed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="The last time this assignment was reversed. Null means the assignment is not reversed.",
+    )
     transaction_uuid = models.UUIDField(
         blank=True,
         null=True,

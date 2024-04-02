@@ -12,6 +12,7 @@ class LearnerContentAssignmentStateChoices:
     CANCELLED = 'cancelled'
     ERRORED = 'errored'
     EXPIRED = 'expired'
+    REVERSED = 'reversed'
 
     CHOICES = (
         (ALLOCATED, 'Allocated'),
@@ -22,7 +23,7 @@ class LearnerContentAssignmentStateChoices:
     )
 
     # States which allow reallocation by an admin.
-    REALLOCATE_STATES = (CANCELLED, ERRORED, EXPIRED)
+    REALLOCATE_STATES = (CANCELLED, ERRORED, EXPIRED, REVERSED)
 
     # States which allow cancellation by an admin.
     CANCELABLE_STATES = (ALLOCATED, ERRORED)
@@ -32,6 +33,9 @@ class LearnerContentAssignmentStateChoices:
 
     # States from which an assignment can be expired
     EXPIRABLE_STATES = (ALLOCATED,)
+
+    # States from which an assignment can be reversed
+    REVERSIBLE_STATES = (ALLOCATED,)
 
 
 class AssignmentActions:
