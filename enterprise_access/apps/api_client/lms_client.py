@@ -197,7 +197,49 @@ class LmsApiClient(BaseOAuthClient):
             )
             raise exc
 
-    def get_enterprise_group_memberships(self):
+    def get_enterprise_group_memberships(self, enterprise_group_uuid):
         """
         Gets all enterprise group memberships
+
+        Arguments:
+            enterprise_group_uuid (str): uuid of the enterprise group uuid
+
+        Returns:
+            A list of dicts in the form of:
+                {
+                    'learner_id': integer,
+                    'pending_learner_id': integer,
+                    'enterprise_group_membership_uuid': UUID,
+                    'member_details': {
+                      'user_email': string,
+                      'user_name': string  ,
+                    },
+                    'recent_action': string,
+                    'member_status': string,
+                    'enterprise_customer': EnterpriseCustomerUser,
+                }
         """
+        try:
+            url = f'{self.enterprise_group_membership}{enterprise_group_uuid}/learners/?pending_users_only=true'            
+            results = []
+
+            while url:
+                response = self.client.get(url, timeout=settings.LMS_CLIENT_TIMEOUT)
+                response.raise_for_status()
+                resp_json = response.json()
+                url = resp_json['next']
+
+                for result in resp_json['results']:
+                    pending_membership = result['pending_learner_id']
+                    recent_action = result['recent_action']
+                    enterprise_customer_name = result['enterprise_customer']['name']
+                    results.append({
+                        pending_membership,
+                        recent_action,
+                        enterprise_customer_name,
+                    })
+            return results
+        except requests.exceptions.HTTPError:
+            logger.exception('Failed to fetch data from LMS. URL: [%s].', url)
+        except KeyError:
+            logger.exception('Incorrect data received from LMS. [%s]', url)
