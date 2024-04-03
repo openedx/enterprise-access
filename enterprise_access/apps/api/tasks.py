@@ -1,15 +1,13 @@
 """
 Celery tasks for Enterprise Access API.
 """
-from datetime import datetime, timedelta
 import logging
 
 from celery import shared_task
 from django.conf import settings
 
-from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
 from enterprise_access.apps.api.serializers import CouponCodeRequestSerializer, LicenseRequestSerializer
-from enterprise_access.apps.api_client.braze_client import BrazeApiClient, ENTERPRISE_BRAZE_ALIAS_LABEL
+from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
@@ -23,7 +21,6 @@ from enterprise_access.apps.subsidy_request.constants import (
     SubsidyTypeChoices
 )
 from enterprise_access.apps.subsidy_request.models import CouponCodeRequest, LicenseRequest
-from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.track.segment import track_event
 from enterprise_access.tasks import LoggedTaskWithRetry
 from enterprise_access.utils import get_subsidy_model
@@ -336,4 +333,3 @@ def unlink_users_from_enterprise_task(enterprise_customer_uuid, lms_user_ids):
             user_emails=user_emails,
             is_relinkable=False
         )
-

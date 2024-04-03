@@ -332,7 +332,7 @@ class SubsidyAccessPolicyViewSet(
 
         response_serializer = serializers.SubsidyAccessPolicyResponseSerializer(policy_to_soft_delete)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
-  
+
 
 class RedemptionRequestException(APIException):
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
