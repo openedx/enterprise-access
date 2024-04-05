@@ -1583,6 +1583,8 @@ class ForcedPolicyRedemption(TimeStampedModel):
     )
     transaction_uuid = models.UUIDField(
         null=True,
+        blank=True,
+        editable=False,
         db_index=True,
         help_text=(
             "The transaction uuid caused by successful redemption.",
@@ -1592,8 +1594,9 @@ class ForcedPolicyRedemption(TimeStampedModel):
 
     def __str__(self):
         return (
-            f'policy_uuid={self.subsidy_access_policy.uuid}, transaction_uuid={self.transaction_uuid}, '
-            f'lms_user_id={self.lms_user_id}, course_run_key={self.course_run_key}'
+            f'<{self.__class__.__name__} policy_uuid={self.subsidy_access_policy.uuid}, '
+            f'transaction_uuid={self.transaction_uuid}, '
+            f'lms_user_id={self.lms_user_id}, course_run_key={self.course_run_key}>'
         )
 
     def create_assignment(self):
@@ -1609,7 +1612,7 @@ class ForcedPolicyRedemption(TimeStampedModel):
         course_key = content_metadata.get('content_key')
         user_record = User.objects.filter(lms_user_id=self.lms_user_id).first()
         if not user_record:
-            raise Exception(f'No email for {self.lms_user_id}')
+            raise Exception(f'No email could be found for lms_user_id {self.lms_user_id}')
 
         return assignments_api.allocate_assignments(
             assignment_configuration,
@@ -1631,7 +1634,7 @@ class ForcedPolicyRedemption(TimeStampedModel):
 
         try:
             with self.subsidy_access_policy.lock():
-                can_redeem, _, existing_transactions = self.subsidy_access_policy.can_redeem(
+                can_redeem, reason, existing_transactions = self.subsidy_access_policy.can_redeem(
                     self.lms_user_id, self.course_run_key,
                 )
                 if can_redeem:
@@ -1643,6 +1646,8 @@ class ForcedPolicyRedemption(TimeStampedModel):
                     self.transaction_uuid = result['uuid']
                     self.redeemed_at = result['modified']
                     self.save()
+                else:
+                    raise Exception(f'Failed forced redemption: {reason}')
         except SubsidyAccessPolicyLockAttemptFailed as exc:
             logger.exception(exc)
             self.errored_at = localized_utcnow()

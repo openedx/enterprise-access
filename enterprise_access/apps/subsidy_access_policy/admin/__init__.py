@@ -3,11 +3,12 @@ import json
 import logging
 
 from django.conf import settings
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.http import HttpResponseRedirect
 from django.urls import re_path, reverse
 from django.utils.safestring import mark_safe
 from django.utils.text import Truncator  # for shortening a text
+from django.utils.translation import gettext_lazy
 from django_object_actions import DjangoObjectActions, action
 from djangoql.admin import DjangoQLSearchMixin
 from pygments import highlight
@@ -369,10 +370,44 @@ class SubsidAccessPolicyAdmin(admin.ModelAdmin):
 
 @admin.register(models.ForcedPolicyRedemption)
 class ForcedPolicyRedemptionAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
+    """
+    Admin class for the forced redemption model/logic.
+    """
     autocomplete_fields = [
         'subsidy_access_policy',
     ]
     readonly_fields = [
         'redeemed_at',
         'errored_at',
+        'transaction_uuid',
+        'traceback',
     ]
+
+    def save_model(self, request, obj, form, change):
+        """
+        If this record has not been successfully redeemed yet,
+        and if ``wait_to_redeem`` is false, then call ``force_redeem()`` on
+        the record.
+        """
+        super().save_model(request, obj, form, change)
+        obj.refresh_from_db()
+
+        if obj.transaction_uuid:
+            message = gettext_lazy("{} has already been redeemed".format(obj))
+            self.message_user(request, message, messages.SUCCESS)
+            return
+
+        if obj.wait_to_redeem:
+            message = gettext_lazy(
+                "{} has wait_to_redeem set to true, redemption will not occur "
+                "until this is changed to false".format(obj)
+            )
+            self.message_user(request, message, messages.WARNING)
+            return
+
+        try:
+            obj.force_redeem()
+        except Exception as exc:  # pylint: disable=broad-except
+            message = gettext_lazy("{} Failure reason: {}".format(obj, exc))
+            self.message_user(request, message, messages.ERROR)
+            logger.exception('Force redemption failed for %s', obj)
