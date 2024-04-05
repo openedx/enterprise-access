@@ -43,8 +43,9 @@ backoff==1.10.0
     # via
     #   -r requirements/test.txt
     #   analytics-python
-backports-zoneinfo[tzdata]==0.2.1
+backports-zoneinfo[tzdata]==0.2.1 ; python_version < "3.9"
     # via
+    #   -c requirements/constraints.txt
     #   -r requirements/test.txt
     #   celery
     #   django
@@ -59,7 +60,7 @@ cachetools==5.3.3
     # via
     #   -r requirements/test.txt
     #   tox
-celery==5.3.6
+celery==5.4.0
     # via
     #   -r requirements/test.txt
     #   django-celery-results
@@ -266,24 +267,24 @@ edx-enterprise-subsidy-client==0.4.2
     # via -r requirements/test.txt
 edx-lint==5.3.6
     # via -r requirements/test.txt
-edx-opaque-keys[django]==2.5.1
+edx-opaque-keys[django]==2.8.0
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
     #   openedx-events
-edx-rbac==1.8.0
+edx-rbac==1.9.0
     # via -r requirements/test.txt
 edx-rest-api-client==5.7.0
     # via
     #   -r requirements/test.txt
     #   edx-enterprise-subsidy-client
-exceptiongroup==1.2.0
+exceptiongroup==1.2.1
     # via
     #   -r requirements/test.txt
     #   pytest
 factory-boy==3.3.0
     # via -r requirements/test.txt
-faker==24.9.0
+faker==24.11.0
     # via
     #   -r requirements/test.txt
     #   factory-boy
@@ -368,7 +369,7 @@ monotonic==1.6
     #   analytics-python
 mysqlclient==2.2.4
     # via -r requirements/test.txt
-newrelic==9.8.0
+newrelic==9.9.0
     # via
     #   -r requirements/test.txt
     #   edx-django-utils
@@ -383,7 +384,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==9.9.1
+openedx-events==9.9.2
     # via -r requirements/test.txt
 packaging==24.0
     # via
@@ -408,7 +409,7 @@ platformdirs==4.2.0
     #   pylint
     #   tox
     #   virtualenv
-pluggy==1.4.0
+pluggy==1.5.0
     # via
     #   -r requirements/test.txt
     #   pytest
@@ -666,7 +667,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.25.1
+virtualenv==20.25.3
     # via
     #   -r requirements/test.txt
     #   tox
@@ -679,3 +680,6 @@ zipp==3.18.1
     #   -r requirements/test.txt
     #   importlib-metadata
     #   importlib-resources
+
+# The following packages are considered to be unsafe in a requirements file:
+# setuptools
