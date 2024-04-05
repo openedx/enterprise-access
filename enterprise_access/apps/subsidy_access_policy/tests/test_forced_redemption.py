@@ -10,6 +10,7 @@ from django.utils import timezone
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
 from enterprise_access.apps.content_assignments.tests.factories import AssignmentConfigurationFactory
 from enterprise_access.apps.core.tests.factories import UserFactory
+from enterprise_access.apps.subsidy_access_policy.constants import FORCE_ENROLLMENT_KEYWORD
 from enterprise_access.apps.subsidy_access_policy.exceptions import (
     SubsidyAccessPolicyLockAttemptFailed,
     SubsidyAPIHTTPError
@@ -110,6 +111,15 @@ class ForcedPolicyRedemptionPerLearnerSpendTests(BaseForcedRedemptionTestCase):
         forced_redemption_record.refresh_from_db()
         self.assertEqual(MOCK_DATETIME_1, forced_redemption_record.redeemed_at)
         self.assertEqual(MOCK_TRANSACTION_UUID_1, forced_redemption_record.transaction_uuid)
+
+        self.mock_subsidy_client.create_subsidy_transaction.assert_called_once_with(
+            subsidy_uuid=str(policy.subsidy_uuid),
+            lms_user_id=self.lms_user_id,
+            content_key=self.course_run_key,
+            subsidy_access_policy_uuid=str(policy.uuid),
+            metadata={FORCE_ENROLLMENT_KEYWORD: True},
+            idempotency_key=mock.ANY,
+        )
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.localized_utcnow', return_value=MOCK_DATETIME_1)
     def test_acquire_lock_fails(self, _):
@@ -231,6 +241,16 @@ class ForcedPolicyRedemptionAssignmentTests(BaseForcedRedemptionTestCase):
         forced_redemption_record.refresh_from_db()
         self.assertEqual(MOCK_DATETIME_1, forced_redemption_record.redeemed_at)
         self.assertEqual(MOCK_TRANSACTION_UUID_1, forced_redemption_record.transaction_uuid)
+
+        self.mock_subsidy_client.create_subsidy_transaction.assert_called_once_with(
+            subsidy_uuid=str(policy.subsidy_uuid),
+            lms_user_id=self.lms_user_id,
+            content_key=self.course_run_key,
+            subsidy_access_policy_uuid=str(policy.uuid),
+            metadata={FORCE_ENROLLMENT_KEYWORD: True},
+            idempotency_key=mock.ANY,
+            requested_price_cents=self.default_content_price,
+        )
 
         assignment = LearnerContentAssignment.objects.filter(lms_user_id=user.lms_user_id).first()
         mock_send_email.delay.assert_called_once_with(assignment.uuid)

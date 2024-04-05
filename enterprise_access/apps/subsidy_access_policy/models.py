@@ -25,6 +25,7 @@ from enterprise_access.utils import format_traceback, is_none, is_not_none, loca
 from ..content_assignments.models import AssignmentConfiguration
 from .constants import (
     CREDIT_POLICY_TYPE_PRIORITY,
+    FORCE_ENROLLMENT_KEYWORD,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_FAILED,
@@ -1642,6 +1643,9 @@ class ForcedPolicyRedemption(TimeStampedModel):
                         self.lms_user_id,
                         self.course_run_key,
                         existing_transactions,
+                        metadata={
+                            FORCE_ENROLLMENT_KEYWORD: True,
+                        },
                     )
                     self.transaction_uuid = result['uuid']
                     self.redeemed_at = result['modified']
