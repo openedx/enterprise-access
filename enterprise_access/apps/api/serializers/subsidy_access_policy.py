@@ -176,11 +176,13 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
             'aggregates',
             'assignment_configuration',
             'group_associations',
+            'late_redemption_allowed_until',
+            'is_late_redemption_allowed',
         ]
         read_only_fields = fields
 
     def get_group_associations(self, obj):
-        return obj.groups.values_list("enterprise_group_uuid", flat=True)
+        return list(obj.groups.values_list("enterprise_group_uuid", flat=True))
 
 
 class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
@@ -213,8 +215,10 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
             'subsidy_expiration_datetime',
             'is_subsidy_active',
             'group_associations',
+            'late_redemption_allowed_until',
+            'is_late_redemption_allowed',
         ]
-        read_only_fields = ['uuid']
+        read_only_fields = ['uuid', 'is_late_redemption_allowed']
         extra_kwargs = {
             'uuid': {'read_only': True},
             'display_name': {
@@ -265,6 +269,10 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
                 'allow_null': True,
                 'required': False,
             },
+            'late_redemption_allowed_until': {
+                'allow_null': True,
+                'required': False,
+            },
         }
 
     @property
@@ -275,7 +283,7 @@ class SubsidyAccessPolicyCRUDSerializer(serializers.ModelSerializer):
         return self.context['view']
 
     def get_group_associations(self, obj):
-        return obj.groups.values_list("enterprise_group_uuid", flat=True)
+        return list(obj.groups.values_list("enterprise_group_uuid", flat=True))
 
     def create(self, validated_data):
         policy_type = validated_data.get('policy_type')
@@ -417,6 +425,7 @@ class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
             'subsidy_active_datetime',
             'subsidy_expiration_datetime',
             'is_subsidy_active',
+            'late_redemption_allowed_until',
         )
         extra_kwargs = {
             'display_name': {
@@ -475,6 +484,10 @@ class SubsidyAccessPolicyUpdateRequestSerializer(serializers.ModelSerializer):
                 'allow_null': True,
                 'required': False,
             },
+            'late_redemption_allowed_until': {
+                'allow_null': True,
+                'required': False,
+            },
         }
 
     def validate(self, attrs):
@@ -520,6 +533,9 @@ class SubsidyAccessPolicyRedeemableResponseSerializer(serializers.ModelSerialize
     """
 
     policy_redemption_url = serializers.SerializerMethodField()
+    is_late_redemption_allowed = serializers.BooleanField(
+        help_text="True if late redemption is currently allowed (i.e. late_redemption_allowed_until is in the future)."
+    )
 
     class Meta:
         model = SubsidyAccessPolicy

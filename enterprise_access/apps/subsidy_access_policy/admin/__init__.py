@@ -3,9 +3,13 @@ import json
 import logging
 
 from django.conf import settings
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.http import HttpResponseRedirect
+from django.urls import re_path, reverse
 from django.utils.safestring import mark_safe
 from django.utils.text import Truncator  # for shortening a text
+from django.utils.translation import gettext_lazy
+from django_object_actions import DjangoObjectActions, action
 from djangoql.admin import DjangoQLSearchMixin
 from pygments import highlight
 from pygments.formatters import HtmlFormatter  # pylint: disable=no-name-in-module
@@ -14,6 +18,8 @@ from simple_history.admin import SimpleHistoryAdmin
 
 from enterprise_access.apps.api.serializers.subsidy_access_policy import SubsidyAccessPolicyResponseSerializer
 from enterprise_access.apps.subsidy_access_policy import constants, models
+from enterprise_access.apps.subsidy_access_policy.admin.utils import UrlNames
+from enterprise_access.apps.subsidy_access_policy.admin.views import SubsidyAccessPolicySetLateRedemptionView
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +46,7 @@ def cents_to_usd_string(cents):
     return "${:,.2f}".format(float(cents) / constants.CENTS_PER_DOLLAR)
 
 
-class BaseSubsidyAccessPolicyMixin(SimpleHistoryAdmin):
+class BaseSubsidyAccessPolicyMixin(DjangoObjectActions, SimpleHistoryAdmin):
     """
     Mixin for common admin properties on subsidy access policy models.
     """
@@ -68,8 +74,39 @@ class BaseSubsidyAccessPolicyMixin(SimpleHistoryAdmin):
         'created',
         'modified',
         'policy_spend_limit_dollars',
+        'late_redemption_allowed_until',
+        'is_late_redemption_allowed',
         'api_serialized_repr',
     )
+
+    change_actions = (
+        'set_late_redemption',
+    )
+
+    @action(
+        label='Set Late Redemption',
+        description='Enable/disable the "late redemption" feature for this policy'
+    )
+    def set_late_redemption(self, request, obj):
+        """
+        Object tool handler method - redirects to set_late_redemption view.
+        """
+        # url names coming from get_urls are prefixed with 'admin' namespace
+        set_late_redemption_url = reverse('admin:' + UrlNames.SET_LATE_REDEMPTION, args=(obj.uuid,))
+        return HttpResponseRedirect(set_late_redemption_url)
+
+    def get_urls(self):
+        """
+        Returns the additional urls used by the custom object tools.
+        """
+        additional_urls = [
+            re_path(
+                r"^([^/]+)/set_late_redemption",
+                self.admin_site.admin_view(SubsidyAccessPolicySetLateRedemptionView.as_view()),
+                name=UrlNames.SET_LATE_REDEMPTION,
+            ),
+        ]
+        return additional_urls + super().get_urls()
 
     @admin.display(description='REST API serialization')
     def api_serialized_repr(self, obj):
@@ -79,20 +116,23 @@ class BaseSubsidyAccessPolicyMixin(SimpleHistoryAdmin):
         https://daniel.feldroy.com/posts/pretty-formatting-json-django-admin
         for this styling idea.
         """
-        data = SubsidyAccessPolicyResponseSerializer(obj).data
-        json_string = json.dumps(data, indent=4, sort_keys=True)
+        try:
+            data = SubsidyAccessPolicyResponseSerializer(obj).data
+            json_string = json.dumps(data, indent=4, sort_keys=True)
 
-        # Get the Pygments formatter
-        formatter = HtmlFormatter(style='default')
+            # Get the Pygments formatter
+            formatter = HtmlFormatter(style='default')
 
-        # Highlight the data
-        response = highlight(json_string, JsonLexer(), formatter)
+            # Highlight the data
+            response = highlight(json_string, JsonLexer(), formatter)
 
-        # Get the stylesheet
-        style = "<style>" + formatter.get_style_defs() + "</style><br>"
+            # Get the stylesheet
+            style = "<style>" + formatter.get_style_defs() + "</style><br>"
 
-        # Safe the output
-        return mark_safe(style + response)
+            # Safe the output
+            return mark_safe(style + response)
+        except Exception:  # pylint: disable=broad-except
+            return ''
 
     def _short_description(self, obj):
         return Truncator(str(obj.description)).chars(255)
@@ -154,6 +194,7 @@ class PerLearnerEnrollmentCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcc
                     'retired',
                     'catalog_uuid',
                     'subsidy_uuid',
+                    'late_redemption_allowed_until',
                     'created',
                     'modified',
                 ]
@@ -206,6 +247,7 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
                     'retired',
                     'catalog_uuid',
                     'subsidy_uuid',
+                    'late_redemption_allowed_until',
                     'created',
                     'modified',
                 ]
@@ -263,6 +305,7 @@ class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcces
                     'retired',
                     'catalog_uuid',
                     'subsidy_uuid',
+                    'late_redemption_allowed_until',
                     'assignment_configuration',
                     'created',
                     'modified',
@@ -295,3 +338,76 @@ class PolicyGroupAssociationAdmin(admin.ModelAdmin):
         'subsidy_access_policy',
         'enterprise_group_uuid',
     )
+
+
+@admin.register(models.SubsidyAccessPolicy)
+class SubsidAccessPolicyAdmin(admin.ModelAdmin):
+    """
+    We need this not-particularly-useful admin class
+    to let the ForcedPolicyRedemptionAdmin class refer
+    to subsidy access policies, of all types, via its
+    ``autocomplete_fields``.
+    It's hidden from the admin index page.
+    """
+    fields = []
+    search_fields = [
+        'uuid',
+        'display_name',
+    ]
+
+    def has_module_permission(self, request):
+        """
+        Hide this view from the admin index page.
+        """
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        """
+        For good measure, declare no change permissions on this admin class.
+        """
+        return False
+
+
+@admin.register(models.ForcedPolicyRedemption)
+class ForcedPolicyRedemptionAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
+    """
+    Admin class for the forced redemption model/logic.
+    """
+    autocomplete_fields = [
+        'subsidy_access_policy',
+    ]
+    readonly_fields = [
+        'redeemed_at',
+        'errored_at',
+        'transaction_uuid',
+        'traceback',
+    ]
+
+    def save_model(self, request, obj, form, change):
+        """
+        If this record has not been successfully redeemed yet,
+        and if ``wait_to_redeem`` is false, then call ``force_redeem()`` on
+        the record.
+        """
+        super().save_model(request, obj, form, change)
+        obj.refresh_from_db()
+
+        if obj.transaction_uuid:
+            message = gettext_lazy("{} has already been redeemed".format(obj))
+            self.message_user(request, message, messages.SUCCESS)
+            return
+
+        if obj.wait_to_redeem:
+            message = gettext_lazy(
+                "{} has wait_to_redeem set to true, redemption will not occur "
+                "until this is changed to false".format(obj)
+            )
+            self.message_user(request, message, messages.WARNING)
+            return
+
+        try:
+            obj.force_redeem()
+        except Exception as exc:  # pylint: disable=broad-except
+            message = gettext_lazy("{} Failure reason: {}".format(obj, exc))
+            self.message_user(request, message, messages.ERROR)
+            logger.exception('Force redemption failed for %s', obj)

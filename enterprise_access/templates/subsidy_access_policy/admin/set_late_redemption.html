@@ -1,0 +1,58 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static admin_urls %}
+
+{% block extrastyle %}
+  <style>
+    .forms-panel .helptext {
+      display: block;
+      font-size: 0.8em;
+      color: #bbb;
+    }
+  </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Home" %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; 
+    <a href="{% url opts|admin_urlname:'change' subsidy_access_policy.uuid %}">
+      {{ subsidy_access_policy|truncatewords:"18" }}
+    </a>
+  &rsaquo; {% trans "Set Late Redemption" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <div class="forms-panel">
+    <h1>{% trans "Set Late Redemption" %}</h1>
+    <p>
+      This tool allows temporary "late" enrollment for any learner redeeming content with this policy. Choose a period
+      of time (starting now) during which the late enrollment feature is enabled for this policy. During that time
+      period, course runs with enrollment deadlines within the last 30 days will become visible and enrollable again to
+      learners.
+    </p>
+    <p>
+      It is encouraged that if you know specifically which historical course run learners must enroll into, you can
+      craft a course about page URL containing a course run filter:
+    </p>
+    <p>
+      <code>
+        {{ ENTERPRISE_LEARNER_PORTAL_URL }}/<strong>&lt;enterprise_slug&gt;</strong>/course/<strong>&lt;course_key&gt;</strong>?course_run_key=<strong>&lt;course_run_key&gt;</strong>
+      </code>
+    </p>
+    <form action="" method="post" enctype="multipart/form-data" id="set-late-redemption-form">
+      {% csrf_token %}
+      {# as_p will render the form fields wrapped in <p> tags: #}
+      {{ set_late_redemption_form.as_p }}
+      <input type="submit" value="Submit"/>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block footer %}
+  {{ block.super }}
+{% endblock %}

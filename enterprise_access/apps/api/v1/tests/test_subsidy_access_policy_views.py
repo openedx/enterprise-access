@@ -45,7 +45,7 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PolicyGroupAssociationFactory
 )
 from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
-from test_utils import TEST_USER_RECORD, APITestWithMocks
+from test_utils import TEST_ENTERPRISE_GROUP_UUID, TEST_USER_RECORD, APITestWithMocks
 
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:subsidy-access-policies-list')
 
@@ -305,6 +305,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             },
             'assignment_configuration': None,
             'group_associations': [str(enterprise_group_uuid)],
+            'late_redemption_allowed_until': None,
+            'is_late_redemption_allowed': False,
         }, response.json())
 
     @ddt.data(
@@ -398,6 +400,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 },
                 'assignment_configuration': None,
                 'group_associations': [],
+                'late_redemption_allowed_until': None,
+                'is_late_redemption_allowed': False,
             },
             {
                 'access_method': 'direct',
@@ -426,6 +430,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 },
                 'assignment_configuration': None,
                 'group_associations': [],
+                'late_redemption_allowed_until': None,
+                'is_late_redemption_allowed': False,
             },
         ]
 
@@ -521,6 +527,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             },
             'assignment_configuration': None,
             'group_associations': [],
+            'late_redemption_allowed_until': None,
+            'is_late_redemption_allowed': False,
         }
         self.assertEqual(expected_response, response.json())
 
@@ -615,6 +623,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'per_learner_enrollment_limit': policy_for_edit.per_learner_enrollment_limit,
             'spend_limit': policy_for_edit.spend_limit,
             'subsidy_uuid': str(policy_for_edit.subsidy_uuid),
+            'late_redemption_allowed_until': None,
 
             # All the rest of the fields that we do not support PATCHing.
             'uuid': str(policy_for_edit.uuid),
@@ -633,6 +642,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             },
             'assignment_configuration': None,
             'group_associations': [],
+            'is_late_redemption_allowed': False,
         }
         expected_response.update(request_payload)
         self.assertEqual(expected_response, response.json())
@@ -852,6 +862,8 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             expected_response = payload.copy()
             expected_response.setdefault("per_learner_enrollment_limit")
             expected_response.setdefault("per_learner_spend_limit")
+            expected_response["late_redemption_allowed_until"] = None
+            expected_response["is_late_redemption_allowed"] = False
             assert response_json == expected_response
         elif expected_response_code == status.HTTP_400_BAD_REQUEST:
             for expected_error_keyword in expected_error_keywords:
@@ -909,6 +921,8 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             expected_response = payload.copy()
             expected_response.setdefault("per_learner_enrollment_limit")
             expected_response.setdefault("per_learner_spend_limit")
+            expected_response["late_redemption_allowed_until"] = None
+            expected_response["is_late_redemption_allowed"] = False
             assert response_json == expected_response
 
         # Test idempotency
@@ -923,6 +937,8 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             expected_response = payload.copy()
             expected_response.setdefault("per_learner_enrollment_limit")
             expected_response.setdefault("per_learner_spend_limit")
+            expected_response["late_redemption_allowed_until"] = None
+            expected_response["is_late_redemption_allowed"] = False
             assert response_json == expected_response
 
 
@@ -1080,11 +1096,16 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         self.addCleanup(contains_key_patcher.stop)
         self.addCleanup(get_content_metadata_patcher.stop)
 
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
-    def test_redeem_policy(self, mock_transactions_cache_for_learner):  # pylint: disable=unused-argument
+    def test_redeem_policy(self, mock_transactions_cache_for_learner, mock_oauth):  # pylint: disable=unused-argument
         """
         Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint works as expected
         """
+        PolicyGroupAssociationFactory(
+            enterprise_group_uuid=TEST_ENTERPRISE_GROUP_UUID,
+            subsidy_access_policy=self.redeemable_policy
+        )
         self.mock_get_content_metadata.return_value = {'content_price': 123}
         mock_transaction_record = {
             'uuid': str(uuid4()),
@@ -1629,6 +1650,12 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
             spend_limit=500000,
         )
         self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
+
+        group_uuid = uuid4()
+        PolicyGroupAssociationFactory(
+            enterprise_group_uuid=group_uuid,
+            subsidy_access_policy=self.redeemable_policy
+        )
 
     def test_can_redeem_policy_missing_params(self):
         """

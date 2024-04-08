@@ -13,16 +13,19 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
 from edx_django_utils.cache.utils import get_cache_key
+from simple_history.models import HistoricalRecords
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.core.models import User
 from enterprise_access.cache_utils import request_cache, versioned_cache_key
-from enterprise_access.utils import is_none, is_not_none, localized_utcnow
+from enterprise_access.utils import format_traceback, is_none, is_not_none, localized_utcnow
 
 from ..content_assignments.models import AssignmentConfiguration
 from .constants import (
     CREDIT_POLICY_TYPE_PRIORITY,
+    FORCE_ENROLLMENT_KEYWORD,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_FAILED,
@@ -30,6 +33,7 @@ from .constants import (
     REASON_LEARNER_MAX_SPEND_REACHED,
     REASON_LEARNER_NOT_ASSIGNED_CONTENT,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
+    REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     REASON_POLICY_EXPIRED,
     REASON_POLICY_SPEND_LIMIT_REACHED,
@@ -57,6 +61,10 @@ from .subsidy_api import (
     set_tiered_cache_subsidy_record
 )
 from .utils import ProxyAwareHistoricalRecords, create_idempotency_key_for_transaction, get_versioned_subsidy_client
+
+# Magic key that is used transaction metadata hint to the subsidy service and all downstream services that the
+# enrollment should be allowed even if the enrollment deadline has passed.
+ALLOW_LATE_ENROLLMENT_KEY = 'allow_late_enrollment'
 
 REQUEST_CACHE_NAMESPACE = 'subsidy_access_policy'
 POLICY_LOCK_RESOURCE_NAME = 'subsidy_access_policy'
@@ -183,6 +191,11 @@ class SubsidyAccessPolicy(TimeStampedModel):
         null=True,
         blank=True,
     )
+    late_redemption_allowed_until = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Before this date, "late redemptions" will be allowed. If empty, late redemptions are disallowed.',
+    )
     per_learner_enrollment_limit = models.IntegerField(
         null=True,
         blank=True,
@@ -227,6 +240,15 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Return True if this policy has redemption enabled.
         """
         return self.active and not self.retired
+
+    @property
+    def is_late_redemption_allowed(self):
+        """
+        Return True if late redemption is currently allowed.
+        """
+        if not self.late_redemption_allowed_until:
+            return False
+        return localized_utcnow() < self.late_redemption_allowed_until
 
     @property
     def subsidy_active_datetime(self):
@@ -460,6 +482,30 @@ class SubsidyAccessPolicy(TimeStampedModel):
             self.get_content_metadata(content_key),
         )
 
+    def includes_learner(self, lms_user_id):
+        """
+        Determine whether the lms user is associated properly with both the enterprise
+        and the policy's group(s).
+        """
+        learner_record = self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id)
+        if not learner_record:
+            return False, REASON_LEARNER_NOT_IN_ENTERPRISE
+
+        associated_group_uuids = set(learner_record.get('enterprise_group', []))
+        # if there are no policy groups, return early
+        if not PolicyGroupAssociation.objects.filter(subsidy_access_policy=self).exists():
+            return True, None
+
+        # if no association for this learner's group(s), return false
+        if not PolicyGroupAssociation.objects.filter(
+            subsidy_access_policy=self,
+            enterprise_group_uuid__in=associated_group_uuids,
+        ).exists():
+            return False, REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP
+
+        # otherwise, return true
+        return True, None
+
     def aggregates_for_policy(self):
         """
         Returns aggregate transaction data for this policy. The result is cached via ``RequestCache``
@@ -474,8 +520,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         cached_response = _cache.get_cached_response(cache_key)
         if cached_response.is_found:
             logger.info(
-                'aggregates_for_policy cache hit: subsidy %s, policy %s',
-                self.subsidy_uuid, self.uuid,
+                f'aggregates_for_policy cache hit: subsidy {self.subsidy_uuid}, policy {self.uuid}'
             )
             return cached_response.value
 
@@ -485,8 +530,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         )
         result = response_payload['aggregates']
         logger.info(
-            'aggregates_for_policy cache miss: subsidy %s, policy %s',
-            self.subsidy_uuid, self.uuid,
+            f'aggregates_for_policy cache miss: subsidy {self.subsidy_uuid}, policy {self.uuid}'
         )
         _cache.set(cache_key, result)
         return result
@@ -559,7 +603,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Helper to log decision points in the can_redeem() function.
         """
         message = (
-            '[POLICY REDEEMABILITY]: policy: %s, is_redeemable: %s, reason: %s'
+            '[POLICY REDEEMABILITY]: policy: %s, is_redeemable: %s, reason: %s '
             'lms_user_id: %s, content_key: %s, extra=%s'
         )
         logger.info(message, self.uuid, is_redeemable, reason, lms_user_id, content_key, extra)
@@ -581,8 +625,8 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 * third a list of any transactions representing existing redemptions (any state).
         """
         logger.info(
-            '[POLICY REDEEMABILITY] Checking for policy: %s, lms_user_id: %s, content_key: %s',
-            self.uuid, lms_user_id, content_key,
+            f'[POLICY REDEEMABILITY] Checking for policy: {self.uuid}, '
+            f'lms_user_id: {lms_user_id}, content_key: {content_key}'
         )
         # inactive policy
         if not self.is_redemption_enabled:
@@ -591,9 +635,16 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # learner not associated to enterprise
         if not skip_customer_user_check:
-            if self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id) is None:
+            learner_record = self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id)
+            if not learner_record:
                 self._log_redeemability(False, REASON_LEARNER_NOT_IN_ENTERPRISE, lms_user_id, content_key)
                 return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
+
+        if not skip_customer_user_check:
+            included_in_policy, reason = self.includes_learner(lms_user_id)
+            if not included_in_policy:
+                self._log_redeemability(False, reason, lms_user_id, content_key)
+                return (False, reason, [])
 
         # no content key in catalog
         if not self.catalog_contains_content_key(content_key):
@@ -676,23 +727,26 @@ class SubsidyAccessPolicy(TimeStampedModel):
         subsidy access policy. The generic checks performed include:
             * Whether the policy is active.
             * Whether the learner is associated to the enterprise.
+            * Whether the learner is associated to the policy's group.
             * Whether the subsidy is active (non-expired).
             * Whether the subsidy has remaining balance.
             * Whether the transactions associated with policy have exceeded the policy-wide spend limit.
         """
         # inactive policy
         if not self.is_redemption_enabled:
-            logger.info('[credit_available] policy %s inactive', self.uuid)
+            logger.info(f'[credit_available] policy {self.uuid} inactive', self.uuid)
             return False
 
         # learner not linked to enterprise
         if not skip_customer_user_check:
             if self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id) is None:
                 logger.info(
-                    '[credit_available] learner %s not linked to enterprise %s',
-                    lms_user_id,
-                    self.enterprise_customer_uuid
+                    f'[credit_available] learner {lms_user_id} not linked to enterprise {self.enterprise_customer_uuid}'
                 )
+                return False
+            included_in_policy, reason = self.includes_learner(lms_user_id)
+            if not included_in_policy:
+                logger.info(f'[credit_available] learner {lms_user_id} encountered error {reason}')
                 return False
 
         # verify associated subsidy is current (non-expired)
@@ -702,7 +756,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 return False
         except requests.exceptions.HTTPError as exc:
             # when associated subsidy is soft-deleted, the subsidy retrieve API raises an exception.
-            logger.info('[credit_available] SubsidyAccessPolicy.subsidy_record() raised HTTPError: %s', exc)
+            logger.info(f'[credit_available] SubsidyAccessPolicy.subsidy_record() raised HTTPError: {exc}')
             return False
 
         # verify associated subsidy has remaining balance
@@ -712,7 +766,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # verify spend against policy and configured spend limit
         if not self.has_credit_available_with_spend_limit():
-            logger.info('[credit_available] policy %s has exceeded spend limit', self.uuid)
+            logger.info(f'[credit_available] policy {self.uuid} has exceeded spend limit')
             return False
 
         return True
@@ -776,13 +830,18 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 subsidy_access_policy_uuid=str(self.uuid),
                 historical_redemptions_uuids=self._redemptions_for_idempotency_key(all_transactions),
             )
+            # If this policy has late redemptions currently enabled, tell that to the subsidy service.
+            metadata_for_tx = metadata
+            if self.is_late_redemption_allowed:
+                metadata_for_tx = metadata.copy() if metadata else {}
+                metadata_for_tx[ALLOW_LATE_ENROLLMENT_KEY] = True
             try:
                 creation_payload = {
                     'subsidy_uuid': str(self.subsidy_uuid),
                     'lms_user_id': lms_user_id,
                     'content_key': content_key,
                     'subsidy_access_policy_uuid': str(self.uuid),
-                    'metadata': metadata,
+                    'metadata': metadata_for_tx,
                     'idempotency_key': idempotency_key,
                 }
                 requested_price_cents = kwargs.get('requested_price_cents')
@@ -1162,8 +1221,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         cached_response = request_cache(namespace=REQUEST_CACHE_NAMESPACE).get_cached_response(cache_key)
         if cached_response.is_found:
             logger.info(
-                'get_assignment cache hit: policy %s lms_user_id %s content_key %s',
-                self.uuid, lms_user_id, content_key,
+                f'get_assignment cache hit: policy {self.uuid} lms_user_id {lms_user_id} content_key {content_key}',
             )
             return cached_response.value
 
@@ -1174,8 +1232,7 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         )
         request_cache(namespace=REQUEST_CACHE_NAMESPACE).set(cache_key, assignment)
         logger.info(
-            'get_assignment cache hit: policy %s lms_user_id %s content_key %s',
-            self.uuid, lms_user_id, content_key,
+            f'get_assignment cache hit: policy {self.uuid} lms_user_id {lms_user_id} content_key {content_key}',
         )
 
         return assignment
@@ -1455,3 +1512,156 @@ class PolicyGroupAssociation(TimeStampedModel):
         blank=True,
         help_text='The uuid that uniquely identifies the associated group.',
     )
+
+
+class ForcedPolicyRedemption(TimeStampedModel):
+    """
+    There is frequently a need to force through a redemption
+    (and related enrollment/fulfillment) of a particular learner,
+    covered by a particular subsidy access policy, into some specific course run.
+    This needs exists for reasons related to upstream business constraints,
+    notably in cases where a course is included in a policy's catalog,
+    but the desired course run is not discoverable due to the
+    current state of its metadata. This model supports executing such a redemption.
+
+    .. no_pii: This model has no PII
+    """
+    uuid = models.UUIDField(
+        primary_key=True,
+        default=uuid4,
+        editable=False,
+        unique=True,
+        help_text='The uuid that uniquely identifies this policy record.',
+    )
+    subsidy_access_policy = models.ForeignKey(
+        SubsidyAccessPolicy,
+        related_name="forced_redemptions",
+        on_delete=models.SET_NULL,
+        null=True,
+        help_text="The SubsidyAccessPolicy that this forced redemption relates to.",
+    )
+    lms_user_id = models.IntegerField(
+        null=False,
+        blank=False,
+        db_index=True,
+        help_text=(
+            "The id of the Open edX LMS user record that identifies the learner.",
+        ),
+    )
+    course_run_key = models.CharField(
+        max_length=255,
+        blank=False,
+        null=False,
+        db_index=True,
+        help_text=(
+            "The course run key to enroll the learner into.",
+        ),
+    )
+    content_price_cents = models.BigIntegerField(
+        null=False,
+        blank=False,
+        help_text="Cost of the content in USD Cents, should be >= 0.",
+    )
+    wait_to_redeem = models.BooleanField(
+        default=False,
+        help_text="If selected, will not force redemption when the record is saved via Django admin.",
+    )
+    redeemed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="The time the forced redemption succeeded.",
+    )
+    errored_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="The time the forced redemption failed.",
+    )
+    traceback = models.TextField(
+        blank=True,
+        null=True,
+        editable=False,
+        help_text="Any traceback we recorded when an error was encountered.",
+    )
+    transaction_uuid = models.UUIDField(
+        null=True,
+        blank=True,
+        editable=False,
+        db_index=True,
+        help_text=(
+            "The transaction uuid caused by successful redemption.",
+        ),
+    )
+    history = HistoricalRecords()
+
+    def __str__(self):
+        return (
+            f'<{self.__class__.__name__} policy_uuid={self.subsidy_access_policy.uuid}, '
+            f'transaction_uuid={self.transaction_uuid}, '
+            f'lms_user_id={self.lms_user_id}, course_run_key={self.course_run_key}>'
+        )
+
+    def create_assignment(self):
+        """
+        For assignment-based policies, an allocated ``LearnerContentAssignment`` must exist
+        before redemption can occur.
+        """
+        assignment_configuration = self.subsidy_access_policy.assignment_configuration
+        content_metadata = get_and_cache_content_metadata(
+            assignment_configuration.enterprise_customer_uuid,
+            self.course_run_key,
+        )
+        course_key = content_metadata.get('content_key')
+        user_record = User.objects.filter(lms_user_id=self.lms_user_id).first()
+        if not user_record:
+            raise Exception(f'No email could be found for lms_user_id {self.lms_user_id}')
+
+        return assignments_api.allocate_assignments(
+            assignment_configuration,
+            [user_record.email],
+            course_key,
+            self.content_price_cents,
+        )
+
+    def force_redeem(self):
+        """
+        Forces redemption for the requested course run key in the associated policy.
+        """
+        if self.redeemed_at and self.transaction_uuid:
+            # Just return if we've already got a successful redemption.
+            return
+
+        if self.subsidy_access_policy.access_method == AccessMethods.ASSIGNED:
+            self.create_assignment()
+
+        try:
+            with self.subsidy_access_policy.lock():
+                can_redeem, reason, existing_transactions = self.subsidy_access_policy.can_redeem(
+                    self.lms_user_id, self.course_run_key,
+                )
+                if can_redeem:
+                    result = self.subsidy_access_policy.redeem(
+                        self.lms_user_id,
+                        self.course_run_key,
+                        existing_transactions,
+                        metadata={
+                            FORCE_ENROLLMENT_KEYWORD: True,
+                        },
+                    )
+                    self.transaction_uuid = result['uuid']
+                    self.redeemed_at = result['modified']
+                    self.save()
+                else:
+                    raise Exception(f'Failed forced redemption: {reason}')
+        except SubsidyAccessPolicyLockAttemptFailed as exc:
+            logger.exception(exc)
+            self.errored_at = localized_utcnow()
+            self.traceback = format_traceback(exc)
+            self.save()
+            raise
+        except SubsidyAPIHTTPError as exc:
+            error_payload = exc.error_payload()
+            self.errored_at = localized_utcnow()
+            self.traceback = format_traceback(exc) + f'\nResponse payload:\n{error_payload}'
+            self.save()
+            logger.exception(f'{exc} when creating transaction in subsidy API: {error_payload}')
+            raise

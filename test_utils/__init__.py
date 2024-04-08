@@ -17,6 +17,7 @@ from django.test import TestCase
 from django.test.client import RequestFactory
 from edx_rest_framework_extensions.auth.jwt.cookies import jwt_cookie_name
 from edx_rest_framework_extensions.auth.jwt.tests.utils import generate_jwt_token, generate_unversioned_payload
+from faker import Faker
 from pytest import mark
 from rest_framework.test import APIClient, APITestCase
 
@@ -36,43 +37,45 @@ COURSE_TITLE_ABOUT_CAKE = 'How to Bake a Cake: So Delicious It Should Be Illegal
 TEST_ENTERPRISE_UUID = uuid4()
 TEST_ENTERPRISE_GROUP_UUID = uuid4()
 TEST_USER_RECORD = {
+    'id': TEST_USER_ID,
     'enterprise_customer': {
         'uuid': str(TEST_ENTERPRISE_UUID),
     },
+    'active': True,
+    'user_id': 1,
     'user': {
         'id': TEST_USER_ID,
-        'enterprise_customer': {
-            'uuid': str(TEST_ENTERPRISE_UUID),
-        },
-        'active': True,
-        'user_id': 1,
-        'user': {
-            'id': TEST_USER_ID,
-            'username': 'billy_bob',
-            'first_name': 'billy',
-            'last_name': 'bob',
-            'email': 'billy@bobby.com',
-            'is_staff': False,
-            'is_active': True,
-            'date_joined': '2024-02-23T20:18:41Z',
-        },
-        'groups': [],
-        'role_assignments': [
-            'enterprise_learner',
-            'enterprise_admin',
-        ],
-        'enterprise_group': [{
-            'enterprise_customer': {
-                'uuid': str(TEST_ENTERPRISE_UUID),
-            },
-            'name': 'Wayne Enterprise',
-            'uuid': str(TEST_ENTERPRISE_GROUP_UUID),
-        }],
+        'username': 'billy_bob',
+        'first_name': 'billy',
+        'last_name': 'bob',
+        'email': 'billy@bobby.com',
+        'is_staff': False,
+        'is_active': True,
+        'date_joined': '2024-02-23T20:18:41Z',
     },
+    'groups': [],
+    'role_assignments': [
+        'enterprise_learner',
+        'enterprise_admin',
+    ],
+    'enterprise_group': [str(TEST_ENTERPRISE_GROUP_UUID)],
 }
 
 TEST_USER_RECORD_NO_GROUPS = copy.deepcopy(TEST_USER_RECORD)
-TEST_USER_RECORD_NO_GROUPS['user']['enterprise_group'] = []
+TEST_USER_RECORD_NO_GROUPS['enterprise_group'] = []
+
+FAKER = Faker()
+
+
+def random_content_key():
+    """
+    Helper to craft a random content key.
+    """
+    fake_words = [
+        FAKER.word() + str(FAKER.random_int())
+        for _ in range(3)
+    ]
+    return 'course-v1:{}+{}+{}'.format(*fake_words)
 
 
 @mark.django_db
