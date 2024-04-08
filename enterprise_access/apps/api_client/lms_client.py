@@ -21,7 +21,7 @@ class LmsApiClient(BaseOAuthClient):
     enterprise_learner_endpoint = enterprise_api_base_url + 'enterprise-learner/'
     enterprise_customer_endpoint = enterprise_api_base_url + 'enterprise-customer/'
     pending_enterprise_learner_endpoint = enterprise_api_base_url + 'pending-enterprise-learner/'
-    enterprise_group_membership = enterprise_api_base_url + 'enterprise-group/'
+    enterprise_group_membership_endpoint = enterprise_api_base_url + 'enterprise-group/'
 
     def get_enterprise_customer_data(self, enterprise_customer_uuid):
         """
@@ -215,11 +215,11 @@ class LmsApiClient(BaseOAuthClient):
                       'user_email': string,
                     },
                     'recent_action': string,
-                    'enterprise_customer': EnterpriseCustomerUser,
                 }
         """
         try:
-            url = f'{self.enterprise_group_membership}{enterprise_group_uuid}/learners/?pending_users_only=true'
+            url = f'{self.enterprise_group_membership_endpoint}' + (
+                f'{enterprise_group_uuid}/learners/?pending_users_only=true')
             results = []
 
             while url:
@@ -230,7 +230,6 @@ class LmsApiClient(BaseOAuthClient):
                 for result in resp_json['results']:
                     pending_learner_id = result['pending_learner_id']
                     recent_action = result['recent_action']
-                    enterprise_customer_name = result['enterprise_customer']['name']
                     user_email = result['member_details']['user_email']
 
                     recent_action_time = result['recent_action'].partition(': ')[2]
@@ -239,7 +238,6 @@ class LmsApiClient(BaseOAuthClient):
                         results.append({
                             'pending_learner_id': pending_learner_id,
                             'recent_action': recent_action,
-                            'enterprise_customer_name': enterprise_customer_name,
                             'user_email': user_email,
                         })
             return results
@@ -247,3 +245,5 @@ class LmsApiClient(BaseOAuthClient):
             logger.exception('Failed to fetch data from LMS. URL: [%s].', url)
         except KeyError:
             logger.exception('Incorrect data received from LMS. [%s]', url)
+
+        return None

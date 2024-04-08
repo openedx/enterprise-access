@@ -36,23 +36,28 @@ class Command(BaseCommand):
         for policy_group_association in policy_group_associations:
             pecu_email_properties = []
             enterprise_group_uuid = policy_group_association.enterprise_group_uuid
+            enterprise_customer_uuid = policy_group_association.subsidy_access_policy.enterprise_customer_uuid
             pending_enterprise_customer_users = (
                 lms_client.get_pending_enterprise_group_memberships(
                     enterprise_group_uuid
                 )
             )
+            enterprise_customer_data = (
+                lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
+            )
             subsidy_expiration_datetime = (
                 policy_group_association.subsidy_access_policy.subsidy_expiration_datetime
             )
             catalog_uuid = policy_group_association.subsidy_access_policy.catalog_uuid
-            catalog_count = enterprise_catalog_client.get_content_metadata_count(
+            catalog_count = enterprise_catalog_client.catalog_content_metadata(
                 catalog_uuid
-            )
+            )['count']
 
             for pending_enterprise_customer_user in pending_enterprise_customer_users:
                 pending_enterprise_customer_user["subsidy_expiration_datetime"] = (
                     subsidy_expiration_datetime
                 )
                 pending_enterprise_customer_user["catalog_count"] = catalog_count
+                pending_enterprise_customer_user["enterprise_customer_name"] = enterprise_customer_data["name"]
                 pecu_email_properties.append(pending_enterprise_customer_user)
             send_group_reminder_emails.delay(pecu_email_properties)

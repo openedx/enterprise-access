@@ -8,17 +8,14 @@ from datetime import datetime, timedelta
 from celery import shared_task
 from django.conf import settings
 
-from enterprise_access.apps.api_client.braze_client import (
-    ENTERPRISE_BRAZE_ALIAS_LABEL,
-    BrazeApiClient,
-)
+from enterprise_access.apps.api_client.braze_client import ENTERPRISE_BRAZE_ALIAS_LABEL, BrazeApiClient
 from enterprise_access.apps.enterprise_groups.constants import (
     BRAZE_GROUPS_EMAIL_CAMPAIGNS_FINAL_REMINDER_DAY,
     BRAZE_GROUPS_EMAIL_CAMPAIGNS_FIRST_REMINDER_DAY,
     BRAZE_GROUPS_EMAIL_CAMPAIGNS_FOURTH_REMINDER_DAY,
     BRAZE_GROUPS_EMAIL_CAMPAIGNS_SECOND_REMINDER_DAY,
     BRAZE_GROUPS_EMAIL_CAMPAIGNS_THIRD_REMINDER_DAY,
-    DAYS_TO_PURGE_PII,
+    DAYS_TO_PURGE_PII
 )
 from enterprise_access.tasks import LoggedTaskWithRetry
 
@@ -31,9 +28,6 @@ def get_braze_campaign_properties(
     """
     Helper function to return braze campaign id and properties based on days passed since group membership invite
     """
-    import pdb
-
-    pdb.set_trace()
     recent_action_time = recent_action.partition(": ")[2]
     current_date = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
     invitation_end_date = datetime.strptime(
@@ -115,9 +109,6 @@ def send_group_reminder_emails(pending_enterprise_users):
     Arguments:
         * pending_enterprise_users (list)
     """
-    import pdb
-
-    pdb.set_trace()
     braze_client_instance = BrazeApiClient()
     for pending_enterprise_user in pending_enterprise_users:
         pecu_email = pending_enterprise_user["user_email"]

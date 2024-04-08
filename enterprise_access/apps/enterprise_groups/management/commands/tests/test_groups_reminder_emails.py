@@ -11,7 +11,7 @@ from enterprise_access.apps.enterprise_groups.management.commands import groups_
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
-    PolicyGroupAssociationFactory,
+    PolicyGroupAssociationFactory
 )
 
 COMMON = "enterprise_access.apps.enterprise_groups.management.commands.groups_reminder_emails."
@@ -77,7 +77,9 @@ class TestGroupsReminderEmails(TestCase):
                 "user_email": "test2@2u.com",
             },
         ]
-        mock_enterprise_catalog_client().get_content_metadata_count.return_value = 5
+        mock_enterprise_catalog_client().catalog_content_metadata.return_value = {
+            'count': 5
+        }
         mock_lms_api_client().get_pending_enterprise_group_memberships.return_value = (
             pending_group_memberships
         )
