@@ -330,7 +330,7 @@ class PolicyGroupAssociationAdmin(admin.ModelAdmin):
     Admin configuration for PolicyGroupAssociation
     """
     search_fields = (
-        'subsidy_access_policy',
+        'subsidy_access_policy__uuid',
         'enterprise_group_uuid',
     )
 
