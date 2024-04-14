@@ -67,19 +67,3 @@ class EnterpriseCatalogApiClient(BaseOAuthClient):
         response = self.client.get(endpoint, params=query_params)
         response.raise_for_status()
         return response.json()
-
-    def get_content_metadata_count(self, catalog_uuid):
-        """
-        Returns the count of content metadata for a catalog.
-
-        Arguments:
-            catalog_uuid (UUID): UUID of the enterprise catalog to check.
-
-        Returns:
-            The number of content metadata for a catalog.
-        """
-
-        endpoint = self.enterprise_catalog_endpoint + str(catalog_uuid) + '/get_content_metadata/'
-        response = self.client.get(endpoint)
-        response.raise_for_status()
-        return response.json()['count']

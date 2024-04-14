@@ -226,7 +226,7 @@ class LmsApiClient(BaseOAuthClient):
                 response = self.client.get(url, timeout=settings.LMS_CLIENT_TIMEOUT)
                 response.raise_for_status()
                 resp_json = response.json()
-                url = resp_json['next']
+                url = resp_json.get('next')
                 for result in resp_json['results']:
                     pending_learner_id = result['pending_learner_id']
                     recent_action = result['recent_action']
