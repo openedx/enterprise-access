@@ -3,7 +3,7 @@ Utils for any app in the enterprise-access project.
 """
 import logging
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.apps import apps
 from pytz import UTC
@@ -12,6 +12,13 @@ from enterprise_access.apps.content_assignments.constants import AssignmentAutom
 from enterprise_access.apps.content_assignments.content_metadata_api import (
     get_content_metadata_for_assignments,
     parse_datetime_string
+)
+from enterprise_access.apps.enterprise_groups.constants import (
+    BRAZE_GROUPS_EMAIL_CAMPAIGNS_FINAL_REMINDER_DAY,
+    BRAZE_GROUPS_EMAIL_CAMPAIGNS_FIRST_REMINDER_DAY,
+    BRAZE_GROUPS_EMAIL_CAMPAIGNS_FOURTH_REMINDER_DAY,
+    BRAZE_GROUPS_EMAIL_CAMPAIGNS_SECOND_REMINDER_DAY,
+    BRAZE_GROUPS_EMAIL_CAMPAIGNS_THIRD_REMINDER_DAY
 )
 from enterprise_access.apps.subsidy_request.constants import SubsidyTypeChoices
 
@@ -171,3 +178,34 @@ def get_automatic_expiration_date_and_reason(
         action_required_by['reason'],
     )
     return action_required_by
+
+
+def should_send_email_to_pecu(recent_action):
+    """
+    Helper to check if the groups invite was sent to pending enterprise customer user
+    5, 25, 50, 65, or 85 days ago.
+    """
+    current_date = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
+    is_5_days_since_invited = current_date - timedelta(
+        days=BRAZE_GROUPS_EMAIL_CAMPAIGNS_FIRST_REMINDER_DAY
+    ) == (datetime.strptime(recent_action, "%B %d, %Y"))
+    is_25_days_since_invited = current_date - timedelta(
+        days=BRAZE_GROUPS_EMAIL_CAMPAIGNS_SECOND_REMINDER_DAY
+    ) == (datetime.strptime(recent_action, "%B %d, %Y"))
+    is_50_days_since_invited = current_date - timedelta(
+        days=BRAZE_GROUPS_EMAIL_CAMPAIGNS_THIRD_REMINDER_DAY
+    ) == (datetime.strptime(recent_action, "%B %d, %Y"))
+    is_65_days_since_invited = current_date - timedelta(
+        days=BRAZE_GROUPS_EMAIL_CAMPAIGNS_FOURTH_REMINDER_DAY
+    ) == (datetime.strptime(recent_action, "%B %d, %Y"))
+    is_85_days_since_invited = current_date - timedelta(
+        days=BRAZE_GROUPS_EMAIL_CAMPAIGNS_FINAL_REMINDER_DAY
+    ) == (datetime.strptime(recent_action, "%B %d, %Y"))
+
+    return (
+        is_5_days_since_invited or
+        is_25_days_since_invited or
+        is_50_days_since_invited or
+        is_65_days_since_invited or
+        is_85_days_since_invited
+    )
