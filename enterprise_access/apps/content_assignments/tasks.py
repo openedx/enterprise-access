@@ -247,6 +247,14 @@ class BaseAssignmentRetryAndErrorActionTask(LoggedTaskWithRetry):
         """
         raise NotImplementedError
 
+    def progress_state_on_failure(self, assignment):
+        """
+        By default, progress the state of the assignment to ERRORED when the task fails.
+        """
+        assignment.state = LearnerContentAssignmentStateChoices.ERRORED
+        assignment.errored_at = localized_utcnow()
+        assignment.save()
+
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """
         If the task fails for any reason (whether or not retries were involved), set the assignment state to errored.
@@ -259,10 +267,7 @@ class BaseAssignmentRetryAndErrorActionTask(LoggedTaskWithRetry):
         )
 
         assignment = _get_assignment_or_raise(args[0])
-
-        assignment.state = LearnerContentAssignmentStateChoices.ERRORED
-        assignment.errored_at = localized_utcnow()
-        assignment.save()
+        self.progress_state_on_failure(assignment)
         self.add_errored_action(assignment, exc)
         if self.request.retries == settings.TASK_MAX_RETRIES:
             # The failure resulted from too many retries.  This fact would be a useful thing to record in a "reason"
@@ -402,6 +407,13 @@ class SendReminderEmailTask(BaseAssignmentRetryAndErrorActionTask):
     """
     def add_errored_action(self, assignment, exc):
         assignment.add_errored_reminded_action(exc)
+
+    def progress_state_on_failure(self, assignment):
+        """
+        Skip progressing the assignment state to `failed` (keeping it `allocated`) so that the assignment remains
+        functional and redeemable for learners and appear as "Waiting on learner..." to admins.
+        """
+        logger.info('NOT progressing the assignment state to failed for reminder failures.')
 
 
 @shared_task(base=SendReminderEmailTask)

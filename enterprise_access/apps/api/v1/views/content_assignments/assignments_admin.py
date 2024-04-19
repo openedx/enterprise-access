@@ -188,7 +188,7 @@ class LearnerContentAssignmentAdminViewSet(
     @extend_schema(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
         summary='Cancel assignments by UUID.',
-        parameters=[LearnerContentAssignmentActionRequestSerializer],
+        request=LearnerContentAssignmentActionRequestSerializer,
         responses={
             status.HTTP_200_OK: None,
             status.HTTP_404_NOT_FOUND: None,
@@ -270,7 +270,7 @@ class LearnerContentAssignmentAdminViewSet(
     @extend_schema(
         tags=[CONTENT_ASSIGNMENT_ADMIN_CRUD_API_TAG],
         summary='Remind assignments by UUID.',
-        parameters=[LearnerContentAssignmentActionRequestSerializer],
+        request=LearnerContentAssignmentActionRequestSerializer,
         responses={
             status.HTTP_200_OK: None,
             status.HTTP_404_NOT_FOUND: None,
