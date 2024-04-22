@@ -1,13 +1,14 @@
 """
 Tests for the ``api.py`` module of the content_assignments app.
 """
+import re
 
 from django.test import TestCase
 from django.utils import timezone
 
 from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
 
-from ..constants import RETIRED_EMAIL_ADDRESS, AssignmentActions
+from ..constants import RETIRED_EMAIL_ADDRESS_FORMAT, AssignmentActions
 from ..models import AssignmentConfiguration
 from .factories import LearnerContentAssignmentFactory
 
@@ -155,12 +156,12 @@ class TestAssignmentActions(TestCase):
 
         self.assignment.clear_pii()
         self.assignment.save()
-        self.assignment.clear_historical_pii()
 
         self.assignment.refresh_from_db()
 
         self.assertEqual(12345, self.assignment.lms_user_id)
-        self.assertEqual(self.assignment.learner_email, RETIRED_EMAIL_ADDRESS)
+        pattern = RETIRED_EMAIL_ADDRESS_FORMAT.format('[a-f0-9]{16}')
+        self.assertIsNotNone(re.match(pattern, self.assignment.learner_email))
 
         for historical_record in self.assignment.history.all():
-            self.assertEqual(historical_record.learner_email, RETIRED_EMAIL_ADDRESS)
+            self.assertIsNotNone(re.match(pattern, historical_record.learner_email))

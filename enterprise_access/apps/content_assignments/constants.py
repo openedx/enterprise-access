@@ -120,4 +120,4 @@ class AssignmentAutomaticExpiredReason:
 
 NUM_DAYS_BEFORE_AUTO_EXPIRATION = 90
 
-RETIRED_EMAIL_ADDRESS = 'retired_user@retired.invalid'
+RETIRED_EMAIL_ADDRESS_FORMAT = 'retired_user{}@retired.invalid'
