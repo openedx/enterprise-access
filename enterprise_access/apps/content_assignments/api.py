@@ -756,7 +756,6 @@ def expire_assignment(
 
         if automatic_expiration_reason == AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED:
             assignment.clear_pii()
-            assignment.clear_historical_pii()
 
         assignment.save()
         send_assignment_automatically_expired_email.delay(assignment.uuid)

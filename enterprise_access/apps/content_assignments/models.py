@@ -1,8 +1,8 @@
 """
 Models for content_assignments
 """
-
 import logging
+from os import urandom
 from uuid import UUID, uuid4
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
@@ -20,7 +20,7 @@ from enterprise_access.utils import format_traceback
 
 from .constants import (
     NUM_DAYS_BEFORE_AUTO_EXPIRATION,
-    RETIRED_EMAIL_ADDRESS,
+    RETIRED_EMAIL_ADDRESS_FORMAT,
     AssignmentActionErrors,
     AssignmentActions,
     AssignmentLearnerStates,
@@ -675,17 +675,26 @@ class LearnerContentAssignment(TimeStampedModel):
             completed_at=timezone.now(),
         )
 
+    @staticmethod
+    def _unique_retired_email():
+        """
+        Helper to return a templated email address
+        that's relatively uniqueified with the addition of a random, 8-byte,
+        hex string.
+        """
+        nonce = urandom(8).hex()
+        return RETIRED_EMAIL_ADDRESS_FORMAT.format(nonce)
+
     def clear_pii(self):
         """
-        Removes PII field values from this assignment.
+        Removes PII field values from this assignment by setting
+        the ``learner_email`` field to a templated email address
+        that's relatively uniqueified with the addition of a random, 8-byte,
+        hex string. Does the same for related historical records.
         """
-        self.learner_email = RETIRED_EMAIL_ADDRESS
-
-    def clear_historical_pii(self):
-        """
-        Removes PII values from this assignment's historical records.
-        """
-        self.history.update(learner_email=RETIRED_EMAIL_ADDRESS)  # pylint: disable=no-member
+        retired_email = self._unique_retired_email()
+        self.learner_email = retired_email
+        self.history.update(learner_email=retired_email)  # pylint: disable=no-member
 
     @classmethod
     def annotate_dynamic_fields_onto_queryset(cls, queryset):
