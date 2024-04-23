@@ -101,8 +101,8 @@ class CouponCodeRequestEventSerializer:
         if cls.SERIALIZER is None:
             KAFKA_SCHEMA_REGISTRY_CONFIG = {
                 'url': getattr(settings, 'SCHEMA_REGISTRY_URL', ''),
-                'basic.auth.user.info': f"{getattr(settings,'SCHEMA_REGISTRY_API_KEY','')}"
-                f":{getattr(settings,'SCHEMA_REGISTRY_API_SECRET','')}",
+                'basic.auth.user.info': f"{getattr(settings, 'SCHEMA_REGISTRY_API_KEY', '')}"
+                f":{getattr(settings, 'SCHEMA_REGISTRY_API_SECRET', '')}",
             }
             schema_registry_client = SchemaRegistryClient(KAFKA_SCHEMA_REGISTRY_CONFIG)
             cls.TRACKING_EVENT_SERIALIZER = AvroSerializer(schema_str=CouponCodeRequestEvent.AVRO_SCHEMA,

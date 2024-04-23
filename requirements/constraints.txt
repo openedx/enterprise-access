@@ -15,3 +15,6 @@
 # around default model fields vs. the serializer field defs,
 # and the discontinued use of OrderedDict in serializers.
 djangorestframework<3.15
+
+# For python greater than or equal to 3.9 backports.zoneinfo causing failures
+backports.zoneinfo; python_version<'3.9'
