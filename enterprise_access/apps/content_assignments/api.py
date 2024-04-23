@@ -406,6 +406,14 @@ def _get_content_title(assignment_configuration, content_key):
     return content_metadata.get('content_title')
 
 
+def _get_preferred_course_run_key(assignment_configuration, content_key):
+    """
+    Helper to retrieve (from cache) the preferred course run key of a content_key'ed content_metadata
+    """
+    content_metadata = _get_content_summary(assignment_configuration, content_key)
+    return content_metadata.get('course_run_key')
+
+
 def _try_populate_assignments_lms_user_id(assignments):
     """
     For all given assignments, try to populate the lms_user_id field based on a matching User.
@@ -476,12 +484,14 @@ def _create_new_assignments(
 
     # First, prepare assignment objects using data available in-memory only.
     content_title = _get_content_title(assignment_configuration, content_key)
+    preferred_course_run_key = _get_preferred_course_run_key(assignment_configuration, content_key)
     assignments_to_create = []
     for learner_email in learner_emails:
         assignment = LearnerContentAssignment(
             assignment_configuration=assignment_configuration,
             learner_email=learner_email,
             content_key=content_key,
+            preferred_course_run_key=preferred_course_run_key,
             content_title=content_title,
             content_quantity=content_quantity,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,

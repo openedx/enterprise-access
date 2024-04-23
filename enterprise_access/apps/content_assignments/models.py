@@ -304,6 +304,16 @@ class LearnerContentAssignment(TimeStampedModel):
         blank=False,
         help_text="Cost of the content in USD Cents.",
     )
+    preferred_course_run_key = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text=(
+            "The preferred course run that the admin primarily intends for the learner, and the one used to control "
+            "nudge emails. This is automatically set at assignment creation or re-allocation time."
+        ),
+    )
     state = models.CharField(
         max_length=255,
         blank=False,

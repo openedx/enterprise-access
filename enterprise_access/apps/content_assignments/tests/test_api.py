@@ -256,6 +256,7 @@ class TestContentAssignmentApi(TestCase):
         Tests the allocation of new assignments against a given configuration.
         """
         content_key = 'demoX'
+        course_run_key = 'demoX+1T2022'
         content_title = 'edx: Demo 101'
         content_price_cents = 100
         # add a duplicate email to the input list to ensure only one
@@ -267,6 +268,7 @@ class TestContentAssignmentApi(TestCase):
         ]
         mock_get_and_cache_content_metadata.return_value = {
             'content_title': content_title,
+            'course_run_key': course_run_key,
         }
 
         allocated_assignment = LearnerContentAssignmentFactory.create(
@@ -342,6 +344,7 @@ class TestContentAssignmentApi(TestCase):
         self.assertEqual(created_assignment.learner_email, 'eugene@foo.com')
         self.assertEqual(created_assignment.lms_user_id, None)
         self.assertEqual(created_assignment.content_key, content_key)
+        self.assertEqual(created_assignment.preferred_course_run_key, course_run_key)
         self.assertEqual(created_assignment.content_title, content_title)
         self.assertEqual(created_assignment.content_quantity, -1 * content_price_cents)
         self.assertEqual(created_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
@@ -488,6 +491,7 @@ class TestContentAssignmentApi(TestCase):
         Tests that allocating assignments correctly sets the lms_user_id when a user pre-exists with a matching email.
         """
         content_key = 'demoX'
+        course_run_key = 'demoX+1T2022'
         content_title = 'edx: Demo 101'
         content_price_cents = 100
         learner_email = 'alice@foo.com'
@@ -496,6 +500,7 @@ class TestContentAssignmentApi(TestCase):
             'content_title': content_title,
             'content_key': content_key,
             'content_price': content_price_cents,
+            'course_run_key': course_run_key,
         }
 
         if user_exists:
