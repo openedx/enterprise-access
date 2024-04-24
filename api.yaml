@@ -1,0 +1,111 @@
+# This file is a "de-compacted" version of api-compact.yaml. The consuming tools are unable to process YAML anchors.
+# This file was generated using http://www.yamllint.com/.
+---
+apigateway_responses:
+  "200":
+    statusCode: "200"
+  "201":
+    statusCode: "201"
+  "401":
+    statusCode: "401"
+  "403":
+    statusCode: "403"
+  "404":
+    statusCode: "404"
+  "422":
+    statusCode: "422"
+  "429":
+    statusCode: "429"
+  "500":
+    statusCode: "500"
+  default:
+    statusCode: "400"
+learner_content_assignment_cancel_responses:
+  "200":
+    description: OK
+  "400":
+    description: Bad Request
+  "401":
+    description: Unauthorized
+  "404":
+    description: Not Found
+  "422":
+    description: Not Cancellable
+  "500":
+    description: Internal Server Error
+assignment_configuration_uuid:
+  name: assignment_configuration_uuid
+  in: path
+  required: true
+  type: string
+auth_header:
+  name: Authorization
+  in: header
+  required: true
+  type: string
+endpoints:
+  v1:
+    learnerContentAssignmentCancelRequest:
+      post:
+        description: Cancel a list of ``LearnerContentAssignment`` records by uuid
+        operationId: api_v1_assignment_configurations_admin_assignments_cancel_create
+        consumes:
+          - application/json
+        produces:
+          - application/json
+        parameters:
+          - name: Authorization
+            in: header
+            required: true
+            type: string
+          - name: assignment_configuration_uuid
+            in: path
+            required: true
+            type: string
+          - name: assignment_uuids
+            in: body
+            description: Single or multiple assignment_uuids in the array.
+            required: true
+            schema:
+              type: array
+              items:
+                type: string
+        responses:
+          "200":
+            description: OK
+          "400":
+            description: Bad Request
+          "401":
+            description: Unauthorized
+          "404":
+            description: Not Found
+          "422":
+            description: Not Cancellable
+          "500":
+            description: Internal Server Error
+        x-amazon-apigateway-integration:
+          responses:
+            "200":
+              statusCode: "200"
+            "201":
+              statusCode: "201"
+            "401":
+              statusCode: "401"
+            "403":
+              statusCode: "403"
+            "404":
+              statusCode: "404"
+            "422":
+              statusCode: "422"
+            "429":
+              statusCode: "429"
+            "500":
+              statusCode: "500"
+            default:
+              statusCode: "400"
+          httpMethod: POST
+          type: http
+          requestParameters:
+            integration.request.header.Authorization: method.request.header.Authorization
+            integration.request.path.assignment_configuration_uuid: method.request.path.assignment_configuration_uuid
+          uri: https://${stageVariables.enterprise_access_host}/api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/cancel/
