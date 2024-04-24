@@ -9,7 +9,6 @@ import ddt
 import pytest
 import requests
 from django.conf import settings
-from django.core.cache import cache as django_cache
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 
@@ -28,6 +27,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_LEARNER_MAX_SPEND_REACHED,
     REASON_LEARNER_NOT_ASSIGNED_CONTENT,
     REASON_LEARNER_NOT_IN_ENTERPRISE,
+    REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     REASON_POLICY_EXPIRED,
     REASON_POLICY_SPEND_LIMIT_REACHED,
@@ -35,6 +35,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
 )
 from enterprise_access.apps.subsidy_access_policy.exceptions import MissingAssignment, SubsidyAPIHTTPError
 from enterprise_access.apps.subsidy_access_policy.models import (
+    ALLOW_LATE_ENROLLMENT_KEY,
     REQUEST_CACHE_NAMESPACE,
     AssignedLearnerCreditAccessPolicy,
     PerLearnerEnrollmentCreditAccessPolicy,
@@ -45,59 +46,20 @@ from enterprise_access.apps.subsidy_access_policy.models import (
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
-    PerLearnerSpendCapLearnerCreditAccessPolicyFactory
+    PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
+    PolicyGroupAssociationFactory
 )
 from enterprise_access.cache_utils import request_cache
+from enterprise_access.utils import localized_utcnow
+from test_utils import TEST_ENTERPRISE_GROUP_UUID, TEST_USER_RECORD, TEST_USER_RECORD_NO_GROUPS
 
 from ..constants import AccessMethods
 from ..exceptions import PriceValidationError
+from .mixins import MockPolicyDependenciesMixin
 
 ACTIVE_LEARNER_SPEND_CAP_POLICY_UUID = uuid4()
 ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID = uuid4()
 ACTIVE_ASSIGNED_LEARNER_CREDIT_POLICY_UUID = uuid4()
-
-
-class MockPolicyDependenciesMixin:
-    """
-    Mixin to help mock out all access policy dependencies
-    on external services.
-    """
-    def setUp(self):
-        """
-        Initialize mocked service clients.
-        """
-        super().setUp()
-        subsidy_client_patcher = patch.object(
-            SubsidyAccessPolicy, 'subsidy_client'
-        )
-        self.mock_subsidy_client = subsidy_client_patcher.start()
-
-        transactions_cache_for_learner_patcher = patch(
-            'enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner'
-        )
-        self.mock_transactions_cache_for_learner = transactions_cache_for_learner_patcher.start()
-
-        catalog_contains_content_key_patcher = patch.object(
-            SubsidyAccessPolicy, 'catalog_contains_content_key'
-        )
-        self.mock_catalog_contains_content_key = catalog_contains_content_key_patcher.start()
-
-        get_content_metadata_patcher = patch(
-            'enterprise_access.apps.subsidy_access_policy.models.get_and_cache_content_metadata'
-        )
-        self.mock_get_content_metadata = get_content_metadata_patcher.start()
-
-        lms_api_client_patcher = patch.object(
-            SubsidyAccessPolicy, 'lms_api_client'
-        )
-        self.mock_lms_api_client = lms_api_client_patcher.start()
-
-        self.addCleanup(subsidy_client_patcher.stop)
-        self.addCleanup(transactions_cache_for_learner_patcher.stop)
-        self.addCleanup(catalog_contains_content_key_patcher.stop)
-        self.addCleanup(get_content_metadata_patcher.stop)
-        self.addCleanup(lms_api_client_patcher.stop)
-        self.addCleanup(django_cache.clear)  # clear any leftover policy locks.
 
 
 @ddt.ddt
@@ -202,12 +164,12 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
 
     @ddt.data(
         {
-            # Happy path: content in catalog, learner in enterprise, subsidy has value,
-            # existing transactions for learner and policy below the policy limits.
-            # Expected can_redeem result: True
+            # Happy path: content in catalog, learner in enterprise, learner in group,
+            # subsidy has value, existing transactions for learner and policy below
+            # the policy limits. Expected can_redeem result: True
             'policy_active_type': 'active',
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': -100}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -218,7 +180,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_active_type': 'active',
             'catalog_contains_content': False,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -231,7 +193,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_active_type': 'active',
             'catalog_contains_content': True,
-            'enterprise_contains_learner': False,
+            'get_enterprise_user': None,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -240,11 +202,24 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             'expect_transaction_fetch': False,
         },
         {
+            # Learner is not in the enterprise group, every other check would succeed.
+            # Expected can_redeem result: False
+            'policy_active_type': 'active',
+            'catalog_contains_content': True,
+            'get_enterprise_user': TEST_USER_RECORD_NO_GROUPS,
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
+            'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
+        },
+        {
             # The subsidy is not redeemable, every other check would succeed.
             # Expected can_redeem result: False
             'policy_active_type': 'active',
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': False, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -256,7 +231,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_active_type': 'active',
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
                 'transactions': [{
@@ -276,7 +251,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_active_type': 'active',
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
                 'transactions': [{
@@ -295,7 +270,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_active_type': 'inactive',
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -308,7 +283,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_active_type': 'non_redeemable',
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -321,7 +296,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_active_type': 'active',
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': False},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -333,7 +308,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         self,
         policy_active_type,
         catalog_contains_content,
-        enterprise_contains_learner,
+        get_enterprise_user,
         subsidy_is_redeemable,
         transactions_for_learner,
         transactions_for_policy,
@@ -344,7 +319,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         """
         Test the can_redeem method of PerLearnerEnrollmentCapLearnerCreditAccessPolicy model
         """
-        self.mock_lms_api_client.enterprise_contains_learner.return_value = enterprise_contains_learner
+        self.mock_lms_api_client.get_enterprise_user.return_value = get_enterprise_user
         self.mock_catalog_contains_content_key.return_value = catalog_contains_content
         self.mock_get_content_metadata.return_value = {
             'content_price': 200,
@@ -358,6 +333,11 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             policy_record = self.per_learner_enroll_policy
         elif policy_active_type == 'non_redeemable':
             policy_record = self.active_non_redeemable_per_learner_enroll_policy
+
+        PolicyGroupAssociationFactory(
+            enterprise_group_uuid=TEST_ENTERPRISE_GROUP_UUID,
+            subsidy_access_policy=policy_record
+        )
 
         can_redeem_result = policy_record.can_redeem(self.lms_user_id, self.course_id)
 
@@ -385,7 +365,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: True
             'policy_is_active': True,
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': -100}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -396,7 +376,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': False,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -409,7 +389,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': True,
-            'enterprise_contains_learner': False,
+            'get_enterprise_user': None,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -418,11 +398,24 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             'expect_transaction_fetch': False,
         },
         {
+            # Learner is not in the enterprise group, every other check would succeed.
+            # Expected can_redeem result: False
+            'policy_is_active': True,
+            'catalog_contains_content': True,
+            'get_enterprise_user': TEST_USER_RECORD_NO_GROUPS,
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
+            'expected_policy_can_redeem': (False, REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP, []),
+            'expect_content_metadata_fetch': False,
+            'expect_transaction_fetch': False,
+        },
+        {
             # The subsidy is not redeemable, every other check would succeed.
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': False, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -434,7 +427,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
                 'transactions': [{
@@ -454,7 +447,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
                 'transactions': [{
@@ -473,7 +466,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': False,
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -486,7 +479,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': True,
-            'enterprise_contains_learner': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': False},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
             'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
@@ -498,7 +491,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         self,
         policy_is_active,
         catalog_contains_content,
-        enterprise_contains_learner,
+        get_enterprise_user,
         subsidy_is_redeemable,
         transactions_for_learner,
         transactions_for_policy,
@@ -509,7 +502,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         """
         Test the can_redeem method of PerLearnerSpendCapLearnerCreditAccessPolicy model
         """
-        self.mock_lms_api_client.enterprise_contains_learner.return_value = enterprise_contains_learner
+        self.mock_lms_api_client.get_enterprise_user.return_value = get_enterprise_user
         self.mock_catalog_contains_content_key.return_value = catalog_contains_content
         self.mock_get_content_metadata.return_value = {
             'content_price': 200,
@@ -521,6 +514,11 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         policy_record = self.inactive_per_learner_spend_policy
         if policy_is_active:
             policy_record = self.per_learner_spend_policy
+
+        PolicyGroupAssociationFactory(
+            enterprise_group_uuid=TEST_ENTERPRISE_GROUP_UUID,
+            subsidy_access_policy=policy_record
+        )
 
         can_redeem_result = policy_record.can_redeem(self.lms_user_id, self.course_id)
 
@@ -649,6 +647,89 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         self.assertIsNone(policy.is_subsidy_active)
         self.assertEqual(policy.subsidy_balance(), 0)
 
+    @ddt.data(
+        # late redemption never set.
+        {
+            'late_redemption_allowed_until': None,
+            'metadata_provided_to_policy': None,
+            'expected_metadata_sent_to_subsidy': None,
+        },
+        # late redemption set, but has expired.
+        {
+            'late_redemption_allowed_until': localized_utcnow() - timedelta(days=1),
+            'metadata_provided_to_policy': None,
+            'expected_metadata_sent_to_subsidy': None,
+        },
+        # late redemption set and currently allowed.
+        {
+            'late_redemption_allowed_until': localized_utcnow() + timedelta(days=1),
+            'metadata_provided_to_policy': None,
+            'expected_metadata_sent_to_subsidy': {ALLOW_LATE_ENROLLMENT_KEY: True},
+        },
+        # late redemption never set.
+        # + some metadata is provided.
+        {
+            'late_redemption_allowed_until': None,
+            'metadata_provided_to_policy': {'foo': 'bar'},
+            'expected_metadata_sent_to_subsidy': {'foo': 'bar'},
+        },
+        # late redemption set, but has expired.
+        # + some metadata is provided.
+        {
+            'late_redemption_allowed_until': localized_utcnow() - timedelta(days=1),
+            'metadata_provided_to_policy': {'foo': 'bar'},
+            'expected_metadata_sent_to_subsidy': {'foo': 'bar'},
+        },
+        # late redemption set and currently allowed.
+        # + some metadata is provided.
+        {
+            'late_redemption_allowed_until': localized_utcnow() + timedelta(days=1),
+            'metadata_provided_to_policy': {'foo': 'bar'},
+            'expected_metadata_sent_to_subsidy': {'foo': 'bar', ALLOW_LATE_ENROLLMENT_KEY: True},
+        },
+    )
+    @ddt.unpack
+    def test_redeem_pass_late_enrollment(
+        self,
+        late_redemption_allowed_until,
+        metadata_provided_to_policy,
+        expected_metadata_sent_to_subsidy,
+    ):
+        """
+        Test redeem() when the late redemption feature is involved.
+        """
+
+        # Set up the entire environment to make the policy and subsidy happy to redeem.
+        self.mock_lms_api_client.get_enterprise_user.return_value = TEST_USER_RECORD
+        self.mock_catalog_contains_content_key.return_value = True
+        self.mock_get_content_metadata.return_value = {
+            'content_price': 200,
+        }
+        self.mock_subsidy_client.can_redeem.return_value = {'can_redeem': True, 'active': True}
+        self.mock_transactions_cache_for_learner.return_value = {
+            'transactions': [],
+            'aggregates': {'total_quantity': -100},
+        }
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': -200},
+        }
+        self.mock_subsidy_client.create_subsidy_transaction.return_value = {'uuid': str(uuid4())}
+
+        # Optionally swap out the test policy with one that allows late redemption.
+        test_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            per_learner_spend_limit=500,
+            spend_limit=10000,
+            late_redemption_allowed_until=late_redemption_allowed_until,
+        )
+
+        # Do the redemption
+        test_policy.redeem(self.lms_user_id, self.course_id, [], metadata=metadata_provided_to_policy)
+
+        # Assert that the metadata we send to enterprise-subsidy contains the allow_late_enrollment hint (or not).
+        assert self.mock_subsidy_client.create_subsidy_transaction.call_args.kwargs['metadata'] \
+            == expected_metadata_sent_to_subsidy
+
 
 class SubsidyAccessPolicyResolverTests(TestCase):
     """ SubsidyAccessPolicy.resolve_policy() tests. """
@@ -695,34 +776,34 @@ class SubsidyAccessPolicyResolverTests(TestCase):
         self.policy_three = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
         self.policy_four = PerLearnerSpendCapLearnerCreditAccessPolicyFactory.create()
 
-        policy_one_subsity_patcher = patch.object(
+        policy_one_subsidy_patcher = patch.object(
             self.policy_one, 'subsidy_record'
         )
-        self.mock_policy_one_subsidy_record = policy_one_subsity_patcher.start()
+        self.mock_policy_one_subsidy_record = policy_one_subsidy_patcher.start()
         self.mock_policy_one_subsidy_record.return_value = self.mock_subsidy_one
 
-        policy_two_subsity_patcher = patch.object(
+        policy_two_subsidy_patcher = patch.object(
             self.policy_two, 'subsidy_record'
         )
-        self.mock_policy_two_subsidy_record = policy_two_subsity_patcher.start()
+        self.mock_policy_two_subsidy_record = policy_two_subsidy_patcher.start()
         self.mock_policy_two_subsidy_record.return_value = self.mock_subsidy_two
 
-        policy_three_subsity_patcher = patch.object(
+        policy_three_subsidy_patcher = patch.object(
             self.policy_three, 'subsidy_record'
         )
-        self.mock_policy_three_subsidy_record = policy_three_subsity_patcher.start()
+        self.mock_policy_three_subsidy_record = policy_three_subsidy_patcher.start()
         self.mock_policy_three_subsidy_record.return_value = self.mock_subsidy_three
 
-        policy_four_subsity_patcher = patch.object(
+        policy_four_subsidy_patcher = patch.object(
             self.policy_four, 'subsidy_record'
         )
-        self.mock_policy_four_subsidy_record = policy_four_subsity_patcher.start()
+        self.mock_policy_four_subsidy_record = policy_four_subsidy_patcher.start()
         self.mock_policy_four_subsidy_record.return_value = self.mock_subsidy_four
 
-        self.addCleanup(policy_one_subsity_patcher.stop)
-        self.addCleanup(policy_two_subsity_patcher.stop)
-        self.addCleanup(policy_three_subsity_patcher.stop)
-        self.addCleanup(policy_four_subsity_patcher.stop)
+        self.addCleanup(policy_one_subsidy_patcher.stop)
+        self.addCleanup(policy_two_subsidy_patcher.stop)
+        self.addCleanup(policy_three_subsidy_patcher.stop)
+        self.addCleanup(policy_four_subsidy_patcher.stop)
 
     def test_setup(self):
         """
@@ -752,7 +833,7 @@ class SubsidyAccessPolicyResolverTests(TestCase):
     @override_settings(MULTI_POLICY_RESOLUTION_ENABLED=True)
     def test_resolve_two_policies_by_expiration(self):
         """
-        Test resolve given a two policies with different balances, differet expiration
+        Test resolve given a two policies with different balances, different expiration
         the sooner expiration policy should be returned.
         """
         policies = [self.policy_one, self.policy_three]
@@ -765,7 +846,7 @@ class SubsidyAccessPolicyResolverTests(TestCase):
         but different type-priority.
         """
         policies = [self.policy_four, self.policy_one]
-        # artificially set the priority attribute higher on one of the policies (lower priority takes precident)
+        # artificially set the priority attribute higher on one of the policies (lower priority takes precedent)
         with patch.object(PerLearnerSpendCreditAccessPolicy, 'priority', new_callable=PropertyMock) as mock:
             mock.return_value = 100
             assert SubsidyAccessPolicy.resolve_policy(policies) == self.policy_one
@@ -908,7 +989,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         self.assignments_api_patcher.stop()
 
         # Set up the entire environment to make the policy happy about all non-assignment stuff.
-        self.mock_lms_api_client.enterprise_contains_learner.return_value = True
+        self.mock_lms_api_client.get_enterprise_user.return_value = TEST_USER_RECORD
         self.mock_catalog_contains_content_key.return_value = True
         self.mock_get_content_metadata.return_value = {
             'content_price': 200,
@@ -1004,7 +1085,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         self.assignments_api_patcher.stop()
 
         # Set up the entire environment to make the policy happy about all non-assignment stuff.
-        self.mock_lms_api_client.enterprise_contains_learner.return_value = True
+        self.mock_lms_api_client.get_enterprise_user.return_value = TEST_USER_RECORD
         self.mock_catalog_contains_content_key.return_value = True
         self.mock_get_content_metadata.return_value = {
             'content_price': 200,
@@ -1079,7 +1160,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
                 assert redeemed_action.action_type == AssignmentActions.REDEEMED
                 assert not redeemed_action.error_reason
             if fail_subsidy_create_transaction:
-                # sad path should generate a failed redeememd action with populated error_reason and traceback.
+                # sad path should generate a failed redeemed action with populated error_reason and traceback.
                 redeemed_action = assignment.actions.last()
                 assert redeemed_action.action_type == AssignmentActions.REDEEMED
                 assert redeemed_action.error_reason == AssignmentActionErrors.ENROLLMENT_ERROR
@@ -1234,7 +1315,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         self.mock_assignments_api.get_allocated_quantity_for_configuration.return_value = -1000
 
         # Request a price just slightly different from the canonical price
-        # the subidy remaining balance and the spend limit are both 10,000
+        # the subsidy remaining balance and the spend limit are both 10,000
         # ((7 * 1000) + 1000 + 1000) < 10000
         can_allocate, _ = self.active_policy.can_allocate(7, self.course_key, 1000)
 
@@ -1269,3 +1350,41 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         }
         with self.assertRaisesRegex(PriceValidationError, 'outside of acceptable interval'):
             self.active_policy.can_allocate(1, self.course_key, requested_price)
+
+
+@ddt.ddt
+class PolicyGroupAssociationTests(MockPolicyDependenciesMixin, TestCase):
+    """ Tests specific to the policy group association model. """
+
+    lms_user_id = 12345
+    group_uuid = uuid4()
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.access_policy = AssignedLearnerCreditAccessPolicyFactory()
+
+    def tearDown(self):
+        """
+        Clears any cached data for the test policy instances between test runs.
+        """
+        super().tearDown()
+        request_cache(namespace=REQUEST_CACHE_NAMESPACE).clear()
+
+    def test_save(self):
+        """
+        Test that the model-level validation of this model works as expected.
+        Should be saved with a unique combination of SubsidyAccessPolicy
+        and group uuid (enterprise_customer_uuid).
+        """
+
+        policy = PolicyGroupAssociationFactory(
+            enterprise_group_uuid=self.group_uuid,
+            subsidy_access_policy=self.access_policy,
+        )
+
+        policy.save()
+        policy.refresh_from_db()
+
+        self.assertEqual(policy.enterprise_group_uuid, self.group_uuid)
+        self.assertIsNotNone(policy.subsidy_access_policy)

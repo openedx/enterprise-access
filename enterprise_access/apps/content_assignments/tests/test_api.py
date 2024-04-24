@@ -1,6 +1,7 @@
 """
 Tests for the ``api.py`` module of the content_assignments app.
 """
+import re
 from unittest import mock
 
 import ddt
@@ -21,7 +22,11 @@ from ..api import (
     get_assignment_for_learner,
     get_assignments_for_configuration
 )
-from ..constants import NUM_DAYS_BEFORE_AUTO_EXPIRATION, RETIRED_EMAIL_ADDRESS, LearnerContentAssignmentStateChoices
+from ..constants import (
+    NUM_DAYS_BEFORE_AUTO_EXPIRATION,
+    RETIRED_EMAIL_ADDRESS_FORMAT,
+    LearnerContentAssignmentStateChoices
+)
 from ..models import AssignmentConfiguration, LearnerContentAssignment
 from .factories import LearnerContentAssignmentFactory
 
@@ -706,11 +711,12 @@ class TestAssignmentExpiration(TestCase):
         assignment.refresh_from_db()
         self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.EXPIRED)
         self.assertEqual(12345, assignment.lms_user_id)
-        self.assertEqual(assignment.learner_email, RETIRED_EMAIL_ADDRESS)
+        pattern = RETIRED_EMAIL_ADDRESS_FORMAT.format('[a-f0-9]{16}')
+        self.assertIsNotNone(re.match(pattern, assignment.learner_email))
 
         for historical_record in assignment.history.all():
             self.assertEqual(12345, historical_record.lms_user_id)
-            self.assertEqual(historical_record.learner_email, RETIRED_EMAIL_ADDRESS)
+            self.assertIsNotNone(re.match(pattern, historical_record.learner_email))
 
         mock_expired_email.delay.assert_called_once_with(assignment.uuid)
 

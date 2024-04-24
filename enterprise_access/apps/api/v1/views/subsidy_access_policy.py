@@ -3,7 +3,6 @@ REST API views for the subsidy_access_policy app.
 """
 import logging
 import os
-import time
 from collections import defaultdict
 from contextlib import suppress
 
@@ -96,19 +95,31 @@ def _get_reasons_for_no_redeemable_policies(enterprise_customer_uuid, non_redeem
     reasons = []
     lms_client = LmsApiClient()
     enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
-    enterprise_admin_users = enterprise_customer_data.get('admin_users')
+    admin_contact = _get_admin_contact_email(enterprise_customer_data)
 
     for reason, policies in non_redeemable_policies_by_reason.items():
         reasons.append({
             "reason": reason,
-            "user_message": _get_user_message_for_reason(reason, enterprise_admin_users),
+            "user_message": _get_user_message_for_reason(reason, admin_contact),
             "metadata": {
-                "enterprise_administrators": enterprise_admin_users,
+                "enterprise_administrators": admin_contact,
             },
             "policy_uuids": [policy.uuid for policy in policies],
         })
 
     return reasons
+
+
+def _get_admin_contact_email(enterprise_customer_data):
+    """
+    Return the point of contact email for an enterprise customer.
+    """
+    if admin_contact_email := enterprise_customer_data.get('contact_email'):
+        return [{
+            "email": admin_contact_email,
+            "lms_user_id": None,
+        }]
+    return enterprise_customer_data.get('admin_users', [])
 
 
 def _get_user_message_for_reason(reason_slug, enterprise_admin_users):
@@ -802,29 +813,21 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
         content_price_cents = serializer.data['content_price_cents']
 
         try:
-            # TODO: remove the timing calls after slowness is identified
-            start_time = time.process_time()
             with policy.lock():
                 can_allocate, reason = policy.can_allocate(
                     len(learner_emails),
                     content_key,
                     content_price_cents,
                 )
-                can_allocate_time = time.process_time() - start_time
-                logger.info('allocate timing: can_allocate() %s', can_allocate_time)
                 if can_allocate:
                     allocation_result = policy.allocate(
                         learner_emails,
                         content_key,
                         content_price_cents,
                     )
-                    do_allocate_time = time.process_time() - can_allocate_time
-                    logger.info('allocate timing: do allocate() %s', do_allocate_time)
                     response_serializer = serializers.SubsidyAccessPolicyAllocationResponseSerializer(
                         allocation_result,
                     )
-                    serialization_time = time.process_time() - do_allocate_time
-                    logger.info('allocate timing: serialization %s', serialization_time)
                     return Response(response_serializer.data, status=status.HTTP_202_ACCEPTED)
                 else:
                     non_allocatable_reason_list = _get_reasons_for_no_redeemable_policies(
@@ -833,11 +836,6 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
                     )
                     raise AllocationRequestException(detail=non_allocatable_reason_list)
 
-            # we may not have hit the `if` block, so just get a time on the
-            # entire policy lock context.  We can infer the difference between
-            # that value and `serialization_time` if the latter is available in logs.
-            lock_release_time = time.process_time() - start_time
-            logger.info('allocate timing: policy lock release %s', lock_release_time)
         except SubsidyAccessPolicyLockAttemptFailed as exc:
             logger.exception(exc)
             raise SubsidyAccessPolicyLockedException() from exc

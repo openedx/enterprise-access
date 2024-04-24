@@ -1,7 +1,7 @@
 """
 Tests for License Manager client.
 """
-
+from datetime import datetime, timedelta
 from unittest import mock
 from uuid import uuid4
 
@@ -13,8 +13,8 @@ from rest_framework import status
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
+from test_utils import TEST_ENTERPRISE_UUID, TEST_USER_ID, TEST_USER_RECORD
 
-TEST_ENTERPRISE_UUID = uuid4()
 TEST_USER_EMAILS = [
     'larry@stooges.com',
     'moe@stooges.com',
@@ -168,32 +168,22 @@ class TestLmsApiClient(TestCase):
 
     @mock.patch('requests.Response.json')
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
-    def test_enterprise_contains_learner(self, mock_oauth_client, mock_json):
+    def test_get_enterprise_user(self, mock_oauth_client, mock_json):
         """
-        Verify enterprise_contains_learner works as expected.
+        Verify get_enterprise_user works as expected.
         """
-        mock_enterprise_uuid = str(uuid4())
-        user_id = 1234
         mock_oauth_client.return_value.get.return_value = requests.Response()
         mock_oauth_client.return_value.get.return_value.status_code = 200
 
         mock_json.return_value = {
             'results': [
-                {
-                    'enterprise_customer': {
-                        'uuid': mock_enterprise_uuid
-                    },
-                    'user': {
-                        'id': user_id
-                    }
-                }
+                TEST_USER_RECORD
             ]
         }
-
-        query_params = {'enterprise_customer_uuid': mock_enterprise_uuid, 'user_ids': user_id}
+        query_params = {'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID), 'user_ids': TEST_USER_ID}
         client = LmsApiClient()
-        enterprise_contains_learner = client.enterprise_contains_learner(mock_enterprise_uuid, user_id)
-        assert enterprise_contains_learner
+        get_enterprise_user = client.get_enterprise_user(str(TEST_ENTERPRISE_UUID), TEST_USER_ID)
+        assert get_enterprise_user == TEST_USER_RECORD
 
         mock_oauth_client.return_value.get.assert_called_with(
             'http://edx-platform.example.com/enterprise/api/v1/enterprise-learner/',
@@ -249,3 +239,57 @@ class TestLmsApiClient(TestCase):
                 {'enterprise_customer': str(TEST_ENTERPRISE_UUID), 'user_email': TEST_USER_EMAILS[2]},
             ],
         )
+
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_pending_enterprise_group_memberships(self, mock_oauth_client, mock_json):
+        """
+        Verify get_pending_enterprise_group_memberships works as expected.
+        """
+        mock_oauth_client.return_value.get.return_value = requests.Response()
+        mock_oauth_client.return_value.get.return_value.status_code = 200
+        enterprise_group_membership_uuid = uuid4()
+        recent_action = datetime.strftime(datetime.today() - timedelta(days=5), '%B %d, %Y')
+        mock_json.return_value = {
+            "next": None,
+            "previous": None,
+            "count": 1,
+            "num_pages": 1,
+            "current_page": 1,
+            "start": 0,
+            "results": [
+                {
+                    "pending_learner_id": 1,
+                    "enterprise_group_membership_uuid": enterprise_group_membership_uuid,
+                    "member_details": {
+                        "user_email": "test1@2u.com",
+                        "user_name": " "
+                    },
+                    "recent_action": f'Invited: {recent_action}',
+                    "member_status": "pending",
+                },
+                {
+                    "pending_learner_id": 2,
+                    "enterprise_group_membership_uuid": enterprise_group_membership_uuid,
+                    "member_details": {
+                        "user_email": "test2@2u.com",
+                        "user_name": " "
+                    },
+                    "recent_action": "Invited: March 30, 2024",
+                    "member_status": "pending",
+                }
+            ]
+        }
+        client = LmsApiClient()
+        expected_return = [{
+            "pending_learner_id": 1,
+            "user_email": "test1@2u.com",
+            "recent_action": f'Invited: {recent_action}'}]
+        pending_enterprise_group_memberships = (
+            client.get_pending_enterprise_group_memberships(enterprise_group_membership_uuid))
+        mock_oauth_client.return_value.get.assert_called_with(
+            'http://edx-platform.example.com/enterprise/api/v1/enterprise-group/' +
+            f'{enterprise_group_membership_uuid}/learners/?pending_users_only=true',
+            timeout=settings.LMS_CLIENT_TIMEOUT
+        )
+        assert pending_enterprise_group_memberships == expected_return

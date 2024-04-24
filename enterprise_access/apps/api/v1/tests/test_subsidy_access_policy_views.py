@@ -41,10 +41,11 @@ from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPol
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
-    PerLearnerSpendCapLearnerCreditAccessPolicyFactory
+    PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
+    PolicyGroupAssociationFactory
 )
 from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
-from test_utils import APITestWithMocks
+from test_utils import TEST_ENTERPRISE_GROUP_UUID, TEST_USER_RECORD, APITestWithMocks
 
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:subsidy-access-policies-list')
 
@@ -268,6 +269,12 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
 
         request_kwargs = {'uuid': str(self.redeemable_policy.uuid)}
 
+        enterprise_group_uuid = uuid4()
+        PolicyGroupAssociationFactory(
+            enterprise_group_uuid=enterprise_group_uuid,
+            subsidy_access_policy=self.redeemable_policy,
+        )
+
         # Test the retrieve endpoint
         response = self.client.get(reverse('api:v1:subsidy-access-policies-detail', kwargs=request_kwargs))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -297,6 +304,9 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'spend_available_usd': 0.02,
             },
             'assignment_configuration': None,
+            'group_associations': [str(enterprise_group_uuid)],
+            'late_redemption_allowed_until': None,
+            'is_late_redemption_allowed': False,
         }, response.json())
 
     @ddt.data(
@@ -389,6 +399,9 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                     'spend_available_usd': 0.00,
                 },
                 'assignment_configuration': None,
+                'group_associations': [],
+                'late_redemption_allowed_until': None,
+                'is_late_redemption_allowed': False,
             },
             {
                 'access_method': 'direct',
@@ -416,6 +429,9 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                     'spend_available_usd': 0.02,
                 },
                 'assignment_configuration': None,
+                'group_associations': [],
+                'late_redemption_allowed_until': None,
+                'is_late_redemption_allowed': False,
             },
         ]
 
@@ -446,7 +462,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             call(
                 subsidy_uuid=self.non_redeemable_policy.subsidy_uuid,
                 subsidy_access_policy_uuid=self.non_redeemable_policy.uuid,
-            )
+            ),
         ])
 
     @ddt.data(
@@ -510,6 +526,9 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'spend_available_usd': 0.02,
             },
             'assignment_configuration': None,
+            'group_associations': [],
+            'late_redemption_allowed_until': None,
+            'is_late_redemption_allowed': False,
         }
         self.assertEqual(expected_response, response.json())
 
@@ -604,6 +623,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'per_learner_enrollment_limit': policy_for_edit.per_learner_enrollment_limit,
             'spend_limit': policy_for_edit.spend_limit,
             'subsidy_uuid': str(policy_for_edit.subsidy_uuid),
+            'late_redemption_allowed_until': None,
 
             # All the rest of the fields that we do not support PATCHing.
             'uuid': str(policy_for_edit.uuid),
@@ -621,6 +641,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'spend_available_usd': 0.04,
             },
             'assignment_configuration': None,
+            'group_associations': [],
+            'is_late_redemption_allowed': False,
         }
         expected_response.update(request_payload)
         self.assertEqual(expected_response, response.json())
@@ -638,7 +660,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
     def test_update_views_fields_disallowed_for_update(self, request_payload):
         """
         Test that the update and partial_update views can NOT modify fields
-        of a policy record that are not included in the update request serializer fields defintion.
+        of a policy record that are not included in the update request serializer fields definition.
         """
         # Set the JWT-based auth to an operator.
         self.set_jwt_cookie([
@@ -828,6 +850,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             'subsidy_active_datetime': self.yesterday.isoformat(),
             'subsidy_expiration_datetime': self.tomorrow.isoformat(),
             'is_subsidy_active': True,
+            'group_associations': [],
         }
         payload.update(extra_fields)
         response = self.client.post(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, payload)
@@ -839,6 +862,8 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             expected_response = payload.copy()
             expected_response.setdefault("per_learner_enrollment_limit")
             expected_response.setdefault("per_learner_spend_limit")
+            expected_response["late_redemption_allowed_until"] = None
+            expected_response["is_late_redemption_allowed"] = False
             assert response_json == expected_response
         elif expected_response_code == status.HTTP_400_BAD_REQUEST:
             for expected_error_keyword in expected_error_keywords:
@@ -884,6 +909,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             'subsidy_active_datetime': self.yesterday.isoformat(),
             'subsidy_expiration_datetime': self.tomorrow.isoformat(),
             'is_subsidy_active': True,
+            'group_associations': [],
         }
         payload.update(extra_fields)
         response = self.client.post(SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT, payload)
@@ -895,6 +921,8 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             expected_response = payload.copy()
             expected_response.setdefault("per_learner_enrollment_limit")
             expected_response.setdefault("per_learner_spend_limit")
+            expected_response["late_redemption_allowed_until"] = None
+            expected_response["is_late_redemption_allowed"] = False
             assert response_json == expected_response
 
         # Test idempotency
@@ -909,6 +937,8 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             expected_response = payload.copy()
             expected_response.setdefault("per_learner_enrollment_limit")
             expected_response.setdefault("per_learner_spend_limit")
+            expected_response["late_redemption_allowed_until"] = None
+            expected_response["is_late_redemption_allowed"] = False
             assert response_json == expected_response
 
 
@@ -1059,18 +1089,23 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         lms_client_patcher = mock.patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
         lms_client = lms_client_patcher.start()
         self.lms_client_instance = lms_client.return_value
-        self.lms_client_instance.enterprise_contains_learner.return_value = True
+        self.lms_client_instance.get_enterprise_user.return_value = TEST_USER_RECORD
 
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
         self.addCleanup(contains_key_patcher.stop)
         self.addCleanup(get_content_metadata_patcher.stop)
 
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
-    def test_redeem_policy(self, mock_transactions_cache_for_learner):  # pylint: disable=unused-argument
+    def test_redeem_policy(self, mock_transactions_cache_for_learner, mock_oauth):  # pylint: disable=unused-argument
         """
         Verify that SubsidyAccessPolicyRedeemViewset redeem endpoint works as expected
         """
+        PolicyGroupAssociationFactory(
+            enterprise_group_uuid=TEST_ENTERPRISE_GROUP_UUID,
+            subsidy_access_policy=self.redeemable_policy
+        )
         self.mock_get_content_metadata.return_value = {'content_price': 123}
         mock_transaction_record = {
             'uuid': str(uuid4()),
@@ -1249,37 +1284,37 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         {
             'is_subsidy_active': True,
             'has_subsidy_balance_remaining': True,
-            'is_learned_linked': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'has_learner_exceed_spend_cap': False,
         },
         {
             'is_subsidy_active': True,
             'has_subsidy_balance_remaining': True,
-            'is_learned_linked': False,
+            'get_enterprise_user': None,
             'has_learner_exceed_spend_cap': False,
         },
         {
             'is_subsidy_active': True,
             'has_subsidy_balance_remaining': True,
-            'is_learned_linked': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'has_learner_exceed_spend_cap': True,
         },
         {
             'is_subsidy_active': False,
             'has_subsidy_balance_remaining': True,
-            'is_learned_linked': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'has_learner_exceed_spend_cap': False,
         },
         {
             'is_subsidy_active': True,
             'has_subsidy_balance_remaining': False,
-            'is_learned_linked': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'has_learner_exceed_spend_cap': False,
         },
         {
             'is_subsidy_active': False,
             'has_subsidy_balance_remaining': False,
-            'is_learned_linked': True,
+            'get_enterprise_user': TEST_USER_RECORD,
             'has_learner_exceed_spend_cap': False,
         },
     )
@@ -1290,7 +1325,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         mock_transactions_cache_for_learner,
         is_subsidy_active,
         has_subsidy_balance_remaining,
-        is_learned_linked,
+        get_enterprise_user,
         has_learner_exceed_spend_cap,
     ):
         """
@@ -1317,10 +1352,12 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         enroll_cap_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
             per_learner_enrollment_limit=5,
+            spend_limit=10000,
         )
         spend_cap_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
             per_learner_spend_limit=(5 if has_learner_exceed_spend_cap else 1000),
+            spend_limit=10000,
         )
 
         mock_transaction_record = {
@@ -1369,7 +1406,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'current_balance': '5000' if has_subsidy_balance_remaining else '0',
             'is_active': is_subsidy_active,
         }
-        self.lms_client_instance.enterprise_contains_learner.return_value = is_learned_linked
+        self.lms_client_instance.get_enterprise_user.return_value = get_enterprise_user
 
         query_params = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),
@@ -1379,7 +1416,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
         response_json = response.json()
 
-        if is_subsidy_active and has_subsidy_balance_remaining and is_learned_linked:
+        if is_subsidy_active and has_subsidy_balance_remaining and get_enterprise_user is not None:
             # the above generic checks passed, now verify the specific policy-type specific checks.
             if has_learner_exceed_spend_cap:
                 # The spend cap policy should not be returned as the learner has exceeded the spend cap.
@@ -1459,7 +1496,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'current_balance': '5000',
             'is_active': True,
         }
-        self.lms_client_instance.enterprise_contains_learner.return_value = True
+        self.lms_client_instance.get_enterprise_user.return_value = TEST_USER_RECORD
         query_params = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),
             'lms_user_id': 1234,
@@ -1590,7 +1627,7 @@ class BaseCanRedeemTestMixin:
         lms_client_patcher = mock.patch('enterprise_access.apps.subsidy_access_policy.models.LmsApiClient')
         lms_client = lms_client_patcher.start()
         lms_client_instance = lms_client.return_value
-        lms_client_instance.enterprise_contains_learner.return_value = True
+        lms_client_instance.get_enterprise_user.return_value = TEST_USER_RECORD
 
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
@@ -1613,6 +1650,12 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
             spend_limit=500000,
         )
         self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
+
+        group_uuid = uuid4()
+        PolicyGroupAssociationFactory(
+            enterprise_group_uuid=group_uuid,
+            subsidy_access_policy=self.redeemable_policy
+        )
 
     def test_can_redeem_policy_missing_params(self):
         """
@@ -1709,21 +1752,34 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient', return_value=mock.MagicMock())
     @ddt.data(
-        {"has_admin_users": True},
-        {"has_admin_users": False},
+        {"has_admin_users": True,
+         "contact_email": 'edx@example.org',
+         "admin_users": [{
+             "email": 'frodo@example.org',
+             "lms_user_id": 12
+         }]},
+        {"has_admin_users": True,
+         "contact_email": None,
+         "admin_users": [{
+             "email": 'frodo@example.org',
+             "lms_user_id": 12,
+         }]},
+        {"has_admin_users": False,
+         "contact_email": None,
+         "admin_users": None}
     )
     @ddt.unpack
     def test_can_redeem_policy_none_redeemable(
-        self, mock_lms_client, mock_transactions_cache_for_learner, has_admin_users
+        self, mock_lms_client, mock_transactions_cache_for_learner, has_admin_users, contact_email, admin_users
     ):
         """
         Test that the can_redeem endpoint returns reasons for why each non-redeemable policy failed.
         """
         slug = 'sluggy'
-        admin_email = 'edx@example.org'
         mock_lms_client().get_enterprise_customer_data.return_value = {
             'slug': slug,
-            'admin_users': [{'email': admin_email}] if has_admin_users else [],
+            'admin_users': admin_users if has_admin_users else [],
+            'contact_email': contact_email
         }
 
         mock_transactions_cache_for_learner.return_value = {
@@ -1789,10 +1845,17 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
 
         expected_user_message = (
             MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS
-            if has_admin_users
+            if contact_email is not None or has_admin_users
             else MissingSubsidyAccessReasonUserMessages.ORGANIZATION_NO_FUNDS_NO_ADMINS
         )
-        expected_enterprise_admins = [{'email': admin_email}] if has_admin_users else []
+        expected_enterprise_admins = []
+        if contact_email is not None:
+            expected_enterprise_admins = [{
+                "email": contact_email,
+                "lms_user_id": None,
+            }]
+        elif has_admin_users:
+            expected_enterprise_admins = admin_users
 
         assert response_list[0]["reasons"] == [
             {

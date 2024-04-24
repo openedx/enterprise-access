@@ -1,14 +1,14 @@
 """
 Tests for the serializers in the API.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 from uuid import uuid4
 
 import ddt
 from django.conf import settings
 from django.test import TestCase
-from django.urls import reverse
+from freezegun import freeze_time
 
 from enterprise_access.apps.api.serializers.subsidy_access_policy import (
     SubsidyAccessPolicyAggregatesSerializer,
@@ -121,30 +121,54 @@ class TestSubsidyAccessPolicyResponseSerializer(TestCase):
         assert data["spend_available_usd_cents"] == available
 
 
+@ddt.ddt
 class TestSubsidyAccessPolicyRedeemableResponseSerializer(TestCase):
     """
     Tests for the SubsidyAccessPolicyRedeemableResponseSerializer.
     """
+    NOW = datetime(2017, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
     def setUp(self):
-        self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
-        self.subsidy_access_policy_redeem_endpoint = reverse(
-            'api:v1:policy-redemption-redeem',
-            kwargs={'policy_uuid': self.non_redeemable_policy.uuid}
-        )
+        self.redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
 
     def test_get_policy_redemption_url(self):
         """
         Test that the get_policy_redemption_url method returns the correct
         URL for the policy redemption.
         """
-
-        serializer = SubsidyAccessPolicyRedeemableResponseSerializer(self.non_redeemable_policy)
+        serializer = SubsidyAccessPolicyRedeemableResponseSerializer(self.redeemable_policy)
 
         data = serializer.data
         self.assertIn("policy_redemption_url", data)
         expected_url = f"{settings.ENTERPRISE_ACCESS_URL}/api/v1/policy-redemption/" \
-                       f"{self.non_redeemable_policy.uuid}/redeem/"
+                       f"{self.redeemable_policy.uuid}/redeem/"
         self.assertEqual(data["policy_redemption_url"], expected_url)
+
+    @ddt.data(
+        {
+            'late_redemption_allowed_until': None,
+            'expected_is_late_redemption_allowed': False,
+        },
+        {
+            'late_redemption_allowed_until': NOW - timedelta(days=1),
+            'expected_is_late_redemption_allowed': False,
+        },
+        {
+            'late_redemption_allowed_until': NOW + timedelta(days=1),
+            'expected_is_late_redemption_allowed': True,
+        },
+    )
+    @ddt.unpack
+    @freeze_time(NOW)
+    def test_is_late_enrollment_allowed(self, late_redemption_allowed_until, expected_is_late_redemption_allowed):
+        """
+        Test that the `is_late_enrollment_allowed` computed field is present and correct.
+        """
+        policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            late_redemption_allowed_until=late_redemption_allowed_until
+        )
+        serializer = SubsidyAccessPolicyRedeemableResponseSerializer(policy)
+        assert serializer.data["is_late_redemption_allowed"] == expected_is_late_redemption_allowed
 
 
 class TestSubsidyAccessPolicyCreditsAvailableResponseSerializer(TestCase):

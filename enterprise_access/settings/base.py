@@ -55,6 +55,7 @@ THIRD_PARTY_APPS = (
     'djangoql',
     'django_celery_results',
     'django_filters',
+    'django_object_actions',
     'rest_framework',
     'rest_framework_swagger',
     'rules.apps.AutodiscoverRulesConfig',
@@ -111,7 +112,7 @@ LOG_REQUEST_ID_HEADER = "HTTP_X_REQUEST_ID"
 GENERATE_REQUEST_ID_IF_NOT_IN_HEADER = False
 REQUEST_ID_RESPONSE_HEADER = "X-Request-ID"
 NO_REQUEST_ID = "None"
-LOG_REQUESTS = True
+LOG_REQUESTS = False
 
 # Enable CORS
 CORS_ALLOW_CREDENTIALS = True
@@ -228,6 +229,7 @@ TEMPLATES = [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.i18n',
                 'django.template.context_processors.media',
+                'django.template.context_processors.request',
                 'django.template.context_processors.static',
                 'django.template.context_processors.tz',
                 'django.contrib.messages.context_processors.messages',
@@ -494,3 +496,9 @@ SIMPLE_HISTORY_DATE_INDEX = False
 
 # Cache timeouts
 SUBSIDY_RECORD_CACHE_TIMEOUT = 60 * 5
+
+BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_5_CAMPAIGN = ''
+BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_25_CAMPAIGN = ''
+BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_50_CAMPAIGN = ''
+BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_65_CAMPAIGN = ''
+BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_85_CAMPAIGN = ''

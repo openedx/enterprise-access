@@ -11,6 +11,7 @@ django-celery-results
 django-crum
 django-extensions
 django-filter
+django-object-actions
 django-rest-swagger
 django-simple-history
 django-waffle
@@ -29,6 +30,7 @@ edx-rest-api-client
 jsonfield2
 mysqlclient
 openedx-events
+pygments
 pymemcache
 pytz
 redis

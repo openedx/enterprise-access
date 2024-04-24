@@ -80,7 +80,7 @@ class LearnerContentAssignmentAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
         'uuid',
         'learner_email',
         'lms_user_id',
-        'assignment_configuration',
+        'assignment_configuration__uuid',
         'assignment_configuration__enterprise_customer_uuid',
     )
     list_filter = ('state',)
@@ -124,7 +124,7 @@ class LearnerContentAssignmentActionAdmin(DjangoQLSearchMixin, SimpleHistoryAdmi
     ordering = ['-modified']
     search_fields = (
         'uuid',
-        'assignment',
+        'assignment__uuid',
         'traceback',
     )
     list_filter = ('action_type', 'error_reason')

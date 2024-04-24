@@ -8,6 +8,7 @@ from django.conf import settings
 from rest_framework import status
 
 from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
+from enterprise_access.utils import should_send_email_to_pecu
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class LmsApiClient(BaseOAuthClient):
     enterprise_learner_endpoint = enterprise_api_base_url + 'enterprise-learner/'
     enterprise_customer_endpoint = enterprise_api_base_url + 'enterprise-customer/'
     pending_enterprise_learner_endpoint = enterprise_api_base_url + 'pending-enterprise-learner/'
+    enterprise_group_membership_endpoint = enterprise_api_base_url + 'enterprise-group/'
 
     def get_enterprise_customer_data(self, enterprise_customer_uuid):
         """
@@ -113,7 +115,7 @@ class LmsApiClient(BaseOAuthClient):
             logger.exception(msg, enterprise_customer_uuid)
             raise
 
-    def enterprise_contains_learner(self, enterprise_customer_uuid, learner_id):
+    def get_enterprise_user(self, enterprise_customer_uuid, learner_id):
         """
         Verify if `learner_id` is a part of an enterprise represented by `enterprise_customer_uuid`.
 
@@ -122,10 +124,8 @@ class LmsApiClient(BaseOAuthClient):
             learner_id (int): LMS user id of a learner.
 
         Returns:
-            bool: True if learner is linked with enterprise else False
+            None or the enterprise customer user record
         """
-
-        result = False
         ec_uuid = str(enterprise_customer_uuid)
         query_params = {'enterprise_customer_uuid': ec_uuid, 'user_ids': learner_id}
 
@@ -134,16 +134,21 @@ class LmsApiClient(BaseOAuthClient):
             response = self.client.get(url, params=query_params, timeout=settings.LMS_CLIENT_TIMEOUT)
             response.raise_for_status()
             json_response = response.json()
-            results = json_response.get('results')
-            results = results and results[0]
-            if results and results['enterprise_customer']['uuid'] == ec_uuid and results['user']['id'] == learner_id:
-                result = True
+            results = json_response.get('results', [])
+            if isinstance(results, list):
+                for result in results:
+                    returned_customer = result.get('enterprise_customer', {})
+                    returned_user = result.get('user', {})
+                    if returned_customer.get('uuid') == ec_uuid and returned_user.get('id') == learner_id:
+                        return result
+            else:
+                logger.exception(f'get_enterprise_user got unexpected results: {results} from {url} ')
         except requests.exceptions.HTTPError:
             logger.exception('Failed to fetch data from LMS. URL: [%s].', url)
         except KeyError:
             logger.exception('Incorrect data received from LMS. [%s]', url)
 
-        return result
+        return None
 
     def create_pending_enterprise_users(self, enterprise_customer_uuid, user_emails):
         """
@@ -192,3 +197,53 @@ class LmsApiClient(BaseOAuthClient):
                 response.text,
             )
             raise exc
+
+    def get_pending_enterprise_group_memberships(self, enterprise_group_uuid):
+        """
+        Gets pending enterprise group memberships
+
+        Arguments:
+            enterprise_group_uuid (str): uuid of the enterprise group uuid
+
+        Returns:
+            A list of dicts of pecus in the form of that reminder emails should
+            be sent to:
+                {
+                    'pending_learner_id': integer,
+                    'enterprise_group_membership_uuid': UUID,
+                    'member_details': {
+                      'user_email': string,
+                    },
+                    'recent_action': string,
+                }
+        """
+        try:
+            url = f'{self.enterprise_group_membership_endpoint}' + (
+                f'{enterprise_group_uuid}/learners/?pending_users_only=true')
+            results = []
+
+            while url:
+                response = self.client.get(url, timeout=settings.LMS_CLIENT_TIMEOUT)
+                response.raise_for_status()
+                resp_json = response.json()
+                url = resp_json.get('next')
+                for result in resp_json['results']:
+                    pending_learner_id = result['pending_learner_id']
+                    recent_action = result['recent_action']
+                    user_email = result['member_details']['user_email']
+
+                    recent_action_time = result['recent_action'].partition(': ')[2]
+
+                    if should_send_email_to_pecu(recent_action_time):
+                        results.append({
+                            'pending_learner_id': pending_learner_id,
+                            'recent_action': recent_action,
+                            'user_email': user_email,
+                        })
+            return results
+        except requests.exceptions.HTTPError:
+            logger.exception('Failed to fetch data from LMS. URL: [%s].', url)
+        except KeyError:
+            logger.exception('Incorrect data received from LMS. [%s]', url)
+
+        return None
