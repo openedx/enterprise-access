@@ -250,6 +250,7 @@ class TestLmsApiClient(TestCase):
         mock_oauth_client.return_value.get.return_value.status_code = 200
         enterprise_group_membership_uuid = uuid4()
         recent_action = datetime.strftime(datetime.today() - timedelta(days=5), '%B %d, %Y')
+        recent_action_no_reminder_needed = datetime.strftime(datetime.today() - timedelta(days=4), '%B %d, %Y')
         mock_json.return_value = {
             "next": None,
             "previous": None,
@@ -259,7 +260,7 @@ class TestLmsApiClient(TestCase):
             "start": 0,
             "results": [
                 {
-                    "pending_learner_id": 1,
+                    "pending_enterprise_customer_user_id": 1,
                     "enterprise_group_membership_uuid": enterprise_group_membership_uuid,
                     "member_details": {
                         "user_email": "test1@2u.com",
@@ -269,26 +270,26 @@ class TestLmsApiClient(TestCase):
                     "member_status": "pending",
                 },
                 {
-                    "pending_learner_id": 2,
+                    "pending_enterprise_customer_user_id": 2,
                     "enterprise_group_membership_uuid": enterprise_group_membership_uuid,
                     "member_details": {
                         "user_email": "test2@2u.com",
                         "user_name": " "
                     },
-                    "recent_action": "Invited: March 30, 2024",
+                    "recent_action": f"Invited: {recent_action_no_reminder_needed}",
                     "member_status": "pending",
                 }
             ]
         }
         client = LmsApiClient()
         expected_return = [{
-            "pending_learner_id": 1,
+            "pending_enterprise_customer_user_id": 1,
             "user_email": "test1@2u.com",
             "recent_action": f'Invited: {recent_action}'}]
         pending_enterprise_group_memberships = (
             client.get_pending_enterprise_group_memberships(enterprise_group_membership_uuid))
         mock_oauth_client.return_value.get.assert_called_with(
-            'http://edx-platform.example.com/enterprise/api/v1/enterprise-group/' +
+            f'{settings.LMS_URL}/enterprise/api/v1/enterprise-group/' +
             f'{enterprise_group_membership_uuid}/learners/?pending_users_only=true',
             timeout=settings.LMS_CLIENT_TIMEOUT
         )

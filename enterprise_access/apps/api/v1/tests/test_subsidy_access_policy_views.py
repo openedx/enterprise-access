@@ -1,6 +1,7 @@
 """
 Tests for Enterprise Access Subsidy Access Policy app API v1 views.
 """
+import copy
 from datetime import datetime, timedelta
 from operator import itemgetter
 from unittest import mock
@@ -2100,6 +2101,119 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
             'detail': 'Subsidy Transaction API error: foobar',
             'subsidy_status_code': str(status.HTTP_503_SERVICE_UNAVAILABLE),
         }
+
+
+@ddt.ddt
+class TestSubsidyAccessPolicyGroupViewset(CRUDViewTestMixin, APITestWithMocks):
+    """
+    Tests for the subsidy access policy group association viewset
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.assignment_configuration = AssignmentConfigurationFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+        )
+        self.assigned_learner_credit_policy = AssignedLearnerCreditAccessPolicyFactory(
+            display_name='An assigned learner credit policy, for the test customer.',
+            enterprise_customer_uuid=self.enterprise_uuid,
+            active=True,
+            assignment_configuration=self.assignment_configuration,
+            spend_limit=1000000,
+        )
+        self.subsidy_access_policy_can_redeem_endpoint = reverse(
+            "api:v1:aggregated-subsidy-enrollments",
+            kwargs={"uuid": self.assigned_learner_credit_policy.uuid},
+        )
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': self.enterprise_uuid,
+        }])
+        self.mock_fetch_group_members = {
+            "next": None,
+            "previous": None,
+            "count": 1,
+            "num_pages": 1,
+            "current_page": 1,
+            "start": 1,
+            "results": [
+                {
+                    "lms_user_id": 1,
+                    "enterprise_customer_user_id": 2,
+                    "pending_enterprise_customer_user_id": None,
+                    "enterprise_group_membership_uuid": uuid4(),
+                    "member_details": {
+                        "user_email": "foobar@example.com",
+                        "user_name": "foobar"
+                    },
+                    "recent_action": "Accepted: April 24, 2024",
+                    "status": "accepted",
+                },
+            ]
+        }
+
+    @staticmethod
+    def _get_csv_data_rows(response):
+        """
+        Helper method to create list of str for each row in the CSV data
+        returned from the licenses CSV endpoint. As is expected, each
+        column in a given row is comma separated.
+        """
+        return str(response.content)[2:].split('\\r\\n')[:-1]
+
+    def test_get_group_member_data_with_aggregates_serializer_validation(self):
+        """
+        Test that the `get_group_member_data_with_aggregates` endpoint will validate request params
+        """
+        response = self.client.get(
+            self.subsidy_access_policy_can_redeem_endpoint,
+            {'traverse_pagination': True, 'group_uuid': uuid4(), 'page': 1},
+        )
+        assert 'Can only support one param of the following at a time: `page` or `traverse_pagination`' in \
+            response.data.get('non_field_errors', [])[0]
+
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
+    @mock.patch(
+        'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_subsidy_learners_aggregate_data'
+    )
+    def test_get_group_member_data_with_aggregates_success(
+        self,
+        mock_subsidy_learners_aggregate_data_cache,
+        mock_lms_api_client,
+    ):
+        """
+        Test that the `get_group_member_data_with_aggregates` endpoint can zip and forward the platform enterprise
+        group members list response
+        """
+        mock_subsidy_learners_aggregate_data_cache.return_value = {1: 99}
+        mock_lms_api_client.return_value.fetch_group_members.return_value = self.mock_fetch_group_members
+        response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, {'group_uuid': uuid4(), 'page': 1})
+        expected_response = copy.deepcopy(self.mock_fetch_group_members)
+        expected_response['results'][0]['enrollment_count'] = 99
+        assert response.headers.get('Content-Type') == 'application/json'
+        assert response.data == expected_response
+
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
+    @mock.patch(
+        'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_subsidy_learners_aggregate_data'
+    )
+    def test_get_group_member_data_with_aggregates_csv_format(
+        self,
+        mock_subsidy_learners_aggregate_data_cache,
+        mock_lms_api_client,
+    ):
+        """
+        Test that the `get_group_member_data_with_aggregates` endpoint can properly format a csv formatted response.
+        """
+        mock_subsidy_learners_aggregate_data_cache.return_value = {1: 99}
+        mock_lms_api_client.return_value.fetch_group_members.return_value = self.mock_fetch_group_members
+        query_params = {'group_uuid': uuid4(), "format_csv": True, 'traverse_pagination': True}
+        response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+        rows = self._get_csv_data_rows(response)
+        assert response.content_type == 'text/csv'
+        assert rows[0] == 'email,name,Recent Action,Enrollment Number,Activation Date,status'
+        # Make sure the `subsidy_learners_aggregate_data` has been zipped with group membership data
+        assert rows[1] == 'foobar@example.com,foobar,"Accepted: April 24, 2024",99,,accepted'
 
 
 @ddt.ddt

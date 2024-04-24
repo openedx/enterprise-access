@@ -2,12 +2,14 @@
 API client for calls to the LMS.
 """
 import logging
+import os
 
 import requests
 from django.conf import settings
 from rest_framework import status
 
 from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
+from enterprise_access.apps.api_client.exceptions import FetchGroupMembersConflictingParamsException
 from enterprise_access.utils import should_send_email_to_pecu
 
 logger = logging.getLogger(__name__)
@@ -22,6 +24,18 @@ class LmsApiClient(BaseOAuthClient):
     enterprise_customer_endpoint = enterprise_api_base_url + 'enterprise-customer/'
     pending_enterprise_learner_endpoint = enterprise_api_base_url + 'pending-enterprise-learner/'
     enterprise_group_membership_endpoint = enterprise_api_base_url + 'enterprise-group/'
+
+    def enterprise_group_endpoint(self, group_uuid):
+        return os.path.join(
+            self.enterprise_api_base_url + 'enterprise-group/',
+            f"{group_uuid}/",
+        )
+
+    def enterprise_group_members_endpoint(self, group_uuid):
+        return os.path.join(
+            self.enterprise_group_endpoint(group_uuid),
+            "learners/",
+        )
 
     def get_enterprise_customer_data(self, enterprise_customer_uuid):
         """
@@ -114,6 +128,66 @@ class LmsApiClient(BaseOAuthClient):
             msg = 'Failed to unlink users from %s.'
             logger.exception(msg, enterprise_customer_uuid)
             raise
+
+    def fetch_group_members(
+        self,
+        group_uuid,
+        sort_by=None,
+        user_query=None,
+        fetch_removed=False,
+        is_reversed=False,
+        traverse_pagination=False,
+        page=1,
+    ):
+        """
+        Fetches enterprise group member records from edx-platform.
+
+        Params:
+            - ``group_uuid`` (string, UUID): The group record PK to fetch members from.
+            - ``sort_by`` (string, optional): Specify how the returned members should be ordered. Supported sorting
+            values
+            are `member_details`, `member_status`, and `recent_action`.
+            - ``user_query`` (string, optional): Filter the returned members by user email with a provided sub-string.
+            - ``fetch_removed`` (bool, optional): Include removed membership records.
+            - ``is_reversed`` (bool, optional): Reverse the order of the returned members.
+            - ``traverse_pagination`` (bool, optional): Indicates that the lms client should traverse and fetch all
+            pages.
+            of data. Cannot be supplied if ``page`` is supplied.
+            - ``page`` (int, optional): Which page of paginated data to return. Cannot be supplied if
+            ``traverse_pagination`` is supplied.
+        """
+        if traverse_pagination and page:
+            raise FetchGroupMembersConflictingParamsException(
+                'Params `traverse_pagination` and `page` are in conflict, only supply one or the other'
+            )
+
+        group_members_url = self.enterprise_group_members_endpoint(group_uuid)
+        params = {
+            "sort_by": sort_by,
+            "user_query": user_query,
+            "fetch_removed": fetch_removed,
+            "page": page,
+        }
+        if is_reversed:
+            params['is_reversed'] = is_reversed
+
+        response = self.client.get(group_members_url, params=params)
+        response.raise_for_status()
+        response_json = response.json()
+        results = response_json.get('results', [])
+        if traverse_pagination:
+            next_page = response.json().get("next")
+            while next_page:
+                response = self.client.get(next_page)
+                response.raise_for_status()
+                response_json = response.json()
+                next_page = response_json.get('next')
+                results.extend(response_json.get('results', []))
+
+            response_json['results'] = results
+            response_json['next'] = None
+            response_json['previous'] = None
+        return response_json
 
     def get_enterprise_user(self, enterprise_customer_uuid, learner_id):
         """
@@ -209,7 +283,9 @@ class LmsApiClient(BaseOAuthClient):
             A list of dicts of pecus in the form of that reminder emails should
             be sent to:
                 {
-                    'pending_learner_id': integer,
+                    'enterprise_customer_user_id': integer,
+                    'lms_user_id': integer,
+                    'pending_enterprise_customer_user_id': integer,
                     'enterprise_group_membership_uuid': UUID,
                     'member_details': {
                       'user_email': string,
@@ -228,7 +304,7 @@ class LmsApiClient(BaseOAuthClient):
                 resp_json = response.json()
                 url = resp_json.get('next')
                 for result in resp_json['results']:
-                    pending_learner_id = result['pending_learner_id']
+                    pending_learner_id = result['pending_enterprise_customer_user_id']
                     recent_action = result['recent_action']
                     user_email = result['member_details']['user_email']
 
@@ -236,7 +312,7 @@ class LmsApiClient(BaseOAuthClient):
 
                     if should_send_email_to_pecu(recent_action_time):
                         results.append({
-                            'pending_learner_id': pending_learner_id,
+                            'pending_enterprise_customer_user_id': pending_learner_id,
                             'recent_action': recent_action,
                             'user_email': user_email,
                         })

@@ -264,6 +264,7 @@ djangoql==0.18.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
+djangorestframework-csv==3.0.2
 djangorestframework==3.14.0
     # via
     #   -r requirements/quality.txt
@@ -324,7 +325,7 @@ edx-drf-extensions==10.3.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.4.2
+edx-enterprise-subsidy-client==0.4.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt

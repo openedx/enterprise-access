@@ -13,6 +13,7 @@ from .content_assignments.assignments import LearnerContentAssignmentViewSet
 from .content_assignments.assignments_admin import LearnerContentAssignmentAdminViewSet
 from .subsidy_access_policy import (
     SubsidyAccessPolicyAllocateViewset,
+    SubsidyAccessPolicyGroupViewset,
     SubsidyAccessPolicyRedeemViewset,
     SubsidyAccessPolicyViewSet
 )

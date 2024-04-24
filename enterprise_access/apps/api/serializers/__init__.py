@@ -17,6 +17,8 @@ from .content_assignments.assignment_configuration import (
     AssignmentConfigurationUpdateRequestSerializer
 )
 from .subsidy_access_policy import (
+    GroupMemberWithAggregatesRequestSerializer,
+    GroupMemberWithAggregatesResponseSerializer,
     SubsidyAccessPolicyAllocateRequestSerializer,
     SubsidyAccessPolicyAllocationResponseSerializer,
     SubsidyAccessPolicyCanRedeemElementResponseSerializer,

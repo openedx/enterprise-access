@@ -25,7 +25,7 @@ class TestEnterpriseTasks(unittest.TestCase):
         self.recent_action = datetime.strftime(datetime.today() - timedelta(days=5), '%B %d, %Y')
 
         self.pending_enterprise_customer_users.append({
-            "pending_learner_id": 1,
+            "pending_enterprise_customer_user_id": 1,
             "enterprise_group_membership_uuid": self.enterprise_group_membership_uuid,
             "user_email": "test1@2u.com",
             "recent_action": f'Invited: {self.recent_action}',
