@@ -29,19 +29,26 @@
   <div class="forms-panel">
     <h1>{% trans "Set Late Redemption" %}</h1>
     <p>
-      This tool allows temporary "late" enrollment for any learner redeeming content with this policy. Choose a period
-      of time (starting now) during which the late enrollment feature is enabled for this policy. During that time
-      period, course runs with enrollment deadlines within the last 30 days will become visible and enrollable again to
-      learners.
+      This tool enables a window for temporary "late" enrollments into exec ed presentations using funds from this
+      particular policy/budget. On this screen, select how many days the intended (properly equipped) learners will have
+      to complete the late enrollments, and click submit. The capability to enroll late expires at midnight UTC X
+      calendar days in the future, according to your selection.
     </p>
     <p>
-      It is encouraged that if you know specifically which historical course run learners must enroll into, you can
-      craft a course about page URL containing a course run filter:
+      At a high level there are three steps to enable late enrollment into an exec ed presentation:
     </p>
+    <ol>
+      <li>Leverage this tool to temporarily enable late enrollment on the budget</li>
+      <li>Assign the course to the intended learner (if budget mandates assignments)</li>
+      <li>Craft a URL for enrollment and share with learner</li>
+    </ol>
     <p>
-      <code>
-        {{ ENTERPRISE_LEARNER_PORTAL_URL }}/<strong>&lt;enterprise_slug&gt;</strong>/course/<strong>&lt;course_key&gt;</strong>?course_run_key=<strong>&lt;course_run_key&gt;</strong>
-      </code>
+      For steps 2 and 3, please follow this
+      <a href="https://2u-internal.atlassian.net/wiki/spaces/SOL/pages/997883909/Late+Enrollment+into+Exec+Ed+Presentations+w+Learner+Credit">
+        thorough guide
+      </a>
+      on setting up and executing a late enrollment on behalf of a customer. Late enrollment is not possible in all
+      cases, as described in the "Conditions" section of the guide.
     </p>
     <form action="" method="post" enctype="multipart/form-data" id="set-late-redemption-form">
       {% csrf_token %}
