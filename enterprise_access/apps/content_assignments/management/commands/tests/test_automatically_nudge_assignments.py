@@ -135,7 +135,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -145,7 +145,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXPrivacy101+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -155,7 +155,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -165,7 +165,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -175,7 +175,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -185,7 +185,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -222,7 +222,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -232,7 +232,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXPrivacy101+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -242,7 +242,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -252,7 +252,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -262,7 +262,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -272,7 +272,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -324,7 +324,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start_date': start_date_between_30_and_14_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date_between_30_and_14_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -334,7 +334,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start_date': start_date_already_started.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date_already_started.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -344,7 +344,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start_date': start_date_beyond_30_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date_beyond_30_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -354,7 +354,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXPrivacy101+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -364,7 +364,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -374,7 +374,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -415,7 +415,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'verified-audit',
@@ -425,7 +425,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXPrivacy101+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -435,7 +435,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'professional',
@@ -445,7 +445,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'bootcamp-2u',
@@ -455,7 +455,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -465,7 +465,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -508,7 +508,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -518,7 +518,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -528,7 +528,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -538,7 +538,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXPrivacy101+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -548,7 +548,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -558,7 +558,7 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                 'course_runs': [
                     {
                         'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
-                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
                 'course_type': 'executive-education-2u',
@@ -725,7 +725,7 @@ class TestAutomaticallyNudgeAssignmentCommand2(TestCase):
                 'key': self.COURSE_KEY,
                 'course_runs': [{
                     'key': self.COURSE_RUN_KEY,
-                    'start_date': course_start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    'start': course_start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 }],
                 'course_type': course_type,
             },
