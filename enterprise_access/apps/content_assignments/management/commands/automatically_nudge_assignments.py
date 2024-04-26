@@ -144,7 +144,7 @@ class Command(BaseCommand):
                         run for run in content_metadata['course_runs']
                         if run['key'] == assignment.preferred_course_run_key
                     )
-                    start_date = course_run_metadata.get('start_date')
+                    start_date = course_run_metadata.get('start')
                     course_type = content_metadata.get('course_type')
 
                     is_executive_education_course_type = course_type == 'executive-education-2u'
