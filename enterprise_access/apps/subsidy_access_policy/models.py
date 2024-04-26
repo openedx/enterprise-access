@@ -47,9 +47,7 @@ from .content_metadata_api import (
     get_list_price_for_content,
     list_price_dict_from_usd_cents
 )
-from .lms_client_api import (
-    get_and_cache_enterprise_contains_learner
-)
+from .customer_api import get_and_cache_enterprise_learner_record
 from .exceptions import (
     ContentPriceNullException,
     MissingAssignment,
@@ -392,10 +390,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Determines if the user is included in the SubsidyAccessPolicy's customer.
         Retrieves it from TieredCache if available, otherwise, it will retrieve and initialize the cache.
         """
-        return get_and_cache_enterprise_contains_learner(
+        if get_and_cache_enterprise_learner_record(
             enterprise_customer_uuid=self.enterprise_customer_uuid,
             learner_id=lms_user_id,
-        )
+        ) is None:
+            return False
+        return True
 
     def subsidy_balance(self):
         """
@@ -751,7 +751,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # learner not linked to enterprise
         if not skip_customer_user_check:
-            if self.includes_user(lms_user_id) is None:
+            if not self.includes_user(lms_user_id):
                 logger.info(
                     f'[credit_available] learner {lms_user_id} not linked to enterprise {self.enterprise_customer_uuid}'
                 )

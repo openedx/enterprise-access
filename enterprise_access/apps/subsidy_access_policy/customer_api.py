@@ -8,21 +8,20 @@ from django.conf import settings
 from edx_django_utils.cache import TieredCache
 from requests.exceptions import HTTPError
 
-from enterprise_access.cache_utils import versioned_cache_key
-
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
+from enterprise_access.cache_utils import versioned_cache_key
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_CACHE_TIMEOUT = getattr(settings, 'LMS_CLIENT_CACHE_TIMEOUT', 60 * 5)
 
 
-def get_and_cache_enterprise_contains_learner(enterprise_customer_uuid, learner_id, timeout=None):
+def get_and_cache_enterprise_learner_record(enterprise_customer_uuid, learner_id, timeout=DEFAULT_CACHE_TIMEOUT):
     """
     Determines if the learner identified by the 'learner_id is linked
     to a specified enterprise identified by the 'enterprise_customer_uuid
 
-    Returns: A bool to specify if the learner is associated to the enterprise
+    Returns: None or the enterprise customer user record
     """
 
     cache_key = versioned_cache_key('get_enterprise_contains_learner', enterprise_customer_uuid, learner_id)
@@ -33,9 +32,9 @@ def get_and_cache_enterprise_contains_learner(enterprise_customer_uuid, learner_
 
     lms_client = LmsApiClient()
     try:
-        is_learner_linked_to_enterprise = lms_client.enterprise_contains_learner(
-            enterprise_customer_uuid,
-            learner_id
+        is_learner_linked_to_enterprise = lms_client.get_enterprise_user(
+            enterprise_customer_uuid=enterprise_customer_uuid,
+            learner_id=learner_id
         )
     except HTTPError as exc:
         raise exc
@@ -45,7 +44,5 @@ def get_and_cache_enterprise_contains_learner(enterprise_customer_uuid, learner_
         enterprise_customer_uuid,
         learner_id
     )
-    TieredCache.set_all_tiers(cache_key, is_learner_linked_to_enterprise, timeout or DEFAULT_CACHE_TIMEOUT)
+    TieredCache.set_all_tiers(cache_key, is_learner_linked_to_enterprise, timeout)
     return is_learner_linked_to_enterprise
-
-

@@ -1091,10 +1091,16 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         self.lms_client_instance = lms_client.return_value
         self.lms_client_instance.get_enterprise_user.return_value = TEST_USER_RECORD
 
+        includes_user_patcher = patch.object(
+            SubsidyAccessPolicy, 'includes_user'
+        )
+        self.mock_includes_user = includes_user_patcher.start()
+
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
         self.addCleanup(contains_key_patcher.stop)
         self.addCleanup(get_content_metadata_patcher.stop)
+        self.addCleanup(includes_user_patcher.stop)
 
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')

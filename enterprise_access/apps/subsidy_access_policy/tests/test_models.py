@@ -320,6 +320,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         Test the can_redeem method of PerLearnerEnrollmentCapLearnerCreditAccessPolicy model
         """
         self.mock_lms_api_client.get_enterprise_user.return_value = get_enterprise_user
+        self.mock_includes_user.return_value = bool(get_enterprise_user)
         self.mock_catalog_contains_content_key.return_value = catalog_contains_content
         self.mock_get_content_metadata.return_value = {
             'content_price': 200,
