@@ -1,5 +1,11 @@
 """
-Management command to automatically nudge learners enrolled in a course in advance
+Management command to nudge learners with accepted assignments about upcoming course start dates.
+
+This management command is designed to run on a cron schedule of ONCE per day. It looks for any accepted assignments
+which correspond to courses that start `days_before_course_start_date` days from now and sends those learners a nudge
+email.
+
+Supply `--days_before_course_start_date` to control the notification lead time (default: 30 days).
 """
 
 import datetime
@@ -22,8 +28,7 @@ logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
     """
-    Automatically nudge learners who are 'days_before_course_start_date' days away from the course start_date
-    The default notification lead time without a provided `days_before_course_start_date` argument is 30 days
+    Management command body (see module docstring).
     """
     help = (
         'Spin off celery tasks to automatically send a braze email to '
@@ -125,7 +130,21 @@ class Command(BaseCommand):
 
                 for assignment in assignments:
                     content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
-                    start_date = content_metadata.get('normalized_metadata', {}).get('start_date')
+                    if not assignment.preferred_course_run_key:
+                        logger.info(
+                            'Skipping nudge emails for legacy assignment [%s] due to missing preferred_course_run_key.',
+                            assignment.uuid,
+                        )
+                        continue
+                    # Nudge learners based on the start date of the "preferred" course run, NOT the start date from the
+                    # "normalized metadata" derived from the *advertised* course run. That latter assumption caused us
+                    # problems in the past because this script would just follow every new published run and keep
+                    # re-triggering nudge emails.
+                    course_run_metadata = next(
+                        run for run in content_metadata['course_runs']
+                        if run['key'] == assignment.preferred_course_run_key
+                    )
+                    start_date = course_run_metadata.get('start_date')
                     course_type = content_metadata.get('course_type')
 
                     is_executive_education_course_type = course_type == 'executive-education-2u'
