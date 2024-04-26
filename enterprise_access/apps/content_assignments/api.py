@@ -279,9 +279,11 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
         content_key,
     )
 
-    # Existing Assignments in consideration by state
-    already_allocated_or_accepted = []
-    cancelled_or_errored_to_update = []
+    # Keep a running list of all existing assignments that will need to be included in bulk update.
+    #
+    # Note: Since the duplicates are just references to the same assignment object, and django model instances are
+    # hashable (on PK), they can be de-duplicated by blinndly adding them to this set.
+    existing_assignments_needs_update = set()
 
     # Maintain a set of emails with existing records - we know we don't have to create
     # new assignments for these.
@@ -290,7 +292,13 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     # Try to populate lms_user_id field on any existing assignments found.  We already ran this function on these
     # assignments (when they were created in a prior request), but time has passed since then so the outcome might be
     # different this time. It's technically possible some learners have registered since the last request.
-    assignments_with_updated_lms_user_id = _try_populate_assignments_lms_user_id(existing_assignments)
+    existing_assignments_needs_update.update(_try_populate_assignments_lms_user_id(existing_assignments))
+
+    # Time has passed since the last time this assignment was allocated/re-allocated. Therefore, it's entirely
+    # possible a new run has been published. We assume the intent of the admin re-allocating this content is
+    # that they want to assign the NEW run. This step to update preferred_course_run_key is required in order
+    # for nudge emails to target the start date of the new run.
+    preferred_course_run_key = _get_preferred_course_run_key(assignment_configuration, content_key)
 
     # Split up the existing assignment records by state
     for assignment in existing_assignments:
@@ -304,25 +312,26 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
             assignment.cancelled_at = None
             assignment.expired_at = None
             assignment.errored_at = None
+            assignment.preferred_course_run_key = preferred_course_run_key
+            # Prevent invalid data from entering the database by calling the low-level full_clean() function manually.
             assignment.full_clean()
-            cancelled_or_errored_to_update.append(assignment)
-        else:
-            already_allocated_or_accepted.append(assignment)
-
-    # These two sets of updated assignments may contain duplicates when combined. Since the duplicates are just
-    # references to the same assignment object, and django model instances are hashable (on PK), they can be
-    # de-duplicated using set union.
-    existing_assignments_to_update = set(cancelled_or_errored_to_update).union(assignments_with_updated_lms_user_id)
+            existing_assignments_needs_update.add(assignment)
+        elif assignment.state == LearnerContentAssignmentStateChoices.ALLOCATED:
+            # For some already-allocated assignments being re-assigned, we might still need to update the preferred
+            # course run for nudge email purposes.
+            if assignment.preferred_course_run_key != preferred_course_run_key:
+                assignment.preferred_course_run_key = preferred_course_run_key
+                existing_assignments_needs_update.add(assignment)
 
     with transaction.atomic():
         # Bulk update and get a list of refreshed objects
         updated_assignments = _update_and_refresh_assignments(
-            existing_assignments_to_update,
+            existing_assignments_needs_update,
             [
                 # `lms_user_id` is updated via the _try_populate_assignments_lms_user_id() function.
                 'lms_user_id',
                 # The following fields are updated via the for-loop above.
-                'allocation_batch_id', 'allocated_at', 'content_quantity', 'state',
+                'allocation_batch_id', 'allocated_at', 'content_quantity', 'state', 'preferred_course_run_key',
             ]
         )
 
@@ -348,11 +357,14 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
         create_pending_enterprise_learner_for_assignment_task.delay(assignment.uuid)
         send_email_for_new_assignment.delay(assignment.uuid)
 
+    # Make a list of all pre-existing assignments that were not updated.
+    unchanged_assignments = list(set(existing_assignments) - set(updated_assignments))
+
     # Return a mapping of the action we took to lists of relevant assignment records.
     return {
         'updated': updated_assignments,
         'created': created_assignments,
-        'no_change': already_allocated_or_accepted,
+        'no_change': unchanged_assignments,
     }
 
 

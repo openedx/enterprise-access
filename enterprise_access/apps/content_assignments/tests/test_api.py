@@ -256,7 +256,8 @@ class TestContentAssignmentApi(TestCase):
         Tests the allocation of new assignments against a given configuration.
         """
         content_key = 'demoX'
-        course_run_key = 'demoX+1T2022'
+        course_run_key_old = 'demoX+1T2022'
+        course_run_key = 'demoX+2T2023'
         content_title = 'edx: Demo 101'
         content_price_cents = 100
         # add a duplicate email to the input list to ensure only one
@@ -264,45 +265,81 @@ class TestContentAssignmentApi(TestCase):
         # We throw a couple ALL UPPER CASE emails into the requested emails to allocate
         # to verify that we filter for pre-existing assignments in a case-insensitive manner.
         learners_to_assign = [
-            f'{name}@foo.com' for name in ('ALICE', 'bob', 'CAROL', 'david', 'eugene', 'eugene', 'bob', 'eugene')
+            f'{name}@foo.com' for name in (
+                'ALICE',
+                'bob',
+                'CAROL',
+                'david',
+                'eugene',
+                'eugene',
+                'BOB',
+                'eugene',
+                'faythe',
+                'erin',
+                'grace',
+            )
         ]
         mock_get_and_cache_content_metadata.return_value = {
             'content_title': content_title,
             'course_run_key': course_run_key,
         }
 
-        allocated_assignment = LearnerContentAssignmentFactory.create(
-            assignment_configuration=self.assignment_configuration,
-            learner_email='alice@foo.com',
-            content_key=content_key,
-            content_title=content_title,
-            content_quantity=-content_price_cents,
-            state=LearnerContentAssignmentStateChoices.ALLOCATED,
-        )
-        accepted_assignment = LearnerContentAssignmentFactory.create(
-            assignment_configuration=self.assignment_configuration,
-            learner_email='BOB@foo.com',
-            content_key=content_key,
-            content_title=content_title,
-            content_quantity=-content_price_cents,
-            state=LearnerContentAssignmentStateChoices.ACCEPTED,
-        )
-        cancelled_assignment = LearnerContentAssignmentFactory.create(
-            assignment_configuration=self.assignment_configuration,
-            learner_email='carol@foo.com',
-            content_key=content_key,
-            content_title=content_title,
-            content_quantity=-200,
-            state=LearnerContentAssignmentStateChoices.CANCELLED,
-        )
-        errored_assignment = LearnerContentAssignmentFactory.create(
-            assignment_configuration=self.assignment_configuration,
-            learner_email='david@foo.com',
-            content_key=content_key,
-            content_title=content_title,
-            content_quantity=-200,
-            state=LearnerContentAssignmentStateChoices.ERRORED,
-        )
+        default_factory_options = {
+            'assignment_configuration': self.assignment_configuration,
+            'content_key': content_key,
+            'preferred_course_run_key': course_run_key,
+            'content_title': content_title,
+            'content_quantity': -content_price_cents,
+        }
+
+        # Allocated assignment should not be updated.
+        allocated_assignment = LearnerContentAssignmentFactory.create(**{
+            **default_factory_options,
+            'learner_email': 'alice@foo.com',
+            'state': LearnerContentAssignmentStateChoices.ALLOCATED,
+        })
+        # Allocated assignment SHOULD be updated because it had an outdated run.
+        allocated_assignment_old_run = LearnerContentAssignmentFactory.create(**{
+            **default_factory_options,
+            'learner_email': 'erin@foo.com',
+            'state': LearnerContentAssignmentStateChoices.ALLOCATED,
+            # outdated run should trigger update.
+            'preferred_course_run_key': course_run_key_old,
+        })
+        # Allocated assignment SHOULD be updated because it had a NULL run.
+        allocated_assignment_null_run = LearnerContentAssignmentFactory.create(**{
+            **default_factory_options,
+            'learner_email': 'faythe@foo.com',
+            'state': LearnerContentAssignmentStateChoices.ALLOCATED,
+            # outdated run should trigger update.
+            'preferred_course_run_key': None,
+        })
+        # Accepted assignment should not be updated.
+        accepted_assignment = LearnerContentAssignmentFactory.create(**{
+            **default_factory_options,
+            'learner_email': 'BOB@foo.com',
+            'state': LearnerContentAssignmentStateChoices.ACCEPTED,
+        })
+        # Cancelled assignment should be updated/re-allocated.
+        cancelled_assignment = LearnerContentAssignmentFactory.create(**{
+            **default_factory_options,
+            'learner_email': 'carol@foo.com',
+            'state': LearnerContentAssignmentStateChoices.CANCELLED,
+        })
+        # Cancelled assignment should be updated/re-allocated (including recieving a new run).
+        cancelled_assignment_old_run = LearnerContentAssignmentFactory.create(**{
+            **default_factory_options,
+            'learner_email': 'grace@foo.com',
+            'state': LearnerContentAssignmentStateChoices.CANCELLED,
+            # outdated run should trigger update.
+            'preferred_course_run_key': course_run_key_old,
+        })
+        # Errored assignment should be updated/re-allocated.
+        errored_assignment = LearnerContentAssignmentFactory.create(**{
+            **default_factory_options,
+            'learner_email': 'david@foo.com',
+            'state': LearnerContentAssignmentStateChoices.ERRORED,
+        })
 
         allocation_results = allocate_assignments(
             self.assignment_configuration,
@@ -312,29 +349,52 @@ class TestContentAssignmentApi(TestCase):
         )
 
         # Refresh from db to get any updates reflected in the python objects.
-        for record in (allocated_assignment, accepted_assignment, cancelled_assignment, errored_assignment):
+        for record in (
+            allocated_assignment,
+            allocated_assignment_old_run,
+            allocated_assignment_null_run,
+            accepted_assignment,
+            cancelled_assignment,
+            cancelled_assignment_old_run,
+            errored_assignment,
+        ):
             record.refresh_from_db()
 
-        # The errored and cancelled assignments should be the only things updated
+        # The allocated assignments with outdated runs, errored assignments, and cancelled assignments should be the
+        # only things updated.
+        expected_updated_assignments = (
+            allocated_assignment_old_run,
+            allocated_assignment_null_run,
+            cancelled_assignment,
+            cancelled_assignment_old_run,
+            errored_assignment,
+        )
         self.assertEqual(
             {record.uuid for record in allocation_results['updated']},
-            {cancelled_assignment.uuid, errored_assignment.uuid},
+            {assignment.uuid for assignment in expected_updated_assignments},
         )
-        for record in (cancelled_assignment, errored_assignment):
-            self.assertEqual(len(record.history.all()), 2)
+        for assignment in expected_updated_assignments:
+            self.assertEqual(len(assignment.history.all()), 2)
 
-        # The allocated and accepted assignments should be the only things with no change
+        # The allocated assignment (with latest run) and accepted assignment should be the only things with no change.
+        expected_no_change_assignments = (
+            allocated_assignment,
+            accepted_assignment,
+        )
         self.assertEqual(
             {record.uuid for record in allocation_results['no_change']},
-            {allocated_assignment.uuid, accepted_assignment.uuid},
+            {assignment.uuid for assignment in expected_no_change_assignments},
         )
-        for record in (allocated_assignment, accepted_assignment):
+        for record in expected_no_change_assignments:
             self.assertEqual(len(record.history.all()), 1)
 
         # The existing assignments should be 'allocated' now, except for the already accepted one
         self.assertEqual(cancelled_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertEqual(cancelled_assignment_old_run.state, LearnerContentAssignmentStateChoices.ALLOCATED)
         self.assertEqual(errored_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
         self.assertEqual(allocated_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertEqual(allocated_assignment_old_run.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertEqual(allocated_assignment_null_run.state, LearnerContentAssignmentStateChoices.ALLOCATED)
         self.assertEqual(accepted_assignment.state, LearnerContentAssignmentStateChoices.ACCEPTED)
 
         # We should have created only one new, allocated assignment for eugene@foo.com
@@ -352,13 +412,23 @@ class TestContentAssignmentApi(TestCase):
         # Assert that an async task was enqueued for each of the updated and created assignments
         mock_pending_learner_task.delay.assert_has_calls([
             mock.call(assignment.uuid) for assignment in
-            (cancelled_assignment, errored_assignment, created_assignment)
+            (
+                cancelled_assignment,
+                cancelled_assignment_old_run,
+                errored_assignment,
+                created_assignment
+            )
         ], any_order=True)
         # Assert that an async task to send notification emails was enqueued
         # for each of the updated and created assignments
         mock_new_assignment_email_task.delay.assert_has_calls([
             mock.call(assignment.uuid) for assignment in
-            (cancelled_assignment, errored_assignment, created_assignment)
+            (
+                cancelled_assignment,
+                cancelled_assignment_old_run,
+                errored_assignment,
+                created_assignment,
+            )
         ], any_order=True)
 
     @mock.patch('enterprise_access.apps.content_assignments.tasks.send_cancel_email_for_pending_assignment')
