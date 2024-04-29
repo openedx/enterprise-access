@@ -49,6 +49,7 @@ class MockPolicyDependenciesMixin:
         )
 
         self.mock_includes_user = includes_user_patcher.start()
+        self.mock_includes_user.return_value = True
 
         self.addCleanup(subsidy_client_patcher.stop)
         self.addCleanup(transactions_cache_for_learner_patcher.stop)

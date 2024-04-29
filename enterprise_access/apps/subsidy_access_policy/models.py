@@ -390,12 +390,11 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Determines if the user is included in the SubsidyAccessPolicy's customer.
         Retrieves it from TieredCache if available, otherwise, it will retrieve and initialize the cache.
         """
-        if get_and_cache_enterprise_learner_record(
+        enterprise_learner_record = get_and_cache_enterprise_learner_record(
             enterprise_customer_uuid=self.enterprise_customer_uuid,
             learner_id=lms_user_id,
-        ) is None:
-            return False
-        return True
+        )
+        return bool(enterprise_learner_record)
 
     def subsidy_balance(self):
         """

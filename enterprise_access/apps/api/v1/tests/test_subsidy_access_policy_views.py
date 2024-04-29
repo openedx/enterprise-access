@@ -1095,6 +1095,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             SubsidyAccessPolicy, 'includes_user'
         )
         self.mock_includes_user = includes_user_patcher.start()
+        self.mock_includes_user.return_value = True
 
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
