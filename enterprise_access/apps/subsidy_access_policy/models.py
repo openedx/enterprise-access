@@ -494,14 +494,18 @@ class SubsidyAccessPolicy(TimeStampedModel):
             self.get_content_metadata(content_key),
         )
 
-    def includes_learner(self, lms_user_id):
+    def includes_learner(self, lms_user_id, enterprise_user_record=None):
         """
         Determine whether the lms user is associated properly with both the enterprise
         and the policy's group(s).
         """
-        learner_record = self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id)
-        if not learner_record:
-            return False, REASON_LEARNER_NOT_IN_ENTERPRISE
+        if enterprise_user_record is not None:
+            learner_record = enterprise_user_record
+        elif self.includes_user(lms_user_id):
+            learner_record = get_and_cache_enterprise_learner_record(
+                enterprise_customer_uuid=self.enterprise_customer_uuid,
+                learner_id=lms_user_id,
+            )
 
         associated_group_uuids = set(learner_record.get('enterprise_group', []))
         # if there are no policy groups, return early
@@ -650,9 +654,14 @@ class SubsidyAccessPolicy(TimeStampedModel):
             if not self.includes_user(lms_user_id):
                 self._log_redeemability(False, REASON_LEARNER_NOT_IN_ENTERPRISE, lms_user_id, content_key)
                 return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
-
-        if not skip_customer_user_check:
-            included_in_policy, reason = self.includes_learner(lms_user_id)
+            enterprise_user_record = get_and_cache_enterprise_learner_record(
+                enterprise_customer_uuid=self.enterprise_customer_uuid,
+                learner_id=lms_user_id
+            )
+            included_in_policy, reason = self.includes_learner(
+                lms_user_id,
+                enterprise_user_record
+            )
             if not included_in_policy:
                 self._log_redeemability(False, reason, lms_user_id, content_key)
                 return (False, reason, [])
@@ -755,7 +764,14 @@ class SubsidyAccessPolicy(TimeStampedModel):
                     f'[credit_available] learner {lms_user_id} not linked to enterprise {self.enterprise_customer_uuid}'
                 )
                 return False
-            included_in_policy, reason = self.includes_learner(lms_user_id)
+            enterprise_user_record = get_and_cache_enterprise_learner_record(
+                enterprise_customer_uuid=self.enterprise_customer_uuid,
+                learner_id=lms_user_id
+            )
+            included_in_policy, reason = self.includes_learner(
+                lms_user_id,
+                enterprise_user_record
+            )
             if not included_in_policy:
                 logger.info(f'[credit_available] learner {lms_user_id} encountered error {reason}')
                 return False
