@@ -612,82 +612,54 @@ class TestAutomaticallyNudgeAssignmentCommand2(TestCase):
 
     @ddt.data(
         # Happy case: course starts in 14 days, and everything about the course and assignment are nudgeable.
+        {},
+        # Not nudgeable due to course metadata being missing from enterprise-catalog.
         {
-            'course_starts_in_x_days': 14,
-            'course_type': 'executive-education-2u',
-            'assignment_preferred_course_run_key': COURSE_RUN_KEY,
-            'assignment_state': LearnerContentAssignmentStateChoices.ACCEPTED,
-            'expected_task_call_days_before_course_start_date': 14,
+            'missing_content_metadata': True,
+            'expected_task_call_days_before_course_start_date': None,
         },
         # Not nudgeable due to course start not being exactly 14 days from now (test course starts in 15 days).
         {
             'course_starts_in_x_days': 15,  # Not exactly 14.
-            'course_type': 'executive-education-2u',
-            'assignment_preferred_course_run_key': COURSE_RUN_KEY,
-            'assignment_state': LearnerContentAssignmentStateChoices.ACCEPTED,
             'expected_task_call_days_before_course_start_date': None,
         },
         # Not nudgeable due to course start not being exactly 14 days from now (test course starts in 13 days).
         {
             'course_starts_in_x_days': 13,  # Not exactly 14.
-            'course_type': 'executive-education-2u',
-            'assignment_preferred_course_run_key': COURSE_RUN_KEY,
-            'assignment_state': LearnerContentAssignmentStateChoices.ACCEPTED,
             'expected_task_call_days_before_course_start_date': None,
         },
         # Not nudgeable due to course start not being exactly 14 days from now (test course started yesterday).
         {
             'course_starts_in_x_days': -1,  # Not exactly 14.
-            'course_type': 'executive-education-2u',
-            'assignment_preferred_course_run_key': COURSE_RUN_KEY,
-            'assignment_state': LearnerContentAssignmentStateChoices.ACCEPTED,
             'expected_task_call_days_before_course_start_date': None,
         },
         # Not nudgeable due to course type not being "executive-education-2u".
         {
-            'course_starts_in_x_days': 14,
             'course_type': 'verified-audit',  # Not exactly "executive-education-2u".
-            'assignment_preferred_course_run_key': COURSE_RUN_KEY,
-            'assignment_state': LearnerContentAssignmentStateChoices.ACCEPTED,
             'expected_task_call_days_before_course_start_date': None,
         },
         # Not nudgeable due to assignment `preferred_course_run_key` field not being set.
         {
-            'course_starts_in_x_days': 14,
-            'course_type': 'executive-education-2u',
             'assignment_preferred_course_run_key': None,  # Legacy assignent has no preferred_course_run_key.
-            'assignment_state': LearnerContentAssignmentStateChoices.ACCEPTED,
             'expected_task_call_days_before_course_start_date': None,
         },
         # Not nudgeable due to assignment `preferred_course_run_key` field being blank.
         {
-            'course_starts_in_x_days': 14,
-            'course_type': 'executive-education-2u',
             'assignment_preferred_course_run_key': '',  # Not sure how this can happen, but lets test it anyway.
-            'assignment_state': LearnerContentAssignmentStateChoices.ACCEPTED,
             'expected_task_call_days_before_course_start_date': None,
         },
         # Not nudgeable due to assignment state not being accepted (test state=allcoated).
         {
-            'course_starts_in_x_days': 14,
-            'course_type': 'executive-education-2u',
-            'assignment_preferred_course_run_key': COURSE_RUN_KEY,
             'assignment_state': LearnerContentAssignmentStateChoices.ALLOCATED,
             'expected_task_call_days_before_course_start_date': None,
         },
         # Not nudgeable due to assignment state not being accepted (test state=errored).
         {
-            'course_starts_in_x_days': 14,
-            'course_type': 'executive-education-2u',
-            'assignment_preferred_course_run_key': COURSE_RUN_KEY,
             'assignment_state': LearnerContentAssignmentStateChoices.ERRORED,
             'expected_task_call_days_before_course_start_date': None,
         },
         # Not nudgeable due to assignment state not being accepted (test state=cancelled).
         {
-            'course_starts_in_x_days': 14,
-            'course_type': 'executive-education-2u',
-            'assignment_preferred_course_run_key': COURSE_RUN_KEY,
             'assignment_state': LearnerContentAssignmentStateChoices.CANCELLED,
             'expected_task_call_days_before_course_start_date': None,
         },
@@ -699,13 +671,15 @@ class TestAutomaticallyNudgeAssignmentCommand2(TestCase):
             self,
             mock_send_exec_ed_enrollment_warmer_task,
             mock_content_metadata_for_assignments,
-            course_starts_in_x_days,
-            course_type,
-            assignment_preferred_course_run_key,
-            assignment_state,
-            expected_task_call_days_before_course_start_date,
+            course_starts_in_x_days=14,
+            course_type='executive-education-2u',
+            missing_content_metadata=False,
+            assignment_preferred_course_run_key=COURSE_RUN_KEY,
+            assignment_state=LearnerContentAssignmentStateChoices.ACCEPTED,
+            expected_task_call_days_before_course_start_date=14,
     ):
         """
+        Test that a nudge email either was or was not sent.
 
         This also tests skipping legacy assignments with a blank/null `preferred_course_run_key` field.
         """
@@ -720,18 +694,22 @@ class TestAutomaticallyNudgeAssignmentCommand2(TestCase):
             state=assignment_state,
         )
         course_start_date = timezone.now().replace(microsecond=0) + timezone.timedelta(days=course_starts_in_x_days)
-        mock_content_metadata_for_assignments.return_value = {
-            self.COURSE_KEY: {
-                'key': self.COURSE_KEY,
-                'course_runs': [{
-                    'key': self.COURSE_RUN_KEY,
-                    'start': course_start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                }],
-                'course_type': course_type,
-            },
-        }
+        if missing_content_metadata:
+            mock_content_metadata_for_assignments.return_value = {}
+        else:
+            mock_content_metadata_for_assignments.return_value = {
+                self.COURSE_KEY: {
+                    'key': self.COURSE_KEY,
+                    'course_runs': [{
+                        'key': self.COURSE_RUN_KEY,
+                        'start': course_start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    }],
+                    'course_type': course_type,
+                },
+            }
         call_command(self.command, days_before_course_start_date=14)
         if expected_task_call_days_before_course_start_date:
+            # Happy case: a nudge email was sent.
             mock_send_exec_ed_enrollment_warmer_task.assert_called_once_with(
                 assignment.uuid,
                 expected_task_call_days_before_course_start_date,

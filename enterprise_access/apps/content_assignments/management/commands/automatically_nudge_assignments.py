@@ -129,11 +129,18 @@ class Command(BaseCommand):
                 )
 
                 for assignment in assignments:
-                    content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
                     if not assignment.preferred_course_run_key:
                         logger.info(
                             'Skipping nudge emails for legacy assignment [%s] due to missing preferred_course_run_key.',
                             assignment.uuid,
+                        )
+                        continue
+                    content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
+                    if not content_metadata:
+                        logger.info(
+                            'Skipping nudge emails for assignment [%s] due to missing content metadata for key [%s].',
+                            assignment.uuid,
+                            assignment.content_key,
                         )
                         continue
                     # Nudge learners based on the start date of the "preferred" course run, NOT the start date from the
