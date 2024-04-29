@@ -47,6 +47,7 @@ from .content_metadata_api import (
     get_list_price_for_content,
     list_price_dict_from_usd_cents
 )
+from .customer_api import get_and_cache_enterprise_learner_record
 from .exceptions import (
     ContentPriceNullException,
     MissingAssignment,
@@ -384,6 +385,17 @@ class SubsidyAccessPolicy(TimeStampedModel):
         set_tiered_cache_subsidy_record(record, *cache_key_args)
         return record
 
+    def includes_user(self, lms_user_id):
+        """
+        Determines if the user is included in the SubsidyAccessPolicy's customer.
+        Retrieves it from TieredCache if available, otherwise, it will retrieve and initialize the cache.
+        """
+        enterprise_learner_record = get_and_cache_enterprise_learner_record(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            learner_id=lms_user_id,
+        )
+        return bool(enterprise_learner_record)
+
     def subsidy_balance(self):
         """
         Returns total remaining balance for the associated subsidy ledger.
@@ -635,8 +647,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # learner not associated to enterprise
         if not skip_customer_user_check:
-            learner_record = self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id)
-            if not learner_record:
+            if not self.includes_user(lms_user_id):
                 self._log_redeemability(False, REASON_LEARNER_NOT_IN_ENTERPRISE, lms_user_id, content_key)
                 return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
 
@@ -739,7 +750,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # learner not linked to enterprise
         if not skip_customer_user_check:
-            if self.lms_api_client.get_enterprise_user(self.enterprise_customer_uuid, lms_user_id) is None:
+            if not self.includes_user(lms_user_id):
                 logger.info(
                     f'[credit_available] learner {lms_user_id} not linked to enterprise {self.enterprise_customer_uuid}'
                 )

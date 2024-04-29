@@ -41,11 +41,20 @@ class MockPolicyDependenciesMixin:
         lms_api_client_patcher = patch.object(
             SubsidyAccessPolicy, 'lms_api_client'
         )
+
         self.mock_lms_api_client = lms_api_client_patcher.start()
+
+        includes_user_patcher = patch.object(
+            SubsidyAccessPolicy, 'includes_user'
+        )
+
+        self.mock_includes_user = includes_user_patcher.start()
+        self.mock_includes_user.return_value = True
 
         self.addCleanup(subsidy_client_patcher.stop)
         self.addCleanup(transactions_cache_for_learner_patcher.stop)
         self.addCleanup(catalog_contains_content_key_patcher.stop)
         self.addCleanup(get_content_metadata_patcher.stop)
         self.addCleanup(lms_api_client_patcher.stop)
+        self.addCleanup(includes_user_patcher.stop)
         self.addCleanup(django_cache.clear)  # clear any leftover policy locks.
