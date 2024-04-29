@@ -387,7 +387,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
     def enterprise_user_record(self, lms_user_id):
         """
-        Determines if the user is included in the SubsidyAccessPolicy's customer.
+        Returns the enterprise_user_record.
         Retrieves it from TieredCache if available, otherwise, it will retrieve and initialize the cache.
         """
         enterprise_user_record = get_and_cache_enterprise_learner_record(

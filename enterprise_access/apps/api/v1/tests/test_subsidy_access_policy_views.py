@@ -1095,6 +1095,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             SubsidyAccessPolicy, 'enterprise_user_record'
         )
         self.mock_enterprise_user_record = enterprise_user_record_patcher.start()
+        self.mock_enterprise_user_record.return_value = TEST_USER_RECORD
 
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
@@ -1413,6 +1414,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'is_active': is_subsidy_active,
         }
         self.lms_client_instance.get_enterprise_user.return_value = get_enterprise_user
+        self.mock_enterprise_user_record.return_value = get_enterprise_user
 
         query_params = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),

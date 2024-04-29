@@ -48,7 +48,7 @@ class MockPolicyDependenciesMixin:
             SubsidyAccessPolicy, 'enterprise_user_record'
         )
 
-        self.mock_enterprise_user_record= enterprise_user_record_patcher.start()
+        self.mock_enterprise_user_record = enterprise_user_record_patcher.start()
 
         self.addCleanup(subsidy_client_patcher.stop)
         self.addCleanup(transactions_cache_for_learner_patcher.stop)
