@@ -1092,17 +1092,17 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         self.lms_client_instance = lms_client.return_value
         self.lms_client_instance.get_enterprise_user.return_value = TEST_USER_RECORD
 
-        includes_user_patcher = patch.object(
-            SubsidyAccessPolicy, 'includes_user'
+        enterprise_user_record_patcher = patch.object(
+            SubsidyAccessPolicy, 'enterprise_user_record'
         )
-        self.mock_includes_user = includes_user_patcher.start()
-        self.mock_includes_user.return_value = True
+        self.mock_enterprise_user_record = enterprise_user_record_patcher.start()
+        self.mock_enterprise_user_record.return_value = TEST_USER_RECORD
 
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
         self.addCleanup(contains_key_patcher.stop)
         self.addCleanup(get_content_metadata_patcher.stop)
-        self.addCleanup(includes_user_patcher.stop)
+        self.addCleanup(enterprise_user_record_patcher.stop)
 
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.get_and_cache_transactions_for_learner')
@@ -1415,6 +1415,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'is_active': is_subsidy_active,
         }
         self.lms_client_instance.get_enterprise_user.return_value = get_enterprise_user
+        self.mock_enterprise_user_record.return_value = get_enterprise_user
 
         query_params = {
             'enterprise_customer_uuid': str(self.enterprise_uuid),

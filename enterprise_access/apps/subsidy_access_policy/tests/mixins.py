@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 from django.core.cache import cache as django_cache
 
+from test_utils import TEST_USER_RECORD
+
 from ..models import SubsidyAccessPolicy
 
 
@@ -44,17 +46,17 @@ class MockPolicyDependenciesMixin:
 
         self.mock_lms_api_client = lms_api_client_patcher.start()
 
-        includes_user_patcher = patch.object(
-            SubsidyAccessPolicy, 'includes_user'
+        enterprise_user_record_patcher = patch.object(
+            SubsidyAccessPolicy, 'enterprise_user_record'
         )
 
-        self.mock_includes_user = includes_user_patcher.start()
-        self.mock_includes_user.return_value = True
+        self.mock_enterprise_user_record = enterprise_user_record_patcher.start()
+        self.mock_enterprise_user_record.return_value = TEST_USER_RECORD
 
         self.addCleanup(subsidy_client_patcher.stop)
         self.addCleanup(transactions_cache_for_learner_patcher.stop)
         self.addCleanup(catalog_contains_content_key_patcher.stop)
         self.addCleanup(get_content_metadata_patcher.stop)
         self.addCleanup(lms_api_client_patcher.stop)
-        self.addCleanup(includes_user_patcher.stop)
+        self.addCleanup(enterprise_user_record_patcher.stop)
         self.addCleanup(django_cache.clear)  # clear any leftover policy locks.
