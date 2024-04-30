@@ -1,11 +1,11 @@
 """ API v1 URLs. """
 
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from enterprise_access.apps.api.v1 import views
 
 app_name = 'v1'
-urlpatterns = []
 
 router = DefaultRouter()
 
@@ -26,5 +26,13 @@ router.register(
     views.LearnerContentAssignmentViewSet,
     'assignments',
 )
+
+urlpatterns = [
+    path(
+        'subsidy-access-policies/<uuid>/group-members',
+        views.SubsidyAccessPolicyGroupViewset.as_view({'get': 'get_group_member_data_with_aggregates'}),
+        name='aggregated-subsidy-enrollments'
+    ),
+]
 
 urlpatterns += router.urls

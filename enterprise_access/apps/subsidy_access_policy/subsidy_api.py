@@ -30,6 +30,38 @@ class TransactionPolicyMismatchError(Exception):
     """
 
 
+def subsidy_learner_aggregate_data_cache_key(subsidy_uuid, policy_uuid=None):
+    return versioned_cache_key('get_subsidy_learners_aggregate_data', subsidy_uuid, policy_uuid)
+
+
+def get_and_cache_subsidy_learners_aggregate_data(subsidy_uuid, policy_uuid=None):
+    """
+    Get aggregated learner data for a given subsidy. This can be optionally further filtered
+    """
+    cache_key = subsidy_learner_aggregate_data_cache_key(subsidy_uuid, policy_uuid)
+    cached_response = TieredCache.get_cached_response(cache_key)
+    if cached_response.is_found:
+        logger.info(
+            f'subsidy_learners_aggregate_data cache hit for subsidy {subsidy_uuid} and policy {policy_uuid}'
+        )
+        return cached_response.value
+
+    client = get_versioned_subsidy_client(version=1)
+    try:
+        response_payload = client.get_subsidy_aggregates_by_learner_data(
+            subsidy_uuid,
+            policy_uuid,
+        )
+    except requests.exceptions.HTTPError as exc:
+        raise SubsidyAPIHTTPError('HTTPError occurred in Subsidy API request.') from exc
+
+    results = {}
+    for aggregated_data in response_payload:
+        results[aggregated_data.get('lms_user_id')] = aggregated_data.get('total')
+    TieredCache.set_all_tiers(cache_key, results, settings.SUBSIDY_AGGREGATES_CACHE_TIMEOUT)
+    return results
+
+
 def learner_transaction_cache_key(subsidy_uuid, lms_user_id):
     return versioned_cache_key('get_transactions_for_learner', subsidy_uuid, lms_user_id)
 

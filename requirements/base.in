@@ -16,6 +16,7 @@ django-rest-swagger
 django-simple-history
 django-waffle
 djangorestframework
+djangorestframework-csv
 fastavro
 edx-api-doc-tools
 edx-auth-backends

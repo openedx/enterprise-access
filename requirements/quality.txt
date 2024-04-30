@@ -206,6 +206,7 @@ django-waffle==4.1.0
     #   edx-drf-extensions
 djangoql==0.18.1
     # via -r requirements/test.txt
+djangorestframework-csv==3.0.2
 djangorestframework==3.14.0
     # via
     #   -c requirements/constraints.txt
@@ -248,7 +249,7 @@ edx-drf-extensions==10.3.0
     # via
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.4.2
+edx-enterprise-subsidy-client==0.4.3
     # via -r requirements/test.txt
 edx-lint==5.3.6
     # via

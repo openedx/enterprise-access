@@ -17,14 +17,17 @@ TRANSACTION_METADATA_KEYS = {
 }
 
 
-def get_versioned_subsidy_client():
+def get_versioned_subsidy_client(version=None):
     """
     Returns an instance of the enterprise subsidy client as the version specified by the
     Django setting `ENTERPRISE_SUBSIDY_API_CLIENT_VERSION`, if any.
     """
     kwargs = {}
-    if getattr(settings, 'ENTERPRISE_SUBSIDY_API_CLIENT_VERSION', None):
-        kwargs['version'] = int(settings.ENTERPRISE_SUBSIDY_API_CLIENT_VERSION)
+    if not version:
+        if getattr(settings, 'ENTERPRISE_SUBSIDY_API_CLIENT_VERSION', None):
+            kwargs['version'] = int(settings.ENTERPRISE_SUBSIDY_API_CLIENT_VERSION)
+    else:
+        kwargs['version'] = int(version)
     return get_enterprise_subsidy_api_client(**kwargs)
 
 

@@ -712,3 +712,114 @@ class SubsidyAccessPolicyAllocationResponseSerializer(serializers.Serializer):
             'learner email(s), and content for this action.'
         ),
     )
+
+
+class GroupMembersDetailsSerializer(serializers.Serializer):
+    """
+    Sub-serializer for the response objects associated with the ``get_group_member_data_with_aggregates``
+    endpoint. Contains data captured by the ``member_details`` field.
+    """
+    user_email = serializers.CharField(
+        help_text='The email associated with the group member user record.',
+    )
+
+    user_name = serializers.CharField(
+        required=False,
+        help_text='The full (first and last) name of the group member user records. Is blank if the member is pending',
+    )
+
+
+class GroupMemberWithAggregatesResponseSerializer(serializers.Serializer):
+    """
+    A read-only serializer for responding to requests to the ``get_group_member_data_with_aggregates`` endpoint.
+
+    For view: SubsidyAccessPolicyGroupViewset.get_group_member_data_with_aggregates
+    """
+    enterprise_customer_user_id = serializers.IntegerField(
+        help_text=('LMS enterprise user ID associated with the membership.'),
+    )
+    lms_user_id = serializers.IntegerField(
+        help_text=('LMS auth user ID associated with the membership.'),
+    )
+    pending_enterprise_customer_user_id = serializers.IntegerField(
+        help_text=('LMS pending enterprise user ID associated with the membership.'),
+    )
+    enterprise_group_membership_uuid = serializers.UUIDField(
+        help_text=('The UUID associated with the group membership record.')
+    )
+    member_details = GroupMembersDetailsSerializer(
+        help_text='User record associated with the membership details, including name and email.'
+    )
+    recent_action = serializers.CharField(
+        help_text='String representation of the most recent action associated with the creation of the membership.',
+    )
+    status = serializers.CharField(
+        help_text='String representation of the current membership status.',
+    )
+    activated_at = serializers.DateTimeField(
+        help_text='Datetime at which the membership and user record when from pending to realized.',
+    )
+    enrollment_count = serializers.IntegerField(
+        help_text=(
+            'Number of enrollments, made by a group member, that are associated with the subsidy access policy'
+            'connected to the group.'
+        ),
+        min_value=0,
+    )
+
+
+class GroupMemberWithAggregatesRequestSerializer(serializers.Serializer):
+    """
+    Request Serializer to validate policy group ``get_group_member_data_with_aggregates`` endpoint GET data.
+
+    For view: SubsidyAccessPolicyGroupViewset.get_group_member_data_with_aggregates
+    """
+    group_uuid = serializers.UUIDField(
+        required=False,
+        help_text=(
+            'The group from which to select members.'
+            'Leave blank to fetch group members for every group associated with the policy',
+        )
+    )
+    user_query = serializers.CharField(required=False, max_length=320)
+    sort_by = serializers.ChoiceField(
+        choices=[
+            ('member_details', 'member_details'),
+            ('status', 'status'),
+            ('recent_action', 'recent_action')
+        ],
+        required=False,
+    )
+    fetch_removed = serializers.BooleanField(
+        required=False,
+        help_text="Set to True to fetch and include removed membership records."
+    )
+    is_reversed = serializers.BooleanField(
+        required=False,
+        help_text="Set to True to reverse the order in which records are returned."
+    )
+    format_csv = serializers.BooleanField(
+        required=False,
+        help_text="Set to True to return data in a csv format."
+    )
+    page = serializers.IntegerField(
+        required=False,
+        help_text=('Determines which page of enterprise group members to fetch. Leave blank for all data'),
+        min_value=1,
+    )
+    traverse_pagination = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text=('Set to True to traverse over and return all group members records across all pages of data.')
+    )
+
+    def validate(self, attrs):
+        """
+        Raises a ValidationError both `traverse_pagination` and `page` are both supplied as they enable conflicting
+        behaviors.
+        """
+        if bool(attrs.get('page')) == bool(attrs.get('traverse_pagination')):
+            raise serializers.ValidationError(
+                "Can only support one param of the following at a time: `page` or `traverse_pagination`"
+            )
+        return attrs

@@ -63,14 +63,16 @@ class TestGroupsReminderEmails(TestCase):
         }
         pending_group_memberships = [
             {
-                "pending_learner_id": 1,
+                "enterprise_customer_user_id": None,
+                "lms_user_id": None,
+                "pending_enterprise_customer_user_id": 1,
                 "enterprise_group_membership_uuid": self.enterprise_group_uuid,
                 "recent_action": "Invited: March 25, 2024",
                 "enterprise_customer": {"name": "Blk Dot Coffee"},
                 "user_email": "test1@2u.com",
             },
             {
-                "pending_learner_id": 2,
+                "pending_enterprise_customer_user_id": 2,
                 "enterprise_group_membership_uuid": self.enterprise_group_uuid,
                 "recent_action": "Invited: March 30, 2024",
                 "enterprise_customer": {"name": "Blk Dot Coffee"},

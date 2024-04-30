@@ -19,6 +19,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import APIException, NotFound
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
+from rest_framework_csv.renderers import CSVRenderer
 
 from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.mixins import UserDetailsFromJwtMixin
@@ -53,10 +54,14 @@ from enterprise_access.apps.subsidy_access_policy.exceptions import (
     SubsidyAPIHTTPError
 )
 from enterprise_access.apps.subsidy_access_policy.models import (
+    PolicyGroupAssociation,
     SubsidyAccessPolicy,
     SubsidyAccessPolicyLockAttemptFailed
 )
-from enterprise_access.apps.subsidy_access_policy.subsidy_api import get_redemptions_by_content_and_policy_for_learner
+from enterprise_access.apps.subsidy_access_policy.subsidy_api import (
+    get_and_cache_subsidy_learners_aggregate_data,
+    get_redemptions_by_content_and_policy_for_learner
+)
 
 from .utils import PaginationWithPageCount
 
@@ -65,6 +70,7 @@ logger = logging.getLogger(__name__)
 SUBSIDY_ACCESS_POLICY_CRUD_API_TAG = 'Subsidy Access Policies CRUD'
 SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG = 'Subsidy Access Policy Redemption'
 SUBSIDY_ACCESS_POLICY_ALLOCATION_API_TAG = 'Subsidy Access Policy Allocation'
+GROUP_MEMBER_DATA_WITH_AGGREGATES_API_TAG = 'Group Member Data With Aggregates'
 
 
 def policy_permission_detail_fn(request, *args, uuid=None, **kwargs):
@@ -851,3 +857,152 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
                 }
             ]
             raise AllocationRequestException(detail=error_detail) from exc
+
+
+class GroupMembersWithAggregatesCsvRenderer(CSVRenderer):
+    """
+    Custom Renderer class to ensure csv column ordering and labelling.
+    """
+    header = [
+        'member_details.user_email',
+        'member_details.user_name',
+        'recent_action',
+        'enrollment_count',
+        'activated_at',
+        'status'
+    ]
+    labels = {
+        'member_details.user_email': 'email',
+        'member_details.user_name': 'name',
+        'recent_action': 'Recent Action',
+        'enrollment_count': 'Enrollment Number',
+        'activated_at': 'Activation Date',
+    }
+
+
+class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequiredMixin, viewsets.GenericViewSet):
+    """
+    Viewset for Subsidy Access Policy Group Associations.
+    """
+    permission_classes = (permissions.IsAuthenticated,)
+    permission_required = SUBSIDY_ACCESS_POLICY_READ_PERMISSION
+    authentication_classes = (JwtAuthentication, authentication.SessionAuthentication)
+    filter_backends = (filters.NoFilterOnDetailBackend,)
+    lookup_field = 'uuid'
+
+    @cached_property
+    def enterprise_customer_uuid(self):
+        """
+        Returns the enterprise customer uuid from request data based.
+        """
+        enterprise_uuid = ''
+        policy_uuid = self.kwargs.get('uuid')
+        with suppress(ValidationError):  # Ignore if `policy_uuid` is not a valid uuid
+            policy = SubsidyAccessPolicy.objects.filter(uuid=policy_uuid).first()
+            if policy:
+                enterprise_uuid = policy.enterprise_customer_uuid
+        return enterprise_uuid
+
+    def get_permission_object(self):
+        """
+        Returns the enterprise uuid to verify that requesting user possess the enterprise learner or admin role.
+        """
+        return str(self.enterprise_customer_uuid)
+
+    def get_queryset(self):
+        """
+        Required by Django Generic Viewsets, since this data is fetched remotely and constructed there is no interal
+        notion of a queryset
+        """
+
+    @extend_schema(
+        tags=[GROUP_MEMBER_DATA_WITH_AGGREGATES_API_TAG],
+        summary='List group member data with aggregates.',
+        parameters=[serializers.SubsidyAccessPolicyAllocateRequestSerializer],
+        responses={
+            status.HTTP_200_OK: serializers.GroupMemberWithAggregatesResponseSerializer,
+            status.HTTP_404_NOT_FOUND: None,
+        },
+    )
+    @action(detail=False, methods=['get'])
+    def get_group_member_data_with_aggregates(self, request, uuid):
+        """
+        Retrieves Enterprise Group Members data zipped with subsidy aggregate enrollment data from a group record
+        linked to a subsidy access policy.
+
+        Params:
+            group_uuid: (Optional) The Enterprise Group uuid from which to select members. Leave blank to fetch the
+                first group found in the PolicyGroupAssociation table associated with the supplied SubsidyAccessPolicy.
+            user_query: (Optional) Query sub-string to search/filter group members by email.
+            sort_by: (Optional) Choice- sort results by either: 'member_details', 'status', or 'recent_action'.
+            fetch_removed: (Optional) Whether or not to return deleted membership records.
+            is_reversed: (Optional) Reverse the order in which records are returned.
+            format_csv: (Optional) Whether or not to return data in a csv format, defaults to `False`
+            page: (Optional) Which page of Enterprise Group Membership records to request. Leave blank to fetch all
+                group membership records
+        """
+        request_serializer = serializers.GroupMemberWithAggregatesRequestSerializer(data=request.query_params)
+        request_serializer.is_valid(raise_exception=True)
+        group_uuid = request_serializer.validated_data.get('group_uuid')
+        page = request_serializer.validated_data.get('page')
+        traverse_pagination = request_serializer.validated_data.get('traverse_pagination')
+
+        try:
+            policy = SubsidyAccessPolicy.objects.get(uuid=uuid)
+        except SubsidyAccessPolicy.DoesNotExist:
+            return Response("Policy not found", status.HTTP_404_NOT_FOUND)
+
+        # IMPLICITLY ASSUME there is exactly one group associated with the policy
+        # as of 04/2024
+        if not group_uuid:
+            policy_group_association = PolicyGroupAssociation.objects.filter(subsidy_access_policy=policy.uuid).first()
+            if not policy_group_association:
+                return Response("Policy group not found associated with subsidy", status.HTTP_404_NOT_FOUND)
+            group_uuid = policy_group_association.enterprise_group_uuid
+
+        # Request learner aggregate data from the subsidy service for this particular subsidy/policy
+        subsidy_learner_aggregate_dict = get_and_cache_subsidy_learners_aggregate_data(
+            policy.subsidy_uuid,
+            policy.uuid
+        )
+
+        # Request the group member data from platform
+        member_response = LmsApiClient().fetch_group_members(
+            group_uuid=group_uuid,
+            sort_by=request_serializer.validated_data.get('sort_by'),
+            user_query=request_serializer.validated_data.get('user_query'),
+            fetch_removed=request_serializer.validated_data.get('fetch_removed'),
+            is_reversed=request_serializer.validated_data.get('is_reversed'),
+            traverse_pagination=traverse_pagination,
+            page=page,
+        )
+        member_results = member_response.get('results')
+        # Sift through the group members data, zipping the aggregate data from the subsidy service into
+        # each member record, assume enrollment count is 0 if subsidy enrollment aggregate data does not exist.
+        for key, result in enumerate(member_results):
+            enrollment_count = 0
+            if lms_user_id := result.get('lms_user_id'):
+                enrollment_count = subsidy_learner_aggregate_dict.get(lms_user_id, 0)
+            result['enrollment_count'] = enrollment_count
+            member_results[key] = result
+        member_response['results'] = member_results
+
+        # return in a csv format if indicated by query params
+        if request_serializer.validated_data.get('format_csv', False):
+            request.accepted_renderer = GroupMembersWithAggregatesCsvRenderer()
+            request.accepted_media_type = GroupMembersWithAggregatesCsvRenderer().media_type
+            return Response(list(member_results), status=status.HTTP_200_OK, content_type='text/csv')
+
+        # Since we are essentially forwarding all request params to platform, we only need to replace the `next` and
+        # `previous` url values from the response returned by platform to construct a valid response object for the
+        # requester.
+        current_url = request.build_absolute_uri()
+        if not traverse_pagination:
+            if member_response.get('next'):
+                member_response['next'] = current_url.replace(f"page={page}", f"page={str(int(page) + 1)}")
+            if member_response.get('previous'):
+                member_response['previous'] = current_url.replace(f"page={page}", f"page={str(int(page) - 1)}")
+        else:
+            member_response['next'] = None
+            member_response['previous'] = None
+        return Response(data=member_response, status=200)
