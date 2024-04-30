@@ -43,6 +43,16 @@ auth_header:
   in: header
   required: true
   type: string
+definitions:
+  LearnerContentAssignmentActionRequest:
+    type: object
+    properties:
+      assignment_uuids:
+        type: array
+        description: List of assignment uuids
+        items:
+          type: string
+          description: assignment uuid
 endpoints:
   v1:
     learnerContentAssignmentCancelRequest:
@@ -62,14 +72,14 @@ endpoints:
             in: path
             required: true
             type: string
-          - name: assignment_uuids
+          - name: LearnerContentAssignmentActionRequest
             in: body
-            description: Single or multiple assignment_uuids in the array.
+            description: Single or multiple assignment_uuids in the array
             required: true
             schema:
               type: array
               items:
-                type: string
+                $ref: "#/definitions/LearnerContentAssignmentActionRequest"
         responses:
           "200":
             description: OK

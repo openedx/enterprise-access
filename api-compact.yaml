@@ -56,6 +56,17 @@ auth_header: &auth_header
   required: true
   type: "string"
 
+definitions:
+  LearnerContentAssignmentActionRequest:
+    type: "object"
+    properties:
+      assignment_uuids:
+        type: "array"
+        description: "List of assignment uuids"
+        items:
+          type: "string"
+          description: "assignment uuid"
+
 endpoints:
   v1:
     # api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/cancel/
@@ -70,14 +81,14 @@ endpoints:
         parameters:
           - *auth_header
           - *assignment_configuration_uuid
-          - name: "assignment_uuids"
+          - name: "LearnerContentAssignmentActionRequest"
             in: "body"
-            description: "Single or multiple assignment_uuids in the array."
+            description: "Single or multiple assignment_uuids in the array"
             required: true
             schema:
               type: "array"
               items:
-                type: "string"
+                $ref: "#/definitions/LearnerContentAssignmentActionRequest"
         responses: *learner_content_assignment_cancel_responses
         x-amazon-apigateway-integration:
           responses: *apigateway_responses
