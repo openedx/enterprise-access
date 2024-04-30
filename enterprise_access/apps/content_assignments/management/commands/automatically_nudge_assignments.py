@@ -143,6 +143,18 @@ class Command(BaseCommand):
                             assignment.content_key,
                         )
                         continue
+                    course_type = content_metadata.get('course_type')
+                    if course_type != 'executive-education-2u':
+                        logger.info(
+                            (
+                                'Skipping nudge emails for assignment [%s] due to course_type ([%s]) not being equal '
+                                'to "executive-education-2u".'
+                            ),
+                            assignment.uuid,
+                            course_type,
+                        )
+                        continue
+
                     # Nudge learners based on the start date of the "preferred" course run, NOT the start date from the
                     # "normalized metadata" derived from the *advertised* course run. That latter assumption caused us
                     # problems in the past because this script would just follow every new published run and keep
@@ -152,9 +164,6 @@ class Command(BaseCommand):
                         if run['key'] == assignment.preferred_course_run_key
                     )
                     start_date = course_run_metadata.get('start')
-                    course_type = content_metadata.get('course_type')
-
-                    is_executive_education_course_type = course_type == 'executive-education-2u'
 
                     # Determine if the date from today + days_before_course_state_date is
                     # equal to the date of the start date
@@ -164,23 +173,33 @@ class Command(BaseCommand):
                         target_datetime=datetime_start_date,
                         num_days=days_before_course_start_date
                     )
-
-                    if is_executive_education_course_type and can_send_nudge_notification_in_advance:
-                        message = (
-                            '[AUTOMATICALLY_REMIND_ACCEPTED_ASSIGNMENTS_2]  assignment_configuration_uuid: [%s], '
-                            'start_date: [%s], datetime_start_date: [%s], '
-                            'days_before_course_start_date: [%s], can_send_nudge_notification_in_advance: [%s], '
-                            'course_type: [%s], dry_run [%s]'
-                        )
+                    if not can_send_nudge_notification_in_advance:
                         logger.info(
-                            message,
-                            assignment_configuration.uuid,
-                            start_date,
-                            datetime_start_date,
+                            (
+                                'Skipping nudge emails for assignment [%s] due to current date not being exactly '
+                                '%s days before the start date of the preferred course run (%s).'
+                            ),
+                            assignment.uuid,
                             days_before_course_start_date,
-                            can_send_nudge_notification_in_advance,
-                            course_type,
-                            dry_run,
+                            start_date,
                         )
-                        if not dry_run:
-                            send_exec_ed_enrollment_warmer.delay(assignment.uuid, days_before_course_start_date)
+                        continue
+
+                    message = (
+                        '[AUTOMATICALLY_REMIND_ACCEPTED_ASSIGNMENTS_2]  assignment_configuration_uuid: [%s], '
+                        'start_date: [%s], datetime_start_date: [%s], '
+                        'days_before_course_start_date: [%s], can_send_nudge_notification_in_advance: [%s], '
+                        'course_type: [%s], dry_run [%s]'
+                    )
+                    logger.info(
+                        message,
+                        assignment_configuration.uuid,
+                        start_date,
+                        datetime_start_date,
+                        days_before_course_start_date,
+                        can_send_nudge_notification_in_advance,
+                        course_type,
+                        dry_run,
+                    )
+                    if not dry_run:
+                        send_exec_ed_enrollment_warmer.delay(assignment.uuid, days_before_course_start_date)
