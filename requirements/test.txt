@@ -109,7 +109,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/base.txt
     #   coreapi
-coverage[toml]==7.4.4
+coverage[toml]==7.5.0
     # via
     #   -r requirements/test.in
     #   pytest-cov
@@ -190,17 +190,23 @@ django-waffle==4.1.0
     #   edx-drf-extensions
 djangoql==0.18.1
     # via -r requirements/base.txt
-djangorestframework-csv==3.0.2
 djangorestframework==3.14.0
     # via
     #   -c requirements/constraints.txt
     #   -r requirements/base.txt
     #   django-rest-swagger
+    #   djangorestframework-csv
     #   drf-jwt
     #   drf-spectacular
     #   drf-yasg
     #   edx-api-doc-tools
     #   edx-drf-extensions
+djangorestframework-csv==3.0.2
+    # via -r requirements/base.txt
+dnspython==2.6.1
+    # via
+    #   -r requirements/base.txt
+    #   pymongo
 drf-jwt==1.19.2
     # via
     #   -r requirements/base.txt
@@ -221,7 +227,7 @@ edx-celeryutils==1.3.0
     # via -r requirements/base.txt
 edx-django-release-util==1.4.0
     # via -r requirements/base.txt
-edx-django-utils==5.12.0
+edx-django-utils==5.13.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
@@ -235,7 +241,7 @@ edx-enterprise-subsidy-client==0.4.3
     # via -r requirements/base.txt
 edx-lint==5.3.6
     # via -r requirements/test.in
-edx-opaque-keys[django]==2.8.0
+edx-opaque-keys[django]==2.9.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
@@ -250,17 +256,17 @@ exceptiongroup==1.2.1
     # via pytest
 factory-boy==3.3.0
     # via -r requirements/test.in
-faker==24.11.0
+faker==25.0.0
     # via factory-boy
 fastavro==1.9.4
     # via
     #   -r requirements/base.txt
     #   openedx-events
-filelock==3.13.4
+filelock==3.14.0
     # via
     #   tox
     #   virtualenv
-freezegun==1.4.0
+freezegun==1.5.0
     # via -r requirements/test.in
 idna==3.7
     # via
@@ -295,7 +301,7 @@ jsonfield==3.1.0
     #   edx-celeryutils
 jsonfield2==4.0.0.post0
     # via -r requirements/base.txt
-jsonschema==4.21.1
+jsonschema==4.22.0
     # via
     #   -r requirements/base.txt
     #   drf-spectacular
@@ -349,7 +355,7 @@ pkgutil-resolve-name==1.3.10
     # via
     #   -r requirements/base.txt
     #   jsonschema
-platformdirs==4.2.0
+platformdirs==4.2.1
     # via
     #   pylint
     #   tox
@@ -400,7 +406,7 @@ pylint-plugin-utils==0.8.2
     #   pylint-django
 pymemcache==4.0.0
     # via -r requirements/base.txt
-pymongo==3.13.0
+pymongo==4.4.0
     # via
     #   -r requirements/base.txt
     #   edx-opaque-keys
@@ -410,7 +416,7 @@ pynacl==1.5.0
     #   edx-django-utils
 pyproject-api==1.6.1
     # via tox
-pytest==8.1.1
+pytest==8.2.0
     # via
     #   pytest-cov
     #   pytest-django
@@ -443,9 +449,9 @@ pyyaml==6.0.1
     #   drf-spectacular
     #   drf-yasg
     #   edx-django-release-util
-redis==5.0.3
+redis==5.0.4
     # via -r requirements/base.txt
-referencing==0.34.0
+referencing==0.35.0
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -492,11 +498,11 @@ slumber==0.7.1
     # via
     #   -r requirements/base.txt
     #   edx-rest-api-client
-social-auth-app-django==5.4.0
+social-auth-app-django==5.4.1
     # via
     #   -r requirements/base.txt
     #   edx-auth-backends
-social-auth-core==4.5.3
+social-auth-core==4.5.4
     # via
     #   -r requirements/base.txt
     #   edx-auth-backends
@@ -522,7 +528,7 @@ tomli==2.0.1
     #   tox
 tomlkit==0.12.4
     # via pylint
-tox==4.14.2
+tox==4.15.0
     # via -r requirements/test.in
 typing-extensions==4.11.0
     # via
@@ -531,7 +537,6 @@ typing-extensions==4.11.0
     #   astroid
     #   drf-spectacular
     #   edx-opaque-keys
-    #   faker
     #   kombu
     #   pylint
 tzdata==2024.1
@@ -555,7 +560,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.25.3
+virtualenv==20.26.1
     # via tox
 wcwidth==0.2.13
     # via
