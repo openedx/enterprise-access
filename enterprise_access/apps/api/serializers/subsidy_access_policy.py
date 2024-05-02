@@ -790,7 +790,7 @@ class GroupMemberWithAggregatesRequestSerializer(serializers.Serializer):
         ],
         required=False,
     )
-    fetch_removed = serializers.BooleanField(
+    show_removed = serializers.BooleanField(
         required=False,
         help_text="Set to True to fetch and include removed membership records."
     )

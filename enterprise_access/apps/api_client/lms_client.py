@@ -134,7 +134,7 @@ class LmsApiClient(BaseOAuthClient):
         group_uuid,
         sort_by=None,
         user_query=None,
-        fetch_removed=False,
+        show_removed=False,
         is_reversed=False,
         traverse_pagination=False,
         page=1,
@@ -148,7 +148,7 @@ class LmsApiClient(BaseOAuthClient):
             values
             are `member_details`, `member_status`, and `recent_action`.
             - ``user_query`` (string, optional): Filter the returned members by user email with a provided sub-string.
-            - ``fetch_removed`` (bool, optional): Include removed membership records.
+            - ``show_removed`` (bool, optional): Include removed membership records.
             - ``is_reversed`` (bool, optional): Reverse the order of the returned members.
             - ``traverse_pagination`` (bool, optional): Indicates that the lms client should traverse and fetch all
             pages.
@@ -165,7 +165,7 @@ class LmsApiClient(BaseOAuthClient):
         params = {
             "sort_by": sort_by,
             "user_query": user_query,
-            "fetch_removed": fetch_removed,
+            "show_removed": show_removed,
             "page": page,
         }
         if is_reversed:

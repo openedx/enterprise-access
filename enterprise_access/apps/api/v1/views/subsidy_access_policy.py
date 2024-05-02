@@ -935,7 +935,7 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
                 first group found in the PolicyGroupAssociation table associated with the supplied SubsidyAccessPolicy.
             user_query: (Optional) Query sub-string to search/filter group members by email.
             sort_by: (Optional) Choice- sort results by either: 'member_details', 'status', or 'recent_action'.
-            fetch_removed: (Optional) Whether or not to return deleted membership records.
+            show_removed: (Optional) Whether or not to return deleted membership records.
             is_reversed: (Optional) Reverse the order in which records are returned.
             format_csv: (Optional) Whether or not to return data in a csv format, defaults to `False`
             page: (Optional) Which page of Enterprise Group Membership records to request. Leave blank to fetch all
@@ -971,7 +971,7 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
             group_uuid=group_uuid,
             sort_by=request_serializer.validated_data.get('sort_by'),
             user_query=request_serializer.validated_data.get('user_query'),
-            fetch_removed=request_serializer.validated_data.get('fetch_removed'),
+            show_removed=request_serializer.validated_data.get('show_removed'),
             is_reversed=request_serializer.validated_data.get('is_reversed'),
             traverse_pagination=traverse_pagination,
             page=page,
