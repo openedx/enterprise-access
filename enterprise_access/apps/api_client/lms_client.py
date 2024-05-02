@@ -165,9 +165,10 @@ class LmsApiClient(BaseOAuthClient):
         params = {
             "sort_by": sort_by,
             "user_query": user_query,
-            "show_removed": show_removed,
             "page": page,
         }
+        if show_removed:
+            params['show_removed'] = show_removed
         if is_reversed:
             params['is_reversed'] = is_reversed
 
