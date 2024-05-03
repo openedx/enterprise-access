@@ -117,3 +117,5 @@ REASON_LEARNER_ASSIGNMENT_FAILED = "reason_learner_assignment_failed"
 # Redeem metadata keyword that
 # forces enrollment to take place, regardless of course state.
 FORCE_ENROLLMENT_KEYWORD = 'allow_late_enrollment'
+
+SORT_BY_ENROLLMENT_COUNT = 'enrollment_count'

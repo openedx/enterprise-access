@@ -45,6 +45,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_POLICY_EXPIRED,
     REASON_POLICY_SPEND_LIMIT_REACHED,
     REASON_SUBSIDY_EXPIRED,
+    SORT_BY_ENROLLMENT_COUNT,
     MissingSubsidyAccessReasonUserMessages,
     TransactionStateChoices
 )
@@ -946,6 +947,8 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
         group_uuid = request_serializer.validated_data.get('group_uuid')
         page = request_serializer.validated_data.get('page')
         traverse_pagination = request_serializer.validated_data.get('traverse_pagination')
+        sort_by = request_serializer.validated_data.get('sort_by')
+        is_reversed = request_serializer.validated_data.get('is_reversed')
 
         try:
             policy = SubsidyAccessPolicy.objects.get(uuid=uuid)
@@ -966,13 +969,16 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
             policy.uuid
         )
 
+        if sort_by_enrollment_count := (sort_by == SORT_BY_ENROLLMENT_COUNT):
+            sort_by = None
+
         # Request the group member data from platform
         member_response = LmsApiClient().fetch_group_members(
             group_uuid=group_uuid,
-            sort_by=request_serializer.validated_data.get('sort_by'),
+            sort_by=sort_by,
             user_query=request_serializer.validated_data.get('user_query'),
             show_removed=request_serializer.validated_data.get('show_removed'),
-            is_reversed=request_serializer.validated_data.get('is_reversed'),
+            is_reversed=is_reversed,
             traverse_pagination=traverse_pagination,
             page=page,
         )
@@ -985,6 +991,9 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
                 enrollment_count = subsidy_learner_aggregate_dict.get(lms_user_id, 0)
             result['enrollment_count'] = enrollment_count
             member_results[key] = result
+
+        if sort_by_enrollment_count:
+            member_results.sort(key=lambda result: result.get('enrollment_count'), reverse=is_reversed)
         member_response['results'] = member_results
 
         # return in a csv format if indicated by query params
