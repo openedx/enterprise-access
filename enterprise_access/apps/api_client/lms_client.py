@@ -6,16 +6,39 @@ import os
 
 import requests
 from django.conf import settings
+from edx_django_utils.cache import TieredCache
 from rest_framework import status
 
 from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
 from enterprise_access.apps.api_client.exceptions import FetchGroupMembersConflictingParamsException
+from enterprise_access.cache_utils import versioned_cache_key
 from enterprise_access.utils import should_send_email_to_pecu
 
 logger = logging.getLogger(__name__)
 
 
+def all_pages_enterprise_group_members_cache_key(
+    group_uuid,
+    sort_by,
+    user_query,
+    show_removed,
+    is_reversed,
+):
+    """
+    helper method to retrieve the all enterprise group members cache key
+    """
+    return versioned_cache_key(
+        'all_enterprise_group_members',
+        group_uuid,
+        sort_by,
+        user_query,
+        show_removed,
+        is_reversed,
+    )
+
+
 class LmsApiClient(BaseOAuthClient):
+
     """
     API client for calls to the LMS service.
     """
@@ -156,9 +179,9 @@ class LmsApiClient(BaseOAuthClient):
             - ``page`` (int, optional): Which page of paginated data to return. Cannot be supplied if
             ``traverse_pagination`` is supplied.
         """
-        if traverse_pagination and page:
+        if bool(traverse_pagination) == bool(page):
             raise FetchGroupMembersConflictingParamsException(
-                'Params `traverse_pagination` and `page` are in conflict, only supply one or the other'
+                'Params `traverse_pagination` and `page` are in conflict, must supply exactly one or the other.'
             )
 
         group_members_url = self.enterprise_group_members_endpoint(group_uuid)
@@ -170,6 +193,22 @@ class LmsApiClient(BaseOAuthClient):
         }
         if is_reversed:
             params['is_reversed'] = is_reversed
+        if traverse_pagination:
+            cache_key = all_pages_enterprise_group_members_cache_key(
+                group_uuid,
+                sort_by,
+                user_query,
+                show_removed,
+                is_reversed,
+            )
+            cached_response = TieredCache.get_cached_response(cache_key)
+            if cached_response.is_found:
+                logger.info(
+                    f'all_enterprise_group_members cache hit for group_uuid {group_uuid}.'
+                )
+                return cached_response.value
+
+            params['page_size'] = 500
 
         response = self.client.get(group_members_url, params=params)
         response.raise_for_status()
@@ -187,6 +226,8 @@ class LmsApiClient(BaseOAuthClient):
             response_json['results'] = results
             response_json['next'] = None
             response_json['previous'] = None
+
+            TieredCache.set_all_tiers(cache_key, response_json, settings.ALL_ENTERPRISE_GROUP_MEMBERS_CACHE_TIMEOUT)
         return response_json
 
     def get_enterprise_user(self, enterprise_customer_uuid, learner_id):

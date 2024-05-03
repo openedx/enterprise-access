@@ -5,6 +5,7 @@ import logging
 import os
 from collections import defaultdict
 from contextlib import suppress
+from urllib import parse
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -34,6 +35,7 @@ from enterprise_access.apps.core.constants import (
 from enterprise_access.apps.events.signals import SUBSIDY_REDEEMED
 from enterprise_access.apps.events.utils import send_subsidy_redemption_event_to_event_bus
 from enterprise_access.apps.subsidy_access_policy.constants import (
+    GROUP_MEMBERS_WITH_AGGREGATES_DEFAULT_PAGE_SIZE,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_FAILED,
@@ -45,6 +47,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_POLICY_EXPIRED,
     REASON_POLICY_SPEND_LIMIT_REACHED,
     REASON_SUBSIDY_EXPIRED,
+    SORT_BY_ENROLLMENT_COUNT,
     MissingSubsidyAccessReasonUserMessages,
     TransactionStateChoices
 )
@@ -71,6 +74,65 @@ SUBSIDY_ACCESS_POLICY_CRUD_API_TAG = 'Subsidy Access Policies CRUD'
 SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG = 'Subsidy Access Policy Redemption'
 SUBSIDY_ACCESS_POLICY_ALLOCATION_API_TAG = 'Subsidy Access Policy Allocation'
 GROUP_MEMBER_DATA_WITH_AGGREGATES_API_TAG = 'Group Member Data With Aggregates'
+
+
+def group_members_with_aggregates_next_page(current_url):
+    """Helper method to create the next page url"""
+    parsed_url = parse.urlparse(current_url)
+    parsed_query = parse.parse_qs(parsed_url.query)
+    parsed_query_page = parsed_query['page']
+    parsed_query_page[0] = str(int(parsed_query_page[0]) + 1)
+    parsed_url._replace(query=parsed_query)
+    return parse.urlunparse(parsed_url)
+
+
+def group_members_with_aggregates_previous_page(current_url):
+    """Helper method to create the previous page url"""
+    parsed_url = parse.urlparse(current_url)
+    parsed_query = parse.parse_qs(parsed_url.query)
+    parsed_query_page = parsed_query['page']
+    parsed_query_page[0] = str(int(parsed_query_page[0]) - 1)
+    parsed_url._replace(query=parsed_query)
+    return parse.urlunparse(parsed_url)
+
+
+def _update_pagination_params_for_group_aggregates(
+    member_response,
+    traverse_pagination,
+    sort_by_enrollment_count,
+    page_index_start,
+    request,
+    num_member_results,
+):
+    """
+    Helper method to construct the api response object with next and previous values
+    """
+    current_url = request.build_absolute_uri()
+    if not traverse_pagination:
+        # If sorting by enrollment count and a provided page, we have to be more clever about when to construct next
+        # and previous values
+        has_next_page = (page_index_start + GROUP_MEMBERS_WITH_AGGREGATES_DEFAULT_PAGE_SIZE) < num_member_results
+        sort_by_enrollment_count_next = (
+            has_next_page and sort_by_enrollment_count
+        )
+        if member_response.get('next') or sort_by_enrollment_count_next:
+            member_response['next'] = group_members_with_aggregates_next_page(current_url)
+        if member_response.get('previous') or (page_index_start > 0 and sort_by_enrollment_count):
+            member_response['previous'] = group_members_with_aggregates_previous_page(current_url)
+    else:
+        member_response['next'] = None
+        member_response['previous'] = None
+
+
+def zip_group_members_data_with_enrollment_count(member_results, subsidy_learner_aggregate_dict):
+    """Helper method to zip group member results with aggregate data from the subsidy service"""
+    for key, result in enumerate(member_results):
+        enrollment_count = 0
+        if lms_user_id := result.get('lms_user_id'):
+            enrollment_count = subsidy_learner_aggregate_dict.get(lms_user_id, 0)
+        result['enrollment_count'] = enrollment_count
+        member_results[key] = result
+    return member_results
 
 
 def policy_permission_detail_fn(request, *args, uuid=None, **kwargs):
@@ -946,6 +1008,8 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
         group_uuid = request_serializer.validated_data.get('group_uuid')
         page = request_serializer.validated_data.get('page')
         traverse_pagination = request_serializer.validated_data.get('traverse_pagination')
+        sort_by = request_serializer.validated_data.get('sort_by')
+        is_reversed = request_serializer.validated_data.get('is_reversed')
 
         try:
             policy = SubsidyAccessPolicy.objects.get(uuid=uuid)
@@ -966,25 +1030,46 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
             policy.uuid
         )
 
+        # If `sort_by_enrollment_count` is true, then we need to fetch all the group members records and do the sorting
+        # ourselves since platform is unaware of enrollment data numbers.
+        page_requested_by_client = None
+        if sort_by_enrollment_count := (sort_by == SORT_BY_ENROLLMENT_COUNT):
+            sort_by = None
+        else:
+            page_requested_by_client = page
+
         # Request the group member data from platform
         member_response = LmsApiClient().fetch_group_members(
             group_uuid=group_uuid,
-            sort_by=request_serializer.validated_data.get('sort_by'),
+            sort_by=sort_by,
             user_query=request_serializer.validated_data.get('user_query'),
             show_removed=request_serializer.validated_data.get('show_removed'),
-            is_reversed=request_serializer.validated_data.get('is_reversed'),
-            traverse_pagination=traverse_pagination,
-            page=page,
+            is_reversed=is_reversed,
+            traverse_pagination=(traverse_pagination or sort_by_enrollment_count),
+            page=page_requested_by_client,
         )
         member_results = member_response.get('results')
+
         # Sift through the group members data, zipping the aggregate data from the subsidy service into
         # each member record, assume enrollment count is 0 if subsidy enrollment aggregate data does not exist.
-        for key, result in enumerate(member_results):
-            enrollment_count = 0
-            if lms_user_id := result.get('lms_user_id'):
-                enrollment_count = subsidy_learner_aggregate_dict.get(lms_user_id, 0)
-            result['enrollment_count'] = enrollment_count
-            member_results[key] = result
+        member_results = zip_group_members_data_with_enrollment_count(member_results, subsidy_learner_aggregate_dict)
+
+        # If the request sorts by enrollment count, sort member data and grab values to properly construct the
+        # `next` and `previous` pages
+        page_index_start = 0
+        num_member_results = 0
+        if sort_by_enrollment_count:
+            member_results.sort(key=lambda result: result.get('enrollment_count'), reverse=(not is_reversed))
+            if page:
+                # Needed to construct `next` and `previous` values for the response
+                num_member_results = len(member_results)
+
+                # Cut down the returned "all data" to the page and size requested
+                page_index_start = (page - 1) * GROUP_MEMBERS_WITH_AGGREGATES_DEFAULT_PAGE_SIZE
+                member_results = member_results[
+                    page_index_start: page_index_start + GROUP_MEMBERS_WITH_AGGREGATES_DEFAULT_PAGE_SIZE
+                ]
+
         member_response['results'] = member_results
 
         # return in a csv format if indicated by query params
@@ -996,13 +1081,12 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
         # Since we are essentially forwarding all request params to platform, we only need to replace the `next` and
         # `previous` url values from the response returned by platform to construct a valid response object for the
         # requester.
-        current_url = request.build_absolute_uri()
-        if not traverse_pagination:
-            if member_response.get('next'):
-                member_response['next'] = current_url.replace(f"page={page}", f"page={str(int(page) + 1)}")
-            if member_response.get('previous'):
-                member_response['previous'] = current_url.replace(f"page={page}", f"page={str(int(page) - 1)}")
-        else:
-            member_response['next'] = None
-            member_response['previous'] = None
+        _update_pagination_params_for_group_aggregates(
+            member_response,
+            traverse_pagination,
+            sort_by_enrollment_count,
+            page_index_start,
+            request,
+            num_member_results,
+        )
         return Response(data=member_response, status=200)
