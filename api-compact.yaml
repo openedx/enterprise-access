@@ -7,6 +7,7 @@
 #
 #
 # Available service endpoints -- note that alternate endpoints may be presented at the API Gateway tier
+# POST  /api/v1/policy-allocation/{policy_uuid}/allocate/
 # POST  /api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/cancel/
 
 apigateway_responses: &apigateway_responses
@@ -16,6 +17,8 @@ apigateway_responses: &apigateway_responses
     statusCode: "200"
   201:
     statusCode: "201"
+  202:
+    statusCode: "202"
   401:
     statusCode: "401"
   403:
@@ -44,6 +47,19 @@ learner_content_assignment_cancel_responses: &learner_content_assignment_cancel_
   500:
     description: "Internal Server Error"
 
+learner_content_assignment_allocate_responses: &learner_content_assignment_allocate_responses
+  202:
+    description: "Accepted"
+  400:
+    description: "Bad Request"
+  401:
+    description: "Unauthorized"
+  404:
+    description: "Not Found"
+  500:
+    description: "Internal Server Error"
+
+
 assignment_configuration_uuid: &assignment_configuration_uuid
   name: "assignment_configuration_uuid"
   in: "path"
@@ -69,6 +85,58 @@ definitions:
 
 endpoints:
   v1:
+    # /api/v1/policy-allocation/{policy_uuid}/allocate/
+    subsidyAccessPolicyAllocation:
+      post:
+        description: "creates or updates allocated LearnerContentAssignment records for a requested list of user email addresses, 
+          in the requested content_key and at the requested price of content_price_cents"
+        operationId: "api_v1_policy_allocation_allocate_create"
+        consumes:
+          - "application/json"
+        produces:
+          - "application/json"
+        parameters:
+          - *auth_header
+          - in: path
+            name: policy_uuid
+            schema:
+              type: string
+              format: uuid
+              description: The uuid that uniquely identifies this policy record.
+            required: true
+          - in: query
+            name: content_key
+            schema:
+              type: string
+              minLength: 1
+            description: Course content_key to which these learners are assigned.
+            required: true
+          - in: query
+            name: content_price_cents
+            schema:
+              type: integer
+              minimum: 0
+            description: The price, in USD cents, of this content at the time of allocation.
+              Must be >= 0.
+            required: true
+          - in: query
+            name: learner_emails
+            schema:
+              type: array
+              items:
+                type: string
+                format: email
+            description: Learner emails to whom LearnerContentAssignments should be allocated.
+            required: true
+        responses: *learner_content_assignment_allocate_responses
+        x-amazon-apigateway-integration:
+          responses: *apigateway_responses
+          httpMethod: "POST"
+          type: "http"
+          requestParameters:
+            integration.request.header.Authorization: "method.request.header.Authorization"
+            integration.request.path.policy_uuid: "method.request.path.policy_uuid"
+          uri: "https://${stageVariables.enterprise_access_host}/api/v1/policy-allocation/{policy_uuid}/allocate/"
     # api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/cancel/
     learnerContentAssignmentCancelRequest:
       post:
