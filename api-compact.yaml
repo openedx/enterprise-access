@@ -8,6 +8,7 @@
 #
 # Available service endpoints -- note that alternate endpoints may be presented at the API Gateway tier
 # POST  /api/v1/policy-allocation/{policy_uuid}/allocate/
+# POST  /api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/remind/
 # POST  /api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/cancel/
 
 apigateway_responses: &apigateway_responses
@@ -33,7 +34,7 @@ apigateway_responses: &apigateway_responses
     statusCode: "500"
 
 
-learner_content_assignment_cancel_responses: &learner_content_assignment_cancel_responses
+learner_content_assignment_remind_cancel_responses: &learner_content_assignment_remind_cancel_responses
   200:
     description: "OK"
   400:
@@ -137,6 +138,36 @@ endpoints:
             integration.request.header.Authorization: "method.request.header.Authorization"
             integration.request.path.policy_uuid: "method.request.path.policy_uuid"
           uri: "https://${stageVariables.enterprise_access_host}/api/v1/policy-allocation/{policy_uuid}/allocate/"
+    # api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/remind/
+    learnerContentAssignmentRemindRequest:
+      post:
+        description: "Send reminders to a list of learners with associated ``LearnerContentAssignment``
+          record by list of uuids."
+        operationId: "api_v1_assignment_configurations_admin_assignments_remind_create"
+        consumes:
+          - "application/json"
+        produces:
+          - "application/json"
+        parameters:
+          - *auth_header
+          - *assignment_configuration_uuid
+          - name: "LearnerContentAssignmentRemindRequest"
+            in: "body"
+            description: "Single or multiple assignment_uuids in the array"
+            required: true
+            schema:
+              type: "array"
+              items:
+                $ref: "#/definitions/LearnerContentAssignmentActionRequest"
+        responses: *learner_content_assignment_remind_cancel_responses
+        x-amazon-apigateway-integration:
+          responses: *apigateway_responses
+          httpMethod: "POST"
+          type: "http"
+          requestParameters:
+            integration.request.header.Authorization: "method.request.header.Authorization"
+            integration.request.path.assignment_configuration_uuid: "method.request.path.assignment_configuration_uuid"
+          uri: "https://${stageVariables.enterprise_access_host}/api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/remind/"
     # api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/cancel/
     learnerContentAssignmentCancelRequest:
       post:
@@ -157,7 +188,7 @@ endpoints:
               type: "array"
               items:
                 $ref: "#/definitions/LearnerContentAssignmentActionRequest"
-        responses: *learner_content_assignment_cancel_responses
+        responses: *learner_content_assignment_remind_cancel_responses
         x-amazon-apigateway-integration:
           responses: *apigateway_responses
           httpMethod: "POST"
