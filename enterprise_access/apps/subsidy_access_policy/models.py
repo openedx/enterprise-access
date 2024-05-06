@@ -1386,6 +1386,10 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             raise
         # Migrate assignment to accepted.
         found_assignment.state = LearnerContentAssignmentStateChoices.ACCEPTED
+        # For course-based assignments we need to update the preferred_course_run_key to point to the actual learner
+        # selection instead of the one we guessed the admin wanted. That way, the nudge emails correspond to the actual
+        # enrolled course run, not just the one that the admin might have preferred.
+        found_assignment.preferred_course_run_key = content_key
         found_assignment.accepted_at = localized_utcnow()
         found_assignment.errored_at = None
         found_assignment.cancelled_at = None
