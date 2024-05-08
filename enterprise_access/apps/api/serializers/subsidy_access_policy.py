@@ -14,7 +14,11 @@ from requests.exceptions import HTTPError
 from rest_framework import serializers
 
 from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
-from enterprise_access.apps.subsidy_access_policy.constants import CENTS_PER_DOLLAR, PolicyTypes
+from enterprise_access.apps.subsidy_access_policy.constants import (
+    CENTS_PER_DOLLAR,
+    SORT_BY_ENROLLMENT_COUNT,
+    PolicyTypes
+)
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 
 from .content_assignments.assignment import (
@@ -786,9 +790,15 @@ class GroupMemberWithAggregatesRequestSerializer(serializers.Serializer):
         choices=[
             ('member_details', 'member_details'),
             ('status', 'status'),
-            ('recent_action', 'recent_action')
+            ('recent_action', 'recent_action'),
+            (SORT_BY_ENROLLMENT_COUNT, SORT_BY_ENROLLMENT_COUNT),
         ],
         required=False,
+        help_text=(
+            "Selectable values by which to sort the returned membership records. [Warning]: 'enrollment_count' "
+            "will automatically cause incoming requests to wait for all pages of data to be fetched from "
+            "edx-enterprise."
+        )
     )
     show_removed = serializers.BooleanField(
         required=False,

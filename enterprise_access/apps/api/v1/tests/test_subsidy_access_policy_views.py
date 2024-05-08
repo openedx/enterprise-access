@@ -2177,6 +2177,113 @@ class TestSubsidyAccessPolicyGroupViewset(CRUDViewTestMixin, APITestWithMocks):
     @mock.patch(
         'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_subsidy_learners_aggregate_data'
     )
+    def test_get_group_members_data_with_aggregates_sorted_by_enrollment_count(
+        self,
+        mock_subsidy_learners_aggregate_data_cache,
+        mock_lms_api_client,
+    ):
+        """
+        Test that the `get_group_member_data_with_aggregates` endpoint can sort by enrollment count after fetching
+        data from both subsidy and platform
+        """
+        mock_fetch_group_response = self.mock_fetch_group_members
+        # Because this is appended to the mock response, it will ultimately come second in the endpoint's response
+        # without further filtering
+        LMS_USER_ID = 2
+        mock_fetch_group_response.get('results').append({
+            "lms_user_id": LMS_USER_ID,
+            "enterprise_customer_user_id": 3,
+            "pending_enterprise_customer_user_id": None,
+            "enterprise_group_membership_uuid": uuid4(),
+            "member_details": {
+                "user_email": "ayylmao@example.com",
+                "user_name": "ayylmao"
+            },
+            "recent_action": "Accepted: April 24, 2024",
+            "status": "accepted",
+        })
+        # Make it so the second members result is associated with more enrollments
+        mock_subsidy_learners_aggregate_data_cache.return_value = {2: 99}
+        mock_lms_api_client.return_value.fetch_group_members.return_value = mock_fetch_group_response
+
+        response = self.client.get(
+            self.subsidy_access_policy_can_redeem_endpoint,
+            {'group_uuid': uuid4(), 'page': 1, 'sort_by': 'enrollment_count'}
+        )
+        sorted_response_json = response.json()
+        # Test unpaginated sorting without reversal
+        assert sorted_response_json.get('results')[0].get('lms_user_id') == LMS_USER_ID
+        assert sorted_response_json.get('results')[1].get('lms_user_id') == 1
+
+        response = self.client.get(
+            self.subsidy_access_policy_can_redeem_endpoint,
+            {'group_uuid': uuid4(), 'page': 1, 'sort_by': 'enrollment_count', 'is_reversed': True}
+        )
+        sorted_response_json = response.json()
+        # Test unpaginated sorting with reversal
+        assert sorted_response_json.get('results')[0].get('lms_user_id') == 1
+        assert sorted_response_json.get('results')[1].get('lms_user_id') == LMS_USER_ID
+
+        # Setup some pagination data
+        mock_fetch_group_response['results'] = [{
+            'lms_user_id': x,
+            'enterprise_customer_user_id': x,
+            'enterprise_group_membership_uuid': uuid4(),
+            "member_details": {
+                "user_email": "ayylmao@example.com",
+                "user_name": "ayylmao"
+            },
+            "recent_action": "Accepted: April 24, 2024",
+            "status": "accepted",
+        } for x in range(11)]
+        mock_fetch_group_response['next'] = self.subsidy_access_policy_can_redeem_endpoint + '?page=2'
+
+        mock_lms_api_client.return_value.fetch_group_members.return_value = mock_fetch_group_response
+        mock_subsidy_learners_aggregate_data_cache.return_value = {x: x for x in range(11)}
+        response = self.client.get(
+            self.subsidy_access_policy_can_redeem_endpoint,
+            {'group_uuid': uuid4(), 'page': 1, 'sort_by': 'enrollment_count'}
+        )
+        paginated_results = response.data.get('results')
+
+        for key, result in enumerate(paginated_results[1:]):
+            # With no reversal, assert any given result has a smaller enrollment count than the one before it
+            assert result.get('enrollment_count') < paginated_results[key].get('enrollment_count')
+
+        second_page_response = self.client.get(
+            self.subsidy_access_policy_can_redeem_endpoint,
+            {'group_uuid': uuid4(), 'page': 2, 'sort_by': 'enrollment_count'}
+        )
+        second_page_paginated_results = second_page_response.data.get('results')
+        for second_page_result in second_page_paginated_results:
+            # With no reversal, assert any given result on a page will have a lower enrollment count than
+            # results on the previous page
+            assert second_page_result.get('enrollment_count') < paginated_results[-1].get('enrollment_count')
+
+        response = self.client.get(
+            self.subsidy_access_policy_can_redeem_endpoint,
+            {'group_uuid': uuid4(), 'page': 1, 'sort_by': 'enrollment_count', 'is_reversed': True}
+        )
+        paginated_results = response.data.get('results')
+        for key, result in enumerate(paginated_results[1:]):
+            # With reversals, assert any given result on a page will have a higher enrollment count than
+            # the one before it
+            assert result.get('enrollment_count') > paginated_results[key].get('enrollment_count')
+
+        second_page_response = self.client.get(
+            self.subsidy_access_policy_can_redeem_endpoint,
+            {'group_uuid': uuid4(), 'page': 2, 'sort_by': 'enrollment_count', 'is_reversed': True}
+        )
+        second_page_paginated_results = second_page_response.data.get('results')
+        for second_page_result in second_page_paginated_results:
+            # With no reversal, assert any given result on a page will have a higher enrollment count than
+            # results on the previous page
+            assert second_page_result.get('enrollment_count') > paginated_results[-1].get('enrollment_count')
+
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
+    @mock.patch(
+        'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_subsidy_learners_aggregate_data'
+    )
     def test_get_group_member_data_with_aggregates_success(
         self,
         mock_subsidy_learners_aggregate_data_cache,
