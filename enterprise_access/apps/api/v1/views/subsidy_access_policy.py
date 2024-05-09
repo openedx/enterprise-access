@@ -2,6 +2,7 @@
 REST API views for the subsidy_access_policy app.
 """
 import logging
+import math
 import os
 from collections import defaultdict
 from contextlib import suppress
@@ -122,6 +123,9 @@ def _update_pagination_params_for_group_aggregates(
     else:
         member_response['next'] = None
         member_response['previous'] = None
+
+    if sort_by_enrollment_count:
+        member_response['num_pages'] = math.ceil(num_member_results / GROUP_MEMBERS_WITH_AGGREGATES_DEFAULT_PAGE_SIZE)
 
 
 def zip_group_members_data_with_enrollment_count(member_results, subsidy_learner_aggregate_dict):
