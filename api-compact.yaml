@@ -100,33 +100,25 @@ endpoints:
           - *auth_header
           - in: path
             name: policy_uuid
-            schema:
-              type: string
-              format: uuid
-              description: The uuid that uniquely identifies this policy record.
+            type: string
+            description: The uuid that uniquely identifies this policy record.
             required: true
           - in: query
             name: content_key
-            schema:
-              type: string
-              minLength: 1
+            type: string
             description: Course content_key to which these learners are assigned.
             required: true
           - in: query
             name: content_price_cents
-            schema:
-              type: integer
-              minimum: 0
+            type: integer
             description: The price, in USD cents, of this content at the time of allocation.
               Must be >= 0.
             required: true
           - in: query
             name: learner_emails
-            schema:
-              type: array
-              items:
-                type: string
-                format: email
+            type: array
+            items:
+              type: string
             description: Learner emails to whom LearnerContentAssignments should be allocated.
             required: true
         responses: *learner_content_assignment_allocate_responses
