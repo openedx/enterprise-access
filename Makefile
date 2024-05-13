@@ -165,6 +165,9 @@ detect_changed_source_translations: ## check if translation files are up-to-date
 
 validate_translations: fake_translations detect_changed_source_translations ## install fake translations and check if translation files are up-to-date
 
+docker_build_no_cache:
+	docker-compose build --no-cache
+
 docker_build:
 	docker build . -f Dockerfile --target app -t openedx/enterprise-access
 	docker build . -f Dockerfile --target app -t openedx/enterprise-access.worker
@@ -190,20 +193,37 @@ dev.provision:
 	bash ./provision-enterprise-access.sh
 
 # devstack-themed shortcuts
-dev.up: # Starts all containers
+# Starts all containers
+dev.up: dev.up.redis
 	docker-compose up -d
 
-dev.up.build: docker_build
+dev.up.build: docker_build dev.up.redis
 	docker-compose up -d
 
-dev.up.build-no-cache:
-	docker-compose build --no-cache
+dev.up.build-no-cache: docker_build_no_cache dev.up.redis
 	docker-compose up -d
 
-dev.down: # Kills containers and all of their data that isn't in volumes
+dev.up.with-events: dev.up.kafka-control-center dev.up
+
+# Start redis via the devstack docker-compose.yml
+dev.up.redis:
+	docker-compose -f $(DEVSTACK_WORKSPACE)/devstack/docker-compose.yml up -d redis
+
+# Start kafka via the devstack docker-compose.yml
+# https://github.com/openedx-unsupported/devstack/blob/323b475b885a2704489566b262e2895a4dca62b6/docker-compose.yml#L140
+dev.up.kafka-control-center:
+	docker-compose -f $(DEVSTACK_WORKSPACE)/devstack/docker-compose.yml up -d kafka-control-center
+
+# Useful for just restarting everything related to the event broker
+dev.down.kafka-control-center:
+	docker-compose -f $(DEVSTACK_WORKSPACE)/devstack/docker-compose.yml down kafka zookeeper schema-registry kafka-control-center
+
+# Kills containers and all of their data that isn't in volumes
+dev.down:
 	docker-compose down
 
-dev.stop: # Stops containers so they can be restarted
+# Stops containers so they can be restarted
+dev.stop:
 	docker-compose stop
 
 dev.backup:

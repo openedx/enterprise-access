@@ -61,7 +61,11 @@ JWT_AUTH.update({
 
 # Install django-extensions for improved dev experiences
 # https://github.com/django-extensions/django-extensions#using-it
-INSTALLED_APPS += ('django_extensions',)
+INSTALLED_APPS += (
+    'django_extensions',
+    'edx_event_bus_kafka',
+    'openedx_events',
+)
 
 # BEGIN CELERY
 CELERY_WORKER_HIJACK_ROOT_LOGGER = True
@@ -109,12 +113,17 @@ SHELL_PLUS_IMPORTS = [
 
 
 ################### Kafka Related Settings ##############################
+
+# "Standard" Kafka settings as defined in https://github.com/openedx/event-bus-kafka/tree/main
+EVENT_BUS_KAFKA_SCHEMA_REGISTRY_URL = 'http://edx.devstack.schema-registry:8081'
+EVENT_BUS_KAFKA_BOOTSTRAP_SERVERS = 'edx.devstack.kafka:29092'
+EVENT_BUS_PRODUCER = 'edx_event_bus_kafka.create_producer'
+EVENT_BUS_CONSUMER = 'edx_event_bus_kafka.KafkaEventConsumer'
+EVENT_BUS_TOPIC_PREFIX = 'dev'
+
+# Potentially deprecated kafka settings
 KAFKA_ENABLED = False
-
-KAFKA_BOOTSTRAP_SERVER = 'edx.devstack.kafka:29092'
-SCHEMA_REGISTRY_URL = 'http://edx.devstack.schema-registry:8081'
 KAFKA_REPLICATION_FACTOR_PER_TOPIC = 1
-
 COUPON_CODE_REQUEST_TOPIC_NAME = "coupon-code-request-dev"
 LICENSE_REQUEST_TOPIC_NAME = "license-request-dev"
 ACCESS_POLICY_TOPIC_NAME = "access-policy-dev"
