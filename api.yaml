@@ -22,7 +22,7 @@ apigateway_responses:
     statusCode: "500"
   default:
     statusCode: "400"
-learner_content_assignment_remind_cancel_responses:
+learner_content_assignment_list_remind_cancel_responses:
   "200":
     description: OK
   "400":
@@ -279,3 +279,86 @@ endpoints:
             integration.request.header.Authorization: method.request.header.Authorization
             integration.request.path.assignment_configuration_uuid: method.request.path.assignment_configuration_uuid
           uri: https://${stageVariables.enterprise_access_host}/api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/cancel/
+    subsidyAccessPolicies:
+      get:
+        description: Lists SubsidyAccessPolicy records, filtered by the given query
+          parameters.
+        operationId: api_v1_subsidy_access_policies_list
+        consumes:
+          - application/json
+        produces:
+          - application/json
+        parameters:
+          - name: Authorization
+            in: header
+            required: true
+            type: string
+          - in: query
+            name: active
+            type: boolean
+            description: Set to FALSE to deactivate and hide this policy. Use this when you
+              want to disable redemption and make it disappear from all
+              frontends, effectively soft-deleting it. Default is False
+              (deactivated).
+            required: false
+          - in: query
+            name: enterprise_customer_uuid
+            type: string
+            description: The owning Enterprise Customer's UUID. Cannot be blank or null.
+            required: true
+          - in: query
+            name: page
+            type: integer
+            description: A page number within the paginated result set.
+            required: false
+          - in: query
+            name: page_size
+            type: integer
+            description: Number of results to return per page.
+            required: false
+          - in: query
+            name: policy_type
+            type: string
+            description: The type of this policy (e.g. the name of an access policy proxy
+              model).
+            required: false
+        responses:
+          "200":
+            description: OK
+          "400":
+            description: Bad Request
+          "401":
+            description: Unauthorized
+          "404":
+            description: Not Found
+          "422":
+            description: Not Cancellable
+          "500":
+            description: Internal Server Error
+        x-amazon-apigateway-integration:
+          responses:
+            "200":
+              statusCode: "200"
+            "201":
+              statusCode: "201"
+            "202":
+              statusCode: "202"
+            "401":
+              statusCode: "401"
+            "403":
+              statusCode: "403"
+            "404":
+              statusCode: "404"
+            "422":
+              statusCode: "422"
+            "429":
+              statusCode: "429"
+            "500":
+              statusCode: "500"
+            default:
+              statusCode: "400"
+          httpMethod: GET
+          type: http
+          requestParameters:
+            integration.request.header.Authorization: method.request.header.Authorization
+          uri: https://${stageVariables.enterprise_access_host}/api/v1/subsidy-access-policies/

@@ -10,6 +10,7 @@
 # POST  /api/v1/policy-allocation/{policy_uuid}/allocate/
 # POST  /api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/remind/
 # POST  /api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/cancel/
+# GET   /api/v1/subsidy-access-policies/
 
 apigateway_responses: &apigateway_responses
   default:
@@ -34,7 +35,7 @@ apigateway_responses: &apigateway_responses
     statusCode: "500"
 
 
-learner_content_assignment_remind_cancel_responses: &learner_content_assignment_remind_cancel_responses
+learner_content_assignment_list_remind_cancel_responses: &learner_content_assignment_list_remind_cancel_responses
   200:
     description: "OK"
   400:
@@ -151,7 +152,7 @@ endpoints:
               type: "array"
               items:
                 $ref: "#/definitions/LearnerContentAssignmentActionRequest"
-        responses: *learner_content_assignment_remind_cancel_responses
+        responses: *learner_content_assignment_list_remind_cancel_responses
         x-amazon-apigateway-integration:
           responses: *apigateway_responses
           httpMethod: "POST"
@@ -180,7 +181,7 @@ endpoints:
               type: "array"
               items:
                 $ref: "#/definitions/LearnerContentAssignmentActionRequest"
-        responses: *learner_content_assignment_remind_cancel_responses
+        responses: *learner_content_assignment_list_remind_cancel_responses
         x-amazon-apigateway-integration:
           responses: *apigateway_responses
           httpMethod: "POST"
@@ -189,3 +190,48 @@ endpoints:
             integration.request.header.Authorization: "method.request.header.Authorization"
             integration.request.path.assignment_configuration_uuid: "method.request.path.assignment_configuration_uuid"
           uri: "https://${stageVariables.enterprise_access_host}/api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/cancel/"
+    # api/v1/subsidy-access-policies/
+    subsidyAccessPolicies:
+      get:
+        description: "Lists SubsidyAccessPolicy records, filtered by the given query parameters."
+        operationId: "api_v1_subsidy_access_policies_list"
+        consumes:
+          - "application/json"
+        produces:
+          - "application/json"
+        parameters:
+          - *auth_header
+          - in: query
+            name: active
+            type: boolean
+            description: "Set to FALSE to deactivate and hide this policy. Use this when you want to disable redemption
+              and make it disappear from all frontends, effectively soft-deleting it. Default is False (deactivated)."
+            required: false
+          - in: query
+            name: enterprise_customer_uuid
+            type: string
+            description: The owning Enterprise Customer's UUID. Cannot be blank or null.
+            required: true
+          - in: query
+            name: page
+            type: integer
+            description: A page number within the paginated result set.
+            required: false
+          - in: query
+            name: page_size
+            type: integer
+            description: Number of results to return per page.
+            required: false
+          - in: query
+            name: policy_type
+            type: string
+            description: The type of this policy (e.g. the name of an access policy proxy model).
+            required: false
+        responses: *learner_content_assignment_list_remind_cancel_responses
+        x-amazon-apigateway-integration:
+          responses: *apigateway_responses
+          httpMethod: "GET"
+          type: "http"
+          requestParameters:
+            integration.request.header.Authorization: "method.request.header.Authorization"
+          uri: "https://${stageVariables.enterprise_access_host}/api/v1/subsidy-access-policies/"
