@@ -23,6 +23,7 @@ def all_pages_enterprise_group_members_cache_key(
     user_query,
     show_removed,
     is_reversed,
+    learners,
 ):
     """
     helper method to retrieve the all enterprise group members cache key
@@ -34,6 +35,7 @@ def all_pages_enterprise_group_members_cache_key(
         user_query,
         show_removed,
         is_reversed,
+        learners,
     )
 
 
@@ -161,6 +163,7 @@ class LmsApiClient(BaseOAuthClient):
         is_reversed=False,
         traverse_pagination=False,
         page=1,
+        learners=None,
     ):
         """
         Fetches enterprise group member records from edx-platform.
@@ -194,6 +197,8 @@ class LmsApiClient(BaseOAuthClient):
             params['show_removed'] = show_removed
         if is_reversed:
             params['is_reversed'] = is_reversed
+        if learners:
+            params['learners'] = learners
         if traverse_pagination:
             cache_key = all_pages_enterprise_group_members_cache_key(
                 group_uuid,
@@ -201,6 +206,7 @@ class LmsApiClient(BaseOAuthClient):
                 user_query,
                 show_removed,
                 is_reversed,
+                learners,
             )
             cached_response = TieredCache.get_cached_response(cache_key)
             if cached_response.is_found:

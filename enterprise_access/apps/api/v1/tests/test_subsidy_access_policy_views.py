@@ -2305,6 +2305,36 @@ class TestSubsidyAccessPolicyGroupViewset(CRUDViewTestMixin, APITestWithMocks):
     @mock.patch(
         'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_subsidy_learners_aggregate_data'
     )
+    def test_get_group_member_data_with_aggregates_supports_specified_learners(
+        self,
+        mock_subsidy_learners_aggregate_data_cache,
+        mock_lms_api_client,
+    ):
+        """
+        Test that the `get_group_member_data_with_aggregates` endpoint supports specifying individual learners
+        """
+        mock_subsidy_learners_aggregate_data_cache.return_value = {1: 99}
+        mock_lms_api_client.return_value.fetch_group_members.return_value = self.mock_fetch_group_members
+        uuid = uuid4()
+        self.client.get(
+            self.subsidy_access_policy_can_redeem_endpoint,
+            {'group_uuid': uuid, 'learners': ["foobar@example.com"], 'page': 1}
+        )
+        mock_lms_api_client.return_value.fetch_group_members.assert_called_with(
+            group_uuid=uuid,
+            sort_by=None,
+            user_query=None,
+            show_removed=False,
+            is_reversed=False,
+            traverse_pagination=False,
+            page=1,
+            learners=["foobar@example.com"],
+        )
+
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
+    @mock.patch(
+        'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_subsidy_learners_aggregate_data'
+    )
     def test_get_group_member_data_with_aggregates_csv_format(
         self,
         mock_subsidy_learners_aggregate_data_cache,

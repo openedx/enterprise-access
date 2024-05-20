@@ -1006,6 +1006,8 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
             format_csv: (Optional) Whether or not to return data in a csv format, defaults to `False`
             page: (Optional) Which page of Enterprise Group Membership records to request. Leave blank to fetch all
                 group membership records
+            learners: (Optional) Array of learner emails. If specified, the endpoint will only return membership
+                records associated with one of the provided emails.
         """
         request_serializer = serializers.GroupMemberWithAggregatesRequestSerializer(data=request.query_params)
         request_serializer.is_valid(raise_exception=True)
@@ -1014,6 +1016,7 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
         traverse_pagination = request_serializer.validated_data.get('traverse_pagination')
         sort_by = request_serializer.validated_data.get('sort_by')
         is_reversed = request_serializer.validated_data.get('is_reversed')
+        learners = request_serializer.validated_data.get('learners')
 
         try:
             policy = SubsidyAccessPolicy.objects.get(uuid=uuid)
@@ -1051,6 +1054,7 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
             is_reversed=is_reversed,
             traverse_pagination=(traverse_pagination or sort_by_enrollment_count),
             page=page_requested_by_client,
+            learners=learners,
         )
         member_results = member_response.get('results')
 

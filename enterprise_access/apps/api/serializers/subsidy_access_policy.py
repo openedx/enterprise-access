@@ -822,6 +822,10 @@ class GroupMemberWithAggregatesRequestSerializer(serializers.Serializer):
         default=False,
         help_text=('Set to True to traverse over and return all group members records across all pages of data.')
     )
+    learners = serializers.ListField(
+        child=serializers.EmailField(required=True),
+        required=False,
+    )
 
     def validate(self, attrs):
         """
