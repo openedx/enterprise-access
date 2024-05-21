@@ -26,6 +26,7 @@ edx-django-utils
 edx-django-release-util
 edx-drf-extensions
 edx-enterprise-subsidy-client
+edx-event-bus-kafka
 edx-rbac
 edx-rest-api-client
 jsonfield2

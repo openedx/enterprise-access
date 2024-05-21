@@ -102,6 +102,7 @@ code-annotations==1.8.0
     # via
     #   -r requirements/test.txt
     #   edx-lint
+    #   edx-toggles
 colorama==0.4.6
     # via
     #   -r requirements/test.txt
@@ -163,7 +164,9 @@ django==4.2.13
     #   edx-django-release-util
     #   edx-django-utils
     #   edx-drf-extensions
+    #   edx-event-bus-kafka
     #   edx-rbac
+    #   edx-toggles
     #   jsonfield
     #   jsonfield2
     #   openedx-events
@@ -177,6 +180,7 @@ django-crum==0.7.9
     #   -r requirements/test.txt
     #   edx-django-utils
     #   edx-rbac
+    #   edx-toggles
 django-dynamic-fixture==4.0.1
     # via -r requirements/test.txt
 django-extensions==3.2.3
@@ -201,6 +205,7 @@ django-waffle==4.1.0
     #   -r requirements/test.txt
     #   edx-django-utils
     #   edx-drf-extensions
+    #   edx-toggles
 djangoql==0.18.1
     # via -r requirements/test.txt
 djangorestframework==3.14.0
@@ -257,13 +262,17 @@ edx-django-utils==5.13.0
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
+    #   edx-event-bus-kafka
     #   edx-rest-api-client
+    #   edx-toggles
     #   openedx-events
 edx-drf-extensions==10.3.0
     # via
     #   -r requirements/test.txt
     #   edx-rbac
 edx-enterprise-subsidy-client==0.4.3
+    # via -r requirements/test.txt
+edx-event-bus-kafka==5.7.0
     # via -r requirements/test.txt
 edx-lint==5.3.6
     # via -r requirements/test.txt
@@ -432,7 +441,7 @@ pyjwt[crypto]==2.8.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==3.1.0
+pylint==3.1.1
     # via
     #   -r requirements/test.txt
     #   edx-lint

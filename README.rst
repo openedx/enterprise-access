@@ -31,6 +31,40 @@ Running migrations
   $ make app-shell
   # python ./manage.py migrate
 
+Setting up openedx-events
+^^^^^^^^^^^^^^^^^^^^^^^^^
+Ensure you've installed the ``edx_event_bus_kafka`` and ``openedx_events`` requirements. Entering
+a shell with ``make app-shell`` and then running ``make requirements`` should install these for you.
+
+From your host, run ``make dev.up.with-events``, which will start a local kafka container for you.
+Visit http://localhost:9021/clusters to access the local "Confluent Control Center".
+Confluent is like a cloud wrapper around vanilla Kafka.
+
+Your ``devstack.py`` settings should already be configured to point at this event broker,
+and to configure enterprise-access as an openedx event consumer and produer.
+
+We have a specific enterprise "ping" event and management command defined to test
+that your local event bus is well-configured. Open a shell with ``make app-shell`` and run::
+
+  ./manage.py consume_enterprise_ping_events
+
+This will consume ping events from the ``dev-enterprise-core`` topic.
+You may see a ``Broker: Unknown topic`` error the first time you run it.  When you run your
+test event production below, that error will resolve (producing the event creates the topic
+if it does not exist). **Leave the consumer running.** You should see the ``enterprise-access-service``
+as a registered consumer in your local confluent control center.
+
+Now, go over to your **enterprise-subsidy** directory. Make sure requirements are installed,
+specifically the ``edx_event_bus_kafka`` and ``openedx_events`` packages. Use ``make app-shell``
+in this repo and we'll *produce* a ping event::
+
+  ./manage.py produce_enterprise_ping_event
+
+If this event was successfully produced, you'll see a log message that says
+``Message delivered to Kafka event bus: topic=dev-events-testing``.
+You should also now see the ``dev-events-testing`` topic available in your local confluent control center,
+and even the test events that are being published to the topic.
+
 A note on creating SubsidyRequestCustomerConfiguration Objects locally
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
