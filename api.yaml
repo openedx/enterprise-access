@@ -66,6 +66,25 @@ definitions:
         items:
           type: string
           description: assignment uuid
+  PolicyAllocationRequestBody:
+    type: object
+    properties:
+      learner_emails:
+        type: array
+        description: Learner emails to whom LearnerContentAssignments should be allocated.
+        required: true
+        items:
+          type: string
+          description: email of a learner
+      content_key:
+        type: string
+        description: Course content_key to which these learners are assigned.
+        required: true
+      content_price_cents:
+        type: integer
+        description: The price, in USD cents, of this content at the time of allocation.
+          Must be >= 0.
+        required: true
 endpoints:
   v1:
     subsidyAccessPolicyAllocation:
@@ -88,25 +107,14 @@ endpoints:
             type: string
             description: The uuid that uniquely identifies this policy record.
             required: true
-          - in: query
-            name: content_key
-            type: string
-            description: Course content_key to which these learners are assigned.
+          - name: PolicyAllocationRequestBody
+            in: body
+            description: Contains learner emails, content keys and price
             required: true
-          - in: query
-            name: content_price_cents
-            type: integer
-            description: The price, in USD cents, of this content at the time of allocation.
-              Must be >= 0.
-            required: true
-          - in: query
-            name: learner_emails
-            type: array
-            items:
-              type: string
-            description: Learner emails to whom LearnerContentAssignments should be
-              allocated.
-            required: true
+            schema:
+              type: array
+              items:
+                $ref: "#/definitions/PolicyAllocationRequestBody"
         responses:
           "202":
             description: Accepted
