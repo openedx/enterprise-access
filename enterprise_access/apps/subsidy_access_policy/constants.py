@@ -121,3 +121,8 @@ FORCE_ENROLLMENT_KEYWORD = 'allow_late_enrollment'
 SORT_BY_ENROLLMENT_COUNT = 'enrollment_count'
 
 GROUP_MEMBERS_WITH_AGGREGATES_DEFAULT_PAGE_SIZE = 10
+
+# Exceeding the spend_limit validation error
+VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE = "You cannot make this change, as the value of all budget limits would exceed the funds available on the subsidy. \
+    Please double-check the subsidy’s initial value and any adjustments, then ensure the budgets sum to an equal or lower amount. If you are trying to re-balance policies, \
+        please reduce the value of one first, then proceed to increase the value of another"
