@@ -29,6 +29,8 @@ learner_content_assignment_list_remind_cancel_responses:
     description: Bad Request
   "401":
     description: Unauthorized
+  "403":
+    description: Forbidden
   "404":
     description: Not Found
   "422":
@@ -187,6 +189,8 @@ endpoints:
             description: Bad Request
           "401":
             description: Unauthorized
+          "403":
+            description: Forbidden
           "404":
             description: Not Found
           "422":
@@ -253,6 +257,8 @@ endpoints:
             description: Bad Request
           "401":
             description: Unauthorized
+          "403":
+            description: Forbidden
           "404":
             description: Not Found
           "422":
@@ -337,6 +343,8 @@ endpoints:
             description: Bad Request
           "401":
             description: Unauthorized
+          "403":
+            description: Forbidden
           "404":
             description: Not Found
           "422":
