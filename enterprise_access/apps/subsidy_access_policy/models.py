@@ -299,6 +299,24 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 return policy_class
         return None
 
+    def get_policies_associated_to_subsidy(self):
+        enterprise_customer_uuid = str(self.enterprise_customer_uuid)
+        subsidy_uuid = str(self.subsidy_uuid)
+        return SubsidyAccessPolicy.objects.filter(
+            enterprise_customer_uuid=enterprise_customer_uuid,
+            subsidy_uuid=subsidy_uuid,
+        )
+
+    def total_spend_limit_for_all_policies_associated_to_subsidy(self, policies):
+        policy_balances = []
+        for policy in policies:
+            policy_uuid = getattr(policy, 'uuid')
+            if(policy_uuid != self.uuid):
+                spend_available_usd_cents = getattr(policy, 'spend_limit')
+                policy_balances.append(spend_available_usd_cents)
+        policy_balances.append(self.spend_limit)
+        return sum(policy_balances)
+
     @property
     def is_assignable(self):
         """
@@ -310,20 +328,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Used to help validate field values before saving this model instance.
         """
-        enterprise_customer_uuid = str(self.enterprise_customer_uuid)
-        subsidy_uuid = str(self.subsidy_uuid)
-        response = SubsidyAccessPolicy.objects.filter(
-            enterprise_customer_uuid=enterprise_customer_uuid,
-            subsidy_uuid=subsidy_uuid,
-        )
-        policy_balances = []
-        for item in response:
-            policy_uuid = getattr(item, 'uuid')
-            if(policy_uuid != self.uuid):
-                spend_available_usd_cents = getattr(item, 'spend_limit')
-                policy_balances.append(spend_available_usd_cents)
-        policy_balances.append(self.spend_limit)
-        if sum(policy_balances) > self.subsidy_balance():
+        policies = self.get_policies_associated_to_subsidy()
+        sum_of_policy_balances = self.total_spend_limit_for_all_policies_associated_to_subsidy(policies)
+        if sum_of_policy_balances > self.subsidy_balance():
             raise ValidationError(f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE}')
         for field_name, (constraint_function, error_message) in self.FIELD_CONSTRAINTS.items():
             field = getattr(self, field_name)
