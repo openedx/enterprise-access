@@ -331,12 +331,11 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Used to help validate field values before saving this model instance.
         """
         # Specific call on spent_limit change, move to save vs clean
-        if(self.policy_type == PolicyTypes().ASSIGNED_LEARNER_CREDIT): 
-            sum_of_policy_balances = self.total_spend_limit_for_all_policies_associated_to_subsidy(
-                policies=self.get_all_policies_associated_to_subsidy
-            )
-            if sum_of_policy_balances > self.subsidy_initial_balance():
-                raise ValidationError(f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE}')
+        sum_of_policy_balances = self.total_spend_limit_for_all_policies_associated_to_subsidy(
+            policies=self.get_all_policies_associated_to_subsidy
+        )
+        if sum_of_policy_balances > self.subsidy_total_deposits():
+            raise ValidationError(f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE}')
         for field_name, (constraint_function, error_message) in self.FIELD_CONSTRAINTS.items():
             field = getattr(self, field_name)
             if not constraint_function(field):
@@ -352,12 +351,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
             raise TypeError("Can not create object of class SubsidyAccessPolicy")
 
         self.policy_type = type(self).__name__
-        # Issue with placing it in the save() function is that the django admin screen does not fail gracefully
-        # sum_of_policy_balances = self.total_spend_limit_for_all_policies_associated_to_subsidy(
-        #     policies=self.get_all_policies_associated_to_subsidy
-        # )
-        # if sum_of_policy_balances > self.subsidy_balance():
-        #     raise ValidationError(f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE}')
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -437,12 +430,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
         current_balance = self.subsidy_record().get('current_balance') or 0
         return int(current_balance)
     
-    def subsidy_initial_balance(self):
+    def subsidy_total_deposits(self):
         """
         Returns total remaining balance for the associated subsidy ledger.
         """
-        starting_balance = self.subsidy_record().get('starting_balance')
-        return int(starting_balance)
+        total_deposits = self.subsidy_record().get('total_deposits')
+        return int(total_deposits)
 
     @property
     def spend_available(self):
@@ -458,7 +451,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
             requests.exceptions.HTTPError if the request to Subsidy API (to fetch aggregates) fails.
         """
         # This is how much available spend the policy limit would allow, ignoring the subsidy balance.
-        print(self.spend_limit, self.total_redeemed, self.subsidy_balance(), 'hIiiii')
         if self.spend_limit is not None:
             # total_redeemed is negative
             policy_limit_balance = max(0, self.spend_limit + self.total_redeemed)
