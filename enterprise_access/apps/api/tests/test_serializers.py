@@ -8,7 +8,6 @@ from uuid import uuid4
 import ddt
 from django.conf import settings
 from django.test import TestCase
-from enterprise_access.apps.subsidy_access_policy.models import AssignedLearnerCreditAccessPolicy
 from freezegun import freeze_time
 
 from enterprise_access.apps.api.serializers.subsidy_access_policy import (

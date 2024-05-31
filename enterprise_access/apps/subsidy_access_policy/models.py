@@ -40,8 +40,8 @@ from .constants import (
     REASON_SUBSIDY_EXPIRED,
     VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE,
     AccessMethods,
-    TransactionStateChoices,
     PolicyTypes,
+    TransactionStateChoices
 )
 from .content_metadata_api import (
     get_and_cache_catalog_contains_content,
@@ -313,7 +313,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         policy_balances = []
         for policy in policies:
             policy_uuid = getattr(policy, 'uuid')
-            if(policy_uuid != self.uuid):
+            if policy_uuid != self.uuid:
                 spend_available_usd_cents = getattr(policy, 'spend_limit')
                 policy_balances.append(spend_available_usd_cents)
         policy_balances.append(self.spend_limit)
@@ -429,7 +429,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         current_balance = self.subsidy_record().get('current_balance') or 0
         return int(current_balance)
-    
+
     def subsidy_total_deposits(self):
         """
         Returns total remaining balance for the associated subsidy ledger.
