@@ -318,6 +318,10 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 policy_balances.append(spend_available_usd_cents)
         policy_balances.append(self.spend_limit)
         return sum(policy_balances)
+    
+    @property
+    def subsidy_access_policy_db_spend_limit(self):
+        return SubsidyAccessPolicy.objects.filter(uuid=self.uuid).first().spend_limit
 
     @property
     def is_assignable(self):
@@ -330,12 +334,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Used to help validate field values before saving this model instance.
         """
-        # Specific call on spent_limit change, move to save vs clean
-        sum_of_policy_balances = self.total_spend_limit_for_all_policies_associated_to_subsidy(
-            policies=self.get_all_policies_associated_to_subsidy
-        )
-        if sum_of_policy_balances > self.subsidy_total_deposits():
-            raise ValidationError(f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE}')
+        if self.subsidy_access_policy_db_spend_limit != self.spend_limit:
+            sum_of_policy_balances = self.total_spend_limit_for_all_policies_associated_to_subsidy(
+                policies=self.get_all_policies_associated_to_subsidy
+            )
+            if sum_of_policy_balances > self.subsidy_total_deposits():
+                raise ValidationError(f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE}')
         for field_name, (constraint_function, error_message) in self.FIELD_CONSTRAINTS.items():
             field = getattr(self, field_name)
             if not constraint_function(field):

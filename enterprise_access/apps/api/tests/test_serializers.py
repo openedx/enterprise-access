@@ -86,6 +86,7 @@ class TestSubsidyAccessPolicyResponseSerializer(TestCase):
             'expiration_datetime': datetime.utcnow() + timedelta(days=1),
             'current_balance': starting_balance - redeemed,
             'is_active': True,
+            'total_deposits': starting_balance
         }
 
         # Create a test policy with a limit set to ``policy_spend_limit``.  Reminder: a value of 0 means no limit.
@@ -185,8 +186,9 @@ class TestSubsidyAccessPolicyCreditsAvailableResponseSerializer(TestCase):
         )
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.transactions_for_learner')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_record')
-    def test_get_subsidy_end_date(self, mock_subsidy_record, mock_transactions_for_learner):
+    # @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_record')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
+    def test_get_subsidy_end_date(self, mock_subsidy_client, mock_transactions_for_learner):
         """
         Test that the get_subsidy_end_date method returns the correct
         subsidy expiration date.
@@ -198,13 +200,14 @@ class TestSubsidyAccessPolicyCreditsAvailableResponseSerializer(TestCase):
             },
         }
         subsidy_exp_date = '2030-01-01 12:00:00Z'
-        mock_subsidy_record.return_value = {
+        mock_subsidy_client.return_value = {
             'uuid': str(uuid4()),
             'title': 'Test Subsidy',
             'enterprise_customer_uuid': str(self.enterprise_uuid),
             'expiration_datetime': subsidy_exp_date,
             'active_datetime': '2020-01-01 12:00:00Z',
             'current_balance': '1000',
+            'total_deposits': '1000',
         }
         serializer = SubsidyAccessPolicyCreditsAvailableResponseSerializer(
             [self.redeemable_policy],
