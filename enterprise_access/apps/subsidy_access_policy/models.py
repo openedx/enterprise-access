@@ -40,7 +40,6 @@ from .constants import (
     REASON_SUBSIDY_EXPIRED,
     VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE,
     AccessMethods,
-    PolicyTypes,
     TransactionStateChoices
 )
 from .content_metadata_api import (
@@ -318,13 +317,16 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         policy_balances = []
         for policy in policies:
-            policy_uuid = getattr(policy, 'uuid')
+            policy_uuid = getattr(policy, 'uuid', self.uuid)
             if policy_uuid != self.uuid:
-                spend_available_usd_cents = getattr(policy, 'spend_limit')
-                policy_balances.append(spend_available_usd_cents)
-        policy_balances.append(self.spend_limit)
+                spend_limit_usd_cents = getattr(policy, 'spend_limit', 0)
+                policy_balances.append(spend_limit_usd_cents)
+        if self.spend_limit is None:
+            policy_balances.append(0)
+        else:
+            policy_balances.append(self.spend_limit)
         return sum(policy_balances)
-    
+
     @property
     def is_spend_limit_updated(self):
         if SubsidyAccessPolicy.objects.filter(uuid=self.uuid).first():
