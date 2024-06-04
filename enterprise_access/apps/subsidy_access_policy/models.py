@@ -302,6 +302,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
     @property
     def get_all_policies_associated_to_subsidy(self):
+        """
+        Retrives all policies associated to instance's subsidy
+        """
         enterprise_customer_uuid = str(self.enterprise_customer_uuid)
         subsidy_uuid = str(self.subsidy_uuid)
         return SubsidyAccessPolicy.objects.filter(
@@ -310,6 +313,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
         )
 
     def total_spend_limit_for_all_policies_associated_to_subsidy(self, policies):
+        """
+        Sums the policies spend_limit excluding the db's instance of this policy
+        """
         policy_balances = []
         for policy in policies:
             policy_uuid = getattr(policy, 'uuid')
@@ -320,8 +326,10 @@ class SubsidyAccessPolicy(TimeStampedModel):
         return sum(policy_balances)
     
     @property
-    def subsidy_access_policy_db_spend_limit(self):
-        return SubsidyAccessPolicy.objects.filter(uuid=self.uuid).first().spend_limit
+    def is_spend_limit_updated(self):
+        if SubsidyAccessPolicy.objects.filter(uuid=self.uuid).first():
+            return SubsidyAccessPolicy.objects.filter(uuid=self.uuid).first().spend_limit != self.spend_limit
+        return False
 
     @property
     def is_assignable(self):
@@ -334,7 +342,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Used to help validate field values before saving this model instance.
         """
-        if self.subsidy_access_policy_db_spend_limit != self.spend_limit:
+        if self.is_spend_limit_updated:
             sum_of_policy_balances = self.total_spend_limit_for_all_policies_associated_to_subsidy(
                 policies=self.get_all_policies_associated_to_subsidy
             )
