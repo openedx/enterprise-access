@@ -79,7 +79,7 @@ class TestGroupsReminderEmails(TestCase):
                 "user_email": "test2@2u.com",
             },
         ]
-        mock_enterprise_catalog_client().catalog_content_metadata.return_value = {
+        mock_enterprise_catalog_client().get_content_metadata_count.return_value = {
             'count': 5
         }
         mock_lms_api_client().get_pending_enterprise_group_memberships.return_value = (

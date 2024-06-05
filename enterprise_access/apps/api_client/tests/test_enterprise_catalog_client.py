@@ -93,3 +93,21 @@ class TestEnterpriseCatalogApiClient(TestCase):
                 'traverse_pagination': True,
             },
         )
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_content_metadata_count(self, mock_oauth_client):
+        mock_response_json = {
+            'count': 2
+        }
+        request_response = Response()
+        request_response.status_code = 200
+        mock_oauth_client.return_value.get.return_value.json.return_value = mock_response_json
+
+        catalog_uuid = uuid4()
+        client = EnterpriseCatalogApiClient()
+        fetched_metadata = client.get_content_metadata_count(catalog_uuid)
+
+        self.assertEqual(fetched_metadata, mock_response_json['count'])
+        mock_oauth_client.return_value.get.assert_called_with(
+            f'http://enterprise-catalog.example.com/api/v1/enterprise-catalogs/{catalog_uuid}/get_content_metadata/',
+        )
