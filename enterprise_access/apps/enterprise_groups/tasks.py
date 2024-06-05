@@ -129,7 +129,7 @@ def send_group_reminder_emails(pending_enterprise_users):
             pending_enterprise_user["catalog_count"],
             pending_enterprise_user["subsidy_expiration_datetime"],
         )
-
+        logger.info(f'Sending braze campaign group reminder email to {recipient}.')
         braze_client_instance.send_campaign_message(
             braze_properties["braze_campaign_id"],
             recipients=[recipient],

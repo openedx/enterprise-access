@@ -1,3 +1,7 @@
+"""
+Constants for the enterprise_groups app.
+"""
+
 DAYS_TO_PURGE_PII = 90
 
 BRAZE_GROUPS_EMAIL_CAMPAIGNS_FIRST_REMINDER_DAY = 5

@@ -49,9 +49,9 @@ class Command(BaseCommand):
                 policy_group_association.subsidy_access_policy.subsidy_expiration_datetime
             )
             catalog_uuid = policy_group_association.subsidy_access_policy.catalog_uuid
-            catalog_count = enterprise_catalog_client.catalog_content_metadata(
+            catalog_count = enterprise_catalog_client.get_content_metadata_count(
                 catalog_uuid
-            )['count']
+            )
 
             for pending_enterprise_customer_user in pending_enterprise_customer_users:
                 pending_enterprise_customer_user["subsidy_expiration_datetime"] = (
