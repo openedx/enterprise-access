@@ -317,6 +317,10 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
     @property
     def is_spend_limit_updated(self):
+        """
+        Checks if SubsidyAccessPolicy object exists in the database, and determines if the
+        database value of spend_limit differs from the current instance of spend_limit
+        """
         if self._state.adding:
             return False
         record_from_db = SubsidyAccessPolicy.objects.get(uuid=self.uuid)

@@ -669,16 +669,16 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         )
 
         request_payload = {
-                'description': 'the new description',
-                'display_name': 'new display_name',
-                'active': True,
-                'retired': True,
-                'catalog_uuid': str(uuid4()),
-                'subsidy_uuid': str(uuid4()),
-                'access_method': AccessMethods.ASSIGNED,
-                'spend_limit': 6,
-                'per_learner_spend_limit': 10000,
-            }
+            'description': 'the new description',
+            'display_name': 'new display_name',
+            'active': True,
+            'retired': True,
+            'catalog_uuid': str(uuid4()),
+            'subsidy_uuid': str(uuid4()),
+            'access_method': AccessMethods.ASSIGNED,
+            'spend_limit': 6,
+            'per_learner_spend_limit': 10000,
+        }
 
         url = reverse(
             'api:v1:subsidy-access-policies-detail',
