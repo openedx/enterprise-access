@@ -86,6 +86,7 @@ class TestSubsidyAccessPolicyResponseSerializer(TestCase):
             'expiration_datetime': datetime.utcnow() + timedelta(days=1),
             'current_balance': starting_balance - redeemed,
             'is_active': True,
+            'total_deposits': starting_balance
         }
 
         # Create a test policy with a limit set to ``policy_spend_limit``.  Reminder: a value of 0 means no limit.
@@ -205,6 +206,7 @@ class TestSubsidyAccessPolicyCreditsAvailableResponseSerializer(TestCase):
             'expiration_datetime': subsidy_exp_date,
             'active_datetime': '2020-01-01 12:00:00Z',
             'current_balance': '1000',
+            'total_deposits': '1000',
         }
         serializer = SubsidyAccessPolicyCreditsAvailableResponseSerializer(
             [self.redeemable_policy],

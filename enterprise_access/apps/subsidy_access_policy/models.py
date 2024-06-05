@@ -38,6 +38,7 @@ from .constants import (
     REASON_POLICY_EXPIRED,
     REASON_POLICY_SPEND_LIMIT_REACHED,
     REASON_SUBSIDY_EXPIRED,
+    VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE,
     AccessMethods,
     TransactionStateChoices
 )
@@ -299,6 +300,33 @@ class SubsidyAccessPolicy(TimeStampedModel):
         return None
 
     @property
+    def total_spend_limit_for_all_policies_associated_to_subsidy(self):
+        """
+        Sums the policies spend_limit excluding the db's instance of this policy
+        """
+        policy_balances = []
+        policy_balances.append(self.spend_limit or 0)
+        sibling_policies = SubsidyAccessPolicy.objects.filter(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            subsidy_uuid=self.subsidy_uuid,
+        ).exclude(uuid=self.uuid)
+
+        for sibling in sibling_policies:
+            policy_balances.append(sibling.spend_limit or 0)
+        return sum(policy_balances)
+
+    @property
+    def is_spend_limit_updated(self):
+        """
+        Checks if SubsidyAccessPolicy object exists in the database, and determines if the
+        database value of spend_limit differs from the current instance of spend_limit
+        """
+        if self._state.adding:
+            return False
+        record_from_db = SubsidyAccessPolicy.objects.get(uuid=self.uuid)
+        return record_from_db.spend_limit != self.spend_limit
+
+    @property
     def is_assignable(self):
         """
         Convenience property to determine if this policy is assignable.
@@ -309,6 +337,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Used to help validate field values before saving this model instance.
         """
+        if self.is_spend_limit_updated:
+            if self.total_spend_limit_for_all_policies_associated_to_subsidy > self.subsidy_total_deposits():
+                raise ValidationError(f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE}')
         for field_name, (constraint_function, error_message) in self.FIELD_CONSTRAINTS.items():
             field = getattr(self, field_name)
             if not constraint_function(field):
@@ -402,6 +433,13 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         current_balance = self.subsidy_record().get('current_balance') or 0
         return int(current_balance)
+
+    def subsidy_total_deposits(self):
+        """
+        Returns total remaining balance for the associated subsidy ledger.
+        """
+        total_deposits = self.subsidy_record().get('total_deposits') or 0
+        return int(total_deposits)
 
     @property
     def spend_available(self):

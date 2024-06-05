@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 import ddt
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
@@ -95,6 +96,8 @@ class CRUDViewTestMixin:
             'expiration_datetime': self.tomorrow,
             'current_balance': 4,
             'is_active': True,
+            'starting_balance': 4,
+            'total_deposits': 4,
         }
         subsidy_client_patcher = patch.object(
             SubsidyAccessPolicy, 'subsidy_client'
@@ -647,6 +650,43 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         }
         expected_response.update(request_payload)
         self.assertEqual(expected_response, response.json())
+
+    def test_update_views_with_exceeding_spend_limit(self):
+        """
+        Test that the update and partial_update views can modify certain
+        fields of a policy record.
+        """
+        # Set the JWT-based auth to an operator.
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        policy_for_edit = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            display_name='old display_name',
+            spend_limit=5,
+            active=False,
+        )
+
+        request_payload = {
+            'description': 'the new description',
+            'display_name': 'new display_name',
+            'active': True,
+            'retired': True,
+            'catalog_uuid': str(uuid4()),
+            'subsidy_uuid': str(uuid4()),
+            'access_method': AccessMethods.ASSIGNED,
+            'spend_limit': 6,
+            'per_learner_spend_limit': 10000,
+        }
+
+        url = reverse(
+            'api:v1:subsidy-access-policies-detail',
+            kwargs={'uuid': str(policy_for_edit.uuid)}
+        )
+
+        with self.assertRaises(ValidationError):
+            self.client.patch(url, data=request_payload)
 
     @ddt.data(
         {

@@ -37,6 +37,13 @@ def policy_pre_write_validation(policy_instance_or_class, field_values_by_name):
     If a constraint occurs, raises a `ValidationError`.
     """
     violations = []
+
+    if isinstance(policy_instance_or_class, SubsidyAccessPolicy):
+        policy_instance_or_class.clean()
+    else:
+        instance = policy_instance_or_class(**field_values_by_name)
+        instance.clean()
+
     constraints = policy_instance_or_class.FIELD_CONSTRAINTS
 
     for field_name, new_value in field_values_by_name.items():
