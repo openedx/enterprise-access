@@ -651,25 +651,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         expected_response.update(request_payload)
         self.assertEqual(expected_response, response.json())
 
-    @ddt.data(
-        # Test sending a bunch of updates as a PATCH.
-        {
-            'is_patch': True,
-            'request_payload': {
-                'description': 'the new description',
-                'display_name': 'new display_name',
-                'active': True,
-                'retired': True,
-                'catalog_uuid': str(uuid4()),
-                'subsidy_uuid': str(uuid4()),
-                'access_method': AccessMethods.ASSIGNED,
-                'spend_limit': 6,
-                'per_learner_spend_limit': 10000,
-            },
-        },
-    )
-    @ddt.unpack
-    def test_update_views_with_exceeding_spend_limit(self, is_patch, request_payload):
+    def test_update_views_with_exceeding_spend_limit(self):
         """
         Test that the update and partial_update views can modify certain
         fields of a policy record.
@@ -686,14 +668,25 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             active=False,
         )
 
-        action = self.client.patch if is_patch else self.client.put
+        request_payload = {
+                'description': 'the new description',
+                'display_name': 'new display_name',
+                'active': True,
+                'retired': True,
+                'catalog_uuid': str(uuid4()),
+                'subsidy_uuid': str(uuid4()),
+                'access_method': AccessMethods.ASSIGNED,
+                'spend_limit': 6,
+                'per_learner_spend_limit': 10000,
+            }
+
         url = reverse(
             'api:v1:subsidy-access-policies-detail',
             kwargs={'uuid': str(policy_for_edit.uuid)}
         )
 
         with self.assertRaises(ValidationError):
-            action(url, data=request_payload)
+            self.client.patch(url, data=request_payload)
 
     @ddt.data(
         {

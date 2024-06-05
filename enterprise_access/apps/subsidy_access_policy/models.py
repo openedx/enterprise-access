@@ -300,38 +300,27 @@ class SubsidyAccessPolicy(TimeStampedModel):
         return None
 
     @property
-    def get_all_policies_associated_to_subsidy(self):
-        """
-        Retrives all policies associated to instance's subsidy
-        """
-        enterprise_customer_uuid = str(self.enterprise_customer_uuid)
-        subsidy_uuid = str(self.subsidy_uuid)
-        return SubsidyAccessPolicy.objects.filter(
-            enterprise_customer_uuid=enterprise_customer_uuid,
-            subsidy_uuid=subsidy_uuid,
-        )
-
-    def total_spend_limit_for_all_policies_associated_to_subsidy(self, policies):
+    def total_spend_limit_for_all_policies_associated_to_subsidy(self):
         """
         Sums the policies spend_limit excluding the db's instance of this policy
         """
         policy_balances = []
-        for policy in policies:
-            policy_uuid = getattr(policy, 'uuid', self.uuid)
-            if policy_uuid != self.uuid:
-                spend_limit_usd_cents = getattr(policy, 'spend_limit', 0)
-                policy_balances.append(spend_limit_usd_cents)
-        if self.spend_limit is None:
-            policy_balances.append(0)
-        else:
-            policy_balances.append(self.spend_limit)
+        policy_balances.append(self.spend_limit or 0)
+        sibling_policies = SubsidyAccessPolicy.objects.filter(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            subsidy_uuid=self.subsidy_uuid,
+        ).exclude(uuid=self.uuid)
+
+        for sibling in sibling_policies:
+            policy_balances.append(sibling.spend_limit or 0)
         return sum(policy_balances)
 
     @property
     def is_spend_limit_updated(self):
-        if SubsidyAccessPolicy.objects.filter(uuid=self.uuid).first():
-            return SubsidyAccessPolicy.objects.filter(uuid=self.uuid).first().spend_limit != self.spend_limit
-        return False
+        if self._state.adding:
+            return False
+        record_from_db = SubsidyAccessPolicy.objects.get(uuid=self.uuid)
+        return record_from_db.spend_limit != self.spend_limit
 
     @property
     def is_assignable(self):
@@ -345,10 +334,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Used to help validate field values before saving this model instance.
         """
         if self.is_spend_limit_updated:
-            sum_of_policy_balances = self.total_spend_limit_for_all_policies_associated_to_subsidy(
-                policies=self.get_all_policies_associated_to_subsidy
-            )
-            if sum_of_policy_balances > self.subsidy_total_deposits():
+            if self.total_spend_limit_for_all_policies_associated_to_subsidy > self.subsidy_total_deposits():
                 raise ValidationError(f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE}')
         for field_name, (constraint_function, error_message) in self.FIELD_CONSTRAINTS.items():
             field = getattr(self, field_name)
@@ -448,7 +434,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Returns total remaining balance for the associated subsidy ledger.
         """
-        total_deposits = self.subsidy_record().get('total_deposits')
+        total_deposits = self.subsidy_record().get('total_deposits') or 0
         return int(total_deposits)
 
     @property
