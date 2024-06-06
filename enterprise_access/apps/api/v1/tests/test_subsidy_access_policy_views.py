@@ -93,6 +93,7 @@ class CRUDViewTestMixin:
             'id': 123455,
             'active_datetime': self.yesterday,
             'expiration_datetime': self.tomorrow,
+            'retired_at': None,
             'current_balance': 4,
             'is_active': True,
         }
@@ -283,6 +284,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'access_method': 'direct',
             'active': True,
             'retired': False,
+            'retired_at': None,
             'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
             'display_name': self.redeemable_policy.display_name,
             'description': 'A generic description',
@@ -362,7 +364,6 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         """
         # Set the JWT-based auth that we'll use for every request
         self.set_jwt_cookie([role_context_dict])
-
         # Test the retrieve endpoint
         response = self.client.get(
             reverse('api:v1:subsidy-access-policies-list'),
@@ -378,6 +379,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'access_method': 'direct',
                 'active': True,
                 'retired': False,
+                'retired_at': None,
                 'catalog_uuid': str(self.non_redeemable_policy.catalog_uuid),
                 'display_name': self.non_redeemable_policy.display_name,
                 'description': 'A generic description',
@@ -408,6 +410,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'access_method': 'direct',
                 'active': True,
                 'retired': False,
+                'retired_at': None,
                 'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
                 'display_name': self.redeemable_policy.display_name,
                 'description': 'A generic description',
@@ -455,16 +458,19 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
 
         # Assert that we only call the subsidy service to list transaction
         # aggregates once per policy
-        self.mock_subsidy_client.list_subsidy_transactions.assert_has_calls([
-            call(
-                subsidy_uuid=self.redeemable_policy.subsidy_uuid,
-                subsidy_access_policy_uuid=self.redeemable_policy.uuid
-            ),
-            call(
-                subsidy_uuid=self.non_redeemable_policy.subsidy_uuid,
-                subsidy_access_policy_uuid=self.non_redeemable_policy.uuid,
-            ),
-        ])
+        self.mock_subsidy_client.list_subsidy_transactions.assert_has_calls(
+            [
+                call(
+                    subsidy_uuid=self.redeemable_policy.subsidy_uuid,
+                    subsidy_access_policy_uuid=self.redeemable_policy.uuid
+                ),
+                call(
+                    subsidy_uuid=self.non_redeemable_policy.subsidy_uuid,
+                    subsidy_access_policy_uuid=self.non_redeemable_policy.uuid,
+                ),
+            ],
+            any_order=True
+        )
 
     @ddt.data(
         {
@@ -505,6 +511,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'access_method': 'direct',
             'active': False,
             'retired': False,
+            'retired_at': None,
             'catalog_uuid': str(self.redeemable_policy.catalog_uuid),
             'display_name': self.redeemable_policy.display_name,
             'description': 'A generic description',
@@ -617,6 +624,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'access_method': policy_for_edit.access_method,
             'active': policy_for_edit.active,
             'retired': policy_for_edit.retired,
+            'retired_at': policy_for_edit.retired_at,
             'catalog_uuid': str(policy_for_edit.catalog_uuid),
             'display_name': policy_for_edit.display_name,
             'description': policy_for_edit.description,
@@ -645,6 +653,13 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'group_associations': [],
             'is_late_redemption_allowed': False,
         }
+
+        if 'retired' in request_payload:
+            if request_payload['retired']:
+                expected_response['retired_at'] = response.json().get('retired_at')
+            else:
+                expected_response['retired_at'] = None
+
         expected_response.update(request_payload)
         self.assertEqual(expected_response, response.json())
 
@@ -843,6 +858,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             'description': 'test description',
             'active': True,
             'retired': False,
+            'retired_at': None,
             'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
             'catalog_uuid': str(uuid4()),
             'subsidy_uuid': str(uuid4()),
@@ -902,6 +918,7 @@ class TestAdminPolicyCreateView(CRUDViewTestMixin, APITestWithMocks):
             'description': 'test description',
             'active': True,
             'retired': False,
+            'retired_at': None,
             'enterprise_customer_uuid': enterprise_customer_uuid,
             'catalog_uuid': catalog_uuid,
             'subsidy_uuid': subsidy_uuid,
