@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 import requests
 from django.conf import settings
+from django.utils import timezone
 from django.core.cache import cache as django_cache
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -83,7 +84,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
     Tie together information used to control access to a subsidy.
     This model joins group, catalog, and access method.
 
-    .. no_pii: This model has no PII
+    . no_pii: This model has no PII
     """
 
     class Meta:
@@ -160,6 +161,13 @@ class SubsidyAccessPolicy(TimeStampedModel):
             "(useful when you want to just expire a policy without expiring the whole plan)."
         ),
     )
+    retired_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "The date and time when this Subsidy is considered retired."
+        )
+    )
     catalog_uuid = models.UUIDField(
         db_index=True,
         help_text='The primary identifier of the catalog associated with this policy.',
@@ -221,6 +229,11 @@ class SubsidyAccessPolicy(TimeStampedModel):
             'Required if policy_type = "PerLearnerSpendCreditAccessPolicy".'
         ),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Store the initial value of retired
+        self._original_retired = self.retired
 
     # Customized version of HistoricalRecords to enable history tracking on child proxy models.  See
     # ProxyAwareHistoricalRecords docstring for more info.
@@ -353,6 +366,11 @@ class SubsidyAccessPolicy(TimeStampedModel):
             # it doesn't make sense to create an object of SubsidyAccessPolicy
             # because it is not a concrete policy
             raise TypeError("Can not create object of class SubsidyAccessPolicy")
+
+        # Update retired_at based on changes to retired
+        if self.retired != self._original_retired:
+            self.retired_at = timezone.now() if self.retired else None
+            self._original_retired = self.retired
 
         self.policy_type = type(self).__name__
         self.full_clean()
