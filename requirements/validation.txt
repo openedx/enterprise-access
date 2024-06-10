@@ -19,7 +19,6 @@ asgiref==3.8.1
     #   -r requirements/test.txt
     #   django
     #   django-cors-headers
-    #   django-simple-history
 astroid==3.2.2
     # via
     #   -r requirements/quality.txt
@@ -133,7 +132,7 @@ coreschema==0.0.4
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   coreapi
-coverage[toml]==7.5.1
+coverage[toml]==7.5.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -176,6 +175,7 @@ django==4.2.13
     #   django-filter
     #   django-log-request-id
     #   django-model-utils
+    #   django-simple-history
     #   django-waffle
     #   djangorestframework
     #   drf-jwt
@@ -239,7 +239,7 @@ django-rest-swagger==2.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-django-simple-history==3.5.0
+django-simple-history==3.7.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -317,7 +317,7 @@ edx-django-release-util==1.4.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-edx-django-utils==5.13.0
+edx-django-utils==5.14.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -368,7 +368,7 @@ factory-boy==3.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==25.2.0
+faker==25.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -501,7 +501,7 @@ mysqlclient==2.2.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-newrelic==9.9.1
+newrelic==9.10.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -539,7 +539,7 @@ pbr==6.0.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   stevedore
-pkginfo==1.10.0
+pkginfo==1.11.0
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -561,7 +561,7 @@ ply==3.11
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   djangoql
-prompt-toolkit==3.0.43
+prompt-toolkit==3.0.45
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -811,7 +811,7 @@ tox==4.15.0
     #   -r requirements/test.txt
 twine==5.1.0
     # via -r requirements/quality.txt
-typing-extensions==4.11.0
+typing-extensions==4.12.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -851,7 +851,7 @@ wcwidth==0.2.13
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   prompt-toolkit
-zipp==3.18.2
+zipp==3.19.1
     # via
     #   -r requirements/quality.txt
     #   importlib-metadata
