@@ -334,6 +334,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
             'uuid': self.policy.subsidy_uuid,
             'expiration_datetime': (now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%SZ'),
         }
+        print(mock_subsidy)
         mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
         mock_braze_client.generate_mailto_link.return_value = f'mailto:{admin_email}'
 
@@ -367,8 +368,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'course_partner': 'Smart Folks, Good People, and Fast Learners',
                 'course_card_image': 'https://itsanimage.com',
                 'learner_portal_link': 'http://enterprise-learner-portal.example.com/test-slug',
-                'action_required_by': 'Jan 01, 2021',
-                'action_required_by_time': '12:00'
+                'action_required_by_timestamp': '12:00 PM Jan 01, 2021'
             },
         )
 
@@ -448,7 +448,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'course_partner': 'Smart Folks and Good People',
                 'course_card_image': 'https://itsanimage.com',
                 'learner_portal_link': '{}/{}'.format(settings.ENTERPRISE_LEARNER_PORTAL_URL, 'test-slug'),
-                'action_required_by': 'Jan 01, 2021',
+                'action_required_by_timestamp': '12:00 PM Jan 01, 2021'
             },
         )
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1

@@ -121,3 +121,5 @@ class AssignmentAutomaticExpiredReason:
 NUM_DAYS_BEFORE_AUTO_EXPIRATION = 90
 
 RETIRED_EMAIL_ADDRESS_FORMAT = 'retired_user{}@retired.invalid'
+
+BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT = "%-I:%M %p %b %d, %Y"

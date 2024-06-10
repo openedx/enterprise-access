@@ -21,7 +21,7 @@ from enterprise_access.apps.content_assignments.content_metadata_api import (
 from enterprise_access.tasks import LoggedTaskWithRetry
 from enterprise_access.utils import get_automatic_expiration_date_and_reason, localized_utcnow
 
-from .constants import LearnerContentAssignmentStateChoices
+from .constants import BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT, LearnerContentAssignmentStateChoices
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class BrazeCampaignSender:
         'course_card_image',
         'learner_portal_link',
         'action_required_by',
-        'action_required_by_time'
+        'action_required_by_timestamp'
     }
 
     def __init__(self, assignment):
@@ -214,15 +214,18 @@ class BrazeCampaignSender:
             return None
         return format_datetime_obj(action_required_by['date'])
 
-    def get_action_required_by_time(self):
+    def get_action_required_by_timestamp(self):
         """
         Returns the minimum of this assignment's auto-expiration date,
-        the content's enrollment deadline, and the related policy's expiration time.
+        the content's enrollment deadline, and the related policy's expiration timestamp.
         """
-        action_required_by_time = get_automatic_expiration_date_and_reason(self.assignment)
-        if not action_required_by_time:
+        action_required_by_timestamp = get_automatic_expiration_date_and_reason(self.assignment)
+        if not action_required_by_timestamp:
             return None
-        return format_datetime_obj(action_required_by_time['date'], output_pattern="%H:%M")
+        return format_datetime_obj(
+            action_required_by_timestamp['date'],
+            output_pattern=BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT
+        )
 
     def get_course_partner(self):
         return get_course_partners(self.course_metadata)
@@ -383,12 +386,10 @@ def send_exec_ed_enrollment_warmer(assignment_uuid, days_before_course_start_dat
         'contact_admin_link',
         'organization',
         'course_title',
-        'enrollment_deadline',
         'start_date',
         'course_partner',
         'course_card_image',
         'learner_portal_link',
-        'action_required_by',
     )
 
     braze_trigger_properties['days_before_course_start_date'] = days_before_course_start_date
@@ -446,8 +447,7 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         'course_partner',
         'course_card_image',
         'learner_portal_link',
-        'action_required_by',
-        'action_required_by_time'
+        'action_required_by_timestamp'
     )
     campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN
     if assignment.lms_user_id is not None:
@@ -490,7 +490,7 @@ def send_email_for_new_assignment(new_assignment_uuid):
         'course_partner',
         'course_card_image',
         'learner_portal_link',
-        'action_required_by',
+        'action_required_by_timestamp'
     )
     campaign_uuid = settings.BRAZE_ASSIGNMENT_NOTIFICATION_CAMPAIGN
     campaign_sender.send_campaign_message(
