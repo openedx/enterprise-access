@@ -8,10 +8,10 @@ from uuid import UUID, uuid4
 
 import requests
 from django.conf import settings
-from django.utils import timezone
 from django.core.cache import cache as django_cache
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from edx_django_utils.cache.utils import get_cache_key
 from simple_history.models import HistoricalRecords
@@ -84,7 +84,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
     Tie together information used to control access to a subsidy.
     This model joins group, catalog, and access method.
 
-    . no_pii: This model has no PII
+    .. no_pii: This model has no PII
     """
 
     class Meta:
