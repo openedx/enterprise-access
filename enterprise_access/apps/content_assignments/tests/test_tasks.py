@@ -368,6 +368,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'course_card_image': 'https://itsanimage.com',
                 'learner_portal_link': 'http://enterprise-learner-portal.example.com/test-slug',
                 'action_required_by': 'Jan 01, 2021',
+                'action_required_by_time': '12:00'
             },
         )
 
