@@ -15,7 +15,7 @@ services:
       - enterprise_access_mysql80:/var/lib/mysql
 
   memcache:
-    image: memcached:1.4.24
+    image: memcached:1.6.28
     container_name: enterprise_access.memcache
     networks:
       - devstack_default
