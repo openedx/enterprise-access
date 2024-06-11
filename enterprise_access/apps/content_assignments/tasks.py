@@ -447,6 +447,7 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         'course_partner',
         'course_card_image',
         'learner_portal_link',
+        'action_required_by',
         'action_required_by_timestamp'
     )
     campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN
@@ -490,6 +491,7 @@ def send_email_for_new_assignment(new_assignment_uuid):
         'course_partner',
         'course_card_image',
         'learner_portal_link',
+        'action_required_by',
         'action_required_by_timestamp'
     )
     campaign_uuid = settings.BRAZE_ASSIGNMENT_NOTIFICATION_CAMPAIGN
