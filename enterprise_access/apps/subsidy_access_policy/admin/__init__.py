@@ -227,6 +227,7 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
     )
     readonly_fields = BaseSubsidyAccessPolicyMixin.readonly_fields + (
         'per_learner_spend_limit_dollars',
+        'retired_at',
     )
     search_fields = (
         'uuid',
@@ -293,6 +294,7 @@ class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcces
         'assignment_configuration',
         'per_learner_spend_limit',
         'per_learner_enrollment_limit',
+        'retired_at',
     )
 
     fieldsets = [
