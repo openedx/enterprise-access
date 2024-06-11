@@ -31,7 +31,7 @@ class TestEnterpriseTasks(unittest.TestCase):
             "recent_action": f'Invited: {self.recent_action}',
             "enterprise_customer_name": "test enterprise",
             "catalog_count": 5,
-            "subsidy_expiration_datetime": datetime.today(),
+            "subsidy_expiration_datetime": "2060-03-25T20:46:28Z",
         })
 
         super().setUp()
@@ -47,7 +47,11 @@ class TestEnterpriseTasks(unittest.TestCase):
             self.pending_enterprise_customer_users,
         )
         recipient = self.pending_enterprise_customer_users[0]['user_email']
-        invitation_end_date = datetime.strptime(self.recent_action, '%B %d, %Y') + timedelta(days=90)
+        invitation_end_date = (datetime.strptime(self.recent_action, '%B %d, %Y') +
+                               timedelta(days=90)).strftime("%B %d, %Y")
+        subsidy_expiration_date = datetime.strptime(
+            self.pending_enterprise_customer_users[0]['subsidy_expiration_datetime'],
+            '%Y-%m-%dT%H:%M:%SZ').strftime("%B %d, %Y")
         calls = [mock.call(
             settings.BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_5_CAMPAIGN,
             recipients=[recipient],
@@ -55,7 +59,7 @@ class TestEnterpriseTasks(unittest.TestCase):
                 'enterprise_customer': self.pending_enterprise_customer_users[0]['enterprise_customer_name'],
                 'catalog_content_count': self.pending_enterprise_customer_users[0]['catalog_count'],
                 'invitation_end_date': invitation_end_date,
-                'subsidy_expiration_datetime': self.pending_enterprise_customer_users[0]['subsidy_expiration_datetime'],
+                'subsidy_expiration_datetime': subsidy_expiration_date,
             },
         )]
         mock_braze_api_client().send_campaign_message.assert_has_calls(calls)

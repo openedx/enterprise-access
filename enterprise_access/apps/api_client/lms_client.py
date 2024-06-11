@@ -358,7 +358,8 @@ class LmsApiClient(BaseOAuthClient):
 
                     recent_action_time = result['recent_action'].partition(': ')[2]
 
-                    if should_send_email_to_pecu(recent_action_time):
+                    if (settings.BRAZE_GROUP_EMAIL_FORCE_REMIND_ALL_PENDING_LEARNERS or
+                            should_send_email_to_pecu(recent_action_time)):
                         results.append({
                             'pending_enterprise_customer_user_id': pending_learner_id,
                             'recent_action': recent_action,
