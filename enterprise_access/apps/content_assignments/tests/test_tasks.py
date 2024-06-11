@@ -368,6 +368,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'course_card_image': 'https://itsanimage.com',
                 'learner_portal_link': 'http://enterprise-learner-portal.example.com/test-slug',
                 'action_required_by': 'Jan 01, 2021',
+                'action_required_by_timestamp': '12:00 PM Jan 01, 2021'
             },
         )
 
@@ -448,6 +449,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'course_card_image': 'https://itsanimage.com',
                 'learner_portal_link': '{}/{}'.format(settings.ENTERPRISE_LEARNER_PORTAL_URL, 'test-slug'),
                 'action_required_by': 'Jan 01, 2021',
+                'action_required_by_timestamp': '12:00 PM Jan 01, 2021'
             },
         )
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
