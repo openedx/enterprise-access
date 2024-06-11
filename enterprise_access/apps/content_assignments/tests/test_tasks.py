@@ -334,7 +334,6 @@ class TestBrazeEmailTasks(APITestWithMocks):
             'uuid': self.policy.subsidy_uuid,
             'expiration_datetime': (now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%SZ'),
         }
-        print(mock_subsidy)
         mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
         mock_braze_client.generate_mailto_link.return_value = f'mailto:{admin_email}'
 
