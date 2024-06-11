@@ -31,17 +31,16 @@ def get_braze_campaign_properties(
     """
     recent_action_time = recent_action.partition(": ")[2]
     current_date = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
-    invitation_end_date = datetime.strptime(
-        recent_action_time, "%B %d, %Y"
-    ) + timedelta(days=DAYS_TO_PURGE_PII)
+    invitation_end_date = (datetime.strptime(recent_action_time, "%B %d, %Y") +
+                           timedelta(days=DAYS_TO_PURGE_PII)).strftime("%B %d, %Y")
+    subsidy_expiration_date = datetime.strptime(subsidy_expiration_datetime, '%Y-%m-%dT%H:%M:%SZ').strftime("%B %d, %Y")
     logger.info('get_braze_campaign_properties_1: recent_action_time {%s}, '
                 'current_date {%s}, invitation_end_date {%s}, catalog_count {%s}, subsidy_expiration_datetime {%s}',
                 recent_action_time,
                 current_date,
                 invitation_end_date,
                 catalog_count,
-                subsidy_expiration_datetime,)
-
+                subsidy_expiration_date,)
     if settings.BRAZE_GROUP_EMAIL_FORCE_REMIND_ALL_PENDING_LEARNERS or current_date - timedelta(
         days=BRAZE_GROUPS_EMAIL_CAMPAIGNS_FIRST_REMINDER_DAY
     ) == datetime.strptime(recent_action_time, "%B %d, %Y"):
@@ -55,7 +54,7 @@ def get_braze_campaign_properties(
                 "enterprise_customer": enterprise_customer_name,
                 "catalog_content_count": catalog_count,
                 "invitation_end_date": invitation_end_date,
-                "subsidy_expiration_datetime": subsidy_expiration_datetime,
+                "subsidy_expiration_datetime": subsidy_expiration_date,
             },
         }
 
@@ -70,7 +69,7 @@ def get_braze_campaign_properties(
             "braze_trigger_properties": {
                 "catalog_content_count": catalog_count,
                 "invitation_end_date": invitation_end_date,
-                "subsidy_expiration_datetime": subsidy_expiration_datetime,
+                "subsidy_expiration_datetime": subsidy_expiration_date,
             },
         }
 
@@ -85,7 +84,7 @@ def get_braze_campaign_properties(
             "braze_trigger_properties": {
                 "catalog_content_count": catalog_count,
                 "invitation_end_date": invitation_end_date,
-                "subsidy_expiration_datetime": subsidy_expiration_datetime,
+                "subsidy_expiration_datetime": subsidy_expiration_date,
             },
         }
 
@@ -101,7 +100,7 @@ def get_braze_campaign_properties(
                 "enterprise_customer": enterprise_customer_name,
                 "catalog_content_count": catalog_count,
                 "invitation_end_date": invitation_end_date,
-                "subsidy_expiration_datetime": subsidy_expiration_datetime,
+                "subsidy_expiration_datetime": subsidy_expiration_date,
             },
         }
 
@@ -116,7 +115,7 @@ def get_braze_campaign_properties(
             "braze_trigger_properties": {
                 "catalog_content_count": catalog_count,
                 "invitation_end_date": invitation_end_date,
-                "subsidy_expiration_datetime": subsidy_expiration_datetime,
+                "subsidy_expiration_datetime": subsidy_expiration_date,
             },
         }
 
@@ -152,6 +151,7 @@ def send_group_reminder_emails(pending_enterprise_users):
             pending_enterprise_user["catalog_count"],
             pending_enterprise_user["subsidy_expiration_datetime"],
         )
+        logger.info(f'get_braze_properties: {braze_properties} for recipient: {recipient}')
         try:
             logger.info(f'Sending braze campaign group reminder email to {recipient}.')
             braze_client_instance.send_campaign_message(
@@ -159,6 +159,7 @@ def send_group_reminder_emails(pending_enterprise_users):
                 recipients=[recipient],
                 trigger_properties=braze_properties["braze_trigger_properties"],
             )
+            logger.info(f'success: sent reminder email {braze_properties["braze_trigger_properties"]}')
         except BrazeClientError as exc:
             message = (
                 "Groups learner reminder email could not be sent "
