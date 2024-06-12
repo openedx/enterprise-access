@@ -165,7 +165,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         null=True,
         blank=True,
         help_text=(
-            "The date and time when this Subsidy is considered retired."
+            "The date and time when this policy is considered retired."
         )
     )
     catalog_uuid = models.UUIDField(
