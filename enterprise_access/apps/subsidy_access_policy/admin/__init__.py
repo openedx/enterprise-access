@@ -342,6 +342,10 @@ class PolicyGroupAssociationAdmin(admin.ModelAdmin):
         'enterprise_group_uuid',
     )
 
+    autocomplete_fields = [
+        'subsidy_access_policy',
+    ]
+
 
 @admin.register(models.SubsidyAccessPolicy)
 class SubsidAccessPolicyAdmin(admin.ModelAdmin):
