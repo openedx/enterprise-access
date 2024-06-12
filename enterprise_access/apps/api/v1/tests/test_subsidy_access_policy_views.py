@@ -1525,7 +1525,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         assignment_configuration = AssignmentConfigurationFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
         )
-        AssignedLearnerCreditAccessPolicyFactory(
+        assigned_learner_policy = AssignedLearnerCreditAccessPolicyFactory(
             display_name='An assigned learner credit policy, for the test customer.',
             enterprise_customer_uuid=self.enterprise_uuid,
             active=True,
@@ -1542,7 +1542,10 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )
         action = assignment1.add_successful_linked_action()
-
+        PolicyGroupAssociationFactory(
+            enterprise_group_uuid=TEST_ENTERPRISE_GROUP_UUID,
+            subsidy_access_policy=assigned_learner_policy,
+        )
         # Implicitly tests that this response only includes allocated assignments
         LearnerContentAssignmentFactory.create(
             assignment_configuration=assignment_configuration,
@@ -1629,7 +1632,35 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             },
             'learner_acknowledged': None,
         }
+        policy_uuid = str(assigned_learner_policy.uuid)
+        policy_redemption_url = f'http://enterprise-access.example.com/api/v1/policy-redemption/{policy_uuid}/redeem/'
+        expected_response = {
+            'uuid': policy_uuid,
+            'policy_redemption_url': policy_redemption_url,
+            'is_late_redemption_allowed': False,
+            'remaining_balance_per_user': None,
+            'remaining_balance': 5000,
+            'subsidy_expiration_date': '2030-01-01 12:00:00Z',
+            'learner_content_assignments': [expected_learner_content_assignment],
+            'group_associations': [str(TEST_ENTERPRISE_GROUP_UUID)],
+            'policy_type': 'AssignedLearnerCreditAccessPolicy',
+            'enterprise_customer_uuid': self.enterprise_uuid,
+            'display_name': 'An assigned learner credit policy, for the test customer.',
+            'description': 'A generic description',
+            'active': True,
+            'retired': False,
+            'retired_at': None,
+            'catalog_uuid': str(assigned_learner_policy.catalog_uuid),
+            'subsidy_uuid': str(assigned_learner_policy.subsidy_uuid),
+            'access_method': 'assigned',
+            'spend_limit': 1000000,
+            'late_redemption_allowed_until': None,
+            'per_learner_enrollment_limit': None,
+            'per_learner_spend_limit': None,
+            'assignment_configuration': str(assignment_configuration.uuid)
+        }
         self.assertEqual(response_json[0]['learner_content_assignments'][0], expected_learner_content_assignment)
+        self.assertEqual(response_json[0], expected_response)
 
 
 class BaseCanRedeemTestMixin:
