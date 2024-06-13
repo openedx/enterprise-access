@@ -58,7 +58,6 @@ class BrazeCampaignSender:
         'course_partner',
         'course_card_image',
         'learner_portal_link',
-        'action_required_by',
         'action_required_by_timestamp'
     }
 
@@ -203,16 +202,6 @@ class BrazeCampaignSender:
         return get_human_readable_date(
             self.course_metadata.get('normalized_metadata', {}).get('start_date')
         )
-
-    def get_action_required_by(self):
-        """
-        Returns the minimum of this assignment's auto-expiration date,
-        the content's enrollment deadline, and the related policy's expiration datetime.
-        """
-        action_required_by = get_automatic_expiration_date_and_reason(self.assignment)
-        if not action_required_by:
-            return None
-        return format_datetime_obj(action_required_by['date'])
 
     def get_action_required_by_timestamp(self):
         """
@@ -447,7 +436,6 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         'course_partner',
         'course_card_image',
         'learner_portal_link',
-        'action_required_by',
         'action_required_by_timestamp'
     )
     campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN
@@ -491,7 +479,6 @@ def send_email_for_new_assignment(new_assignment_uuid):
         'course_partner',
         'course_card_image',
         'learner_portal_link',
-        'action_required_by',
         'action_required_by_timestamp'
     )
     campaign_uuid = settings.BRAZE_ASSIGNMENT_NOTIFICATION_CAMPAIGN
