@@ -585,6 +585,8 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
     )
     learner_content_assignments = serializers.SerializerMethodField('get_assignments_serializer')
 
+    group_associations = serializers.SerializerMethodField()
+
     @extend_schema_field(LearnerContentAssignmentWithLearnerAcknowledgedResponseSerializer)
     def get_assignments_serializer(self, obj):
         """
@@ -625,6 +627,9 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
     def get_remaining_balance(self, obj):
         """Returns the remaining balance for the policy"""
         return obj.subsidy_balance()
+
+    def get_group_associations(self, obj):
+        return list(obj.groups.values_list("enterprise_group_uuid", flat=True))
 
 
 class SubsidyAccessPolicyCanRedeemReasonResponseSerializer(serializers.Serializer):
