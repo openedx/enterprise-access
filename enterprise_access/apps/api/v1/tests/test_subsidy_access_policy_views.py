@@ -610,7 +610,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             enterprise_customer_uuid=self.enterprise_uuid,
             display_name='old display_name',
             spend_limit=5,
-            active=False,
+            active=True,
         )
 
         action = self.client.patch if is_patch else self.client.put
@@ -680,14 +680,13 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             enterprise_customer_uuid=self.enterprise_uuid,
             display_name='old display_name',
             spend_limit=5,
-            active=False,
+            active=True,
         )
 
         request_payload = {
             'description': 'the new description',
             'display_name': 'new display_name',
             'active': True,
-            'retired': True,
             'catalog_uuid': str(uuid4()),
             'subsidy_uuid': str(uuid4()),
             'access_method': AccessMethods.ASSIGNED,
@@ -699,9 +698,45 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'api:v1:subsidy-access-policies-detail',
             kwargs={'uuid': str(policy_for_edit.uuid)}
         )
-
         with self.assertRaises(ValidationError):
             self.client.patch(url, data=request_payload)
+
+    def test_update_views_with_exceeding_spend_limit_for_inactive_policies(self):
+        """
+        Test that the update and partial_update views can modify certain
+        fields of a policy record.
+        """
+        # Set the JWT-based auth to an operator.
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
+        policy_for_edit = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            display_name='old display_name',
+            spend_limit=5,
+            active=True,
+        )
+
+        request_payload = {
+            'description': 'the new description',
+            'display_name': 'new display_name',
+            'catalog_uuid': str(uuid4()),
+            'active': False,
+            'subsidy_uuid': str(uuid4()),
+            'access_method': AccessMethods.ASSIGNED,
+            'spend_limit': 6,
+            'per_learner_spend_limit': 10000,
+        }
+
+        url = reverse(
+            'api:v1:subsidy-access-policies-detail',
+            kwargs={'uuid': str(policy_for_edit.uuid)}
+        )
+
+        response = self.client.patch(url, data=request_payload)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     @ddt.data(
         {
@@ -726,7 +761,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         policy_for_edit = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
             spend_limit=5,
-            active=False,
+            active=True,
         )
         url = reverse(
             'api:v1:subsidy-access-policies-detail',

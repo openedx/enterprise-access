@@ -317,16 +317,13 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Sums the policies spend_limit excluding the db's instance of this policy
         """
-        policy_balances = []
-        policy_balances.append(self.spend_limit or 0)
-        sibling_policies = SubsidyAccessPolicy.objects.filter(
+        spend_limit = self.spend_limit if self.active and self.spend_limit else 0
+        sibling_policies_sum = SubsidyAccessPolicy.objects.filter(
             enterprise_customer_uuid=self.enterprise_customer_uuid,
             subsidy_uuid=self.subsidy_uuid,
-        ).exclude(uuid=self.uuid)
-
-        for sibling in sibling_policies:
-            policy_balances.append(sibling.spend_limit or 0)
-        return sum(policy_balances)
+            active=True
+        ).exclude(uuid=self.uuid).aggregate(models.Sum("spend_limit", default=0))["spend_limit__sum"]
+        return spend_limit + sibling_policies_sum
 
     @property
     def is_spend_limit_updated(self):
@@ -340,6 +337,17 @@ class SubsidyAccessPolicy(TimeStampedModel):
         return record_from_db.spend_limit != self.spend_limit
 
     @property
+    def is_active_updated(self):
+        """
+        Checks if SubsidyAccessPolicy object exists in the database, and determines if the
+        database value of active flag differs from the current instance of active
+        """
+        if self._state.adding:
+            return False
+        record_from_db = SubsidyAccessPolicy.objects.get(uuid=self.uuid)
+        return record_from_db.active != self.active
+
+    @property
     def is_assignable(self):
         """
         Convenience property to determine if this policy is assignable.
@@ -350,7 +358,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         Used to help validate field values before saving this model instance.
         """
-        if self.is_spend_limit_updated:
+        if self.active and (self.is_active_updated or self.is_spend_limit_updated):
             if self.total_spend_limit_for_all_policies_associated_to_subsidy > self.subsidy_total_deposits():
                 raise ValidationError(f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE}')
         for field_name, (constraint_function, error_message) in self.FIELD_CONSTRAINTS.items():
