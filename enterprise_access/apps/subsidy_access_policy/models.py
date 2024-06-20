@@ -689,9 +689,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
         # learner not associated to enterprise
         if not skip_customer_user_check:
             enterprise_user_record = self.enterprise_user_record(lms_user_id)
-            if not enterprise_user_record:
-                self._log_redeemability(False, REASON_LEARNER_NOT_IN_ENTERPRISE, lms_user_id, content_key)
-                return (False, REASON_LEARNER_NOT_IN_ENTERPRISE, [])
             included_in_policy, reason = self.includes_learner(
                 lms_user_id,
                 enterprise_user_record
