@@ -532,17 +532,14 @@ class SubsidyAccessPolicy(TimeStampedModel):
             self.get_content_metadata(content_key),
         )
 
-    def includes_learner(self, lms_user_id, enterprise_user_record=None):
+    def includes_learner(self, lms_user_id):
         """
         Determine whether the lms user is associated properly with both the enterprise
         and the policy's group(s).
         """
-        if enterprise_user_record is not None:
-            learner_record = enterprise_user_record
-        else:
-            learner_record = self.enterprise_user_record(lms_user_id)
-            if not learner_record:
-                return False, REASON_LEARNER_NOT_IN_ENTERPRISE
+        learner_record = self.enterprise_user_record(lms_user_id)
+        if not learner_record:
+            return False, REASON_LEARNER_NOT_IN_ENTERPRISE
 
         associated_group_uuids = set(learner_record.get('enterprise_group', []))
         # if there are no policy groups, return early
@@ -688,11 +685,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # learner not associated to enterprise
         if not skip_customer_user_check:
-            enterprise_user_record = self.enterprise_user_record(lms_user_id)
-            included_in_policy, reason = self.includes_learner(
-                lms_user_id,
-                enterprise_user_record
-            )
+            included_in_policy, reason = self.includes_learner(lms_user_id)
             if not included_in_policy:
                 self._log_redeemability(False, reason, lms_user_id, content_key)
                 return (False, reason, [])
@@ -790,16 +783,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
 
         # learner not linked to enterprise
         if not skip_customer_user_check:
-            enterprise_user_record = self.enterprise_user_record(lms_user_id)
-            if not enterprise_user_record:
-                logger.info(
-                    f'[credit_available] learner {lms_user_id} not linked to enterprise {self.enterprise_customer_uuid}'
-                )
-                return False
-            included_in_policy, reason = self.includes_learner(
-                lms_user_id,
-                enterprise_user_record
-            )
+            included_in_policy, reason = self.includes_learner(lms_user_id)
             if not included_in_policy:
                 logger.info(f'[credit_available] learner {lms_user_id} encountered error {reason}')
                 return False
