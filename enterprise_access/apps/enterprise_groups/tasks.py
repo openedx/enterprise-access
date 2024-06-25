@@ -10,6 +10,7 @@ from celery import shared_task
 from django.conf import settings
 
 from enterprise_access.apps.api_client.braze_client import ENTERPRISE_BRAZE_ALIAS_LABEL, BrazeApiClient
+from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.enterprise_groups.constants import (
     BRAZE_GROUPS_EMAIL_CAMPAIGNS_FINAL_REMINDER_DAY,
     BRAZE_GROUPS_EMAIL_CAMPAIGNS_FIRST_REMINDER_DAY,
@@ -132,6 +133,7 @@ def send_group_reminder_emails(pending_enterprise_users):
         * pending_enterprise_users (list)
     """
     braze_client_instance = BrazeApiClient()
+    lms_client = LmsApiClient()
     for pending_enterprise_user in pending_enterprise_users:
         pecu_email = pending_enterprise_user["user_email"]
 
@@ -165,5 +167,8 @@ def send_group_reminder_emails(pending_enterprise_users):
                 "Groups learner reminder email could not be sent "
                 f"to {recipient} with braze properties {braze_properties}."
             )
+            lms_client.update_pending_learner_status(
+                enterprise_group_uuid=pending_enterprise_user["enterprise_group_uuid"],
+                learner_email=pecu_email)
             logger.exception(message)
             raise exc
