@@ -213,43 +213,36 @@ def has_explicit_access_to_content_assignments_learner(user, enterprise_customer
 # Consolidate implicit and explicit rule predicates. #
 ######################################################
 
-# pylint: disable=unsupported-binary-operation
 has_subsidy_request_admin_access = (
     has_implicit_access_to_requests_admin | has_explicit_access_to_requests_admin
 )
 
 
-# pylint: disable=unsupported-binary-operation
 has_subsidy_request_learner_access = (
     has_implicit_access_to_requests_learner | has_explicit_access_to_requests_learner
 )
 
 
-# pylint: disable=unsupported-binary-operation
 has_subsidy_access_policy_operator_access = (
     has_implicit_access_to_policy_operator | has_explicit_access_to_policy_operator
 )
 
 
-# pylint: disable=unsupported-binary-operation
 has_subsidy_access_policy_learner_access = (
     has_implicit_access_to_policy_learner | has_explicit_access_to_policy_learner
 )
 
 
-# pylint: disable=unsupported-binary-operation
 has_content_assignments_operator_access = (
     has_implicit_access_to_content_assignments_operator | has_explicit_access_to_content_assignments_operator
 )
 
 
-# pylint: disable=unsupported-binary-operation
 has_content_assignments_admin_access = (
     has_implicit_access_to_content_assignments_admin | has_explicit_access_to_content_assignments_admin
 )
 
 
-# pylint: disable=unsupported-binary-operation
 has_content_assignments_learner_access = (
     has_implicit_access_to_content_assignments_learner | has_explicit_access_to_content_assignments_learner
 )
