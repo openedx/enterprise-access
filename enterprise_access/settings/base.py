@@ -46,6 +46,7 @@ INSTALLED_APPS = (
     'drf_spectacular',
     'drf_yasg',
     'edx_api_doc_tools',
+    'openedx_events',
     'release_util',
 )
 
