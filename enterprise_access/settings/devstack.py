@@ -64,7 +64,6 @@ JWT_AUTH.update({
 INSTALLED_APPS += (
     'django_extensions',
     'edx_event_bus_kafka',
-    'openedx_events',
 )
 
 # BEGIN CELERY
