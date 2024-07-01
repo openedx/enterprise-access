@@ -294,7 +294,7 @@ edx-toggles==5.2.0
     #   edx-event-bus-kafka
 factory-boy==3.3.0
     # via -r requirements/test.txt
-faker==25.9.1
+faker==26.0.0
     # via
     #   -r requirements/test.txt
     #   factory-boy
@@ -429,7 +429,7 @@ pycparser==2.22
     # via
     #   -r requirements/test.txt
     #   cffi
-pydata-sphinx-theme==0.15.3
+pydata-sphinx-theme==0.15.4
     # via sphinx-book-theme
 pygments==2.18.0
     # via
@@ -447,7 +447,7 @@ pyjwt[crypto]==2.8.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==3.2.3
+pylint==3.2.5
     # via
     #   -r requirements/test.txt
     #   edx-lint
@@ -469,7 +469,7 @@ pylint-plugin-utils==0.8.2
     #   pylint-django
 pymemcache==4.0.0
     # via -r requirements/test.txt
-pymongo==4.7.3
+pymongo==4.8.0
     # via
     #   -r requirements/test.txt
     #   edx-opaque-keys
@@ -519,7 +519,7 @@ pyyaml==6.0.1
     #   edx-django-release-util
 readme-renderer==43.0
     # via -r requirements/doc.in
-redis==5.0.6
+redis==5.0.7
     # via -r requirements/test.txt
 referencing==0.35.1
     # via
