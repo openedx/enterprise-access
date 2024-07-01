@@ -6,7 +6,9 @@ from datetime import datetime, timedelta
 from unittest import mock
 from uuid import uuid4
 
+from braze.exceptions import BrazeClientError
 from django.conf import settings
+from pytest import raises
 
 from enterprise_access.apps.enterprise_groups.tasks import send_group_reminder_emails
 
@@ -32,6 +34,7 @@ class TestEnterpriseTasks(unittest.TestCase):
             "enterprise_customer_name": "test enterprise",
             "catalog_count": 5,
             "subsidy_expiration_datetime": "2060-03-25T20:46:28Z",
+            "enterprise_group_uuid": uuid4(),
         })
 
         super().setUp()
@@ -63,3 +66,22 @@ class TestEnterpriseTasks(unittest.TestCase):
             },
         )]
         mock_braze_api_client().send_campaign_message.assert_has_calls(calls)
+
+    @mock.patch('enterprise_access.apps.enterprise_groups.tasks.LmsApiClient', return_value=mock.MagicMock())
+    @mock.patch('enterprise_access.apps.enterprise_groups.tasks.BrazeApiClient', return_value=mock.MagicMock())
+    def test_fail_send_group_reminder_emails(self, mock_braze_api_client, mock_lms_client):
+        """
+        Verify braze fails send email and calls update_pending_learner_status with correct params
+        """
+        mock_braze_api_client().create_recipient_no_external_id.return_value = (
+            self.pending_enterprise_customer_users[0]['user_email'])
+        mock_braze_api_client().send_campaign_message.side_effect = BrazeClientError(
+            "Any thing that happens during email")
+
+        with raises(BrazeClientError):
+            send_group_reminder_emails(
+                self.pending_enterprise_customer_users)
+            mock_lms_client().update_pending_learner_status.assert_called_with(
+                enterprise_group_uuid=self.pending_enterprise_customer_users[0]["enterprise_group_uuid"],
+                learner_email=self.pending_enterprise_customer_users[0]['user_email']
+            )

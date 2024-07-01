@@ -59,5 +59,6 @@ class Command(BaseCommand):
                 )
                 pending_enterprise_customer_user["catalog_count"] = catalog_count
                 pending_enterprise_customer_user["enterprise_customer_name"] = enterprise_customer_data["name"]
+                pending_enterprise_customer_user["enterprise_group_uuid"] = enterprise_group_uuid
                 pecu_email_properties.append(pending_enterprise_customer_user)
             send_group_reminder_emails.delay(pecu_email_properties)
