@@ -762,17 +762,15 @@ class TestAssignmentExpiration(TestCase):
         Test that we expire an assignment and clear
         its PII, as long the state is not "accepted".
         """
+        # set the allocation time to be more than the threshold number of days ago
+        enough_days_to_be_cancelled = NUM_DAYS_BEFORE_AUTO_EXPIRATION + 1
         assignment = LearnerContentAssignmentFactory.create(
             assignment_configuration=self.assignment_configuration,
             state=assignment_state,
             learner_email='larry@stooges.com',
             lms_user_id=12345,
+            allocated_at=delta_t(days=-enough_days_to_be_cancelled),
         )
-        action = assignment.add_successful_notified_action()
-        # set the last notified action to be more than the threshold number of days ago
-        enough_days_to_be_cancelled = NUM_DAYS_BEFORE_AUTO_EXPIRATION + 1
-        action.completed_at = delta_t(days=-enough_days_to_be_cancelled)
-        action.save()
 
         # set a policy-subsidy expiration date in the future
         mock_subsidy_record = {'expiration_datetime': delta_t(days=100, as_string=True)}
