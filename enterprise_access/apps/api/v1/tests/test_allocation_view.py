@@ -234,7 +234,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'actions': [],
                     'earliest_possible_expiration': {
                         'date': (
-                            self.alice_assignment.created + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                            self.alice_assignment.allocated_at + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
                         ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                         'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
                     }
@@ -254,7 +254,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'actions': [],
                     'earliest_possible_expiration': {
                         'date': (
-                            self.bob_assignment.created + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                            self.bob_assignment.allocated_at + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
                         ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                         'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
                     }
@@ -274,7 +274,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'actions': [],
                     'earliest_possible_expiration': {
                         'date': (
-                            self.carol_assignment.created + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                            self.carol_assignment.allocated_at + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
                         ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                         'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
                     }
@@ -559,7 +559,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
                     'actions': [],
                     'earliest_possible_expiration': {
                         'date': (
-                            new_allocation.created + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                            new_allocation.allocated_at + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
                         ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                         'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
                     }
