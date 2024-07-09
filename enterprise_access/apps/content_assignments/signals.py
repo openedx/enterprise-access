@@ -50,7 +50,7 @@ def update_assignment_status_for_reversed_transaction(**kwargs):
     try:
         assignment_to_update = LearnerContentAssignment.objects.get(transaction_uuid=transaction_uuid)
     except LearnerContentAssignment.DoesNotExist:
-        logger.error(f'No LearnerContentAssignment exists with transaction uuid: {transaction_uuid}')
+        logger.info(f'No LearnerContentAssignment exists with transaction uuid: {transaction_uuid}')
         return
 
     if assignment_to_update.state in LearnerContentAssignmentStateChoices.REVERSIBLE_STATES:
