@@ -740,8 +740,8 @@ class LearnerContentAssignment(TimeStampedModel):
             recent_action_time=Coalesce(
                 # Time of most recent reminder.
                 Max('actions__completed_at', filter=Q(actions__action_type=AssignmentActions.REMINDED)),
-                # Fallback to created time.
-                F('created'),
+                # Fallback to allocation time
+                F('allocated_at'),
                 # Coerce CreationDateTimeField into a compatible field.
                 output_field=DateTimeField(),
             )

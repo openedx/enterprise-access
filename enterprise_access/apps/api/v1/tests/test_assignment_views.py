@@ -429,7 +429,7 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             'error_reason': None,
             'recent_action': {
                 'action_type': AssignmentRecentActionTypes.ASSIGNED,
-                'timestamp': self.assignment_allocated_pre_link.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                'timestamp': self.assignment_allocated_pre_link.allocated_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
             },
             'learner_state': AssignmentLearnerStates.NOTIFYING,
             'earliest_possible_expiration': {
