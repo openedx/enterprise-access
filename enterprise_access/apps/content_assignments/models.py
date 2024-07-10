@@ -327,9 +327,10 @@ class LearnerContentAssignment(TimeStampedModel):
         ),
     )
     allocated_at = models.DateTimeField(
-        null=True,
+        null=False,
         blank=True,
-        help_text="The last time the assignment was allocated. Null means the assignment is not allocated.",
+        default=timezone.now,
+        help_text="The last time the assignment was allocated. Cannot be null.",
     )
     accepted_at = models.DateTimeField(
         null=True,
