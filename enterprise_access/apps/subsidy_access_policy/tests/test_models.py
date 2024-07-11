@@ -22,7 +22,9 @@ from enterprise_access.apps.content_assignments.tests.factories import LearnerCo
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
+    REASON_LEARNER_ASSIGNMENT_EXPIRED,
     REASON_LEARNER_ASSIGNMENT_FAILED,
+    REASON_LEARNER_ASSIGNMENT_REVERSED,
     REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
     REASON_LEARNER_MAX_SPEND_REACHED,
     REASON_LEARNER_NOT_ASSIGNED_CONTENT,
@@ -977,6 +979,16 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         {
             'assignment_state': LearnerContentAssignmentStateChoices.ERRORED,
             'expected_policy_can_redeem': (False, REASON_LEARNER_ASSIGNMENT_FAILED, []),
+        },
+        # Sad path, assignment has state='expired'.
+        {
+            'assignment_state': LearnerContentAssignmentStateChoices.EXPIRED,
+            'expected_policy_can_redeem': (False, REASON_LEARNER_ASSIGNMENT_EXPIRED, []),
+        },
+        # Sad path, assignment has state='reversed'.
+        {
+            'assignment_state': LearnerContentAssignmentStateChoices.REVERSED,
+            'expected_policy_can_redeem': (False, REASON_LEARNER_ASSIGNMENT_REVERSED, []),
         },
     )
     @ddt.unpack

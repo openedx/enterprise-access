@@ -113,6 +113,8 @@ REASON_LEARNER_MAX_ENROLLMENTS_REACHED = "learner_max_enrollments_reached"
 REASON_LEARNER_NOT_ASSIGNED_CONTENT = "reason_learner_not_assigned_content"
 REASON_LEARNER_ASSIGNMENT_CANCELLED = "reason_learner_assignment_cancelled"
 REASON_LEARNER_ASSIGNMENT_FAILED = "reason_learner_assignment_failed"
+REASON_LEARNER_ASSIGNMENT_EXPIRED = "reason_learner_assignment_expired"
+REASON_LEARNER_ASSIGNMENT_REVERSED = "reason_learner_assignment_reversed"
 
 # Redeem metadata keyword that
 # forces enrollment to take place, regardless of course state.
