@@ -2,11 +2,13 @@
 Tests for Subsidy Access Policy Assignment Allocation view(s).
 """
 from datetime import timedelta
+from operator import itemgetter
 from unittest import mock
 from uuid import UUID, uuid4
 
 import ddt
 from django.core.cache import cache as django_cache
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.serializers import ValidationError
@@ -25,6 +27,7 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
+from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
@@ -523,56 +526,148 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'enterprise_customer_uuid': str(self.enterprise_uuid),
             'expiration_datetime': '2030-01-01 12:00:00Z',
             'active_datetime': '2020-01-01 12:00:00Z',
-            'current_balance': '5000',
+            'current_balance': '5000000',
             'is_active': True,
         }
 
+        # Create existing assignment records in the canceled and expired
+        # states and later verify that they're modified to `allocated`
+        # due to our allocation request.
+        LearnerContentAssignmentFactory(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='canceled@foo.com',
+            lms_user_id=None,
+            cancelled_at=timezone.now(),
+            content_key=self.content_key,
+            content_title=self.content_title,
+            content_quantity=-12345,
+            state=LearnerContentAssignmentStateChoices.CANCELLED,
+        )
+        expired_user = UserFactory.create(
+            email='expired@foo.com',
+            lms_user_id=4277
+        )
+        LearnerContentAssignmentFactory(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='retired-assignment@foo.com',
+            lms_user_id=expired_user.lms_user_id,
+            expired_at=timezone.now(),
+            errored_at=timezone.now(),
+            content_key=self.content_key,
+            content_title=self.content_title,
+            content_quantity=-12345,
+            state=LearnerContentAssignmentStateChoices.EXPIRED,
+        )
+
+        # create a user record for an email address that does
+        # not have an existing assignment. This will help test that
+        # the lms_user_id is populated for newly-created assignment records.
+        foo_user = UserFactory.create(
+            email='new@foo.com',
+            lms_user_id=18000,
+        )
+
         allocate_url = _allocation_url(self.assigned_learner_credit_policy.uuid)
         allocate_payload = {
-            'learner_emails': ['new@foo.com'],
+            'learner_emails': ['new@foo.com', 'canceled@foo.com', 'expired@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': 123.45 * 100,  # policy limit is 100000.00 USD, so this should be well below limit
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)
 
-        new_allocation = self.assignment_configuration.assignments.filter(
-            learner_email='new@foo.com',
-            state=LearnerContentAssignmentStateChoices.ALLOCATED,
-            content_key=self.content_key,
-            content_quantity=-123.45 * 100,
-        ).first()
-        self.assertIsNotNone(new_allocation)
-        expected_response_payload = {
-            'updated': [],
-            'created': [
-                {
-                    'assignment_configuration': str(self.assignment_configuration.uuid),
-                    'learner_email': 'new@foo.com',
-                    'lms_user_id': None,
-                    'content_key': self.content_key,
-                    'content_title': self.content_title,
-                    'content_quantity': -123.45 * 100,
-                    'state': LearnerContentAssignmentStateChoices.ALLOCATED,
-                    'transaction_uuid': None,
-                    'uuid': str(new_allocation.uuid),
-                    'actions': [],
-                    'earliest_possible_expiration': {
-                        'date': (
-                            new_allocation.allocated_at + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
-                        ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
-                        'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
-                    }
-                },
-            ],
-            'no_change': [],
+        allocation_records_by_email = {
+            assignment.learner_email: assignment
+            for assignment in self.assignment_configuration.assignments.filter(
+                state=LearnerContentAssignmentStateChoices.ALLOCATED,
+                content_key=self.content_key,
+                content_quantity=-123.45 * 100,
+            )
         }
-        self.assertEqual(expected_response_payload, response.json())
+        self.assertEqual(3, len(allocation_records_by_email))
+
+        response_payload = response.json()
+
+        foo_record = allocation_records_by_email['new@foo.com']
+        expected_created_records = [{
+            'assignment_configuration': str(self.assignment_configuration.uuid),
+            'learner_email': 'new@foo.com',
+            'lms_user_id': foo_user.lms_user_id,
+            'content_key': self.content_key,
+            'content_title': self.content_title,
+            'content_quantity': -123.45 * 100,
+            'state': LearnerContentAssignmentStateChoices.ALLOCATED,
+            'transaction_uuid': None,
+            'uuid': str(foo_record.uuid),
+            'actions': [],
+            'earliest_possible_expiration': {
+                'date': (
+                    foo_record.allocated_at + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
+            }
+        }]
+        self.assertEqual(response_payload['created'], expected_created_records)
+
+        canceled_record = allocation_records_by_email['canceled@foo.com']
+        expired_record = allocation_records_by_email['expired@foo.com']
+        expected_updated_records = [
+            {
+                'assignment_configuration': str(self.assignment_configuration.uuid),
+                'learner_email': 'canceled@foo.com',
+                'lms_user_id': None,
+                'content_key': self.content_key,
+                'content_title': self.content_title,
+                'content_quantity': -123.45 * 100,
+                'state': LearnerContentAssignmentStateChoices.ALLOCATED,
+                'transaction_uuid': None,
+                'uuid': str(canceled_record.uuid),
+                'actions': [],
+                'earliest_possible_expiration': {
+                    'date': (
+                        canceled_record.allocated_at + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                    ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
+                }
+            },
+            {
+                'assignment_configuration': str(self.assignment_configuration.uuid),
+                'learner_email': 'expired@foo.com',
+                'lms_user_id': expired_user.lms_user_id,
+                'content_key': self.content_key,
+                'content_title': self.content_title,
+                'content_quantity': -123.45 * 100,
+                'state': LearnerContentAssignmentStateChoices.ALLOCATED,
+                'transaction_uuid': None,
+                'uuid': str(expired_record.uuid),
+                'actions': [],
+                'earliest_possible_expiration': {
+                    'date': (
+                        expired_record.allocated_at + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                    ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                    'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED
+                }
+            }
+        ]
+        self.assertEqual(
+            sorted(response_payload['updated'], key=itemgetter('uuid')),
+            sorted(expected_updated_records, key=itemgetter('uuid')),
+        )
+
         mock_is_subsidy_active.assert_called_once_with()  # No args for PropertyMock
         mock_catalog_inclusion.assert_called_once_with(self.assigned_learner_credit_policy, self.content_key)
         mock_aggregates_for_policy.assert_called_once_with(self.assigned_learner_credit_policy)
         mock_subsidy_balance.assert_called_once_with(self.assigned_learner_credit_policy)
-        mock_pending_learner_task.delay.assert_called_once_with(new_allocation.uuid)
+        mock_pending_learner_task.delay.assert_has_calls([
+            mock.call(foo_record.uuid),
+            mock.call(canceled_record.uuid),
+            mock.call(expired_record.uuid),
+        ], any_order=True)
+
+        for record in allocation_records_by_email.values():
+            self.assertIsNone(record.cancelled_at)
+            self.assertIsNone(record.expired_at)
+            self.assertIsNone(record.errored_at)
 
     @mock.patch.object(
         AssignedLearnerCreditAccessPolicy, 'get_content_price', autospec=True,

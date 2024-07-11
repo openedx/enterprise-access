@@ -8,13 +8,11 @@ import ddt
 from django.test import TestCase
 from django.utils import timezone
 
-from enterprise_access.apps.core.models import User
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
 
 from ..api import (
     AllocationException,
-    _try_populate_assignments_lms_user_id,
     allocate_assignments,
     cancel_assignments,
     expire_assignment,
@@ -608,62 +606,6 @@ class TestContentAssignmentApi(TestCase):
             existing_assignment_state in (LearnerContentAssignmentStateChoices.REALLOCATE_STATES)
         ):
             mock_pending_learner_task.delay.assert_called_once_with(assignment.uuid)
-
-    @mock.patch(
-        'enterprise_access.apps.content_assignments.api.USER_EMAIL_READ_BATCH_SIZE',
-        TEST_USER_EMAIL_READ_BATCH_SIZE,
-    )
-    def test_try_populate_assignments_lms_user_id_with_batching(self):
-        """
-        Tests the _try_populate_assignments_lms_user_id() function, especially the read batching feature.
-
-        Make 2*N users with unique emails,
-        Call function on:
-            0.5*N assignment with new emails,
-            and 2*N assignments with existing emails,
-        Where N is the max batch size.
-
-        The result should be 3 queries (3 batches).
-        """
-        num_users_to_create = 2 * TEST_USER_EMAIL_READ_BATCH_SIZE
-        existing_users = [UserFactory() for _ in range(num_users_to_create)]
-
-        assignments_for_non_existing_users = [
-            LearnerContentAssignmentFactory.create(
-                assignment_configuration=self.assignment_configuration,
-                lms_user_id=None,
-                state=LearnerContentAssignmentStateChoices.ALLOCATED,
-            )
-            for _ in range(int(0.5 * TEST_USER_EMAIL_READ_BATCH_SIZE))
-        ]
-        assignments_for_existing_users = [
-            LearnerContentAssignmentFactory.create(
-                assignment_configuration=self.assignment_configuration,
-                learner_email=existing_user.email,
-                lms_user_id=None,
-                state=LearnerContentAssignmentStateChoices.ALLOCATED,
-            )
-            for existing_user in existing_users
-        ]
-        # Assemble a list of assignments 2.5 longer than the max batch size.
-        all_assignments = assignments_for_non_existing_users + assignments_for_existing_users
-
-        # Call the function under test, and actually make sure only 3 queries were executed.
-        with self.assertNumQueries(3):
-            _ = _try_populate_assignments_lms_user_id(all_assignments)
-
-        # save() and update all assignments from the db.
-        for assignment in all_assignments:
-            assignment.save()
-            assignment.refresh_from_db()
-
-        # We should not have updated the lms_user_id of the assignment if no user existed.
-        for assignment in assignments_for_non_existing_users:
-            assert assignment.lms_user_id is None
-
-        # We should have updated the lms_user_id of the assignment if a user existed.
-        for assignment in assignments_for_existing_users:
-            assert assignment.lms_user_id == User.objects.get(email=assignment.learner_email).lms_user_id
 
 
 @ddt.ddt
