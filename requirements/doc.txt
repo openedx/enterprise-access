@@ -44,7 +44,7 @@ billiard==4.2.0
     # via
     #   -r requirements/test.txt
     #   celery
-cachetools==5.3.3
+cachetools==5.4.0
     # via
     #   -r requirements/test.txt
     #   tox
@@ -270,11 +270,11 @@ edx-drf-extensions==10.3.0
     # via
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.4.3
+edx-enterprise-subsidy-client==0.4.4
     # via -r requirements/test.txt
 edx-event-bus-kafka==5.7.0
     # via -r requirements/test.txt
-edx-lint==5.3.6
+edx-lint==5.3.7
     # via -r requirements/test.txt
 edx-opaque-keys[django]==2.10.0
     # via
@@ -585,7 +585,7 @@ social-auth-core==4.5.4
     #   social-auth-app-django
 soupsieve==2.5
     # via beautifulsoup4
-sphinx==7.3.7
+sphinx==7.4.6
     # via
     #   -r requirements/doc.in
     #   pydata-sphinx-theme
@@ -604,7 +604,7 @@ sphinxcontrib-qthelp==1.0.7
     # via sphinx
 sphinxcontrib-serializinghtml==1.1.10
     # via sphinx
-sqlparse==0.5.0
+sqlparse==0.5.1
     # via
     #   -r requirements/test.txt
     #   django

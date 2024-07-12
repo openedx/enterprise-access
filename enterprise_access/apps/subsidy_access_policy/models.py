@@ -1038,6 +1038,37 @@ class SubsidyAccessPolicy(TimeStampedModel):
         logger.info('resolve_policy multiple policies resolved')
         return sorted_policies[0]
 
+    def create_deposit(
+        self,
+        desired_deposit_quantity,
+        sales_contract_reference_id,
+        sales_contract_reference_provider,
+        metadata=None,
+    ):
+        """
+        Create a Deposit for the associated Subsidy and update this Policy's spend_limit.
+
+        Alternatively, this is referred to as a "Top-Up".
+
+        Raises:
+            SubsidyAPIHTTPError if the Subsidy API request failed.
+        """
+        deposit_kwargs = {
+            "subsidy_uuid": self.subsidy_uuid,
+            "desired_deposit_quantity": desired_deposit_quantity,
+            "sales_contract_reference_id": sales_contract_reference_id,
+            "sales_contract_reference_provider": sales_contract_reference_provider,
+            "metadata": metadata,
+        }
+        logger.info("Attempting deposit creation with arguments %s", deposit_kwargs)
+        try:
+            self.subsidy_client.create_subsidy_deposit(**deposit_kwargs)
+        except requests.exceptions.HTTPError as exc:
+            logger.exception("Deposit creation request failed, skipping updating policy spend_limit.")
+            raise SubsidyAPIHTTPError() from exc
+        self.spend_limit += desired_deposit_quantity
+        self.save()
+
     def delete(self, *args, **kwargs):
         """
         Perform a soft-delete, overriding the standard delete() method to prevent hard-deletes.

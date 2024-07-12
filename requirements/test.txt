@@ -33,7 +33,7 @@ billiard==4.2.0
     # via
     #   -r requirements/base.txt
     #   celery
-cachetools==5.3.3
+cachetools==5.4.0
     # via tox
 celery==5.4.0
     # via
@@ -238,11 +238,11 @@ edx-drf-extensions==10.3.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.4.3
+edx-enterprise-subsidy-client==0.4.4
     # via -r requirements/base.txt
 edx-event-bus-kafka==5.7.0
     # via -r requirements/base.txt
-edx-lint==5.3.6
+edx-lint==5.3.7
     # via -r requirements/test.in
 edx-opaque-keys[django]==2.10.0
     # via
@@ -509,7 +509,7 @@ social-auth-core==4.5.4
     #   -r requirements/base.txt
     #   edx-auth-backends
     #   social-auth-app-django
-sqlparse==0.5.0
+sqlparse==0.5.1
     # via
     #   -r requirements/base.txt
     #   django

@@ -1,6 +1,7 @@
 """
 Tests for subsidy_access_policy models.
 """
+import contextlib
 from datetime import datetime, timedelta
 from unittest.mock import ANY, PropertyMock, patch
 from uuid import uuid4
@@ -733,6 +734,64 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         # Assert that the metadata we send to enterprise-subsidy contains the allow_late_enrollment hint (or not).
         assert self.mock_subsidy_client.create_subsidy_transaction.call_args.kwargs['metadata'] \
             == expected_metadata_sent_to_subsidy
+
+    @ddt.data(
+        {
+            'old_spend_limit': 100,
+            'deposit_quantity': 50,
+            'api_side_effect': None,
+            'expected_spend_limit': 150,
+        },
+        {
+            'old_spend_limit': 100,
+            'deposit_quantity': 50,
+            'api_side_effect': requests.exceptions.HTTPError,
+            'expected_spend_limit': 100,
+        },
+    )
+    @ddt.unpack
+    def test_create_deposit(
+        self,
+        old_spend_limit,
+        deposit_quantity,
+        api_side_effect,
+        expected_spend_limit,
+    ):
+        """
+        Test the Policy.create_deposit() function.
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            spend_limit=old_spend_limit,
+            per_learner_spend_limit=None,
+        )
+        subsidy_record_patcher = patch.object(policy, 'subsidy_record')
+        mock_subsidy_record = subsidy_record_patcher.start()
+        mock_subsidy_record.return_value = {
+            'id': 1,
+            'active_datetime': datetime.utcnow() - timedelta(days=1),
+            'expiration_datetime': datetime.utcnow() + timedelta(days=1),
+            'is_active': True,
+            'current_balance': 9999,
+            'total_deposits': 9999,
+        }
+        self.mock_subsidy_client.create_subsidy_deposit.side_effect = api_side_effect
+        assert_raises_or_not = self.assertRaises(SubsidyAPIHTTPError) if api_side_effect else contextlib.nullcontext()
+        with assert_raises_or_not:
+            policy.create_deposit(
+                desired_deposit_quantity=deposit_quantity,
+                sales_contract_reference_id='test-ref-id',
+                sales_contract_reference_provider='test-slug',
+                metadata={'foo': 'bar'},
+            )
+        self.mock_subsidy_client.create_subsidy_deposit.assert_called_once_with(
+            subsidy_uuid=policy.subsidy_uuid,
+            desired_deposit_quantity=deposit_quantity,
+            sales_contract_reference_id='test-ref-id',
+            sales_contract_reference_provider='test-slug',
+            metadata={'foo': 'bar'},
+        )
+        policy.refresh_from_db()
+        assert policy.spend_limit == expected_spend_limit
 
 
 class SubsidyAccessPolicyResolverTests(TestCase):
