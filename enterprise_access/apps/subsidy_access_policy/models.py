@@ -29,7 +29,9 @@ from .constants import (
     FORCE_ENROLLMENT_KEYWORD,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
+    REASON_LEARNER_ASSIGNMENT_EXPIRED,
     REASON_LEARNER_ASSIGNMENT_FAILED,
+    REASON_LEARNER_ASSIGNMENT_REVERSED,
     REASON_LEARNER_MAX_ENROLLMENTS_REACHED,
     REASON_LEARNER_MAX_SPEND_REACHED,
     REASON_LEARNER_NOT_ASSIGNED_CONTENT,
@@ -1338,29 +1340,22 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             return (False, reason, existing_redemptions)
         # Now that the default checks are complete, proceed with the custom checks for this assignment policy type.
         found_assignment = self.get_assignment(lms_user_id, content_key)
-        if not found_assignment:
-            self._log_redeemability(
-                False, REASON_LEARNER_NOT_ASSIGNED_CONTENT, lms_user_id, content_key, extra=existing_redemptions,
-            )
-            return (False, REASON_LEARNER_NOT_ASSIGNED_CONTENT, existing_redemptions)
-        elif found_assignment.state == LearnerContentAssignmentStateChoices.CANCELLED:
-            self._log_redeemability(
-                False, REASON_LEARNER_ASSIGNMENT_CANCELLED, lms_user_id, content_key, extra=existing_redemptions,
-            )
-            return (False, REASON_LEARNER_ASSIGNMENT_CANCELLED, existing_redemptions)
-        elif found_assignment.state == LearnerContentAssignmentStateChoices.ERRORED:
-            self._log_redeemability(
-                False, REASON_LEARNER_ASSIGNMENT_FAILED, lms_user_id, content_key, extra=existing_redemptions,
-            )
-            return (False, REASON_LEARNER_ASSIGNMENT_FAILED, existing_redemptions)
-        elif found_assignment.state == LearnerContentAssignmentStateChoices.ACCEPTED:
+        failure_reason_for_state = {
+            None: REASON_LEARNER_NOT_ASSIGNED_CONTENT,
+            LearnerContentAssignmentStateChoices.CANCELLED: REASON_LEARNER_ASSIGNMENT_CANCELLED,
+            LearnerContentAssignmentStateChoices.ERRORED: REASON_LEARNER_ASSIGNMENT_FAILED,
+            LearnerContentAssignmentStateChoices.EXPIRED: REASON_LEARNER_ASSIGNMENT_EXPIRED,
+            LearnerContentAssignmentStateChoices.REVERSED: REASON_LEARNER_ASSIGNMENT_REVERSED,
             # This should never happen.  Even if the frontend had a bug that called the redemption endpoint for already
             # redeemed content, we already check for existing redemptions at the beginning of this function and fail
             # fast.  Reaching this block would be extremely weird.
-            self._log_redeemability(
-                False, REASON_LEARNER_NOT_ASSIGNED_CONTENT, lms_user_id, content_key, extra=existing_redemptions,
-            )
-            return (False, REASON_LEARNER_NOT_ASSIGNED_CONTENT, existing_redemptions)
+            LearnerContentAssignmentStateChoices.ACCEPTED: REASON_LEARNER_NOT_ASSIGNED_CONTENT,
+        }
+        if not found_assignment or found_assignment.state != LearnerContentAssignmentStateChoices.ALLOCATED:
+            found_assignment_state = getattr(found_assignment, "state", None)
+            failure_reason = failure_reason_for_state.get(found_assignment_state, REASON_LEARNER_NOT_ASSIGNED_CONTENT)
+            self._log_redeemability(False, failure_reason, lms_user_id, content_key, extra=existing_redemptions)
+            return (False, failure_reason, existing_redemptions)
 
         # Learner can redeem the subsidy access policy
         self._log_redeemability(True, None, lms_user_id, content_key)
