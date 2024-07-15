@@ -2,6 +2,7 @@
 Models for content_assignments
 """
 import logging
+from datetime import datetime
 from os import urandom
 from uuid import UUID, uuid4
 
@@ -9,7 +10,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
 from django.db.models import Case, Exists, F, Max, OuterRef, Q, Value, When
 from django.db.models.fields import BooleanField, CharField, DateTimeField, IntegerField
-from django.db.models.functions import Coalesce
+from django.db.models.lookups import GreaterThan
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
 from pytz import UTC
@@ -734,35 +735,37 @@ class LearnerContentAssignment(TimeStampedModel):
             QuerySet: LearnerContentAssignment queryset, same objects but with extra fields annotated.
         """
         # Annotate a derived field ``recent_action_time`` using pure ORM so that we can order_by() it later.
-        # ``recent_action_time`` is defined as the time of the most recent successful reminder, and falls
-        # back to assignment creation time if there are no successful reminders.
+        # ``recent_action_time`` is defined as the max of the assignment's allocation time
+        # or the most recent, successful reminder action.
         new_queryset = queryset.annotate(
-            recent_action_time=Coalesce(
-                # Time of most recent reminder.
-                Max('actions__completed_at', filter=Q(actions__action_type=AssignmentActions.REMINDED)),
-                # Fallback to allocation time
-                F('allocated_at'),
-                # Coerce CreationDateTimeField into a compatible field.
-                output_field=DateTimeField(),
-            )
-        )
-
-        # Annotate a derived field ``recent_action``
-        new_queryset = new_queryset.annotate(
-            has_reminded=Exists(
-                LearnerContentAssignmentAction.objects.filter(
-                    assignment=OuterRef('uuid'),
-                    action_type=AssignmentActions.REMINDED,
-                    error_reason__isnull=True,
-                    completed_at__isnull=False,
-                )
-            )
+            most_recent_reminder=Max(
+                'actions__completed_at',
+                filter=Q(actions__action_type=AssignmentActions.REMINDED),
+                default=timezone.make_aware(datetime.min),
+            ),
         ).annotate(
             recent_action=Case(
-                When(has_reminded=False, then=Value(AssignmentRecentActionTypes.ASSIGNED)),
-                When(has_reminded=True, then=Value(AssignmentRecentActionTypes.REMINDED)),
+                When(
+                    GreaterThan(F('allocated_at'), F('most_recent_reminder')),
+                    then=Value(AssignmentRecentActionTypes.ASSIGNED),
+                ),
+                When(
+                    GreaterThan(F('most_recent_reminder'), F('allocated_at')),
+                    then=Value(AssignmentRecentActionTypes.ASSIGNED),
+                ),
                 output_field=BooleanField(),
-            )
+            ),
+            recent_action_time=Case(
+                When(
+                    GreaterThan(F('allocated_at'), F('most_recent_reminder')),
+                    then=F('allocated_at'),
+                ),
+                When(
+                    GreaterThan(F('most_recent_reminder'), F('allocated_at')),
+                    then=F('most_recent_reminder'),
+                ),
+                output_field=DateTimeField(),
+            ),
         )
 
         # Annotate a derived field ``learner_state`` using pure ORM so that we do not need to store it as duplicate

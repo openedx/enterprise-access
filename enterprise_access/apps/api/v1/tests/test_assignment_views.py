@@ -396,6 +396,14 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # Mock results from the subsidy record.
         mock_subsidy_record.return_value = self.mock_subsidy_record
 
+        # Add a successful reminder for our assignment record in the past,
+        # so that we can later assert that the recent_action in the response payload
+        # is the assignment's allocation time, not the (more distant) reminder time.
+        self.assignment_allocated_pre_link.actions.create(
+            action_type=AssignmentActions.REMINDED,
+            completed_at=timezone.now() - timedelta(hours=3),
+        )
+
         # Setup and call the retrieve endpoint.
         detail_kwargs = {
             'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID),
