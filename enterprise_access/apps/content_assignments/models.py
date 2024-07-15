@@ -9,7 +9,8 @@ from uuid import UUID, uuid4
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
 from django.db.models import Case, Exists, F, Max, OuterRef, Q, Value, When
-from django.db.models.fields import BooleanField, CharField, DateTimeField, IntegerField
+from django.db.models.fields import CharField, DateTimeField, IntegerField
+from django.db.models.functions import Cast, Coalesce
 from django.db.models.lookups import GreaterThan
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
@@ -738,11 +739,14 @@ class LearnerContentAssignment(TimeStampedModel):
         # ``recent_action_time`` is defined as the max of the assignment's allocation time
         # or the most recent, successful reminder action.
         new_queryset = queryset.annotate(
-            most_recent_reminder=Max(
-                'actions__completed_at',
-                filter=Q(actions__action_type=AssignmentActions.REMINDED),
-                default=timezone.make_aware(datetime.min),
-            ),
+            most_recent_reminder=Coalesce(
+                Max(
+                    'actions__completed_at',
+                    filter=Q(actions__action_type=AssignmentActions.REMINDED),
+                    output_field=DateTimeField(),
+                ),
+                Cast(datetime.min, DateTimeField()),
+            )
         ).annotate(
             recent_action=Case(
                 When(
@@ -751,9 +755,9 @@ class LearnerContentAssignment(TimeStampedModel):
                 ),
                 When(
                     GreaterThan(F('most_recent_reminder'), F('allocated_at')),
-                    then=Value(AssignmentRecentActionTypes.ASSIGNED),
+                    then=Value(AssignmentRecentActionTypes.REMINDED),
                 ),
-                output_field=BooleanField(),
+                output_field=CharField(),
             ),
             recent_action_time=Case(
                 When(
