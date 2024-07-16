@@ -15,7 +15,7 @@ asgiref==3.8.1
     #   -r requirements/validation.txt
     #   django
     #   django-cors-headers
-astroid==3.2.2
+astroid==3.2.3
     # via
     #   -r requirements/validation.txt
     #   pylint
@@ -103,7 +103,7 @@ colorama==0.4.6
     # via
     #   -r requirements/validation.txt
     #   tox
-confluent-kafka==2.4.0
+confluent-kafka==2.5.0
     # via -r requirements/validation.txt
 coreapi==2.3.3
     # via
@@ -114,7 +114,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/validation.txt
     #   coreapi
-coverage[toml]==7.5.4
+coverage[toml]==7.6.0
     # via
     #   -r requirements/validation.txt
     #   pytest-cov
@@ -141,7 +141,7 @@ distlib==0.3.8
     # via
     #   -r requirements/validation.txt
     #   virtualenv
-django==4.2.13
+django==4.2.14
     # via
     #   -r requirements/validation.txt
     #   django-celery-results
@@ -182,7 +182,7 @@ django-crum==0.7.9
     #   edx-django-utils
     #   edx-rbac
     #   edx-toggles
-django-debug-toolbar==4.4.5
+django-debug-toolbar==4.4.6
     # via -r requirements/dev.in
 django-dynamic-fixture==4.0.1
     # via -r requirements/validation.txt
@@ -297,7 +297,7 @@ faker==26.0.0
     # via
     #   -r requirements/validation.txt
     #   factory-boy
-fastavro==1.9.4
+fastavro==1.9.5
     # via
     #   -r requirements/validation.txt
     #   openedx-events
@@ -362,7 +362,7 @@ jsonfield==3.1.0
     #   edx-celeryutils
 jsonfield2==4.0.0.post0
     # via -r requirements/validation.txt
-jsonschema==4.22.0
+jsonschema==4.23.0
     # via
     #   -r requirements/validation.txt
     #   drf-spectacular
@@ -411,7 +411,7 @@ more-itertools==10.3.0
     #   jaraco-functools
 mysqlclient==2.2.4
     # via -r requirements/validation.txt
-newrelic==9.11.0
+newrelic==9.12.0
     # via
     #   -r requirements/validation.txt
     #   edx-django-utils
@@ -577,7 +577,7 @@ pyyaml==6.0.1
     #   drf-yasg
     #   edx-django-release-util
     #   edx-i18n-tools
-readme-renderer==43.0
+readme-renderer==44.0
     # via
     #   -r requirements/validation.txt
     #   twine
@@ -616,7 +616,7 @@ rich==13.7.1
     # via
     #   -r requirements/validation.txt
     #   twine
-rpds-py==0.18.1
+rpds-py==0.19.0
     # via
     #   -r requirements/validation.txt
     #   jsonschema
@@ -653,7 +653,7 @@ snowballstemmer==2.2.0
     # via
     #   -r requirements/validation.txt
     #   pydocstyle
-social-auth-app-django==5.4.1
+social-auth-app-django==5.4.2
     # via
     #   -r requirements/validation.txt
     #   edx-auth-backends
@@ -677,7 +677,7 @@ text-unidecode==1.3
     # via
     #   -r requirements/validation.txt
     #   python-slugify
-tomlkit==0.12.5
+tomlkit==0.13.0
     # via
     #   -r requirements/validation.txt
     #   pylint
