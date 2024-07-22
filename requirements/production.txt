@@ -83,7 +83,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/base.txt
     #   coreapi
-cryptography==42.0.8
+cryptography==43.0.0
     # via
     #   -r requirements/base.txt
     #   pyjwt
@@ -209,7 +209,7 @@ edx-drf-extensions==10.3.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==0.4.3
+edx-enterprise-subsidy-client==0.4.4
     # via -r requirements/base.txt
 edx-event-bus-kafka==5.7.0
     # via -r requirements/base.txt
@@ -435,7 +435,7 @@ social-auth-core==4.5.4
     #   -r requirements/base.txt
     #   edx-auth-backends
     #   social-auth-app-django
-sqlparse==0.5.0
+sqlparse==0.5.1
     # via
     #   -r requirements/base.txt
     #   django
