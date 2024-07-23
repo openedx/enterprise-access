@@ -29,7 +29,8 @@
   <div class="forms-panel">
     <h1>{% trans "Deposit Funds" %}</h1>
     <p>
-      This tool enables admins to deposit funds into the Subsidy corresponding to this Policy.
+      This tool enables admins to deposit funds into the Subsidy corresponding to this Policy. The spend_limit of this
+      Policy will be automatically increased by the same amount, so that the newly added value can actually be redeemed.
     </p>
     <form action="" method="post" enctype="multipart/form-data" id="deposit-funds-form">
       {% csrf_token %}
