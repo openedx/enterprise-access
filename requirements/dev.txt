@@ -15,7 +15,7 @@ asgiref==3.8.1
     #   -r requirements/validation.txt
     #   django
     #   django-cors-headers
-astroid==3.2.3
+astroid==3.2.4
     # via
     #   -r requirements/validation.txt
     #   pylint
@@ -118,10 +118,11 @@ coverage[toml]==7.6.0
     # via
     #   -r requirements/validation.txt
     #   pytest-cov
-cryptography==42.0.8
+cryptography==43.0.0
     # via
     #   -r requirements/validation.txt
     #   pyjwt
+    #   secretstorage
     #   social-auth-core
 ddt==1.7.2
     # via -r requirements/validation.txt
@@ -270,7 +271,7 @@ edx-enterprise-subsidy-client==0.4.4
     # via -r requirements/validation.txt
 edx-event-bus-kafka==5.7.0
     # via -r requirements/validation.txt
-edx-i18n-tools==1.6.0
+edx-i18n-tools==1.6.2
     # via -r requirements/dev.in
 edx-lint==5.3.7
     # via -r requirements/validation.txt
@@ -344,6 +345,11 @@ jaraco-functools==4.0.1
     # via
     #   -r requirements/validation.txt
     #   keyring
+jeepney==0.8.0
+    # via
+    #   -r requirements/validation.txt
+    #   keyring
+    #   secretstorage
 jinja2==3.1.4
     # via
     #   -r requirements/validation.txt
@@ -372,12 +378,8 @@ kombu==5.3.7
     # via
     #   -r requirements/validation.txt
     #   celery
-lxml[html-clean,html_clean]==5.2.2
-    # via
-    #   edx-i18n-tools
-    #   lxml-html-clean
-lxml-html-clean==0.1.1
-    # via lxml
+lxml==5.2.2
+    # via edx-i18n-tools
 markdown-it-py==3.0.0
     # via
     #   -r requirements/validation.txt
@@ -435,7 +437,7 @@ packaging==24.1
     #   pyproject-api
     #   pytest
     #   tox
-path==16.14.0
+path==16.16.0
     # via edx-i18n-tools
 pbr==6.0.0
     # via
@@ -495,7 +497,7 @@ pyjwt[crypto]==2.8.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==3.2.5
+pylint==3.2.6
     # via
     #   -r requirements/validation.txt
     #   edx-lint
@@ -534,7 +536,7 @@ pyproject-hooks==1.1.0
     #   -r requirements/pip-tools.txt
     #   build
     #   pip-tools
-pytest==8.2.2
+pytest==8.3.2
     # via
     #   -r requirements/validation.txt
     #   pytest-cov
@@ -575,7 +577,7 @@ readme-renderer==44.0
     # via
     #   -r requirements/validation.txt
     #   twine
-redis==5.0.7
+redis==5.0.8
     # via -r requirements/validation.txt
 referencing==0.35.1
     # via
@@ -610,13 +612,17 @@ rich==13.7.1
     # via
     #   -r requirements/validation.txt
     #   twine
-rpds-py==0.19.0
+rpds-py==0.19.1
     # via
     #   -r requirements/validation.txt
     #   jsonschema
     #   referencing
 rules==3.4
     # via -r requirements/validation.txt
+secretstorage==3.3.3
+    # via
+    #   -r requirements/validation.txt
+    #   keyring
 semantic-version==2.10.0
     # via
     #   -r requirements/validation.txt
