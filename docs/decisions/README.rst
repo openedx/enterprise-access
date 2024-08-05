@@ -200,7 +200,8 @@ credit Subsidy Access Policy.
 *Feature: Subsidy Access Policy Redemption*
 
 Proposed April 2024, this ADR describes a new ``RedemptionAttempt``
-model for audit-log type record for learner credit Subsidy Access Policy.
+model for audit-log type records regarding redemption for learner credit 
+Subsidy Access Policy.
 
 `<0021-transaction-aggregates.rst>`_
 ********************************
@@ -208,7 +209,7 @@ model for audit-log type record for learner credit Subsidy Access Policy.
 
 Proposed April 2024, this ADR describes a new ``aggregate`` redemption
 model that contains count/spend metrics at the subsidy level, policy level,
-and policy learner level for learner credit Subsidy Access Policy.
+and policy+learner level for learner credit Subsidy Access Policy.
 
 `<0022-deposit-creation-ux.rst>`_
 ********************************
@@ -224,6 +225,6 @@ related policy.
 *Feature: Subsidy Access Policy Spend-limit*
 
 Accepted June 2024, this ADR describes a new constraint on the
-``SubsidyAccessPolicy`` model's ``spend_limit`` field on the models
-``clean()`` function. It prevents admins from increasing the policies
-``spend_limit`` above the subsidies ``total_deposits``.
+``SubsidyAccessPolicy`` model's ``spend_limit`` field on the model's
+``clean()`` function. It prevents admins from increasing the policy's
+``spend_limit`` above the subsidy's ``total_deposits``.
