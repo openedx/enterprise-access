@@ -19,7 +19,10 @@ from simple_history.admin import SimpleHistoryAdmin
 from enterprise_access.apps.api.serializers.subsidy_access_policy import SubsidyAccessPolicyResponseSerializer
 from enterprise_access.apps.subsidy_access_policy import constants, models
 from enterprise_access.apps.subsidy_access_policy.admin.utils import UrlNames
-from enterprise_access.apps.subsidy_access_policy.admin.views import SubsidyAccessPolicySetLateRedemptionView
+from enterprise_access.apps.subsidy_access_policy.admin.views import (
+    SubsidyAccessPolicyDepositFundsView,
+    SubsidyAccessPolicySetLateRedemptionView
+)
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +84,7 @@ class BaseSubsidyAccessPolicyMixin(DjangoObjectActions, SimpleHistoryAdmin):
 
     change_actions = (
         'set_late_redemption',
+        'deposit_funds',
     )
 
     @action(
@@ -95,6 +99,18 @@ class BaseSubsidyAccessPolicyMixin(DjangoObjectActions, SimpleHistoryAdmin):
         set_late_redemption_url = reverse('admin:' + UrlNames.SET_LATE_REDEMPTION, args=(obj.uuid,))
         return HttpResponseRedirect(set_late_redemption_url)
 
+    @action(
+        label='Deposit Funds',
+        description='Top-up the subsidy and spend_limit associated with this policy'
+    )
+    def deposit_funds(self, request, obj):
+        """
+        Object tool handler method - redirects to deposit_funds view.
+        """
+        # url names coming from get_urls are prefixed with 'admin' namespace
+        deposit_funds_url = reverse('admin:' + UrlNames.DEPOSIT_FUNDS, args=(obj.uuid,))
+        return HttpResponseRedirect(deposit_funds_url)
+
     def get_urls(self):
         """
         Returns the additional urls used by the custom object tools.
@@ -104,6 +120,11 @@ class BaseSubsidyAccessPolicyMixin(DjangoObjectActions, SimpleHistoryAdmin):
                 r"^([^/]+)/set_late_redemption",
                 self.admin_site.admin_view(SubsidyAccessPolicySetLateRedemptionView.as_view()),
                 name=UrlNames.SET_LATE_REDEMPTION,
+            ),
+            re_path(
+                r"^([^/]+)/deposit_funds",
+                self.admin_site.admin_view(SubsidyAccessPolicyDepositFundsView.as_view()),
+                name=UrlNames.DEPOSIT_FUNDS,
             ),
         ]
         return additional_urls + super().get_urls()
