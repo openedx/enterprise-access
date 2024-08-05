@@ -12,7 +12,7 @@ When a customer provisions a learner-credit-based policy, ``enterprise_subsidy``
 the ``starting_balance`` would initally be set as the sum of all policies ``spend_limit`` or a user defined ``starting_balance``.
 A pattern began to emerge where the the sum of all policies associated to a subsidy's ``spend_limit`` field found on the 
 ``SubsidyAccessPolicy`` model would be greater then the ``total_deposits`` value. The ``total_deposits`` value represents the sum of
-all committed transactions (`source <https://github.com/openedx/openedx-ledger/blob/bd498864afdd517391323ee99e91bfb75d5a63e9/openedx_ledger/models.py#L189-L208>`_).
+all committed deposits and adjustments. (`source <https://github.com/openedx/openedx-ledger/blob/bd498864afdd517391323ee99e91bfb75d5a63e9/openedx_ledger/models.py#L189-L208>`_).
 This includes the ``starting_balance`` and any ``adjustments`` on the subsidy.
 
 Having the sum of the ``spend_limit`` for policies be greater then the ``total_deposits`` value does not accurately represent how
@@ -23,26 +23,26 @@ Decision
 Validation was added in the ``SubsidyAccessPolicy`` model's ``clean()`` function to verify that a modified or created ``spend_limit``
 would adhere to the following constraint:
 
-* For ``active`` policy's, (policies with the same ``subsidy_uuid`` and ``enterprise_customer``)
+* For ``active`` policies, (policies with the same ``subsidy_uuid`` and ``enterprise_customer``)
     * The sum of all policies ``spend_limit`` must not exceed the subsidy record's ``total_deposits``
 
 The purpose of adding the validation within the ``clean()`` function ensures modification to the field via the Django admin screen
-would be adhere to the constraint without modification to the original ``SubsidyAccesPolicy`` model. Modification of the
+adhere to the constraint without modification to the original ``SubsidyAccesPolicy`` model. Modification of the
 ``SubsidyAccessPolicy`` model would require a backfill heuristic which was deemed too complex due to the ``spend_limit``
 ``null`` value corresponding to an unlimited ``spend_limit`` budget. 
 
-Additionally, the ``clean()`` function call was added to the  ``subsidy_access_policy`` serializer to ensure the constraints
-were applied to API's that modify the ``spend_limit`` field. 
+Additionally, the ``clean()`` function call was added to the  ``subsidy_access_policy`` serializer to ensure that this
+new constraint is enforced to any API views that allow modification of the ``spend_limit`` field
 
 
 Consequences
 ============
-This puts a stricter definition on ``spend_limit`` (amount of spend allowable to spend on the policy level) not exceeding 
-the ``total_deposits`` (amount of spend given to spend of the subsidy level). This ensures that a learner cannot spend more
+This puts a stricter definition on ``spend_limit`` (amount of allowable spend per policy) not exceeding 
+the ``total_deposits`` (amount of allowable spend per subsidy). This ensures that a learner cannot spend more
 funds then the subsidy has available.
 
-Furthermore, additional steps would need to be taken when modifying ``spend_limit`` on multiple policies within the same subsidy
-or if ``adjustments`` were to be made.
+Furthermore, additional steps are now needed in two scenarios: when modifying ``spend_limit`` across multiple policies;
+and when adding an ``adjustment`` to a subsidy.
 
 For example:
 
