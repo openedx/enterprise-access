@@ -194,3 +194,36 @@ Subsidy Access Policy records.
 Accepted April 2024, this ADR describes a new ``ForcedPolicyRedemption``
 model and Django admin view for forcing redemption via a learner
 credit Subsidy Access Policy.
+
+`<0020-redemption-attempt-record.rst>`_
+********************************
+*Feature: Subsidy Access Policy Redemption*
+
+Proposed April 2024, this ADR describes a new ``RedemptionAttempt``
+model for audit-log type record for learner credit Subsidy Access Policy.
+
+`<0021-transaction-aggregates.rst>`_
+********************************
+*Feature: Subsidy Access Policy Aggregate*
+
+Proposed April 2024, this ADR describes a new ``aggregate`` redemption
+model that contains count/spend metrics at the subsidy level, policy level,
+and policy learner level for learner credit Subsidy Access Policy.
+
+`<0022-deposit-creation-ux.rst>`_
+********************************
+*Feature: Subsidy Access Policy Deposits*
+
+Accepted July 2024, this ADR describes a new Django admin action for the
+``SubsidyAccessPolicy`` edit page called "Deposit Funds". It automates much
+of the workflow around adding additional funds to a subsidy directly from the 
+related policy.
+
+`<0023-spend-limits-constraint.rst>`_
+********************************
+*Feature: Subsidy Access Policy Spend-limit*
+
+Accepted June 2024, this ADR describes a new constraint on the
+``SubsidyAccessPolicy`` model's ``spend_limit`` field on the models
+``clean()`` function. It prevents admins from increasing the policies
+``spend_limit`` above the subsidies ``total_deposits``.

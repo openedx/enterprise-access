@@ -72,4 +72,4 @@ For example:
 Alternatives Considered
 =======================
 * Modify the ``spend_limit`` model field. This alternative was discussed but the backfill heuristic was deemed to complex and inconsistent
-  to accurately capture all permutations of ensuring the ``spend_limit`` value was less then the ``total_deposits`` given the unlimited spend polices.
+  to accurately capture all permutations of ensuring the ``spend_limit`` value was less than the ``total_deposits`` given the unlimited spend polices.
