@@ -12,6 +12,7 @@ class LearnerContentAssignmentStateChoices:
     CANCELLED = 'cancelled'
     ERRORED = 'errored'
     EXPIRED = 'expired'
+    REVERSED = 'reversed'
 
     CHOICES = (
         (ALLOCATED, 'Allocated'),
@@ -19,10 +20,11 @@ class LearnerContentAssignmentStateChoices:
         (CANCELLED, 'Cancelled'),
         (ERRORED, 'Errored'),
         (EXPIRED, 'Expired'),
+        (REVERSED, 'Reversed'),
     )
 
     # States which allow reallocation by an admin.
-    REALLOCATE_STATES = (CANCELLED, ERRORED, EXPIRED)
+    REALLOCATE_STATES = (CANCELLED, ERRORED, EXPIRED, REVERSED)
 
     # States which allow cancellation by an admin.
     CANCELABLE_STATES = (ALLOCATED, ERRORED)
@@ -32,6 +34,9 @@ class LearnerContentAssignmentStateChoices:
 
     # States from which an assignment can be expired
     EXPIRABLE_STATES = (ALLOCATED,)
+
+    # States from which an assignment can be reversed
+    REVERSIBLE_STATES = (ACCEPTED,)
 
 
 class AssignmentActions:
@@ -46,6 +51,7 @@ class AssignmentActions:
     CANCELLED_ACKNOWLEDGED = 'cancelled_acknowledged'
     EXPIRED = 'expired'
     EXPIRED_ACKNOWLEDGED = 'expired_acknowledged'
+    REVERSED = 'reversed'
 
     CHOICES = (
         (LEARNER_LINKED, 'Learner linked to customer'),
@@ -56,6 +62,7 @@ class AssignmentActions:
         (CANCELLED_ACKNOWLEDGED, 'Learner assignment cancellation acknowledged by learner'),
         (EXPIRED, 'Learner assignment expired'),
         (EXPIRED_ACKNOWLEDGED, 'Learner assignment expiration acknowledged by learner'),
+        (REVERSED, 'Transaction for this assignment has been reversed'),
     )
 
 

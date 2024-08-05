@@ -46,6 +46,12 @@ logger = logging.getLogger(__name__)
 # Batch size derivation formula: ((1 MB) / (258 B)) / 10 ≈ 350
 USER_EMAIL_READ_BATCH_SIZE = 100
 
+ASSIGNMENT_REALLOCATION_FIELDS = [
+    'lms_user_id', 'learner_email', 'allocation_batch_id',
+    'content_quantity', 'state', 'preferred_course_run_key',
+    'allocated_at', 'cancelled_at', 'expired_at', 'errored_at',
+]
+
 
 class AllocationException(Exception):
     """
@@ -272,49 +278,44 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     # content_price_cents, and then persist that in the assignment records.
     content_quantity = content_price_cents * -1
 
-    # Fetch any existing assignments for all pairs of (learner, content) in this assignment config.
-    existing_assignments = get_assignments_for_admin(
+    lms_user_ids_by_email, emails_by_lms_user_id = _map_allocation_emails_with_lms_user_ids(
+        learner_emails_to_allocate,
+    )
+    existing_assignments = _get_existing_assignments_for_allocation(
         assignment_configuration,
         learner_emails_to_allocate,
         content_key,
+        lms_user_ids_by_email,
     )
-
-    # Keep a running list of all existing assignments that will need to be included in bulk update.
-    #
-    # Note: Since the duplicates are just references to the same assignment object, and django model instances are
-    # hashable (on PK), they can be de-duplicated by blinndly adding them to this set.
-    existing_assignments_needs_update = set()
-
     # Maintain a set of emails with existing records - we know we don't have to create
     # new assignments for these.
     learner_emails_with_existing_assignments = set()
 
-    # Try to populate lms_user_id field on any existing assignments found.  We already ran this function on these
-    # assignments (when they were created in a prior request), but time has passed since then so the outcome might be
-    # different this time. It's technically possible some learners have registered since the last request.
-    existing_assignments_needs_update.update(_try_populate_assignments_lms_user_id(existing_assignments))
+    # Keep a running list of all existing assignments that will need to be included in bulk update.
+    existing_assignments_needs_update = set()
 
-    # Time has passed since the last time this assignment was allocated/re-allocated. Therefore, it's entirely
-    # possible a new run has been published. We assume the intent of the admin re-allocating this content is
-    # that they want to assign the NEW run. This step to update preferred_course_run_key is required in order
+    # This step to find and update the preferred_course_run_key is required in order
     # for nudge emails to target the start date of the new run.
     preferred_course_run_key = _get_preferred_course_run_key(assignment_configuration, content_key)
 
     # Split up the existing assignment records by state
     for assignment in existing_assignments:
-        learner_emails_with_existing_assignments.add(assignment.learner_email.lower())
+        if not assignment.lms_user_id:
+            existing_lms_user_id = lms_user_ids_by_email.get(assignment.learner_email.lower())
+            if existing_lms_user_id:
+                assignment.lms_user_id = existing_lms_user_id
+                existing_assignments_needs_update.add(assignment)
+
+        if assignment.state == LearnerContentAssignmentStateChoices.EXPIRED and assignment.lms_user_id is not None:
+            # If the existing assignment is expired and has an lms_user_id, it has a retired/expired email address
+            # that we want to change based on our lookup of lms_user_id -> email.
+            assignment_email_from_lms_user_id = emails_by_lms_user_id.get(assignment.lms_user_id)
+            if assignment_email_from_lms_user_id is not None:
+                assignment.learner_email = assignment_email_from_lms_user_id
+                existing_assignments_needs_update.add(assignment)
+
         if assignment.state in LearnerContentAssignmentStateChoices.REALLOCATE_STATES:
-            assignment.content_quantity = content_quantity
-            assignment.state = LearnerContentAssignmentStateChoices.ALLOCATED
-            assignment.allocation_batch_id = allocation_batch_id
-            assignment.allocated_at = localized_utcnow()
-            assignment.accepted_at = None
-            assignment.cancelled_at = None
-            assignment.expired_at = None
-            assignment.errored_at = None
-            assignment.preferred_course_run_key = preferred_course_run_key
-            # Prevent invalid data from entering the database by calling the low-level full_clean() function manually.
-            assignment.full_clean()
+            _reallocate_assignment(assignment, content_quantity, allocation_batch_id, preferred_course_run_key)
             existing_assignments_needs_update.add(assignment)
         elif assignment.state == LearnerContentAssignmentStateChoices.ALLOCATED:
             # For some already-allocated assignments being re-assigned, we might still need to update the preferred
@@ -323,16 +324,13 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
                 assignment.preferred_course_run_key = preferred_course_run_key
                 existing_assignments_needs_update.add(assignment)
 
+        learner_emails_with_existing_assignments.add(assignment.learner_email.lower())
+
     with transaction.atomic():
         # Bulk update and get a list of refreshed objects
         updated_assignments = _update_and_refresh_assignments(
             existing_assignments_needs_update,
-            [
-                # `lms_user_id` is updated via the _try_populate_assignments_lms_user_id() function.
-                'lms_user_id',
-                # The following fields are updated via the for-loop above.
-                'allocation_batch_id', 'allocated_at', 'content_quantity', 'state', 'preferred_course_run_key',
-            ]
+            ASSIGNMENT_REALLOCATION_FIELDS,
         )
 
         # Narrow down creation list of learner emails
@@ -347,6 +345,7 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
             learner_emails_for_assignment_creation,
             content_key,
             content_quantity,
+            lms_user_ids_by_email,
             allocation_batch_id,
         )
 
@@ -381,6 +380,114 @@ def _deduplicate_learner_emails_to_allocate(learner_emails):
             deduplicated.append(email)
             seen_lowercased_emails.add(email_lower)
     return deduplicated
+
+
+def _map_allocation_emails_with_lms_user_ids(learner_emails_to_allocate):
+    """
+    To allocate assignments, we'll need to lookup existing assignments
+    by both email *and* lms_user_id. We'll also use these lms_user_ids
+    to populate the `lms_user_id` field on existing assignments that
+    don't currently have the field populated. The returned mapping of emails -> lms_user_id
+    contains **lowered** email values.
+
+    We'll also need a reverse lookup of lms_user_id -> email
+    to re-populate the `learner_email` of existing assignments that are
+    in an expired state (and thus have an auto-generated, non-identifiable `learner_email` value).
+    The returned mapping of lms_user_id -> emails contains emails values
+    in the casing provided by the caller.
+
+    Returns:
+      Two dicts, the first mapping email -> lms_user_id, and the second
+      mapping lms_user_id -> email.
+    """
+    lms_user_ids_by_email = _get_lms_user_ids_by_email(learner_emails_to_allocate)
+
+    emails_by_lms_user_id = {}
+    for provided_email in learner_emails_to_allocate:
+        lms_user_id = lms_user_ids_by_email.get(provided_email.lower())
+        if lms_user_id is not None:
+            emails_by_lms_user_id[lms_user_id] = provided_email
+
+    return lms_user_ids_by_email, emails_by_lms_user_id
+
+
+def _get_lms_user_ids_by_email(emails):
+    """
+    Helper to return a mapping of learner email addresses to lms_user_id.
+    If no user record exists with a given email address, it will *not*
+    be present in the mapping.
+
+    Performance note: This results in one or more reads against the User model.
+      The chunk size has been tuned to minimize the number of reads
+      while simultaneously avoiding hard limits on statement length.
+    """
+    lms_user_ids_by_email = {}
+    for email_chunk in chunks(emails, USER_EMAIL_READ_BATCH_SIZE):
+        # Construct a list of tuples containing (email, lms_user_id) for every email in this chunk.
+        # this is the part that could exceed max statement length if batch size is too large.
+        # There's no case-insensitive IN query in Django, so we have to build up a big
+        # OR type of query.
+        queryset = User.objects.filter(
+            _inexact_email_filter(email_chunk, field_name='email'),
+            lms_user_id__isnull=False,
+        ).annotate(
+            email_lower=Lower('email'),
+        ).values_list('email_lower', 'lms_user_id')
+
+        # dict() on a list of 2-tuples treats the first elements as keys and second elements as values.
+        lms_user_ids_by_email.update(dict(queryset))
+
+    return lms_user_ids_by_email
+
+
+def _get_existing_assignments_for_allocation(
+        assignment_configuration, learner_emails_to_allocate, content_key, lms_user_ids_by_email,
+):
+    """
+    Finds any existing assignments records related to the provided ``assignment_cofiguration``,
+    ``content_key``, and the learners the client has requested to allocate.
+    Learners are identified either via the `learner_email` field, or via the `lms_user_id` field
+    based on the provided ``learner_emails_to_allocate`` and the provided mapping
+    ``lms_user_ids_by_email``.
+    """
+    # Compose a set of all existing assignments related to the requested allocation.
+    # A set is a fine data structure because Django models are hashable on their PK.
+    existing_assignments = set()
+
+    # Fetch any existing assignments for all pairs of (learner email, content) in this assignment config.
+    assignments_for_emails_queryset = get_assignments_for_admin(
+        assignment_configuration, learner_emails_to_allocate, content_key,
+    )
+    existing_assignments.update(assignments_for_emails_queryset)
+
+    # Fetch existing assignments for all pairs of (known lms_user_id, content) in this assignment config.
+    assignments_for_lms_user_ids_queryset = get_assignments_for_configuration(
+        assignment_configuration,
+        lms_user_id__in=lms_user_ids_by_email.values(),
+        content_key=content_key,
+    )
+    existing_assignments.update(assignments_for_lms_user_ids_queryset)
+
+    return existing_assignments
+
+
+def _reallocate_assignment(assignment, content_quantity, allocation_batch_id, preferred_course_run_key):
+    """
+    Modifies a ``LearnerContentAssignment`` record during the allocation flow.  The record
+    is **not** saved.
+    """
+    assignment.content_quantity = content_quantity
+    assignment.state = LearnerContentAssignmentStateChoices.ALLOCATED
+    assignment.allocation_batch_id = allocation_batch_id
+    assignment.allocated_at = localized_utcnow()
+    assignment.accepted_at = None
+    assignment.cancelled_at = None
+    assignment.expired_at = None
+    assignment.errored_at = None
+    assignment.preferred_course_run_key = preferred_course_run_key
+    # Prevent invalid data from entering the database by calling the low-level full_clean() function manually.
+    assignment.full_clean()
+    return assignment
 
 
 def _update_and_refresh_assignments(assignment_records, fields_changed):
@@ -420,59 +527,15 @@ def _get_content_title(assignment_configuration, content_key):
 
 def _get_preferred_course_run_key(assignment_configuration, content_key):
     """
-    Helper to retrieve (from cache) the preferred course run key of a content_key'ed content_metadata
+    During assignment allocation, time has passed since the last time an assignment
+    was allocated/re-allocated. Therefore, it's entirely possible a new course run has been published.
+    We assume the intent of the admin re-allocating this content is that they want to assign the NEW run.
+
+    Returns:
+      The preferred course run key (from cache) of a content_key'ed content_metadata
     """
     content_metadata = _get_content_summary(assignment_configuration, content_key)
     return content_metadata.get('course_run_key')
-
-
-def _try_populate_assignments_lms_user_id(assignments):
-    """
-    For all given assignments, try to populate the lms_user_id field based on a matching User.
-
-    Notes:
-    * This function does NOT save() the assignment record, only alters the given objects as a side-effect..
-    * This is a best-effort only; most of the time a User will not exist for an assignment, and this function is a no-op
-      for that assignment.
-    * If multiple User records match based on email, choice is non-deterministic.
-    * Performance: This results in one or more reads against the User model.  The chunk size has been tuned to minimize
-      the number of reads while simultaneously avoiding hard limits on statement length.
-
-    Args:
-        assignments (list of LearnerContentAssignment):
-            The unsaved assignments on which to update the lms_user_id field.
-
-    Returns:
-        list of LearnerContentAssignment: A non-strict subset of the input assignments, only the ones altered.
-    """
-    # only operate on assignments that actually need to be updated.
-    assignments_with_empty_lms_user_id = [assignment for assignment in assignments if assignment.lms_user_id is None]
-
-    assignments_to_save = []
-
-    for assignment_chunk in chunks(assignments_with_empty_lms_user_id, USER_EMAIL_READ_BATCH_SIZE):
-        emails = [assignment.learner_email for assignment in assignment_chunk]
-        # Construct a list of tuples containing (email, lms_user_id) for every assignment in this chunk.
-        # this is the part that could exceed max statement length if batch size is too large.
-        # There's no case-insensitive IN query in Django, so we have to build up a big
-        # OR type of query.
-        email_lms_user_id = User.objects.filter(
-            _inexact_email_filter(emails, field_name='email'),
-            lms_user_id__isnull=False,
-        ).annotate(
-            email_lower=Lower('email'),
-        ).values_list('email_lower', 'lms_user_id')
-
-        # dict() on a list of 2-tuples treats the first elements as keys and second elements as values.
-        lms_user_id_by_email = dict(email_lms_user_id)
-
-        for assignment in assignment_chunk:
-            lms_user_id = lms_user_id_by_email.get(assignment.learner_email.lower())
-            if lms_user_id:
-                assignment.lms_user_id = lms_user_id
-                assignments_to_save.append(assignment)
-
-    return assignments_to_save
 
 
 def _create_new_assignments(
@@ -480,6 +543,7 @@ def _create_new_assignments(
     learner_emails,
     content_key,
     content_quantity,
+    lms_user_ids_by_email,
     allocation_batch_id
 ):
     """
@@ -502,6 +566,7 @@ def _create_new_assignments(
         assignment = LearnerContentAssignment(
             assignment_configuration=assignment_configuration,
             learner_email=learner_email,
+            lms_user_id=lms_user_ids_by_email.get(learner_email.lower()),
             content_key=content_key,
             preferred_course_run_key=preferred_course_run_key,
             content_title=content_title,
@@ -511,14 +576,6 @@ def _create_new_assignments(
             allocated_at=localized_utcnow(),
         )
         assignments_to_create.append(assignment)
-
-    # Next, try to populate the lms_user_id field on all assignments to be created (resulting in reads against User).
-    # Note: This covers the case where an admin assigns content to a learner AFTER they register.  For the case where an
-    # admin assigns content to a learner BEFORE they register, see the User post_save hook implemented in signals.py.
-    #
-    # Do not store result because we are simply relying on the side-effect of the function (a subset of
-    # `assignments_to_create` has been altered).
-    _ = _try_populate_assignments_lms_user_id(assignments_to_create)
 
     # Validate all assignments to be created.
     for assignment in assignments_to_create:

@@ -396,6 +396,14 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # Mock results from the subsidy record.
         mock_subsidy_record.return_value = self.mock_subsidy_record
 
+        # Add a successful reminder for our assignment record in the past,
+        # so that we can later assert that the recent_action in the response payload
+        # is the assignment's allocation time, not the (more distant) reminder time.
+        self.assignment_allocated_pre_link.actions.create(
+            action_type=AssignmentActions.REMINDED,
+            completed_at=timezone.now() - timedelta(hours=3),
+        )
+
         # Setup and call the retrieve endpoint.
         detail_kwargs = {
             'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID),
@@ -429,12 +437,12 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             'error_reason': None,
             'recent_action': {
                 'action_type': AssignmentRecentActionTypes.ASSIGNED,
-                'timestamp': self.assignment_allocated_pre_link.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                'timestamp': self.assignment_allocated_pre_link.allocated_at.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
             },
             'learner_state': AssignmentLearnerStates.NOTIFYING,
             'earliest_possible_expiration': {
                 'date': (
-                    self.assignment_allocated_pre_link.created + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                    self.assignment_allocated_pre_link.allocated_at + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
                 ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                 'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED,
             },
@@ -1035,7 +1043,6 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         response = self.client.get(detail_url)
 
         assert response.status_code == status.HTTP_200_OK
-        last_notified_action = self.requester_assignment_accepted.get_last_successful_notified_action()
         assert response.json() == {
             'uuid': str(self.requester_assignment_accepted.uuid),
             'assignment_configuration': str(self.requester_assignment_accepted.assignment_configuration.uuid),
@@ -1059,7 +1066,7 @@ class TestAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
             ],
             'earliest_possible_expiration': {
                 'date': (
-                    last_notified_action.completed_at + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
+                    self.requester_assignment_accepted.allocated_at + timedelta(days=NUM_DAYS_BEFORE_AUTO_EXPIRATION)
                 ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                 'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED,
             }

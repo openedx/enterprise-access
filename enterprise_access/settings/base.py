@@ -46,6 +46,7 @@ INSTALLED_APPS = (
     'drf_spectacular',
     'drf_yasg',
     'edx_api_doc_tools',
+    'openedx_events',
     'release_util',
 )
 
@@ -508,3 +509,11 @@ BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_25_CAMPAIGN = ''
 BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_50_CAMPAIGN = ''
 BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_65_CAMPAIGN = ''
 BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_85_CAMPAIGN = ''
+
+# The "Desposit Funds" button (custom django object action) triggers an API call which needs to pass a sales contract
+# reference provider slug matching one SalesContractReferenceProvider in the enterprise-subsidy database. Since these
+# slugs are operator-defined at runtime, this codebase cannot hard-code the value. However, the least we can do is
+# inherit the same default:
+# https://github.com/openedx/enterprise-subsidy/blob/70e1a13f9f9b1be6a09a2c2f1a02e7a46315eaa6/enterprise_subsidy/apps/subsidy/models.py#L67
+SALES_CONTRACT_REFERENCE_PROVIDER_NAME = 'Salesforce OpportunityLineItem'
+SALES_CONTRACT_REFERENCE_PROVIDER_SLUG = 'salesforce_opportunity_line_item'

@@ -1,0 +1,47 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static admin_urls %}
+
+{% block extrastyle %}
+  <style>
+    .forms-panel .helptext {
+      display: block;
+      font-size: 0.8em;
+      color: #bbb;
+    }
+  </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Home" %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; 
+    <a href="{% url opts|admin_urlname:'change' subsidy_access_policy.uuid %}">
+      {{ subsidy_access_policy|truncatewords:"18" }}
+    </a>
+  &rsaquo; {% trans "Deposit Funds" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <div class="forms-panel">
+    <h1>{% trans "Deposit Funds" %}</h1>
+    <p>
+      This tool enables admins to deposit funds into the Subsidy corresponding to this Policy. The spend_limit of this
+      Policy will be automatically increased by the same amount, so that the newly added value can actually be redeemed.
+    </p>
+    <form action="" method="post" enctype="multipart/form-data" id="deposit-funds-form">
+      {% csrf_token %}
+      {# as_p will render the form fields wrapped in <p> tags: #}
+      {{ deposit_funds_form.as_p }}
+      <input type="submit" value="Submit"/>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block footer %}
+  {{ block.super }}
+{% endblock %}

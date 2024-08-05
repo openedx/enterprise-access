@@ -11,8 +11,9 @@ from rest_framework import status
 
 from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
 from enterprise_access.apps.api_client.exceptions import FetchGroupMembersConflictingParamsException
+from enterprise_access.apps.enterprise_groups.constants import GROUP_MEMBERSHIP_EMAIL_ERROR_STATUS
 from enterprise_access.cache_utils import versioned_cache_key
-from enterprise_access.utils import should_send_email_to_pecu
+from enterprise_access.utils import localized_utcnow, should_send_email_to_pecu
 
 logger = logging.getLogger(__name__)
 
@@ -371,4 +372,27 @@ class LmsApiClient(BaseOAuthClient):
         except KeyError:
             logger.exception('Incorrect data received from LMS. [%s]', url)
 
+        return None
+
+    def update_pending_learner_status(self, enterprise_group_uuid, learner_email):
+        """
+        Partially updates learners
+
+        Arguments:
+            enterprise_group_uuid (str): uuid of the enterprise group uuid
+            learner_email (str): email for learner
+
+        """
+        try:
+            url = f'{self.enterprise_group_membership_endpoint}' + (
+                f'{enterprise_group_uuid}/learners/')
+            payload = {'learner': learner_email,
+                       'status': GROUP_MEMBERSHIP_EMAIL_ERROR_STATUS,
+                       'errored_at': localized_utcnow()}
+            response = self.client.patch(url, data=payload)
+            return response.json()
+        except requests.exceptions.HTTPError:
+            logger.exception('failed to update group membership status. URL: [%s].', url)
+        except KeyError:
+            logger.exception('failed to update group membership status. [%s]', url)
         return None
