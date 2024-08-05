@@ -51,7 +51,7 @@ For example:
         * Policy A, an ``active`` policy with a ``spend_limit`` of 10,000
         * Policy B, an ``active`` policy with a ``spend_limit`` of 40,000
     * If Policy A were set to ``!active``
-        * Policy B's ``spend_limit`` can now be set to ``50,000`` (even if spend has occured on Policy A or B)
+        * Policy B's ``spend_limit`` can now be set to 50,000 (even if spend has occured on Policy A or B)
 
 * When modying the ``spend_limit`` of policies with a positive ``adjustment`` made on the subsidy (adding funds)
     * For Subsidy A with ``total_deposits`` value of 50,000 with two policies.
