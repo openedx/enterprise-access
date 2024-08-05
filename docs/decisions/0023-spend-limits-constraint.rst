@@ -1,4 +1,4 @@
-0022 Constraint on ``spend_limit`` based on ``total_deposits``
+0023 Constraint on ``spend_limit`` based on ``total_deposits``
 ********************************************
 
 Status
