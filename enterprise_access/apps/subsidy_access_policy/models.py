@@ -1717,7 +1717,7 @@ class ForcedPolicyRedemption(TimeStampedModel):
             self.content_price_cents,
         )
 
-    def force_redeem(self):
+    def force_redeem(self, extra_metadata=None):
         """
         Forces redemption for the requested course run key in the associated policy.
         """
@@ -1733,6 +1733,7 @@ class ForcedPolicyRedemption(TimeStampedModel):
                 can_redeem, reason, existing_transactions = self.subsidy_access_policy.can_redeem(
                     self.lms_user_id, self.course_run_key,
                 )
+                extra_metadata = extra_metadata or {}
                 if can_redeem:
                     result = self.subsidy_access_policy.redeem(
                         self.lms_user_id,
@@ -1740,6 +1741,7 @@ class ForcedPolicyRedemption(TimeStampedModel):
                         existing_transactions,
                         metadata={
                             FORCE_ENROLLMENT_KEYWORD: True,
+                            **extra_metadata,
                         },
                     )
                     self.transaction_uuid = result['uuid']

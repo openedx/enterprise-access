@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.http import HttpResponseRedirect
 from django.urls import re_path, reverse
+from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.text import Truncator  # for shortening a text
 from django.utils.translation import gettext_lazy
@@ -24,6 +25,8 @@ from enterprise_access.apps.subsidy_access_policy.admin.views import (
     SubsidyAccessPolicySetLateRedemptionView
 )
 
+from .forms import ForcedPolicyRedemptionForm
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,6 +36,9 @@ EVERY_SPEND_LIMIT_FIELD = [
     'per_learner_spend_limit',
     'per_learner_enrollment_limit',
 ]
+
+FORCED_REDEMPTION_GEAG_KEYS = ('geag_first_name', 'geag_last_name', 'geag_date_of_birth')
+FORCED_REDEMPTION_CURRENT_TIME_KEY = 'geag_terms_accepted_at'
 
 
 def super_admin_enabled():
@@ -403,6 +409,7 @@ class ForcedPolicyRedemptionAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
     """
     Admin class for the forced redemption model/logic.
     """
+    form = ForcedPolicyRedemptionForm
     autocomplete_fields = [
         'subsidy_access_policy',
     ]
@@ -436,7 +443,16 @@ class ForcedPolicyRedemptionAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
             return
 
         try:
-            obj.force_redeem()
+            extra_metadata = {
+                key: str(form.cleaned_data.get(key))
+                for key in FORCED_REDEMPTION_GEAG_KEYS
+                if form.cleaned_data.get(key)
+            }
+            if extra_metadata:
+                extra_metadata[FORCED_REDEMPTION_CURRENT_TIME_KEY] = str(timezone.now())
+                obj.force_redeem(extra_metadata=extra_metadata)
+            else:
+                obj.force_redeem()
         except Exception as exc:  # pylint: disable=broad-except
             message = gettext_lazy("{} Failure reason: {}".format(obj, exc))
             self.message_user(request, message, messages.ERROR)

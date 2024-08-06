@@ -5,6 +5,8 @@ from django import forms
 from django.conf import settings
 from django.utils.translation import gettext as _
 
+from ..models import ForcedPolicyRedemption
+
 
 class LateRedemptionDaysFromNowChoices:
     """
@@ -61,3 +63,32 @@ class DepositFundsForm(forms.Form):
             "required": 'Salesforce Opportunity Line Item ID is required.',
         }
     )
+
+
+class ForcedPolicyRedemptionForm(forms.ModelForm):
+    """
+    Admin form for the ForcedPolicyRedemption model.
+    """
+    geag_first_name = forms.CharField(
+        label=_("Learner First Name (EE-only)"),
+        help_text=_(
+            "First name of learner, only used for Exec Ed Redemptions. "
+            "This value (along with last name and D.O.B.) are not persisted; "
+            "if you select 'Wait to redeem', the values will be gone when you try to save later."
+        ),
+        required=False,
+    )
+    geag_last_name = forms.CharField(
+        label=_("Learner Last Name (EE-only)"),
+        help_text=_("Last name of learner, only used for Exec Ed Redemptions"),
+        required=False,
+    )
+    geag_date_of_birth = forms.DateField(
+        label=_("Learner Date of Birth (EE-only)"),
+        help_text=_("Learner date of birth, only used for Exec Ed Redemptions"),
+        required=False,
+    )
+
+    class Meta:
+        model = ForcedPolicyRedemption
+        fields = '__all__'
