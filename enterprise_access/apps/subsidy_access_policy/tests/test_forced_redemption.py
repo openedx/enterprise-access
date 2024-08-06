@@ -106,7 +106,8 @@ class ForcedPolicyRedemptionPerLearnerSpendTests(BaseForcedRedemptionTestCase):
             content_price_cents=self.default_content_price,
         )
 
-        forced_redemption_record.force_redeem()
+        extra_metadata = {'foo': 1, 'bar': 2}
+        forced_redemption_record.force_redeem(extra_metadata=extra_metadata)
 
         forced_redemption_record.refresh_from_db()
         self.assertEqual(MOCK_DATETIME_1, forced_redemption_record.redeemed_at)
@@ -117,7 +118,7 @@ class ForcedPolicyRedemptionPerLearnerSpendTests(BaseForcedRedemptionTestCase):
             lms_user_id=self.lms_user_id,
             content_key=self.course_run_key,
             subsidy_access_policy_uuid=str(policy.uuid),
-            metadata={FORCE_ENROLLMENT_KEYWORD: True},
+            metadata={FORCE_ENROLLMENT_KEYWORD: True, **extra_metadata},
             idempotency_key=mock.ANY,
         )
 
