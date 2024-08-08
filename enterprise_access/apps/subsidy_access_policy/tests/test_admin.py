@@ -1,14 +1,14 @@
 """
 Tests for the admin module.
 """
-from datetime import date
+from datetime import date, datetime
 from unittest import mock
 
 from django.contrib.admin.sites import AdminSite
 from django.test import TestCase
 
 from ...core.tests.factories import UserFactory
-from ..admin import ForcedPolicyRedemptionAdmin, ForcedPolicyRedemptionForm
+from ..admin import GEAG_DATETIME_FMT, ForcedPolicyRedemptionAdmin, ForcedPolicyRedemptionForm
 from ..models import ForcedPolicyRedemption
 
 
@@ -52,3 +52,9 @@ class ForcedPolicyRedemptionAdminTests(TestCase):
                 'geag_email': 'foo@bar.com',
             }
         )
+        terms_accepted_value =\
+            forced_redemption_obj.force_redeem.call_args_list[0][1]['extra_metadata']['geag_terms_accepted_at']
+        # we don't really care about the value, but
+        # we want to know that parsing the value matches the datetime
+        # format accepted by GEAG.
+        assert datetime.strptime(terms_accepted_value, GEAG_DATETIME_FMT)
