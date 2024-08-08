@@ -24,7 +24,7 @@ astroid==3.2.4
     #   -r requirements/test.txt
     #   pylint
     #   pylint-celery
-attrs==23.2.0
+attrs==24.1.0
     # via
     #   -r requirements/test.txt
     #   jsonschema
@@ -117,7 +117,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/test.txt
     #   coreapi
-coverage[toml]==7.6.0
+coverage[toml]==7.6.1
     # via
     #   -r requirements/test.txt
     #   pytest-cov
@@ -185,7 +185,7 @@ django-dynamic-fixture==4.0.1
     # via -r requirements/test.txt
 django-extensions==3.2.3
     # via -r requirements/test.txt
-django-filter==24.2
+django-filter==24.3
     # via -r requirements/test.txt
 django-log-request-id==2.1.0
     # via -r requirements/test.txt
@@ -258,7 +258,7 @@ edx-celeryutils==1.3.0
     # via -r requirements/test.txt
 edx-django-release-util==1.4.0
     # via -r requirements/test.txt
-edx-django-utils==5.14.2
+edx-django-utils==5.15.0
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
@@ -272,7 +272,7 @@ edx-drf-extensions==10.3.0
     #   edx-rbac
 edx-enterprise-subsidy-client==0.4.4
     # via -r requirements/test.txt
-edx-event-bus-kafka==5.7.0
+edx-event-bus-kafka==5.8.0
     # via -r requirements/test.txt
 edx-lint==5.3.7
     # via -r requirements/test.txt
@@ -294,7 +294,7 @@ edx-toggles==5.2.0
     #   edx-event-bus-kafka
 factory-boy==3.3.0
     # via -r requirements/test.txt
-faker==26.0.0
+faker==26.1.0
     # via
     #   -r requirements/test.txt
     #   factory-boy
@@ -439,7 +439,7 @@ pygments==2.18.0
     #   pydata-sphinx-theme
     #   readme-renderer
     #   sphinx
-pyjwt[crypto]==2.8.0
+pyjwt[crypto]==2.9.0
     # via
     #   -r requirements/test.txt
     #   drf-jwt
