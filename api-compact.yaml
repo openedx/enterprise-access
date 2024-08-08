@@ -168,7 +168,6 @@ endpoints:
             required: false
             items:
               type: string
-              description: "content key"
           - in: query
             name: learner_email
             type: string
@@ -181,7 +180,6 @@ endpoints:
             required: false
             items:
               type: string
-              description: "Email of learner"
           - in: query
             name: learner_state
             type: string
@@ -196,7 +194,6 @@ endpoints:
             items:
               type: string
               enum: ["notifying", "waiting", "failed", "expired"]
-              description: "Learner's state"
           - in: query
             name: lms_user_id
             type: integer
@@ -211,7 +208,6 @@ endpoints:
             required: false
             items:
               type: integer
-              description: "The id of OpenEdx LMS user"
           - in: query
             name: ordering
             type: string
@@ -247,7 +243,6 @@ endpoints:
             items:
               type: string
               enum: ["allocated", "accepted", "cancelled", "errored", "expired", "reversed"]
-              description: "The current state of the LearnerContentAssignment"
             required: false
         responses: *learner_content_assignment_list_remind_cancel_responses
         x-amazon-apigateway-integration:
