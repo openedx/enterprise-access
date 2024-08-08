@@ -42,6 +42,7 @@ FORCED_REDEMPTION_GEAG_KEYS = ('geag_first_name', 'geag_last_name', 'geag_date_o
 FORCED_REDEMPTION_CURRENT_TIME_KEY = 'geag_terms_accepted_at'
 FORCED_REDEMPTION_DATA_SHARE_CONSENT_KEY = 'geag_data_share_consent'
 FORCED_REDEMPTION_EMAIL_KEY = 'geag_email'
+GEAG_DATETIME_FMT = '%Y-%m-%dT%H:%M:%SZ'
 
 
 def super_admin_enabled():
@@ -454,7 +455,7 @@ class ForcedPolicyRedemptionAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
             }
             if extra_metadata:
                 user_record = User.objects.get(lms_user_id=form.cleaned_data.get('lms_user_id'))
-                extra_metadata[FORCED_REDEMPTION_CURRENT_TIME_KEY] = str(timezone.now())
+                extra_metadata[FORCED_REDEMPTION_CURRENT_TIME_KEY] = timezone.now().strftime(GEAG_DATETIME_FMT)
                 extra_metadata[FORCED_REDEMPTION_DATA_SHARE_CONSENT_KEY] = True
                 extra_metadata[FORCED_REDEMPTION_EMAIL_KEY] = user_record.email
                 obj.force_redeem(extra_metadata=extra_metadata)
