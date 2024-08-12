@@ -25,7 +25,7 @@ astroid==3.2.4
     #   -r requirements/test.txt
     #   pylint
     #   pylint-celery
-attrs==24.1.0
+attrs==24.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -58,7 +58,7 @@ certifi==2024.7.4
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   requests
-cffi==1.16.0
+cffi==1.17.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -164,7 +164,7 @@ distlib==0.3.8
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   virtualenv
-django==4.2.14
+django==4.2.15
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -335,7 +335,7 @@ edx-enterprise-subsidy-client==0.4.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-edx-event-bus-kafka==5.8.0
+edx-event-bus-kafka==5.8.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -368,7 +368,7 @@ factory-boy==3.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==26.1.0
+faker==26.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -393,7 +393,7 @@ idna==3.7
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   requests
-importlib-metadata==6.11.0
+importlib-metadata==8.2.0
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -464,7 +464,7 @@ keyring==25.3.0
     # via
     #   -r requirements/quality.txt
     #   twine
-kombu==5.3.7
+kombu==5.4.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -492,7 +492,7 @@ monotonic==1.6
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   analytics-python
-more-itertools==10.3.0
+more-itertools==10.4.0
     # via
     #   -r requirements/quality.txt
     #   jaraco-classes
@@ -501,7 +501,7 @@ mysqlclient==2.2.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-newrelic==9.12.0
+newrelic==9.13.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -676,7 +676,7 @@ pytz==2024.1
     #   -r requirements/test.txt
     #   djangorestframework
     #   drf-yasg
-pyyaml==6.0.1
+pyyaml==6.0.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -728,7 +728,7 @@ rich==13.7.1
     # via
     #   -r requirements/quality.txt
     #   twine
-rpds-py==0.19.1
+rpds-py==0.20.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -805,7 +805,7 @@ tomlkit==0.13.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pylint
-tox==4.16.0
+tox==4.17.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -851,7 +851,7 @@ wcwidth==0.2.13
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   prompt-toolkit
-zipp==3.19.2
+zipp==3.20.0
     # via
     #   -r requirements/quality.txt
     #   importlib-metadata
