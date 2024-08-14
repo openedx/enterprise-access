@@ -37,6 +37,7 @@ from enterprise_access.apps.events.signals import SUBSIDY_REDEEMED
 from enterprise_access.apps.events.utils import send_subsidy_redemption_event_to_event_bus
 from enterprise_access.apps.subsidy_access_policy.constants import (
     GROUP_MEMBERS_WITH_AGGREGATES_DEFAULT_PAGE_SIZE,
+    REASON_BEYOND_ENROLLMENT_DEADLINE,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_FAILED,
@@ -224,6 +225,7 @@ def _get_user_message_for_reason(reason_slug, enterprise_admin_users):
         REASON_LEARNER_MAX_SPEND_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
         REASON_LEARNER_MAX_ENROLLMENTS_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
         REASON_CONTENT_NOT_IN_CATALOG: MissingSubsidyAccessReasonUserMessages.CONTENT_NOT_IN_CATALOG,
+        REASON_BEYOND_ENROLLMENT_DEADLINE: MissingSubsidyAccessReasonUserMessages.BEYOND_ENROLLMENT_DEADLINE,
         REASON_LEARNER_NOT_ASSIGNED_CONTENT: MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_ASSIGNED_CONTENT,
         REASON_LEARNER_ASSIGNMENT_CANCELLED: MissingSubsidyAccessReasonUserMessages.LEARNER_ASSIGNMENT_CANCELED,
         REASON_LEARNER_ASSIGNMENT_FAILED: MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_ASSIGNED_CONTENT,
@@ -768,7 +770,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                     enterprise_customer_uuid, lms_user_id, content_key
                 )
 
-            if not redemptions and not redeemable_policies:
+            if not successful_redemptions and not redeemable_policies:
                 reasons.extend(_get_reasons_for_no_redeemable_policies(
                     enterprise_customer_uuid,
                     non_redeemable_policies

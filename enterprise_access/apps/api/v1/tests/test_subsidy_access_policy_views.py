@@ -30,6 +30,7 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
 from enterprise_access.apps.subsidy_access_policy.constants import (
+    REASON_BEYOND_ENROLLMENT_DEADLINE,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_FAILED,
     REASON_LEARNER_NOT_ASSIGNED_CONTENT,
@@ -2201,6 +2202,57 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         assert response.json() == {
             'detail': f'Could not determine price for content_key: {test_content_key}',
         }
+
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
+    def test_can_redeem_policy_beyond_enrollment_deadline(self, mock_lms_client, mock_transactions_cache_for_learner):
+        """
+        Test that the can_redeem endpoint successfully serializes a response for content whose
+        enrollment deadline has passed.
+        """
+        test_content_key = "course-v1:demox+1234+2T2023"
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
+            'slug': 'sluggy',
+            'admin_users': [{'email': 'edx@example.org'}],
+        }
+
+        self.mock_get_content_metadata.return_value = {
+            "content_price": 1234,
+            "enroll_by_date": '2001-01-01T00:00:00Z',
+        }
+
+        mock_transactions_cache_for_learner.return_value = {
+            'transactions': [],
+            'aggregates': {
+                'total_quantity': 0,
+            },
+        }
+
+        mocked_content_data_from_view = {
+            "content_uuid": str(uuid4()),
+            "content_key": test_content_key,
+            "source": "edX",
+            "content_price": 1234,
+            "enroll_by_date": '2001-01-01T00:00:00Z',
+        }
+
+        with mock.patch(
+            'enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata',
+            return_value=mocked_content_data_from_view,
+        ):
+            query_params = {'content_key': test_content_key}
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
+        assert response.status_code == status.HTTP_200_OK
+        response_list = response.json()
+        assert response_list[0]["reasons"] == [
+            {
+                "reason": REASON_BEYOND_ENROLLMENT_DEADLINE,
+                "user_message": MissingSubsidyAccessReasonUserMessages.BEYOND_ENROLLMENT_DEADLINE,
+                "metadata": mock.ANY,
+                "policy_uuids": [str(self.redeemable_policy.uuid)],
+            },
+        ]
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_versioned_subsidy_client')
     def test_can_redeem_subsidy_client_http_error(self, mock_get_client):

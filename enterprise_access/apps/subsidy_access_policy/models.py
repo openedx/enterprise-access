@@ -27,6 +27,7 @@ from ..content_assignments.models import AssignmentConfiguration
 from .constants import (
     CREDIT_POLICY_TYPE_PRIORITY,
     FORCE_ENROLLMENT_KEYWORD,
+    REASON_BEYOND_ENROLLMENT_DEADLINE,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_EXPIRED,
@@ -46,6 +47,7 @@ from .constants import (
     TransactionStateChoices
 )
 from .content_metadata_api import (
+    enroll_by_datetime,
     get_and_cache_catalog_contains_content,
     get_and_cache_content_metadata,
     get_list_price_for_content,
@@ -686,7 +688,11 @@ class SubsidyAccessPolicy(TimeStampedModel):
         )
         logger.info(message, self.uuid, is_redeemable, reason, lms_user_id, content_key, extra)
 
-    def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
+    def can_redeem(
+        self, lms_user_id, content_key,
+        skip_customer_user_check=False, skip_enrollment_deadline_check=False,
+        **kwargs,
+    ):
         """
         Check that a given learner can redeem the given content.
         The ordering of each conditional is intentional based on an expected
@@ -732,7 +738,13 @@ class SubsidyAccessPolicy(TimeStampedModel):
             self._log_redeemability(False, REASON_CONTENT_NOT_IN_CATALOG, lms_user_id, content_key)
             return (False, REASON_CONTENT_NOT_IN_CATALOG, [])
 
-        # TODO: Add Course Upgrade/Registration Deadline Passed Error here
+        # Check if the current time is beyond the enrollment deadline for the content,
+        # but only if late redemption is *not* currently allowed.
+        if not skip_enrollment_deadline_check and not self.is_late_redemption_allowed:
+            enrollment_deadline = enroll_by_datetime(content_metadata)
+            if enrollment_deadline and (timezone.now() > enrollment_deadline):
+                self._log_redeemability(False, REASON_BEYOND_ENROLLMENT_DEADLINE, lms_user_id, content_key)
+                return (False, REASON_BEYOND_ENROLLMENT_DEADLINE, [])
 
         # We want to wait to do these checks that might require a call
         # to the enterprise-subsidy service until we *know* we'll need the data.
@@ -1115,14 +1127,22 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
         """
         proxy = True
 
-    def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
+    def can_redeem(
+        self, lms_user_id, content_key,
+        skip_customer_user_check=False, skip_enrollment_deadline_check=False,
+        **kwargs,
+    ):
         """
         Checks if the given lms_user_id has a number of existing subsidy transactions
         LTE to the learner enrollment cap declared by this policy.
         """
         # perform generic access checks
         should_attempt_redemption, reason, existing_redemptions = \
-            super().can_redeem(lms_user_id, content_key, skip_customer_user_check)
+            super().can_redeem(
+                lms_user_id, content_key,
+                skip_customer_user_check, skip_enrollment_deadline_check,
+                **kwargs,
+            )
         if not should_attempt_redemption:
             return (False, reason, existing_redemptions)
 
@@ -1185,7 +1205,11 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         """
         proxy = True
 
-    def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
+    def can_redeem(
+        self, lms_user_id, content_key,
+        skip_customer_user_check=False, skip_enrollment_deadline_check=False,
+        **kwargs,
+    ):
         """
         Determines whether learner can redeem a subsidy access policy given the
         limits specified on the policy.
@@ -1195,6 +1219,8 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             lms_user_id,
             content_key,
             skip_customer_user_check,
+            skip_enrollment_deadline_check,
+            **kwargs,
         )
         if not should_attempt_redemption:
             self._log_redeemability(False, reason, lms_user_id, content_key, extra=existing_redemptions)
@@ -1356,7 +1382,11 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         # that value has been consumed from a subsidy (though not necessarily fulfilled)
         return list_price_dict_from_usd_cents(found_assignment.content_quantity * -1)
 
-    def can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False):
+    def can_redeem(
+        self, lms_user_id, content_key,
+        skip_customer_user_check=False, skip_enrollment_deadline_check=False,
+        **kwargs,
+    ):
         """
         Checks if the given lms_user_id has an existing assignment on the given content_key, ready to be accepted.
         """
@@ -1365,6 +1395,8 @@ class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             lms_user_id,
             content_key,
             skip_customer_user_check,
+            skip_enrollment_deadline_check,
+            **kwargs,
         )
         if not should_attempt_redemption:
             self._log_redeemability(False, reason, lms_user_id, content_key, extra=existing_redemptions)
@@ -1731,7 +1763,7 @@ class ForcedPolicyRedemption(TimeStampedModel):
         try:
             with self.subsidy_access_policy.lock():
                 can_redeem, reason, existing_transactions = self.subsidy_access_policy.can_redeem(
-                    self.lms_user_id, self.course_run_key,
+                    self.lms_user_id, self.course_run_key, skip_enrollment_deadline_check=True,
                 )
                 extra_metadata = extra_metadata or {}
                 if can_redeem:
