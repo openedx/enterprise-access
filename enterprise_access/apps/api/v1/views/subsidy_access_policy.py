@@ -478,7 +478,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             enterprise_customer_uuid=self.enterprise_customer_uuid,
         ).order_by('-created')
 
-    def evaluate_policies(self, enterprise_customer_uuid, lms_user_id, content_key):
+    def evaluate_policies(self, enterprise_customer_uuid, lms_user_id, content_key, skip_customer_user_check=False):
         """
         Evaluate all policies for the given enterprise customer to check if it can be redeemed against the given learner
         and content.
@@ -497,7 +497,9 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         all_policies_for_enterprise = self.get_queryset()
         for policy in all_policies_for_enterprise:
             try:
-                redeemable, reason, _ = policy.can_redeem(lms_user_id, content_key, skip_customer_user_check=True)
+                redeemable, reason, _ = policy.can_redeem(
+                    lms_user_id, content_key, skip_customer_user_check=skip_customer_user_check
+                )
                 logger.info(
                     f'[can_redeem] {policy} inputs: (lms_user_id={lms_user_id}, content_key={content_key}) results: '
                     f'redeemable={redeemable}, reason={reason}.'
@@ -716,7 +718,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         serializer.is_valid(raise_exception=True)
 
         content_keys = serializer.data['content_key']
-        lms_user_id = self.lms_user_id or request.user.lms_user_id
+        lms_user_id_override = serializer.data.get('lms_user_id') if request.user.is_staff else None
+        lms_user_id = lms_user_id_override or self.lms_user_id or request.user.lms_user_id
         if not lms_user_id:
             logger.warning(
                 f'No lms_user_id found when checking if we can redeem {content_keys} '
@@ -765,7 +768,10 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             # so we don't unnecessarily call `can_redeem()` on every policy.
             if not successful_redemptions:
                 redeemable_policies, non_redeemable_policies = self.evaluate_policies(
-                    enterprise_customer_uuid, lms_user_id, content_key
+                    enterprise_customer_uuid,
+                    lms_user_id, content_key,
+                    # don't skip the customer user check if we're using an override lms_user_id
+                    skip_customer_user_check=not bool(lms_user_id_override),
                 )
 
             if not redemptions and not redeemable_policies:

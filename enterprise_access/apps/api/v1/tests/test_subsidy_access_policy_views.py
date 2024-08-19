@@ -33,6 +33,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_FAILED,
     REASON_LEARNER_NOT_ASSIGNED_CONTENT,
+    REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP,
     REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
     AccessMethods,
     MissingSubsidyAccessReasonUserMessages,
@@ -1108,7 +1109,7 @@ class TestPolicyRedemptionAuthNAndPermissionChecks(APITestWithMocks):
         response = self.client.get(reverse('api:v1:policy-redemption-credits-available'), query_params)
         self.assertEqual(response.status_code, expected_response_code)
 
-        # The can_redeem endpoint
+        # The can-redeem endpoint
         url = reverse(
             "api:v1:policy-redemption-can-redeem",
             kwargs={"enterprise_customer_uuid": self.enterprise_uuid},
@@ -1788,11 +1789,17 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         )
         self.non_redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
 
-        group_uuid = uuid4()
         PolicyGroupAssociationFactory(
-            enterprise_group_uuid=group_uuid,
+            enterprise_group_uuid=TEST_ENTERPRISE_GROUP_UUID,
             subsidy_access_policy=self.redeemable_policy
         )
+
+        enterprise_user_record_patcher = patch.object(
+            SubsidyAccessPolicy, 'enterprise_user_record'
+        )
+        self.mock_enterprise_user_record = enterprise_user_record_patcher.start()
+        self.mock_enterprise_user_record.return_value = TEST_USER_RECORD
+        self.addCleanup(enterprise_user_record_patcher.stop)
 
     def test_can_redeem_policy_missing_params(self):
         """
@@ -2230,6 +2237,92 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
             'detail': 'Subsidy Transaction API error: foobar',
             'subsidy_status_code': str(status.HTTP_503_SERVICE_UNAVAILABLE),
         }
+
+    @ddt.data(
+        {'is_staff': True, 'lms_user_id_override': 1234},
+        {'is_staff': True, 'lms_user_id_override': None},
+        {'is_staff': False, 'lms_user_id_override': 5678},
+        {'is_staff': False, 'lms_user_id_override': None}
+    )
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
+    @ddt.unpack
+    def test_can_redeem_lms_user_id_override_for_staff(
+        self,
+        mock_lms_client,
+        mock_transactions_cache_for_learner,
+        is_staff,
+        lms_user_id_override,
+    ):
+        """
+        Test that the can_redeem endpoint allows staff to override the LMS user ID.
+        """
+        self.user.lms_user_id = TEST_USER_RECORD['user']['id']
+        # Authenticate as a staff user
+        if is_staff:
+            self.user.is_staff = True
+        else:
+            self.user.is_staff = False
+        self.user.save()
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': self.enterprise_uuid,
+        }])
+
+        # Setup mocks
+        mock_enterprise_customer_data = {
+            'uuid': self.enterprise_uuid,
+            'slug': 'sluggy',
+            'admin_users': [{'email': 'edx@example.org'}],
+        }
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = mock_enterprise_customer_data
+
+        if is_staff and lms_user_id_override:
+            TEST_OTHER_USER_RECORD = copy.deepcopy(TEST_USER_RECORD)
+            TEST_OTHER_USER_RECORD['user']['id'] = lms_user_id_override
+            TEST_OTHER_USER_RECORD['enterprise_group'] = [uuid4()]  # different group membership
+            self.mock_enterprise_user_record.return_value = TEST_OTHER_USER_RECORD
+        else:
+            self.mock_enterprise_user_record.return_value = TEST_USER_RECORD
+
+        mock_transactions_cache_for_learner.return_value = {
+            'transactions': [],
+            'aggregates': {
+                'total_quantity': 0,
+            },
+        }
+        test_content_key = 'course-v1:demox+1234+2T2023'
+        mock_subsidy_content_data = {
+            'content_uuid': str(uuid4()),
+            'content_key': test_content_key,
+            'source': 'edX',
+            'content_price': 19900,
+        }
+        self.mock_get_content_metadata.return_value = mock_subsidy_content_data
+        query_params = {'content_key': test_content_key}
+        if lms_user_id_override:
+            query_params['lms_user_id'] = lms_user_id_override
+        with mock.patch(
+            'enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata',
+            return_value=mock_subsidy_content_data,
+        ):
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
+        assert response.status_code == status.HTTP_200_OK
+        response_json = response.json()
+        assert len(response_json) == 1
+        assert response_json[0]['content_key'] == test_content_key
+        expected_can_redeem = not (is_staff and lms_user_id_override)
+        assert response_json[0]['can_redeem'] == expected_can_redeem
+        learner_not_in_group_reason = {
+            'reason': REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP,
+            'user_message': MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_IN_ENTERPRISE,
+            'metadata': {
+                'enterprise_administrators': mock_enterprise_customer_data['admin_users'],
+            },
+            'policy_uuids': [str(self.redeemable_policy.uuid)],
+        }
+        assert response_json[0]['reasons'] == [] if expected_can_redeem else [learner_not_in_group_reason]
 
 
 @ddt.ddt
