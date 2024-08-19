@@ -190,6 +190,7 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
             'group_associations',
             'late_redemption_allowed_until',
             'is_late_redemption_allowed',
+            'created',
         ]
         read_only_fields = fields
 
