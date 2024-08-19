@@ -307,7 +307,7 @@ rules==3.4
     # via -r requirements/base.in
 semantic-version==2.10.0
     # via edx-drf-extensions
-simplejson==3.19.2
+simplejson==3.19.3
     # via django-rest-swagger
 six==1.16.0
     # via
