@@ -183,7 +183,7 @@ edx-opaque-keys[django]==2.10.0
     #   edx-ccx-keys
     #   edx-drf-extensions
     #   openedx-events
-edx-rbac==1.9.0
+edx-rbac==1.10.0
     # via -r requirements/base.in
 edx-rest-api-client==5.7.1
     # via

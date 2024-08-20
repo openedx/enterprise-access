@@ -267,7 +267,7 @@ edx-opaque-keys[django]==2.10.0
     #   edx-ccx-keys
     #   edx-drf-extensions
     #   openedx-events
-edx-rbac==1.9.0
+edx-rbac==1.10.0
     # via -r requirements/test.txt
 edx-rest-api-client==5.7.1
     # via
@@ -298,7 +298,7 @@ idna==3.7
     # via
     #   -r requirements/test.txt
     #   requests
-importlib-metadata==8.2.0
+importlib-metadata==8.4.0
     # via twine
 inflection==0.5.1
     # via
@@ -320,7 +320,7 @@ itypes==1.2.0
     #   coreapi
 jaraco-classes==3.4.0
     # via keyring
-jaraco-context==5.3.0
+jaraco-context==6.0.1
     # via keyring
 jaraco-functools==4.0.2
     # via keyring
