@@ -2239,10 +2239,10 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         }
 
     @ddt.data(
-        {'is_staff': True, 'lms_user_id_override': 1234},
-        {'is_staff': True, 'lms_user_id_override': None},
-        {'is_staff': False, 'lms_user_id_override': 5678},
-        {'is_staff': False, 'lms_user_id_override': None}
+        {'is_staff': True, 'lms_user_id_override': 1234, 'expected_can_redeem': False},
+        {'is_staff': True, 'lms_user_id_override': None, 'expected_can_redeem': True},
+        {'is_staff': False, 'lms_user_id_override': 5678, 'expected_can_redeem': True},
+        {'is_staff': False, 'lms_user_id_override': None, 'expected_can_redeem': True}
     )
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
@@ -2253,6 +2253,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         mock_transactions_cache_for_learner,
         is_staff,
         lms_user_id_override,
+        expected_can_redeem,
     ):
         """
         Test that the can_redeem endpoint allows staff to override the LMS user ID.
@@ -2278,10 +2279,10 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         mock_lms_client.return_value.get_enterprise_customer_data.return_value = mock_enterprise_customer_data
 
         if is_staff and lms_user_id_override:
-            TEST_OTHER_USER_RECORD = copy.deepcopy(TEST_USER_RECORD)
-            TEST_OTHER_USER_RECORD['user']['id'] = lms_user_id_override
-            TEST_OTHER_USER_RECORD['enterprise_group'] = [uuid4()]  # different group membership
-            self.mock_enterprise_user_record.return_value = TEST_OTHER_USER_RECORD
+            test_other_user_record = copy.deepcopy(TEST_USER_RECORD)
+            test_other_user_record['user']['id'] = lms_user_id_override
+            test_other_user_record['enterprise_group'] = [uuid4()]  # different group membership
+            self.mock_enterprise_user_record.return_value = test_other_user_record
         else:
             self.mock_enterprise_user_record.return_value = TEST_USER_RECORD
 
@@ -2312,7 +2313,6 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         response_json = response.json()
         assert len(response_json) == 1
         assert response_json[0]['content_key'] == test_content_key
-        expected_can_redeem = not (is_staff and lms_user_id_override)
         assert response_json[0]['can_redeem'] == expected_can_redeem
         learner_not_in_group_reason = {
             'reason': REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP,
@@ -2323,6 +2323,10 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
             'policy_uuids': [str(self.redeemable_policy.uuid)],
         }
         assert response_json[0]['reasons'] == [] if expected_can_redeem else [learner_not_in_group_reason]
+
+        # Reset current user to be non-staff
+        self.user.is_staff = False
+        self.user.save()
 
 
 @ddt.ddt
