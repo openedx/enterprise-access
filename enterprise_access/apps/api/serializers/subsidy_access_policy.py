@@ -400,6 +400,10 @@ class SubsidyAccessPolicyCanRedeemRequestSerializer(serializers.Serializer):
         allow_empty=False,
         help_text='Content keys about which redeemability will be queried.',
     )
+    lms_user_id = serializers.IntegerField(
+        required=False,
+        help_text='The user identifier for which redeemability will be queried (only applicable to staff users).',
+    )
 
 
 # pylint: disable=abstract-method
@@ -664,7 +668,7 @@ class SubsidyAccessPolicyCanRedeemElementResponseSerializer(serializers.Serializ
     """
     Response serializer representing a single element of the response list for the can_redeem endpoint.
     """
-    content_key = ContentKeyField(help_text="requested content_key to which the rest of this element pertains.")
+    content_key = ContentKeyField(help_text="Requested content_key to which the rest of this element pertains.")
     list_price = ListPriceResponseSerializer(help_text="List price for content.")
     redemptions = serializers.ListField(
         # TODO: figure out a way to import TransactionSerializer from enterprise-subsidy.  Until then, the output docs
