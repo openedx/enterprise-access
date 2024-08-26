@@ -195,7 +195,7 @@ fastavro==1.9.5
     # via
     #   -r requirements/base.in
     #   openedx-events
-idna==3.7
+idna==3.8
     # via requests
 inflection==0.5.1
     # via
@@ -231,7 +231,7 @@ oauthlib==3.2.2
     #   social-auth-core
 openapi-codec==1.3.2
     # via django-rest-swagger
-openedx-events==9.11.0
+openedx-events==9.12.0
     # via
     #   -r requirements/base.in
     #   edx-event-bus-kafka
@@ -325,7 +325,7 @@ social-auth-core==4.5.4
     #   social-auth-app-django
 sqlparse==0.5.1
     # via django
-stevedore==5.2.0
+stevedore==5.3.0
     # via
     #   code-annotations
     #   edx-django-utils
