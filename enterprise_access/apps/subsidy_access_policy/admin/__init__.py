@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.http import HttpResponseRedirect
 from django.urls import re_path, reverse
+from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.text import Truncator  # for shortening a text
 from django.utils.translation import gettext_lazy
@@ -17,12 +18,15 @@ from pygments.lexers import JsonLexer  # pylint: disable=no-name-in-module
 from simple_history.admin import SimpleHistoryAdmin
 
 from enterprise_access.apps.api.serializers.subsidy_access_policy import SubsidyAccessPolicyResponseSerializer
+from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy import constants, models
 from enterprise_access.apps.subsidy_access_policy.admin.utils import UrlNames
 from enterprise_access.apps.subsidy_access_policy.admin.views import (
     SubsidyAccessPolicyDepositFundsView,
     SubsidyAccessPolicySetLateRedemptionView
 )
+
+from .forms import ForcedPolicyRedemptionForm
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +37,12 @@ EVERY_SPEND_LIMIT_FIELD = [
     'per_learner_spend_limit',
     'per_learner_enrollment_limit',
 ]
+
+FORCED_REDEMPTION_GEAG_KEYS = ('geag_first_name', 'geag_last_name', 'geag_date_of_birth')
+FORCED_REDEMPTION_CURRENT_TIME_KEY = 'geag_terms_accepted_at'
+FORCED_REDEMPTION_DATA_SHARE_CONSENT_KEY = 'geag_data_share_consent'
+FORCED_REDEMPTION_EMAIL_KEY = 'geag_email'
+GEAG_DATETIME_FMT = '%Y-%m-%dT%H:%M:%SZ'
 
 
 def super_admin_enabled():
@@ -403,6 +413,7 @@ class ForcedPolicyRedemptionAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
     """
     Admin class for the forced redemption model/logic.
     """
+    form = ForcedPolicyRedemptionForm
     autocomplete_fields = [
         'subsidy_access_policy',
     ]
@@ -435,8 +446,21 @@ class ForcedPolicyRedemptionAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
             self.message_user(request, message, messages.WARNING)
             return
 
+        form.full_clean()  # populates cleaned_data below
         try:
-            obj.force_redeem()
+            extra_metadata = {
+                key: str(form.cleaned_data.get(key))
+                for key in FORCED_REDEMPTION_GEAG_KEYS
+                if form.cleaned_data.get(key)
+            }
+            if extra_metadata:
+                user_record = User.objects.get(lms_user_id=form.cleaned_data.get('lms_user_id'))
+                extra_metadata[FORCED_REDEMPTION_CURRENT_TIME_KEY] = timezone.now().strftime(GEAG_DATETIME_FMT)
+                extra_metadata[FORCED_REDEMPTION_DATA_SHARE_CONSENT_KEY] = True
+                extra_metadata[FORCED_REDEMPTION_EMAIL_KEY] = user_record.email
+                obj.force_redeem(extra_metadata=extra_metadata)
+            else:
+                obj.force_redeem()
         except Exception as exc:  # pylint: disable=broad-except
             message = gettext_lazy("{} Failure reason: {}".format(obj, exc))
             self.message_user(request, message, messages.ERROR)

@@ -21,6 +21,7 @@ from enterprise_access.apps.content_assignments.constants import (
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
 from enterprise_access.apps.subsidy_access_policy.constants import (
+    REASON_BEYOND_ENROLLMENT_DEADLINE,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_EXPIRED,
@@ -318,6 +319,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         expected_policy_can_redeem,
         expect_content_metadata_fetch=True,
         expect_transaction_fetch=True,
+        enroll_by_date='2099-01-01T00:00:00Z',
     ):
         """
         Test the can_redeem method of PerLearnerEnrollmentCapLearnerCreditAccessPolicy model
@@ -327,6 +329,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         self.mock_catalog_contains_content_key.return_value = catalog_contains_content
         self.mock_get_content_metadata.return_value = {
             'content_price': 200,
+            'enroll_by_date': enroll_by_date,
         }
         self.mock_subsidy_client.can_redeem.return_value = subsidy_is_redeemable
         self.mock_transactions_cache_for_learner.return_value = transactions_for_learner
@@ -369,6 +372,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: True
             'policy_is_active': True,
             'catalog_contains_content': True,
+            'enroll_by_date': '2099-01-01T00:00:00Z',
             'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {'total_quantity': -100}},
@@ -380,6 +384,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': False,
+            'enroll_by_date': '2099-01-01T00:00:00Z',
             'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
@@ -389,10 +394,55 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             'expect_transaction_fetch': False,
         },
         {
+            # Content enrollment deadline is missing, every other check would succeed.
+            # Expected can_redeem result: True
+            'policy_is_active': True,
+            'catalog_contains_content': True,
+            'enroll_by_date': None,
+            'get_enterprise_user': TEST_USER_RECORD,
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
+            'expected_policy_can_redeem': (True, None, []),
+            'expect_content_metadata_fetch': True,
+            'expect_transaction_fetch': True,
+        },
+        {
+            # Content enrollment deadline has passed, every other check would succeed.
+            # Expected can_redeem result: False
+            'policy_is_active': True,
+            'catalog_contains_content': True,
+            'enroll_by_date': '2020-01-01T00:00:00Z',
+            'get_enterprise_user': TEST_USER_RECORD,
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
+            'expected_policy_can_redeem': (False, REASON_BEYOND_ENROLLMENT_DEADLINE, []),
+            'expect_content_metadata_fetch': True,
+            'expect_transaction_fetch': False,
+        },
+        {
+            # Content enrollment deadline has passed, every other check would succeed,
+            # but late redemption is enabled.
+            # Expected can_redeem result: True
+            'policy_is_active': True,
+            'catalog_contains_content': True,
+            'enroll_by_date': '2020-01-01T00:00:00Z',
+            'get_enterprise_user': TEST_USER_RECORD,
+            'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
+            'transactions_for_learner': {'transactions': [], 'aggregates': {}},
+            'transactions_for_policy': {'results': [], 'aggregates': {'total_quantity': -200}},
+            'expected_policy_can_redeem': (True, None, []),
+            'expect_content_metadata_fetch': True,
+            'expect_transaction_fetch': True,
+            'late_redemption_allowed_until': localized_utcnow() + timedelta(days=1),
+        },
+        {
             # Learner is not in the enterprise, every other check would succeed.
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': True,
+            'enroll_by_date': '2099-01-01T00:00:00Z',
             'get_enterprise_user': None,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
@@ -406,6 +456,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': True,
+            'enroll_by_date': '2099-01-01T00:00:00Z',
             'get_enterprise_user': TEST_USER_RECORD_NO_GROUPS,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
@@ -419,6 +470,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': True,
+            'enroll_by_date': '2099-01-01T00:00:00Z',
             'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': False, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
@@ -431,6 +483,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': True,
+            'enroll_by_date': '2099-01-01T00:00:00Z',
             'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
@@ -451,6 +504,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': True,
+            'enroll_by_date': '2099-01-01T00:00:00Z',
             'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {
@@ -470,6 +524,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': False,
             'catalog_contains_content': True,
+            'enroll_by_date': '2099-01-01T00:00:00Z',
             'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': True},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
@@ -483,6 +538,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             # Expected can_redeem result: False
             'policy_is_active': True,
             'catalog_contains_content': True,
+            'enroll_by_date': '2099-01-01T00:00:00Z',
             'get_enterprise_user': TEST_USER_RECORD,
             'subsidy_is_redeemable': {'can_redeem': True, 'active': False},
             'transactions_for_learner': {'transactions': [], 'aggregates': {}},
@@ -495,6 +551,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         self,
         policy_is_active,
         catalog_contains_content,
+        enroll_by_date,
         get_enterprise_user,
         subsidy_is_redeemable,
         transactions_for_learner,
@@ -502,6 +559,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         expected_policy_can_redeem,
         expect_content_metadata_fetch=True,
         expect_transaction_fetch=True,
+        late_redemption_allowed_until=None,
     ):
         """
         Test the can_redeem method of PerLearnerSpendCapLearnerCreditAccessPolicy model
@@ -511,6 +569,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         self.mock_catalog_contains_content_key.return_value = catalog_contains_content
         self.mock_get_content_metadata.return_value = {
             'content_price': 200,
+            'enroll_by_date': enroll_by_date,
         }
         self.mock_subsidy_client.can_redeem.return_value = subsidy_is_redeemable
         self.mock_transactions_cache_for_learner.return_value = transactions_for_learner
@@ -519,6 +578,9 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         policy_record = self.inactive_per_learner_spend_policy
         if policy_is_active:
             policy_record = self.per_learner_spend_policy
+
+        if late_redemption_allowed_until:
+            policy_record.late_redemption_allowed_until = late_redemption_allowed_until
 
         PolicyGroupAssociationFactory(
             enterprise_group_uuid=TEST_ENTERPRISE_GROUP_UUID,
@@ -1066,6 +1128,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         self.mock_catalog_contains_content_key.return_value = True
         self.mock_get_content_metadata.return_value = {
             'content_price': 200,
+            'enroll_by_date': '2099-01-01T00:00:00Z',
         }
         self.mock_assign_get_content_metadata.return_value = {
             'content_price': 200,

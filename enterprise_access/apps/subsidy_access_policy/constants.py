@@ -93,6 +93,8 @@ class MissingSubsidyAccessReasonUserMessages:
     LEARNER_LIMITS_REACHED = "You can't enroll right now because of limits set by your organization."
     CONTENT_NOT_IN_CATALOG = \
         "You can't enroll right now because this course is no longer available in your organization's catalog."
+    BEYOND_ENROLLMENT_DEADLINE = \
+        "You can't enroll right now because the enrollment deadline for this course has passed."
     LEARNER_NOT_IN_ENTERPRISE = \
         "You can't enroll right now because your account is no longer associated with the organization."
     LEARNER_NOT_ASSIGNED_CONTENT = \
@@ -104,6 +106,7 @@ class MissingSubsidyAccessReasonUserMessages:
 REASON_POLICY_EXPIRED = "policy_expired"
 REASON_SUBSIDY_EXPIRED = "subsidy_expired"
 REASON_CONTENT_NOT_IN_CATALOG = "content_not_in_catalog"
+REASON_BEYOND_ENROLLMENT_DEADLINE = "beyond_enrollment_deadline"
 REASON_LEARNER_NOT_IN_ENTERPRISE = "learner_not_in_enterprise"
 REASON_LEARNER_NOT_IN_ENTERPRISE_GROUP = "learner_not_in_enterprise_group"
 REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY = "not_enough_value_in_subsidy"

@@ -37,6 +37,7 @@ from enterprise_access.apps.events.signals import SUBSIDY_REDEEMED
 from enterprise_access.apps.events.utils import send_subsidy_redemption_event_to_event_bus
 from enterprise_access.apps.subsidy_access_policy.constants import (
     GROUP_MEMBERS_WITH_AGGREGATES_DEFAULT_PAGE_SIZE,
+    REASON_BEYOND_ENROLLMENT_DEADLINE,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_FAILED,
@@ -224,6 +225,7 @@ def _get_user_message_for_reason(reason_slug, enterprise_admin_users):
         REASON_LEARNER_MAX_SPEND_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
         REASON_LEARNER_MAX_ENROLLMENTS_REACHED: MissingSubsidyAccessReasonUserMessages.LEARNER_LIMITS_REACHED,
         REASON_CONTENT_NOT_IN_CATALOG: MissingSubsidyAccessReasonUserMessages.CONTENT_NOT_IN_CATALOG,
+        REASON_BEYOND_ENROLLMENT_DEADLINE: MissingSubsidyAccessReasonUserMessages.BEYOND_ENROLLMENT_DEADLINE,
         REASON_LEARNER_NOT_ASSIGNED_CONTENT: MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_ASSIGNED_CONTENT,
         REASON_LEARNER_ASSIGNMENT_CANCELLED: MissingSubsidyAccessReasonUserMessages.LEARNER_ASSIGNMENT_CANCELED,
         REASON_LEARNER_ASSIGNMENT_FAILED: MissingSubsidyAccessReasonUserMessages.LEARNER_NOT_ASSIGNED_CONTENT,
@@ -478,7 +480,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             enterprise_customer_uuid=self.enterprise_customer_uuid,
         ).order_by('-created')
 
-    def evaluate_policies(self, enterprise_customer_uuid, lms_user_id, content_key):
+    def evaluate_policies(self, enterprise_customer_uuid, lms_user_id, content_key, skip_customer_user_check=False):
         """
         Evaluate all policies for the given enterprise customer to check if it can be redeemed against the given learner
         and content.
@@ -497,7 +499,9 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         all_policies_for_enterprise = self.get_queryset()
         for policy in all_policies_for_enterprise:
             try:
-                redeemable, reason, _ = policy.can_redeem(lms_user_id, content_key, skip_customer_user_check=True)
+                redeemable, reason, _ = policy.can_redeem(
+                    lms_user_id, content_key, skip_customer_user_check=skip_customer_user_check
+                )
                 logger.info(
                     f'[can_redeem] {policy} inputs: (lms_user_id={lms_user_id}, content_key={content_key}) results: '
                     f'redeemable={redeemable}, reason={reason}.'
@@ -716,7 +720,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         serializer.is_valid(raise_exception=True)
 
         content_keys = serializer.data['content_key']
-        lms_user_id = self.lms_user_id or request.user.lms_user_id
+        lms_user_id_override = serializer.data.get('lms_user_id') if request.user.is_staff else None
+        lms_user_id = lms_user_id_override or self.lms_user_id or request.user.lms_user_id
         if not lms_user_id:
             logger.warning(
                 f'No lms_user_id found when checking if we can redeem {content_keys} '
@@ -765,10 +770,13 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             # so we don't unnecessarily call `can_redeem()` on every policy.
             if not successful_redemptions:
                 redeemable_policies, non_redeemable_policies = self.evaluate_policies(
-                    enterprise_customer_uuid, lms_user_id, content_key
+                    enterprise_customer_uuid,
+                    lms_user_id, content_key,
+                    # don't skip the customer user check if we're using an override lms_user_id
+                    skip_customer_user_check=not bool(lms_user_id_override),
                 )
 
-            if not redemptions and not redeemable_policies:
+            if not successful_redemptions and not redeemable_policies:
                 reasons.extend(_get_reasons_for_no_redeemable_policies(
                     enterprise_customer_uuid,
                     non_redeemable_policies

@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import requests
 from django.conf import settings
+from django.utils.dateparse import parse_datetime
 from edx_django_utils.cache import TieredCache
 from requests.exceptions import HTTPError
 
@@ -125,3 +126,13 @@ def list_price_dict_from_usd_cents(list_price_integer_cents):
         "usd": list_price_decimal_dollars,
         "usd_cents": list_price_integer_cents,
     }
+
+
+def enroll_by_datetime(content_metadata):
+    """
+    Helper to return a datetime object representing
+    the enrollment deadline for a content_metdata record.
+    """
+    if enroll_by_date := content_metadata.get('enroll_by_date'):
+        return parse_datetime(enroll_by_date)
+    return None

@@ -19,7 +19,7 @@ astroid==3.2.4
     # via
     #   pylint
     #   pylint-celery
-attrs==23.2.0
+attrs==24.2.0
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -33,7 +33,7 @@ billiard==4.2.0
     # via
     #   -r requirements/base.txt
     #   celery
-cachetools==5.4.0
+cachetools==5.5.0
     # via tox
 celery==5.4.0
     # via
@@ -44,7 +44,7 @@ certifi==2024.7.4
     # via
     #   -r requirements/base.txt
     #   requests
-cffi==1.16.0
+cffi==1.17.0
     # via
     #   -r requirements/base.txt
     #   cryptography
@@ -99,7 +99,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/base.txt
     #   coreapi
-coverage[toml]==7.6.0
+coverage[toml]==7.6.1
     # via
     #   -r requirements/test.in
     #   pytest-cov
@@ -162,7 +162,7 @@ django-dynamic-fixture==4.0.1
     # via -r requirements/test.in
 django-extensions==3.2.3
     # via -r requirements/base.txt
-django-filter==24.2
+django-filter==24.3
     # via -r requirements/base.txt
 django-log-request-id==2.1.0
     # via -r requirements/base.txt
@@ -185,9 +185,8 @@ django-waffle==4.1.0
     #   edx-toggles
 djangoql==0.18.1
     # via -r requirements/base.txt
-djangorestframework==3.14.0
+djangorestframework==3.15.2
     # via
-    #   -c requirements/constraints.txt
     #   -r requirements/base.txt
     #   django-rest-swagger
     #   djangorestframework-csv
@@ -226,7 +225,7 @@ edx-celeryutils==1.3.0
     # via -r requirements/base.txt
 edx-django-release-util==1.4.0
     # via -r requirements/base.txt
-edx-django-utils==5.14.2
+edx-django-utils==5.15.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
@@ -240,7 +239,7 @@ edx-drf-extensions==10.3.0
     #   edx-rbac
 edx-enterprise-subsidy-client==0.4.4
     # via -r requirements/base.txt
-edx-event-bus-kafka==5.7.0
+edx-event-bus-kafka==5.8.1
     # via -r requirements/base.txt
 edx-lint==5.3.7
     # via -r requirements/test.in
@@ -250,7 +249,7 @@ edx-opaque-keys[django]==2.10.0
     #   edx-ccx-keys
     #   edx-drf-extensions
     #   openedx-events
-edx-rbac==1.9.0
+edx-rbac==1.10.0
     # via -r requirements/base.txt
 edx-rest-api-client==5.7.1
     # via
@@ -260,9 +259,9 @@ edx-toggles==5.2.0
     # via
     #   -r requirements/base.txt
     #   edx-event-bus-kafka
-factory-boy==3.3.0
+factory-boy==3.3.1
     # via -r requirements/test.in
-faker==26.0.0
+faker==27.0.0
     # via factory-boy
 fastavro==1.9.5
     # via
@@ -310,7 +309,7 @@ jsonschema-specifications==2023.12.1
     # via
     #   -r requirements/base.txt
     #   jsonschema
-kombu==5.3.7
+kombu==5.4.0
     # via
     #   -r requirements/base.txt
     #   celery
@@ -326,7 +325,7 @@ monotonic==1.6
     #   analytics-python
 mysqlclient==2.2.4
     # via -r requirements/base.txt
-newrelic==9.12.0
+newrelic==9.13.0
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -381,7 +380,7 @@ pycparser==2.22
     #   cffi
 pygments==2.18.0
     # via -r requirements/base.txt
-pyjwt[crypto]==2.8.0
+pyjwt[crypto]==2.9.0
     # via
     #   -r requirements/base.txt
     #   drf-jwt
@@ -441,9 +440,8 @@ python3-openid==3.2.0
 pytz==2024.1
     # via
     #   -r requirements/base.txt
-    #   djangorestframework
     #   drf-yasg
-pyyaml==6.0.1
+pyyaml==6.0.2
     # via
     #   -r requirements/base.txt
     #   code-annotations
@@ -471,7 +469,7 @@ requests-oauthlib==2.0.0
     # via
     #   -r requirements/base.txt
     #   social-auth-core
-rpds-py==0.19.1
+rpds-py==0.20.0
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -482,7 +480,7 @@ semantic-version==2.10.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
-simplejson==3.19.2
+simplejson==3.19.3
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
@@ -523,9 +521,9 @@ text-unidecode==1.3
     # via
     #   -r requirements/base.txt
     #   python-slugify
-tomlkit==0.13.0
+tomlkit==0.13.2
     # via pylint
-tox==4.16.0
+tox==4.18.0
     # via -r requirements/test.in
 typing-extensions==4.12.2
     # via

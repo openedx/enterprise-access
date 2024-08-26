@@ -8,6 +8,7 @@
 #
 # Available service endpoints -- note that alternate endpoints may be presented at the API Gateway tier
 # POST  /api/v1/policy-allocation/{policy_uuid}/allocate/
+# GET   /api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/
 # POST  /api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/remind/
 # POST  /api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/cancel/
 # GET   /api/v1/subsidy-access-policies/
@@ -141,6 +142,131 @@ endpoints:
             integration.request.header.Authorization: "method.request.header.Authorization"
             integration.request.path.policy_uuid: "method.request.path.policy_uuid"
           uri: "https://${stageVariables.enterprise_access_host}/api/v1/policy-allocation/{policy_uuid}/allocate/"
+    # api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/
+    learnerContentAssignmentListRequest:
+      get:
+        description: "Lists LearnerContentAssignment records, filtered by the given query parameters."
+        operationId: "api_v1_assignment_configurations_admin_assignments_list"
+        consumes:
+          - "application/json"
+        produces:
+          - "application/json"
+        parameters:
+          - *auth_header
+          - *assignment_configuration_uuid
+          - in: query
+            name: content_key
+            type: string
+            description: "The globally unique content identifier to assign to the learner.
+              Joinable with ContentMetadata.content_key in enterprise-catalog."
+            required: false
+          - in: query
+            name: content_key__in
+            type: array
+            description: "The globally unique content identifier to assign to the learner.
+              Joinable with ContentMetadata.content_key in enterprise-catalog."
+            required: false
+            items:
+              type: string
+          - in: query
+            name: learner_email
+            type: string
+            description: "Email of learner to assign content. Automatically scrubbed after 90 days."
+            required: false
+          - in: query
+            name: learner_email__in
+            type: array
+            description: "Email of learner to assign content. Automatically scrubbed after 90 days."
+            required: false
+            items:
+              type: string
+          - in: query
+            name: learner_state
+            type: string
+            enum: ["notifying", "waiting", "failed", "expired"]
+            description: "Choose from the following valid learner states: notifying, waiting, failed, expired."
+            required: false
+          - in: query
+            name: learner_state__in
+            type: array
+            description: "Choose from the following valid learner states: notifying, waiting, failed, expired."
+            required: false
+            items:
+              type: string
+              enum: ["notifying", "waiting", "failed", "expired"]
+          - in: query
+            name: lms_user_id
+            type: integer
+            description: "The id of the Open edX LMS user record with which this LearnerContentAssignment is associated.
+              This may be null at time of creation."
+            required: false
+          - in: query
+            name: lms_user_id__in
+            type: array
+            description: "The id of the Open edX LMS user record with which this LearnerContentAssignment is associated.
+              This may be null at time of creation."
+            required: false
+            items:
+              type: integer
+          - in: query
+            name: ordering
+            type: string
+            description: "Which field to use when ordering the results."
+            required: false
+          - in: query
+            name: page
+            type: integer
+            description: "A page number within the paginated result set."
+            required: false
+          - in: query
+            name: page_size
+            type: integer
+            description: "Number of results to return per page."
+            required: false
+          - in: query
+            name: search
+            type: string
+            description: A search term.
+            required: false
+          - in: query
+            name: state
+            type: string
+            enum: ["allocated", "accepted", "cancelled", "errored", "expired", "reversed"]
+            description: "The current state of the LearnerContentAssignment. One of: 
+              ['allocated', 'accepted', 'cancelled', 'errored', 'expired', 'reversed']"
+            required: false
+          - in: query
+            name: state__in
+            type: array
+            description: "The current state of the LearnerContentAssignment. One of: 
+              ['allocated', 'accepted', 'cancelled', 'errored', 'expired', 'reversed']"
+            items:
+              type: string
+              enum: ["allocated", "accepted", "cancelled", "errored", "expired", "reversed"]
+            required: false
+        responses: *learner_content_assignment_list_remind_cancel_responses
+        x-amazon-apigateway-integration:
+          responses: *apigateway_responses
+          httpMethod: "GET"
+          type: "http"
+          requestParameters:
+            integration.request.header.Authorization: "method.request.header.Authorization"
+            integration.request.path.assignment_configuration_uuid: "method.request.path.assignment_configuration_uuid"
+            integration.request.querystring.content_key: "method.request.querystring.content_key"
+            integration.request.querystring.content_key__in: "method.request.querystring.content_key__in"
+            integration.request.querystring.learner_email: "method.request.querystring.learner_email"
+            integration.request.querystring.learner_email__in: "method.request.querystring.learner_email__in"
+            integration.request.querystring.learner_state: "method.request.querystring.learner_state"
+            integration.request.querystring.learner_state__in: "method.request.querystring.learner_state__in"
+            integration.request.querystring.lms_user_id: "method.request.querystring.lms_user_id"
+            integration.request.querystring.lms_user_id__in: "method.request.querystring.lms_user_id__in"
+            integration.request.querystring.ordering: "method.request.querystring.ordering"
+            integration.request.querystring.page: "method.request.querystring.page"
+            integration.request.querystring.page_size: "method.request.querystring.page_size"
+            integration.request.querystring.search: "method.request.querystring.search"
+            integration.request.querystring.state: "method.request.querystring.state"
+            integration.request.querystring.state__in: "method.request.querystring.state__in"
+          uri: "https://${stageVariables.enterprise_access_host}/api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/"
     # api/v1/assignment-configurations/{assignment_configuration_uuid}/admin/assignments/remind/
     learnerContentAssignmentRemindRequest:
       post:
