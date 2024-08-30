@@ -525,6 +525,27 @@ def _get_content_title(assignment_configuration, content_key):
     return content_metadata.get('content_title')
 
 
+def _get_parent_content_key(assignment_configuration, content_key):
+    """
+    Helper to retrieve (from cache) the parent content key of a content_key's content_metadata.
+    Note: content_key is either a course run key or a course key. Only course run keys have a
+    parent course key.
+
+    If content_key is for a course key, this will return the same key. Otherwise, the content_key
+    represents a course run, and this will return the run's parent course key.
+    """
+    content_metadata = _get_content_summary(assignment_configuration, content_key)
+    metadata_content_key = content_metadata.get('content_key')
+
+    # Check if the assignment's content_key matches the returned content_key. If so, this is a course key
+    # which has no parent key.
+    if content_key == metadata_content_key:
+        return None
+
+    # Otherwise, this is a course run key, so return the parent course key
+    return metadata_content_key
+
+
 def _get_preferred_course_run_key(assignment_configuration, content_key):
     """
     During assignment allocation, time has passed since the last time an assignment
@@ -560,7 +581,10 @@ def _create_new_assignments(
 
     # First, prepare assignment objects using data available in-memory only.
     content_title = _get_content_title(assignment_configuration, content_key)
+    parent_content_key = _get_parent_content_key(assignment_configuration, content_key)
     preferred_course_run_key = _get_preferred_course_run_key(assignment_configuration, content_key)
+    is_assigned_course_run = bool(parent_content_key)
+
     assignments_to_create = []
     for learner_email in learner_emails:
         assignment = LearnerContentAssignment(
@@ -568,6 +592,8 @@ def _create_new_assignments(
             learner_email=learner_email,
             lms_user_id=lms_user_ids_by_email.get(learner_email.lower()),
             content_key=content_key,
+            parent_content_key=parent_content_key,
+            is_assigned_course_run=is_assigned_course_run,
             preferred_course_run_key=preferred_course_run_key,
             content_title=content_title,
             content_quantity=content_quantity,

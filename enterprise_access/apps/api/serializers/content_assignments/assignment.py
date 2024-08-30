@@ -120,6 +120,8 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
             'learner_email',
             'lms_user_id',
             'content_key',
+            'parent_content_key',
+            'is_assigned_course_run',
             'content_title',
             'content_quantity',
             'state',

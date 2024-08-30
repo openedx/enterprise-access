@@ -293,6 +293,24 @@ class LearnerContentAssignment(TimeStampedModel):
             "ContentMetadata.content_key in enterprise-catalog."
         ),
     )
+    parent_content_key = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text=(
+            "The globally unique content identifier of the parent content to assign to the learner.  Joinable with "
+            "ContentMetadata.content_key in enterprise-catalog."
+        ),
+    )
+    is_assigned_course_run = models.BooleanField(
+        null=False,
+        blank=False,
+        default=False,
+        help_text=(
+            "Whether the content_key corresponds to a course run. If True, the content_key should be a course run key."
+        ),
+    )
     content_title = models.CharField(
         max_length=255,
         blank=True,
