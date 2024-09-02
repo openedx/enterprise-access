@@ -34,7 +34,7 @@ celery==5.4.0
     #   -r requirements/base.txt
     #   django-celery-results
     #   edx-celeryutils
-certifi==2024.7.4
+certifi==2024.8.30
     # via
     #   -r requirements/base.txt
     #   requests
@@ -309,7 +309,7 @@ packaging==24.1
     #   -r requirements/base.txt
     #   drf-yasg
     #   gunicorn
-pbr==6.0.0
+pbr==6.1.0
     # via
     #   -r requirements/base.txt
     #   stevedore
@@ -478,7 +478,7 @@ wcwidth==0.2.13
     #   prompt-toolkit
 zope-event==5.0
     # via gevent
-zope-interface==7.0.1
+zope-interface==7.0.3
     # via gevent
 
 # The following packages are considered to be unsafe in a requirements file:
