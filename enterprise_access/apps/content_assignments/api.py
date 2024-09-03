@@ -521,8 +521,8 @@ def _get_content_title(assignment_configuration, content_key):
     """
     Helper to retrieve (from cache) the title of a content_key'ed content_metadata
     """
-    content_metadata = _get_content_summary(assignment_configuration, content_key)
-    return content_metadata.get('content_title')
+    course_content_metadata = _get_content_summary(assignment_configuration, content_key)
+    return course_content_metadata.get('content_title')
 
 
 def _get_parent_content_key(assignment_configuration, content_key):
@@ -534,8 +534,8 @@ def _get_parent_content_key(assignment_configuration, content_key):
     If content_key is for a course key, this will return the same key. Otherwise, the content_key
     represents a course run, and this will return the run's parent course key.
     """
-    content_metadata = _get_content_summary(assignment_configuration, content_key)
-    metadata_content_key = content_metadata.get('content_key')
+    course_content_metadata = _get_content_summary(assignment_configuration, content_key)
+    metadata_content_key = course_content_metadata.get('content_key')
 
     # Check if the assignment's content_key matches the returned content_key. If so, this is a course key
     # which has no parent key.
@@ -555,8 +555,8 @@ def _get_preferred_course_run_key(assignment_configuration, content_key):
     Returns:
       The preferred course run key (from cache) of a content_key'ed content_metadata
     """
-    content_metadata = _get_content_summary(assignment_configuration, content_key)
-    return content_metadata.get('course_run_key')
+    course_content_metadata = _get_content_summary(assignment_configuration, content_key)
+    return course_content_metadata.get('course_run_key')
 
 
 def _create_new_assignments(
