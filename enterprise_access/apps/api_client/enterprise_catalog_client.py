@@ -1,10 +1,11 @@
 """
 API client for enterprise-catalog service.
 """
-
+import backoff
 from django.conf import settings
 
 from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
+from enterprise_access.apps.api_client.constants import autoretry_for_exceptions
 
 
 class EnterpriseCatalogApiClient(BaseOAuthClient):
@@ -14,6 +15,7 @@ class EnterpriseCatalogApiClient(BaseOAuthClient):
     api_base_url = settings.ENTERPRISE_CATALOG_URL + '/api/v1/'
     enterprise_catalog_endpoint = api_base_url + 'enterprise-catalogs/'
 
+    @backoff.on_exception(wait_gen=backoff.expo, exception=autoretry_for_exceptions)
     def contains_content_items(self, catalog_uuid, content_ids):
         """
         Check whether the specified enterprise catalog contains the given content.
@@ -33,6 +35,7 @@ class EnterpriseCatalogApiClient(BaseOAuthClient):
         response_json = response.json()
         return response_json.get('contains_content_items', False)
 
+    @backoff.on_exception(wait_gen=backoff.expo, exception=autoretry_for_exceptions)
     def catalog_content_metadata(self, catalog_uuid, content_keys, traverse_pagination=True, **kwargs):
         """
         Returns a list of requested content metadata records for the given catalog_uuid.
@@ -68,6 +71,7 @@ class EnterpriseCatalogApiClient(BaseOAuthClient):
         response.raise_for_status()
         return response.json()
 
+    @backoff.on_exception(wait_gen=backoff.expo, exception=autoretry_for_exceptions)
     def get_content_metadata_count(self, catalog_uuid):
         """
         Returns the count of content metadata for a catalog.
