@@ -458,6 +458,14 @@ class SendNotificationEmailTask(BaseAssignmentRetryAndErrorActionTask):
     def add_errored_action(self, assignment, exc):
         assignment.add_errored_notified_action(exc)
 
+    def progress_state_on_failure(self, assignment):
+        """
+        Skip progressing the assignment state to `failed` (keeping it `allocated`)
+        so that the assignment remains functional and redeemable
+        for learners and appears as actionable to admins.
+        """
+        logger.info('NOT progressing the assignment state to failed for notification failures.')
+
 
 @shared_task(base=SendNotificationEmailTask)
 def send_email_for_new_assignment(new_assignment_uuid):

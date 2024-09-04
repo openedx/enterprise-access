@@ -784,9 +784,23 @@ class LearnerContentAssignment(TimeStampedModel):
                     error_reason__isnull=True,
                     completed_at__isnull=False,
                 )
+            ),
+            # ... or if they have an errored notification.
+            has_errored_notification=Exists(
+                LearnerContentAssignmentAction.objects.filter(
+                    assignment=OuterRef('uuid'),
+                    action_type=AssignmentActions.NOTIFIED,
+                    error_reason__isnull=False,
+                )
             )
         ).annotate(
             learner_state=Case(
+                When(
+                    Q(state=LearnerContentAssignmentStateChoices.ALLOCATED) &
+                    Q(has_errored_notification=True) &
+                    Q(has_notification=False),
+                    then=Value(AssignmentLearnerStates.FAILED),
+                ),
                 When(
                     Q(state=LearnerContentAssignmentStateChoices.ALLOCATED) & Q(has_notification=False),
                     then=Value(AssignmentLearnerStates.NOTIFYING),

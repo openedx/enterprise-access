@@ -12,6 +12,7 @@ from rest_framework.reverse import reverse
 
 from enterprise_access.apps.content_assignments.constants import (
     NUM_DAYS_BEFORE_AUTO_EXPIRATION,
+    AssignmentActionErrors,
     AssignmentActions,
     AssignmentAutomaticExpiredReason,
     AssignmentLearnerStates,
@@ -446,6 +447,53 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
                 ).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                 'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED,
             },
+        }
+
+    @ddt.data(
+        # A good admin role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+        # A good operator role, and with a context matching the main testing customer.
+        {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)},
+    )
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient', autospec=True)
+    @mock.patch.object(SubsidyAccessPolicy, 'subsidy_record', autospec=True)
+    def test_retrieve_allocated_with_notification_error(
+        self, role_context_dict, mock_subsidy_record, mock_catalog_client
+    ):
+        assignment = LearnerContentAssignmentFactory(
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+            lms_user_id=98123,
+            transaction_uuid=None,
+            assignment_configuration=self.assignment_configuration,
+            content_key='edX+edXPrivacy101',
+            content_quantity=-321,
+            content_title='edx: Privacy 101'
+        )
+        assignment.add_errored_notified_action(Exception('foo'))
+
+        # Set the JWT-based auth that we'll use for every request.
+        self.set_jwt_cookie([role_context_dict])
+
+        # Mock results from the catalog content metadata API endpoint.
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = self.mock_catalog_result
+
+        # Mock results from the subsidy record.
+        mock_subsidy_record.return_value = self.mock_subsidy_record
+
+        # Setup and call the retrieve endpoint.
+        detail_kwargs = {
+            'assignment_configuration_uuid': str(TEST_ASSIGNMENT_CONFIG_UUID),
+            'uuid': str(assignment.uuid),
+        }
+        detail_url = reverse('api:v1:admin-assignments-detail', kwargs=detail_kwargs)
+        response = self.client.get(detail_url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json().get('state') == LearnerContentAssignmentStateChoices.ALLOCATED
+        assert response.json().get('learner_state') == AssignmentLearnerStates.FAILED
+        assert response.json().get('error_reason') == {
+            'action_type': AssignmentActions.NOTIFIED,
+            'error_reason': AssignmentActionErrors.EMAIL_ERROR,
         }
 
     @ddt.data(

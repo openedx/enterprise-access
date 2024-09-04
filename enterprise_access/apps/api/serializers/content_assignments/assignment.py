@@ -184,8 +184,12 @@ class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentRe
         Resolves the error reason for the assignment, if any, for display purposes based on
         any associated actions.
         """
-        # If the assignment is not in an errored state, there should be no error reason.
-        if assignment.state != LearnerContentAssignmentStateChoices.ERRORED:
+        # If the assignment is not in an errored or allocated state,
+        # there should be no error reason.
+        if assignment.state not in (
+            LearnerContentAssignmentStateChoices.ERRORED,
+            LearnerContentAssignmentStateChoices.ALLOCATED,
+        ):
             return None
 
         # Assignment is an errored state, so determine the appropriate error reason so clients don't need to.
