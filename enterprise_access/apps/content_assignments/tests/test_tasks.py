@@ -39,6 +39,8 @@ from enterprise_access.cache_utils import request_cache
 from enterprise_access.utils import get_automatic_expiration_date_and_reason
 from test_utils import APITestWithMocks
 
+TEST_CONTENT_KEY = 'course:test_content'
+TEST_ENTERPRISE_CUSTOMER_NAME = 'test-customer-name'
 TEST_ENTERPRISE_UUID = uuid4()
 TEST_EMAIL = 'foo@bar.com'
 TEST_LMS_USER_ID = 2
@@ -215,13 +217,37 @@ class TestBrazeEmailTasks(APITestWithMocks):
             assignment_configuration=cls.assignment_configuration,
             spend_limit=10000000,
         )
+        cls.mock_enterprise_customer_data = {
+            'uuid': TEST_ENTERPRISE_UUID,
+            'slug': 'test-slug',
+            'admin_users': [{
+                'email': 'test@admin.com',
+                'lms_user_id': 1
+            }],
+            'name': TEST_ENTERPRISE_CUSTOMER_NAME,
+        }
+        cls.mock_content_metadata = {
+            'key': TEST_CONTENT_KEY,
+            'normalized_metadata': {
+                'start_date': '2020-01-01T12:00:00Z',
+                'end_date': '2022-01-01 12:00:00Z',
+                'enroll_by_date': '2021-01-01T12:00:00Z',
+                'content_price': 123,
+            },
+            'owners': [
+                {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
+                {'name': 'Good People', 'logo_image_url': 'http://pictures.nice'},
+            ],
+            'card_image_url': 'https://itsanimage.com',
+        }
 
     def setUp(self):
         super().setUp()
         self.course_name = 'test-course-name'
-        self.enterprise_customer_name = 'test-customer-name'
+        self.enterprise_customer_name = TEST_ENTERPRISE_CUSTOMER_NAME
         self.assignment = LearnerContentAssignmentFactory(
             uuid=TEST_ASSIGNMENT_UUID,
+            content_key=TEST_CONTENT_KEY,
             learner_email='TESTING THIS EMAIL',
             lms_user_id=TEST_LMS_USER_ID,
             assignment_configuration=self.assignment_configuration,
@@ -386,36 +412,13 @@ class TestBrazeEmailTasks(APITestWithMocks):
         """
         Verify send_email_for_new_assignment hits braze client with expected args
         """
-        admin_email = 'test@admin.com'
-        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
-            'uuid': TEST_ENTERPRISE_UUID,
-            'slug': 'test-slug',
-            'admin_users': [{
-                'email': admin_email,
-                'lms_user_id': 1
-            }],
-            'name': self.enterprise_customer_name,
-        }
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = self.mock_enterprise_customer_data
         mock_recipient = {
             'external_user_id': 1
         }
-        mock_metadata = {
-            'key': self.assignment.content_key,
-            'normalized_metadata': {
-                'start_date': '2020-01-01T12:00:00Z',
-                'end_date': '2022-01-01 12:00:00Z',
-                'enroll_by_date': '2021-01-01T12:00:00Z',
-                'content_price': 123,
-            },
-            'owners': [
-                {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
-                {'name': 'Good People', 'logo_image_url': 'http://pictures.nice'},
-            ],
-            'card_image_url': 'https://itsanimage.com',
-        }
         mock_catalog_client.return_value.catalog_content_metadata.return_value = {
             'count': 1,
-            'results': [mock_metadata]
+            'results': [self.mock_content_metadata]
         }
 
         # Set the subsidy expiration time to tomorrow
@@ -425,7 +428,8 @@ class TestBrazeEmailTasks(APITestWithMocks):
         }
         mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
 
-        mock_admin_mailto = f'mailto:{admin_email}'
+        admin_email = self.mock_enterprise_customer_data['admin_users'][0]['email']
+        mock_admin_mailto = f"mailto:{admin_email}"
         mock_braze_client.return_value.create_recipient.return_value = mock_recipient
         mock_braze_client.return_value.generate_mailto_link.return_value = mock_admin_mailto
 
@@ -446,12 +450,61 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'enrollment_deadline': 'Jan 01, 2021',
                 'start_date': 'Jan 01, 2020',
                 'course_partner': 'Smart Folks and Good People',
-                'course_card_image': 'https://itsanimage.com',
-                'learner_portal_link': '{}/{}'.format(settings.ENTERPRISE_LEARNER_PORTAL_URL, 'test-slug'),
+                'course_card_image': self.mock_content_metadata['card_image_url'],
+                'learner_portal_link': '{}/{}'.format(
+                    settings.ENTERPRISE_LEARNER_PORTAL_URL,
+                    self.mock_enterprise_customer_data['slug']
+                ),
                 'action_required_by_timestamp': '2021-01-01T12:00:00Z'
             },
         )
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
+
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
+    def test_send_email_for_new_assignment_failure(
+        self,
+        mock_braze_client,
+        mock_lms_client,
+        mock_catalog_client,
+        mock_subsidy_client,
+    ):
+        """
+        Verify send_email_for_new_assignment does not change the state of the
+        assignment record on failure.
+        """
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = self.mock_enterprise_customer_data
+        mock_recipient = {
+            'external_user_id': 1
+        }
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
+            'count': 1,
+            'results': [self.mock_content_metadata]
+        }
+
+        # Set the subsidy expiration time to tomorrow
+        mock_subsidy = {
+            'uuid': self.policy.subsidy_uuid,
+            'expiration_datetime': (now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%SZ'),
+        }
+        mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
+
+        braze_client_instance = mock_braze_client.return_value
+        braze_client_instance.send_campaign_message.side_effect = Exception('foo')
+
+        admin_email = self.mock_enterprise_customer_data['admin_users'][0]['email']
+        mock_admin_mailto = f"mailto:{admin_email}"
+        braze_client_instance.create_recipient.return_value = mock_recipient
+        braze_client_instance.generate_mailto_link.return_value = mock_admin_mailto
+
+        send_email_for_new_assignment.delay(self.assignment.uuid)
+        self.assertEqual(self.assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertTrue(self.assignment.actions.filter(
+            error_reason=AssignmentActionErrors.EMAIL_ERROR,
+            action_type=AssignmentActions.NOTIFIED,
+        ).exists())
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.objects')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
