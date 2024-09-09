@@ -34,11 +34,11 @@ celery==5.4.0
     #   -r requirements/base.txt
     #   django-celery-results
     #   edx-celeryutils
-certifi==2024.7.4
+certifi==2024.8.30
     # via
     #   -r requirements/base.txt
     #   requests
-cffi==1.17.0
+cffi==1.17.1
     # via
     #   -r requirements/base.txt
     #   cryptography
@@ -72,7 +72,7 @@ code-annotations==1.8.0
     # via
     #   -r requirements/base.txt
     #   edx-toggles
-confluent-kafka==2.5.0
+confluent-kafka==2.5.3
     # via -r requirements/base.txt
 coreapi==2.3.3
     # via
@@ -83,7 +83,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/base.txt
     #   coreapi
-cryptography==43.0.0
+cryptography==43.0.1
     # via
     #   -r requirements/base.txt
     #   pyjwt
@@ -93,7 +93,7 @@ defusedxml==0.8.0rc2
     #   -r requirements/base.txt
     #   python3-openid
     #   social-auth-core
-django==4.2.15
+django==4.2.16
     # via
     #   -r requirements/base.txt
     #   django-celery-results
@@ -138,7 +138,7 @@ django-filter==24.3
     # via -r requirements/base.txt
 django-log-request-id==2.1.0
     # via -r requirements/base.txt
-django-model-utils==4.5.1
+django-model-utils==5.0.0
     # via
     #   -r requirements/base.txt
     #   edx-celeryutils
@@ -205,7 +205,7 @@ edx-django-utils==5.15.0
     #   edx-rest-api-client
     #   edx-toggles
     #   openedx-events
-edx-drf-extensions==10.3.0
+edx-drf-extensions==10.4.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
@@ -213,7 +213,7 @@ edx-enterprise-subsidy-client==0.4.4
     # via -r requirements/base.txt
 edx-event-bus-kafka==5.8.1
     # via -r requirements/base.txt
-edx-opaque-keys[django]==2.10.0
+edx-opaque-keys[django]==2.11.0
     # via
     #   -r requirements/base.txt
     #   edx-ccx-keys
@@ -221,7 +221,7 @@ edx-opaque-keys[django]==2.10.0
     #   openedx-events
 edx-rbac==1.10.0
     # via -r requirements/base.txt
-edx-rest-api-client==5.7.1
+edx-rest-api-client==6.0.0
     # via
     #   -r requirements/base.txt
     #   edx-enterprise-subsidy-client
@@ -229,7 +229,7 @@ edx-toggles==5.2.0
     # via
     #   -r requirements/base.txt
     #   edx-event-bus-kafka
-fastavro==1.9.5
+fastavro==1.9.7
     # via
     #   -r requirements/base.txt
     #   openedx-events
@@ -300,7 +300,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
-openedx-events==9.12.0
+openedx-events==9.14.0
     # via
     #   -r requirements/base.txt
     #   edx-event-bus-kafka
@@ -309,7 +309,7 @@ packaging==24.1
     #   -r requirements/base.txt
     #   drf-yasg
     #   gunicorn
-pbr==6.0.0
+pbr==6.1.0
     # via
     #   -r requirements/base.txt
     #   stevedore
@@ -391,7 +391,6 @@ requests==2.32.3
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   requests-oauthlib
-    #   slumber
     #   social-auth-core
 requests-oauthlib==2.0.0
     # via
@@ -402,7 +401,7 @@ rpds-py==0.20.0
     #   -r requirements/base.txt
     #   jsonschema
     #   referencing
-rules==3.4
+rules==3.5
     # via -r requirements/base.txt
 semantic-version==2.10.0
     # via
@@ -421,10 +420,6 @@ six==1.16.0
     #   edx-django-release-util
     #   edx-rbac
     #   python-dateutil
-slumber==0.7.1
-    # via
-    #   -r requirements/base.txt
-    #   edx-rest-api-client
 social-auth-app-django==5.4.2
     # via
     #   -r requirements/base.txt
@@ -478,7 +473,7 @@ wcwidth==0.2.13
     #   prompt-toolkit
 zope-event==5.0
     # via gevent
-zope-interface==7.0.1
+zope-interface==7.0.3
     # via gevent
 
 # The following packages are considered to be unsafe in a requirements file:
