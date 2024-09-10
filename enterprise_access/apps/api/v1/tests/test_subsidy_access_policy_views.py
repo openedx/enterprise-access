@@ -1560,7 +1560,8 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         learner credit access policies.
         """
         self.maxDiff = None
-        content_key = 'demoX'
+        parent_content_key = 'edX+DemoX'
+        content_key = 'course-v1:edX+DemoX+T2024a'
         content_title = 'edx: Demo 101'
         content_price_cents = 100
         # Create a pair of AssignmentConfiguration + SubsidyAccessPolicy for the main test customer.
@@ -1579,6 +1580,8 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             learner_email='alice@foo.com',
             lms_user_id=1234,
             content_key=content_key,
+            parent_content_key=parent_content_key,
+            is_assigned_course_run=True,
             content_title=content_title,
             content_quantity=-content_price_cents,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
@@ -1594,6 +1597,8 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             learner_email='bob@foo.com',
             lms_user_id=12345,
             content_key=content_key,
+            parent_content_key=parent_content_key,
+            is_assigned_course_run=True,
             content_title=content_title,
             content_quantity=-content_price_cents,
             state=LearnerContentAssignmentStateChoices.ACCEPTED,
@@ -1643,6 +1648,8 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'learner_email': 'alice@foo.com',
             'lms_user_id': 1234,
             'content_key': content_key,
+            'parent_content_key': parent_content_key,
+            'is_assigned_course_run': True,
             'content_title': content_title,
             'content_quantity': -content_price_cents,
             'state': LearnerContentAssignmentStateChoices.ALLOCATED,

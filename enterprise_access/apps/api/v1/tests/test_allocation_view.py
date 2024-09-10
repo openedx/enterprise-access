@@ -122,7 +122,8 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
         self.mock_catalog_result = {
             'count': 2,
             'results': [
-                {'key': 'course+A', 'data': 'things'}, {'key': 'course+B', 'data': 'stuff'},
+                {'key': 'course+A', 'data': 'things'},
+                {'key': 'course+B', 'data': 'stuff'},
             ],
         }
 
@@ -229,6 +230,8 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'learner_email': 'alice@foo.com',
                     'lms_user_id': None,
                     'content_key': self.content_key,
+                    'parent_content_key': None,
+                    'is_assigned_course_run': False,
                     'content_title': self.content_title,
                     'content_quantity': -123,
                     'state': LearnerContentAssignmentStateChoices.ERRORED,
@@ -249,6 +252,8 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'learner_email': 'bob@foo.com',
                     'lms_user_id': None,
                     'content_key': self.content_key,
+                    'parent_content_key': None,
+                    'is_assigned_course_run': False,
                     'content_title': self.content_title,
                     'content_quantity': -456,
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
@@ -269,6 +274,8 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'learner_email': 'carol@foo.com',
                     'lms_user_id': None,
                     'content_key': self.content_key,
+                    'parent_content_key': None,
+                    'is_assigned_course_run': False,
                     'content_title': self.content_title,
                     'content_quantity': -789,
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
@@ -420,7 +427,8 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.enterprise_uuid = OTHER_TEST_ENTERPRISE_UUID
-        cls.content_key = 'course-v1:edX+edXPrivacy101+3T2020'
+        cls.content_key = 'course-v1:edX+Privacy101+3T2020'
+        cls.parent_content_key = 'edX+Privacy101'
         cls.content_title = 'edX: Privacy 101'
 
         # Create a pair of AssignmentConfiguration + SubsidyAccessPolicy for the main test customer.
@@ -434,6 +442,18 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             assignment_configuration=cls.assignment_configuration,
             spend_limit=10000 * 100,
         )
+
+        # Mock results from the catalog content metadata API endpoint.
+        cls.mock_catalog_result = {
+            'count': 2,
+            'results': [
+                {
+                    'key': cls.content_key,
+                    'parent_content_key': cls.parent_content_key,
+                    'data': 'things',
+                },
+            ],
+        }
 
     def setUp(self):
         super().setUp()
@@ -452,14 +472,6 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         # delete all assignment records for our policy between test function runs
         def delete_assignments():
             return self.assignment_configuration.assignments.all().delete()
-
-        # Mock results from the catalog content metadata API endpoint.
-        self.mock_catalog_result = {
-            'count': 2,
-            'results': [
-                {'key': 'course+A', 'data': 'things'}, {'key': 'course+B', 'data': 'stuff'},
-            ],
-        }
 
         self.addCleanup(delete_assignments)
 
@@ -509,6 +521,8 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         """
         mock_get_and_cache_content_metadata.return_value = {
             'content_title': self.content_title,
+            'content_key': self.parent_content_key,
+            'course_run_key': self.content_key,
         }
         mock_get_content_price.return_value = 123.45 * 100
         mock_aggregates_for_policy.return_value = {
@@ -539,6 +553,8 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             lms_user_id=None,
             cancelled_at=timezone.now(),
             content_key=self.content_key,
+            parent_content_key=self.parent_content_key,
+            is_assigned_course_run=True,
             content_title=self.content_title,
             content_quantity=-12345,
             state=LearnerContentAssignmentStateChoices.CANCELLED,
@@ -547,6 +563,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             email='expired@foo.com',
             lms_user_id=4277
         )
+        assignment_content_quantity_usd_cents = 12345
         LearnerContentAssignmentFactory(
             assignment_configuration=self.assignment_configuration,
             learner_email='retired-assignment@foo.com',
@@ -554,8 +571,10 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             expired_at=timezone.now(),
             errored_at=timezone.now(),
             content_key=self.content_key,
+            parent_content_key=self.parent_content_key,
+            is_assigned_course_run=True,
             content_title=self.content_title,
-            content_quantity=-12345,
+            content_quantity=-assignment_content_quantity_usd_cents,
             state=LearnerContentAssignmentStateChoices.EXPIRED,
         )
 
@@ -571,7 +590,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
         allocate_payload = {
             'learner_emails': ['new@foo.com', 'canceled@foo.com', 'expired@foo.com'],
             'content_key': self.content_key,
-            'content_price_cents': 123.45 * 100,  # policy limit is 100000.00 USD, so this should be well below limit
+            'content_price_cents': assignment_content_quantity_usd_cents,  # this should be well below limit
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)
@@ -581,7 +600,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             for assignment in self.assignment_configuration.assignments.filter(
                 state=LearnerContentAssignmentStateChoices.ALLOCATED,
                 content_key=self.content_key,
-                content_quantity=-123.45 * 100,
+                content_quantity=-assignment_content_quantity_usd_cents
             )
         }
         self.assertEqual(3, len(allocation_records_by_email))
@@ -594,8 +613,10 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'learner_email': 'new@foo.com',
             'lms_user_id': foo_user.lms_user_id,
             'content_key': self.content_key,
+            'parent_content_key': self.parent_content_key,
+            'is_assigned_course_run': True,
             'content_title': self.content_title,
-            'content_quantity': -123.45 * 100,
+            'content_quantity': -assignment_content_quantity_usd_cents,
             'state': LearnerContentAssignmentStateChoices.ALLOCATED,
             'transaction_uuid': None,
             'uuid': str(foo_record.uuid),
@@ -617,8 +638,10 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
                 'learner_email': 'canceled@foo.com',
                 'lms_user_id': None,
                 'content_key': self.content_key,
+                'parent_content_key': self.parent_content_key,
+                'is_assigned_course_run': True,
                 'content_title': self.content_title,
-                'content_quantity': -123.45 * 100,
+                'content_quantity': -assignment_content_quantity_usd_cents,
                 'state': LearnerContentAssignmentStateChoices.ALLOCATED,
                 'transaction_uuid': None,
                 'uuid': str(canceled_record.uuid),
@@ -635,8 +658,10 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
                 'learner_email': 'expired@foo.com',
                 'lms_user_id': expired_user.lms_user_id,
                 'content_key': self.content_key,
+                'parent_content_key': self.parent_content_key,
+                'is_assigned_course_run': True,
                 'content_title': self.content_title,
-                'content_quantity': -123.45 * 100,
+                'content_quantity': -assignment_content_quantity_usd_cents,
                 'state': LearnerContentAssignmentStateChoices.ALLOCATED,
                 'transaction_uuid': None,
                 'uuid': str(expired_record.uuid),
