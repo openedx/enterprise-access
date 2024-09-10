@@ -22,6 +22,7 @@ from enterprise_access.apps.content_assignments.content_metadata_api import (
 )
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 from enterprise_access.apps.content_assignments.tasks import send_exec_ed_enrollment_warmer
+from enterprise_access.utils import get_normalized_metadata_for_assignment
 
 logger = logging.getLogger(__name__)
 
@@ -155,23 +156,20 @@ class Command(BaseCommand):
                         )
                         continue
 
-                    # Nudge learners based on the start date of the "preferred" course run, NOT the start date from the
-                    # "normalized metadata" derived from the *advertised* course run. That latter assumption caused us
-                    # problems in the past because this script would just follow every new published run and keep
-                    # re-triggering nudge emails.
-                    course_run_metadata = next(
-                        run for run in content_metadata['course_runs']
-                        if run['key'] == assignment.preferred_course_run_key
-                    )
-                    start_date = course_run_metadata.get('start')
+                    normalized_metadata = get_normalized_metadata_for_assignment(assignment, content_metadata)
+                    start_date = normalized_metadata.get('start_date')
 
                     # Determine if the date from today + days_before_course_state_date is
                     # equal to the date of the start date
                     # If they are equal, then send the nudge email, otherwise continue
                     datetime_start_date = parse_datetime_string(start_date, set_to_utc=True)
-                    can_send_nudge_notification_in_advance = is_date_n_days_from_now(
-                        target_datetime=datetime_start_date,
-                        num_days=days_before_course_start_date
+                    can_send_nudge_notification_in_advance = (
+                        is_date_n_days_from_now(
+                            target_datetime=datetime_start_date,
+                            num_days=days_before_course_start_date
+                        )
+                        if start_date is not None
+                        else False
                     )
                     if not can_send_nudge_notification_in_advance:
                         logger.info(
