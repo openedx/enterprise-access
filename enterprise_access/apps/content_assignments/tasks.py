@@ -1,13 +1,15 @@
 """
 Tasks for content_assignments app.
 """
-
+import datetime
 import logging
 
 from braze.exceptions import BrazeBadRequestError
 from celery import shared_task
+from dateutil import parser
 from django.apps import apps
 from django.conf import settings
+from pytz import UTC
 
 from enterprise_access.apps.api_client.braze_client import ENTERPRISE_BRAZE_ALIAS_LABEL, BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
@@ -21,7 +23,11 @@ from enterprise_access.apps.content_assignments.content_metadata_api import (
 from enterprise_access.tasks import LoggedTaskWithRetry
 from enterprise_access.utils import get_automatic_expiration_date_and_reason, localized_utcnow
 
-from .constants import BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT, LearnerContentAssignmentStateChoices
+from .constants import (
+    BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT,
+    START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS,
+    LearnerContentAssignmentStateChoices
+)
 
 logger = logging.getLogger(__name__)
 
@@ -199,9 +205,18 @@ class BrazeCampaignSender:
         return get_human_readable_date(self._enrollment_deadline_raw())
 
     def get_start_date(self):
-        return get_human_readable_date(
-            self.course_metadata.get('normalized_metadata', {}).get('start_date')
-        )
+        """
+        Checks if the start_date is before today's date offset by the
+        START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS value and returns today's date
+        If not, pass through the formatted start date.
+        """
+        start_date = self.course_metadata.get('normalized_metadata', {}).get('start_date')
+        start_date_datetime = parser.parse(start_date)
+        now = datetime.datetime.now()
+        offset_date_from_today = now - datetime.timedelta(days=START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS)
+        if start_date_datetime < offset_date_from_today.replace(tzinfo=UTC):
+            return get_human_readable_date(now.strftime(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT))
+        return get_human_readable_date(start_date)
 
     def get_action_required_by_timestamp(self):
         """
