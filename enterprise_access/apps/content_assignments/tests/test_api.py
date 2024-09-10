@@ -626,7 +626,7 @@ class TestAssignmentExpiration(TestCase):
             spend_limit=1000000,
         )
 
-    def mock_content_metadata(self, content_key, enroll_by_date):
+    def mock_content_metadata(self, content_key, course_run_key, enroll_by_date):
         """
         Helper to produce content metadata with a given enroll_by_date.
         """
@@ -634,6 +634,11 @@ class TestAssignmentExpiration(TestCase):
             'key': content_key,
             'normalized_metadata': {
                 'enroll_by_date': enroll_by_date,
+            },
+            'normalized_metadata_by_run': {
+                course_run_key: {
+                    'enroll_by_date': enroll_by_date,
+                },
             },
         }
 
@@ -652,7 +657,7 @@ class TestAssignmentExpiration(TestCase):
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
-                content_metadata=self.mock_content_metadata('edX+DemoX', None),
+                metadata_for_assignment=self.mock_content_metadata('edX+DemoX', 'course-v1:edX+DemoX+T2024', None),
                 modify_assignment=True,
             )
 
@@ -682,7 +687,13 @@ class TestAssignmentExpiration(TestCase):
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
-                content_metadata=self.mock_content_metadata('edX+DemoX', delta_t(days=100, as_string=True)),
+                metadata_for_assignment={
+                    'content_metadata': self.mock_content_metadata(
+                        'edX+DemoX',
+                        'course-v1:edX+DemoX+T2024',
+                        delta_t(days=100, as_string=True)
+                    )
+                },
                 modify_assignment=True,
             )
 
@@ -719,7 +730,9 @@ class TestAssignmentExpiration(TestCase):
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
-                content_metadata=self.mock_content_metadata('edX+DemoX', None),
+                metadata_for_assignment={
+                    'content_metadata': self.mock_content_metadata('edX+DemoX', 'course-v1:edX+DemoX+T2024', None),
+                },
                 modify_assignment=True,
             )
 
@@ -747,7 +760,8 @@ class TestAssignmentExpiration(TestCase):
         """
         Tests that we expire assignments with a passed enroll_by_date
         """
-        content_key = 'demoX'
+        content_key = 'edX+DemoX'
+        course_run_key = 'course-v1:edX+DemoX+T2024'
         assignment = LearnerContentAssignmentFactory.create(
             content_key='demoX',
             assignment_configuration=self.assignment_configuration,
@@ -760,6 +774,7 @@ class TestAssignmentExpiration(TestCase):
         # create expired content metadata
         mock_content_metadata = self.mock_content_metadata(
             content_key=content_key,
+            course_run_key=course_run_key,
             enroll_by_date=delta_t(days=-1, as_string=True),
         )
 
@@ -768,7 +783,7 @@ class TestAssignmentExpiration(TestCase):
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
-                content_metadata=mock_content_metadata,
+                metadata_for_assignment={'content_metadata': mock_content_metadata},
                 modify_assignment=True,
             )
 
@@ -792,7 +807,8 @@ class TestAssignmentExpiration(TestCase):
         """
         Tests that we expire assignments with an underlying subsidy that has expired.
         """
-        content_key = 'demoX'
+        content_key = 'edX+DemoX'
+        course_run_key = 'course-v1:edX+DemoX+T2024'
         assignment = LearnerContentAssignmentFactory.create(
             assignment_configuration=self.assignment_configuration,
             content_key=content_key,
@@ -805,6 +821,7 @@ class TestAssignmentExpiration(TestCase):
         # create non-expired content metadata
         mock_content_metadata = self.mock_content_metadata(
             content_key=content_key,
+            course_run_key=course_run_key,
             enroll_by_date=delta_t(days=100, as_string=True),
         )
 
@@ -813,7 +830,7 @@ class TestAssignmentExpiration(TestCase):
         with mock.patch.object(self.policy, 'subsidy_record', return_value=mock_subsidy_record):
             expire_assignment(
                 assignment,
-                content_metadata=mock_content_metadata,
+                metadata_for_assignment={'content_metadata': mock_content_metadata},
                 modify_assignment=True,
             )
 

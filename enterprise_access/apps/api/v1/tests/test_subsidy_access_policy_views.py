@@ -1559,7 +1559,6 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         Verify that SubsidyAccessPolicyViewset credits_available returns learner content assignments for assigned
         learner credit access policies.
         """
-        self.maxDiff = None
         parent_content_key = 'edX+DemoX'
         content_key = 'course-v1:edX+DemoX+T2024a'
         content_title = 'edx: Demo 101'
@@ -1621,12 +1620,20 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         # Mock catalog content metadata results. See LearnerContentAssignmentWithContentMetadataResponseSerializer
         # for what we expect to be in the response payload w.r.t. content metadata.
         mock_content_metadata = {
-            'key': content_key,
+            'key': parent_content_key,
             'normalized_metadata': {
                 'start_date': '2020-01-01T12:00:00Z',
                 'end_date': '2022-01-01T12:00:00Z',
                 'enroll_by_date': '2021-01-01T12:00:00Z',
                 'content_price': content_price_cents,
+            },
+            'normalized_metadata_by_run': {
+                content_key: {
+                    'start_date': '2020-01-01T12:00:00Z',
+                    'end_date': '2022-01-01T12:00:00Z',
+                    'enroll_by_date': '2021-01-01T12:00:00Z',
+                    'content_price': content_price_cents,
+                },
             },
             'course_type': 'verified-audit',
             'owners': [

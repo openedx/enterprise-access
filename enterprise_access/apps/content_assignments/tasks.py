@@ -19,7 +19,11 @@ from enterprise_access.apps.content_assignments.content_metadata_api import (
     get_human_readable_date
 )
 from enterprise_access.tasks import LoggedTaskWithRetry
-from enterprise_access.utils import get_automatic_expiration_date_and_reason, localized_utcnow
+from enterprise_access.utils import (
+    get_automatic_expiration_date_and_reason,
+    get_normalized_metadata_for_assignment,
+    localized_utcnow
+)
 
 from .constants import BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT, LearnerContentAssignmentStateChoices
 
@@ -77,7 +81,7 @@ class BrazeCampaignSender:
         self.braze_client = BrazeApiClient()
         self.lms_client = LmsApiClient()
         self._customer_data = None
-        self._course_metadata = None
+        self._metadata_for_assignment = None
 
     def send_campaign_message(self, braze_trigger_properties, campaign_identifier):
         """
@@ -140,22 +144,23 @@ class BrazeCampaignSender:
         return self._customer_data
 
     @property
-    def course_metadata(self):
+    def metadata_for_assignment(self):
         """
         Returns memoized course metadata dictionary.
         """
-        if not self._course_metadata:
+        if not self._metadata_for_assignment:
             metadata_by_key = get_content_metadata_for_assignments(
                 self.policy.catalog_uuid, [self.assignment]
             )
-            self._course_metadata = metadata_by_key.get(self.assignment.content_key)
-            if not self._course_metadata:
+            self._metadata_for_assignment = metadata_by_key.get(self.assignment.content_key)
+            if not self._metadata_for_assignment.get('content_metadata', {}):
                 msg = (
                     f'Could not fetch metadata for assignment {self.assignment.uuid}, '
-                    f'content_key {self.assignment.content_key}'
+                    f'content_key {self.assignment.content_key}, '
+                    f'parent_content_key {self.assignment.parent_content_key}'
                 )
                 raise Exception(msg)
-        return self._course_metadata
+        return self._metadata_for_assignment
 
     @property
     def subsidy_record(self):
@@ -193,14 +198,14 @@ class BrazeCampaignSender:
         return self.assignment.content_title
 
     def _enrollment_deadline_raw(self):
-        return self.course_metadata.get('normalized_metadata', {}).get('enroll_by_date')
+        return get_normalized_metadata_for_assignment(self.metadata_for_assignment).get('enroll_by_date')
 
     def get_enrollment_deadline(self):
         return get_human_readable_date(self._enrollment_deadline_raw())
 
     def get_start_date(self):
         return get_human_readable_date(
-            self.course_metadata.get('normalized_metadata', {}).get('start_date')
+            get_normalized_metadata_for_assignment(self.metadata_for_assignment).get('start_date')
         )
 
     def get_action_required_by_timestamp(self):
@@ -217,18 +222,18 @@ class BrazeCampaignSender:
         )
 
     def get_course_partner(self):
-        return get_course_partners(self.course_metadata)
+        return get_course_partners(self.metadata_for_assignment.get('content_metadata'))
 
     def get_course_card_image(self):
         """
         Fetches the ``course_card_image`` property for this object's assignment and course.
         """
-        image_url = get_card_image_url(self.course_metadata)
+        image_url = get_card_image_url(self.metadata_for_assignment.get('content_metadata'))
         logger.warning(
             'Found course_card_image %s for assignment %s with metadata %s',
             image_url,
             self.assignment.uuid,
-            self.course_metadata,
+            self.metadata_for_assignment.get('content_metadata'),
         )
         return image_url
 

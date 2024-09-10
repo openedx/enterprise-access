@@ -13,7 +13,7 @@ from enterprise_access.apps.content_assignments.constants import (
     LearnerContentAssignmentStateChoices
 )
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment, LearnerContentAssignmentAction
-from enterprise_access.utils import get_automatic_expiration_date_and_reason
+from enterprise_access.utils import get_automatic_expiration_date_and_reason, get_normalized_metadata_for_assignment
 
 logger = logging.getLogger(__name__)
 
@@ -145,8 +145,8 @@ class LearnerContentAssignmentResponseSerializer(serializers.ModelSerializer):
         """
         Returns the earliest possible expiration date for the assignment.
         """
-        assignment_content_metadata = self.get_content_metadata_from_context(assignment.content_key)
-        return get_automatic_expiration_date_and_reason(assignment, content_metadata=assignment_content_metadata)
+        metadata_for_assignment = self.get_content_metadata_from_context(assignment.content_key)
+        return get_automatic_expiration_date_and_reason(assignment, metadata_for_assignment)
 
 
 class LearnerContentAssignmentAdminResponseSerializer(LearnerContentAssignmentResponseSerializer):
@@ -286,7 +286,7 @@ class ContentMetadataForAssignmentSerializer(serializers.Serializer):
     content_price = serializers.SerializerMethodField(
         help_text='The price, in USD, of this content',
     )
-    course_type = serializers.CharField(
+    course_type = serializers.SerializerMethodField(
         help_text='The type of course, something like "executive-education-2u" or "verified-audit"',
         # Try to be a little defensive against malformed data.
         required=False,
@@ -296,19 +296,27 @@ class ContentMetadataForAssignmentSerializer(serializers.Serializer):
 
     @extend_schema_field(serializers.DateTimeField)
     def get_start_date(self, obj):
-        return obj.get('normalized_metadata', {}).get('start_date')
+        return get_normalized_metadata_for_assignment(obj).get('start_date')
 
     @extend_schema_field(serializers.DateTimeField)
     def get_end_date(self, obj):
-        return obj.get('normalized_metadata', {}).get('end_date')
+        return get_normalized_metadata_for_assignment(obj).get('end_date')
 
     @extend_schema_field(serializers.DateTimeField)
     def get_enroll_by_date(self, obj):
-        return obj.get('normalized_metadata', {}).get('enroll_by_date')
+        return get_normalized_metadata_for_assignment(obj).get('enroll_by_date')
 
     @extend_schema_field(serializers.IntegerField)
     def get_content_price(self, obj):
-        return obj.get('normalized_metadata', {}).get('content_price')
+        return get_normalized_metadata_for_assignment(obj).get('content_price')
+
+    @extend_schema_field(serializers.CharField)
+    def get_course_type(self, obj):
+        """
+        Returns the course type for the content metadata, if available.
+        """
+        content_metadata = obj.get('content_metadata', {})
+        return content_metadata.get('course_type')
 
     @extend_schema_field(CoursePartnerSerializer)
     def get_partners(self, obj):
@@ -317,7 +325,8 @@ class ContentMetadataForAssignmentSerializer(serializers.Serializer):
         enterprise-catalog/enterprise_catalog/apps/catalog/algolia_utils.py
         """
         partners = []
-        owners = obj.get('owners') or []
+        content_metadata = obj.get('content_metadata', {})
+        owners = content_metadata.get('owners') or []
 
         for owner in owners:
             partner_name = owner.get('name')

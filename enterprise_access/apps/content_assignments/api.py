@@ -23,7 +23,12 @@ from enterprise_access.apps.content_assignments.tasks import (
 )
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
-from enterprise_access.utils import chunks, get_automatic_expiration_date_and_reason, localized_utcnow
+from enterprise_access.utils import (
+    chunks,
+    get_automatic_expiration_date_and_reason,
+    get_normalized_metadata_for_assignment,
+    localized_utcnow
+)
 
 from .constants import AssignmentAutomaticExpiredReason, LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
@@ -761,8 +766,11 @@ def nudge_assignments(assignments, assignment_configuration_uuid, days_before_co
             enterprise_catalog_uuid,
             [assignment],
         )
-        content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
-        start_date = content_metadata.get('normalized_metadata', {}).get('start_date')
+        content_metadata_and_assignment_run_key = content_metadata_for_assignments.get(assignment.content_key, {})
+        normalized_metadata = get_normalized_metadata_for_assignment(content_metadata_and_assignment_run_key) or {}
+        content_metadata = content_metadata_and_assignment_run_key.get('content_metadata')
+
+        start_date = normalized_metadata.get('start_date')
         course_type = content_metadata.get('course_type')
 
         # check if the course_type is an executive-education course
@@ -828,7 +836,7 @@ def nudge_assignments(assignments, assignment_configuration_uuid, days_before_co
 
 def expire_assignment(
     assignment: LearnerContentAssignment,
-    content_metadata: dict,
+    metadata_for_assignment: dict,
     modify_assignment: bool = True
 ):
     """
@@ -839,7 +847,7 @@ def expire_assignment(
         logger.info('Cannot expire accepted assignment %s', assignment.uuid)
         return None
 
-    automatic_expiration_date_and_reason = get_automatic_expiration_date_and_reason(assignment, content_metadata)
+    automatic_expiration_date_and_reason = get_automatic_expiration_date_and_reason(assignment, metadata_for_assignment)
     automatic_expiration_date = automatic_expiration_date_and_reason['date']
     automatic_expiration_reason = automatic_expiration_date_and_reason['reason']
 

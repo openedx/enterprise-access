@@ -28,13 +28,36 @@ def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
         to a content metadata dictionary, or null if no such dictionary
         could be found for a given key.
     """
-    content_keys = sorted({assignment.content_key for assignment in assignments})
-    content_metadata_list = get_and_cache_catalog_content_metadata(enterprise_catalog_uuid, content_keys)
-    metadata_by_key = {
-        record['key']: record for record in content_metadata_list
+    content_keys = {
+        (
+            assignment.content_key,
+            assignment.is_assigned_course_run,
+        )
+        for assignment in assignments
     }
+    content_metadata_list = get_and_cache_catalog_content_metadata(enterprise_catalog_uuid, content_keys)
+    metadata_by_key = {}
+    for record in content_metadata_list:
+        record_key = record.get('key')
+
+        # Now, check if the record_key matches either the content_key or parent_content_key in the original content_keys
+        for content_key, is_assigned_course_run in content_keys:
+            if is_assigned_course_run:
+                metadata_by_key.update({
+                    content_key: record
+                })
+                break  # Stop searching after the match is found
+            if record_key == content_key:
+                metadata_by_key.update({
+                    record_key: record
+                })
+                break  # Stop searching after the match is found
+
     return {
-        assignment.content_key: metadata_by_key.get(assignment.content_key)
+        assignment.content_key: {
+            'content_metadata': metadata_by_key.get(assignment.content_key),
+            'assignment_course_run_key': assignment.content_key if assignment.is_assigned_course_run else None,
+        }
         for assignment in assignments
     }
 

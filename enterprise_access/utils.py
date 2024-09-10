@@ -83,14 +83,14 @@ def _get_subsidy_expiration(assignment):
     return subsidy_expiration_datetime
 
 
-def _get_enrollment_deadline_date(content_metadata):
+def _get_enrollment_deadline_date(metadata_for_assignment):
     """
     Helper to get the enrollment end date from a content metadata record.
     """
-    if not content_metadata:
+    if not metadata_for_assignment:
         return None
 
-    normalized_metadata = content_metadata.get('normalized_metadata') or {}
+    normalized_metadata = get_normalized_metadata_for_assignment(metadata_for_assignment) or {}
     enrollment_end_date_str = normalized_metadata.get('enroll_by_date')
     try:
         datetime_obj = parse_datetime_string(enrollment_end_date_str)
@@ -99,7 +99,7 @@ def _get_enrollment_deadline_date(content_metadata):
     except ValueError:
         logger.warning(
             'Bad datetime format for %s, value: %s',
-            content_metadata.get('key'),
+            metadata_for_assignment.get('content_metadata').get('key'),
             enrollment_end_date_str,
         )
     return None
@@ -107,7 +107,7 @@ def _get_enrollment_deadline_date(content_metadata):
 
 def get_automatic_expiration_date_and_reason(
     assignment,
-    content_metadata: dict = None
+    metadata_for_assignment: dict = None
 ):
     """
     For the given assignment, returns the date at which this assignment expires due to:
@@ -120,7 +120,7 @@ def get_automatic_expiration_date_and_reason(
 
     Arguments:
         assignment (LearnerContentAssignment): The assignment to check for expiration.
-        [content_metadata] (dict): Content metadata for the assignment's content key. If not provided, it will be
+        [metadata_for_assignment] (dict): Content metadata for the assignment's content key. If not provided, it will be
             fetched and subsequently cached from the content metadata API.
     """
     assignment_configuration = assignment.assignment_configuration
@@ -131,14 +131,14 @@ def get_automatic_expiration_date_and_reason(
     subsidy_expiration_datetime = _get_subsidy_expiration(assignment)
 
     # content enrollment deadline
-    if not content_metadata:
+    if not metadata_for_assignment:
         content_key = assignment.content_key
         content_metadata_by_key = get_content_metadata_for_assignments(
             enterprise_catalog_uuid=subsidy_access_policy.catalog_uuid,
             assignments=[assignment],
         )
-        content_metadata = content_metadata_by_key.get(content_key)
-    enrollment_deadline_datetime = _get_enrollment_deadline_date(content_metadata)
+        metadata_for_assignment = content_metadata_by_key.get(content_key)
+    enrollment_deadline_datetime = _get_enrollment_deadline_date(metadata_for_assignment)
     if enrollment_deadline_datetime:
         enrollment_deadline_datetime = enrollment_deadline_datetime.replace(tzinfo=UTC)
 
@@ -209,3 +209,34 @@ def should_send_email_to_pecu(recent_action):
         is_65_days_since_invited or
         is_85_days_since_invited
     )
+
+
+def get_normalized_metadata_for_assignment(obj):
+    """
+    Retrieve normalized metadata for a given object. If the object is associated
+    with a specific course run, return the metadata for that run. If metadata
+    for the run is missing, log a warning and return an empty dictionary.
+
+    Args:
+        obj (dict): A dictionary containing `content_metadata` and `assignment_course_run_key`.
+
+    Returns:
+        dict: Normalized metadata, either for the specific course run or the advertised course run, if any.
+    """
+    content_metadata = obj.get('content_metadata') or {}
+    normalized_metadata_by_run = content_metadata.get('normalized_metadata_by_run', {})
+
+    assignment_course_run_key = obj.get('assignment_course_run_key')
+    if not assignment_course_run_key:
+        return content_metadata.get('normalized_metadata', {})
+
+    metadata_for_run = normalized_metadata_by_run.get(assignment_course_run_key)
+
+    if not metadata_for_run:
+        logger.warning(
+            'Content metadata missing for course run key [%s].',
+            assignment_course_run_key,
+        )
+        return {}
+
+    return metadata_for_run

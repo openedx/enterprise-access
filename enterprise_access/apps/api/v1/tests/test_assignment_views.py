@@ -768,14 +768,25 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
         # Mock content metadata for assignment
         mock_content_metadata_for_assignments.return_value = {
             self.content_metadata_one['content_key']: {
-                'key': self.content_metadata_one['parent_content_key'],
-                'normalized_metadata': {
-                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    'end_date': end_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    'content_price': self.content_metadata_one['content_quantity'],
+                'content_metadata': {
+                    'key': self.content_metadata_one['parent_content_key'],
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'end_date': end_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'content_price': self.content_metadata_one['content_quantity'],
+                    },
+                    'normalized_metadata_by_run': {
+                        self.content_metadata_one['content_key']: {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            'end_date': end_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            'content_price': self.content_metadata_one['content_quantity'],
+                        },
+                    },
+                    'course_type': 'executive-education-2u',
                 },
-                'course_type': 'executive-education-2u',
+                'assignment_course_run_key': self.content_metadata_one['content_key'],
             },
         }
         # Call the nudge endpoint.

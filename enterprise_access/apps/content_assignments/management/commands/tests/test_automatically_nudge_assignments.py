@@ -218,64 +218,94 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
         }
         mock_content_metadata_for_assignments.return_value = {
             'edX+edXAccessibility101': {
-                'key': 'edX+edXAccessibility101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXAccessibility101',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXAccessibility101+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                    'course_type': 'executive-education-2u',
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXPrivacy101': {
-                'key': 'edX+edXPrivacy101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXPrivacy101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXPrivacy101',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXPrivacy101+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                    'course_type': 'executive-education-2u',
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXTesseract4D': {
-                'key': 'edX+edXTesseract4D',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXTesseract4D',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXTesseract4D+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                    'course_type': 'executive-education-2u',
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXQuadrilateral306090': {
-                'key': 'edX+edXQuadrilateral306090',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXQuadrilateral306090',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXQuadrilateral306090+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                    'course_type': 'executive-education-2u',
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXIsoscelesPyramid2012': {
-                'key': 'edX+edXIsoscelesPyramid2012',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXIsoscelesPyramid2012',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXIsoscelesPyramid2012+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                    'course_type': 'executive-education-2u',
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXBeeHivesAlive0220': {
-                'key': 'edX+edXBeeHivesAlive0220',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXBeeHivesAlive0220',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXBeeHivesAlive0220+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                    'course_type': 'executive-education-2u',
+                },
+                'assignment_course_run_key': None,
             },
         }
 
@@ -320,64 +350,106 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
         }
         mock_content_metadata_for_assignments.return_value = {
             'edX+edXAccessibility101': {
-                'key': 'edX+edXAccessibility101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start': start_date_between_30_and_14_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXAccessibility101',
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date_between_30_and_14_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXAccessibility101+1T2022': {
+                            'start_date': start_date_between_30_and_14_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXTesseract4D': {
-                'key': 'edX+edXTesseract4D',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start': start_date_already_started.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXTesseract4D',
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date_already_started.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXTesseract4D+1T2022': {
+                            'start_date': start_date_already_started.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXQuadrilateral306090': {
-                'key': 'edX+edXQuadrilateral306090',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start': start_date_beyond_30_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXQuadrilateral306090',
+                    'normalized_metadata': {
+                        'start_date': start_date_beyond_30_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXQuadrilateral306090+1T2022': {
+                            'start_date': start_date_beyond_30_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                    'course_type': 'executive-education-2u',
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXPrivacy101': {
-                'key': 'edX+edXPrivacy101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXPrivacy101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXPrivacy101',
+                    'course_runs': [
+                        {
+                            'key': 'course-v1:edX+edXPrivacy101+1T2022',
+                            'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    ],
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXPrivacy101+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXIsoscelesPyramid2012': {
-                'key': 'edX+edXIsoscelesPyramid2012',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXIsoscelesPyramid2012',
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXIsoscelesPyramid2012+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXBeeHivesAlive0220': {
-                'key': 'edX+edXBeeHivesAlive0220',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXBeeHivesAlive0220',
+                    'course_runs': [
+                        {
+                            'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
+                            'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    ],
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXBeeHivesAlive0220+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
         }
 
@@ -411,64 +483,94 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
         # Update course_type to check for only 'executive-education' or 'executive-education-2u' course types
         mock_content_metadata_for_assignments.return_value = {
             'edX+edXAccessibility101': {
-                'key': 'edX+edXAccessibility101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXAccessibility101',
+                    'course_type': 'verified-audit',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'verified-audit',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXAccessibility101+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXPrivacy101': {
-                'key': 'edX+edXPrivacy101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXPrivacy101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXPrivacy101',
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXPrivacy101+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXTesseract4D': {
-                'key': 'edX+edXTesseract4D',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXTesseract4D',
+                    'course_type': 'professional',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'professional',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXTesseract4D+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXQuadrilateral306090': {
-                'key': 'edX+edXQuadrilateral306090',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXQuadrilateral306090',
+                    'course_type': 'bootcamp-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'bootcamp-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXQuadrilateral306090+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXIsoscelesPyramid2012': {
-                'key': 'edX+edXIsoscelesPyramid2012',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXIsoscelesPyramid2012',
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXIsoscelesPyramid2012+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXBeeHivesAlive0220': {
-                'key': 'edX+edXBeeHivesAlive0220',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXBeeHivesAlive0220',
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXBeeHivesAlive0220+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
         }
 
@@ -504,64 +606,99 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
         }
         mock_content_metadata_for_assignments.return_value = {
             'edX+edXAccessibility101': {
-                'key': 'edX+edXAccessibility101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXAccessibility101',
+                    'course_runs': [
+                        {
+                            'key': 'course-v1:edX+edXAccessibility101+1T2022',
+                            'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    ],
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXAccessibility101+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXTesseract4D': {
-                'key': 'edX+edXTesseract4D',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXTesseract4D',
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXTesseract4D+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXQuadrilateral306090': {
-                'key': 'edX+edXQuadrilateral306090',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXQuadrilateral306090',
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXQuadrilateral306090+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXPrivacy101': {
-                'key': 'edX+edXPrivacy101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXPrivacy101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXPrivacy101',
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXPrivacy101+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
             'edX+edXIsoscelesPyramid2012': {
-                'key': 'edX+edXIsoscelesPyramid2012',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXIsoscelesPyramid2012',
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXIsoscelesPyramid2012+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
             },
             'edX+edXBeeHivesAlive0220': {
-                'key': 'edX+edXBeeHivesAlive0220',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'content_metadata': {
+                    'key': 'edX+edXBeeHivesAlive0220',
+                    'course_type': 'executive-education-2u',
+                    'normalized_metadata': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
-                'course_type': 'executive-education-2u',
+                    'normalized_metadata_by_run': {
+                        'course-v1:edX+edXBeeHivesAlive0220+1T2022': {
+                            'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
+                },
+                'assignment_course_run_key': None,
             },
         }
 
@@ -699,12 +836,19 @@ class TestAutomaticallyNudgeAssignmentCommand2(TestCase):
         else:
             mock_content_metadata_for_assignments.return_value = {
                 self.COURSE_KEY: {
-                    'key': self.COURSE_KEY,
-                    'course_runs': [{
-                        'key': self.COURSE_RUN_KEY,
-                        'start': course_start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    }],
-                    'course_type': course_type,
+                    'content_metadata': {
+                        'key': self.COURSE_KEY,
+                        'course_type': course_type,
+                        'normalized_metadata': {
+                            'start_date': course_start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                        'normalized_metadata_by_run': {
+                            self.COURSE_RUN_KEY: {
+                                'start_date': course_start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            },
+                        },
+                    },
+                    'assignment_course_run_key': None,
                 },
             }
         call_command(self.command, days_before_course_start_date=14)

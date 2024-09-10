@@ -91,9 +91,9 @@ class Command(BaseCommand):
                 )
 
                 for assignment in assignments:
-                    content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
+                    metadata_for_assignment = content_metadata_for_assignments.get(assignment.content_key, {})
                     expire_assignment(
                         assignment,
-                        content_metadata,
+                        metadata_for_assignment,
                         modify_assignment=not dry_run,
                     )
