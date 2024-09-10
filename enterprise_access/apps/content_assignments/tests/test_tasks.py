@@ -1,6 +1,7 @@
 """
 Tests for Enterprise Access content_assignments tasks.
 """
+import datetime
 from unittest import mock
 from uuid import uuid4
 
@@ -20,7 +21,7 @@ from enterprise_access.apps.content_assignments.constants import (
     AssignmentActions,
     LearnerContentAssignmentStateChoices
 )
-from enterprise_access.apps.content_assignments.content_metadata_api import format_datetime_obj
+from enterprise_access.apps.content_assignments.content_metadata_api import format_datetime_obj, get_human_readable_date
 from enterprise_access.apps.content_assignments.tasks import (
     BrazeCampaignSender,
     create_pending_enterprise_learner_for_assignment_task,
@@ -240,6 +241,9 @@ class TestBrazeEmailTasks(APITestWithMocks):
             ],
             'card_image_url': 'https://itsanimage.com',
         }
+        cls.mock_formatted_todays_date = get_human_readable_date(datetime.datetime.now().strftime(
+            BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT
+        ))
 
     def setUp(self):
         super().setUp()
@@ -382,6 +386,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 [self.assignment.learner_email],
                 ENTERPRISE_BRAZE_ALIAS_LABEL,
             )
+
         mock_braze_client.send_campaign_message.assert_called_once_with(
             expected_campaign_identifier,
             recipients=[expected_recipient],
@@ -390,7 +395,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'organization': self.enterprise_customer_name,
                 'course_title': self.assignment.content_title,
                 'enrollment_deadline': 'Jan 01, 2021',
-                'start_date': 'Jan 01, 2020',
+                'start_date': self.mock_formatted_todays_date,
                 'course_partner': 'Smart Folks, Good People, and Fast Learners',
                 'course_card_image': 'https://itsanimage.com',
                 'learner_portal_link': 'http://enterprise-learner-portal.example.com/test-slug',
@@ -420,7 +425,6 @@ class TestBrazeEmailTasks(APITestWithMocks):
             'count': 1,
             'results': [self.mock_content_metadata]
         }
-
         # Set the subsidy expiration time to tomorrow
         mock_subsidy = {
             'uuid': self.policy.subsidy_uuid,
@@ -439,7 +443,6 @@ class TestBrazeEmailTasks(APITestWithMocks):
         mock_lms_client.return_value.get_enterprise_customer_data.assert_called_with(
             self.assignment_configuration.enterprise_customer_uuid
         )
-
         mock_braze_client.return_value.send_campaign_message.assert_any_call(
             'test-assignment-notification-campaign',
             recipients=[mock_recipient],
@@ -448,7 +451,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'organization': self.enterprise_customer_name,
                 'course_title': self.assignment.content_title,
                 'enrollment_deadline': 'Jan 01, 2021',
-                'start_date': 'Jan 01, 2020',
+                'start_date': self.mock_formatted_todays_date,
                 'course_partner': 'Smart Folks and Good People',
                 'course_card_image': self.mock_content_metadata['card_image_url'],
                 'learner_portal_link': '{}/{}'.format(
