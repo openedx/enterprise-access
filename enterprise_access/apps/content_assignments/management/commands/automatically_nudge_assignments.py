@@ -168,7 +168,7 @@ class Command(BaseCommand):
                             target_datetime=datetime_start_date,
                             num_days=days_before_course_start_date
                         )
-                        if start_date is not None
+                        if datetime_start_date is not None
                         else False
                     )
                     if not can_send_nudge_notification_in_advance:
