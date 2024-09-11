@@ -17,6 +17,23 @@ DATE_INPUT_PATTERNS = [
 DEFAULT_STRFTIME_PATTERN = '%b %d, %Y'
 
 
+def _process_course_metadata(course_metadata, is_run_based_by_content_key, metadata_by_key):
+    """
+    Helper function to update the metadata_by_key dictionary with the course metadata based on
+    either a course run key (for run-based assignments) or a course key.
+    """
+    course_key = course_metadata.get('key')
+
+    # If a course run is assigned, update the metadata for the course run key. Otherwise,
+    # update the metadata for the course key.
+    for assignment_content_key, is_assigned_course_run in is_run_based_by_content_key.items():
+        if is_assigned_course_run:
+            metadata_by_key[assignment_content_key] = course_metadata
+        else:
+            # if not is_assigned_course_run, we can assume it's a (legacy) course-based assignment
+            metadata_by_key[course_key] = course_metadata
+
+
 def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
     """
     Fetches (from cache or enterprise-catalog API call) content metadata
@@ -40,21 +57,8 @@ def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
         is_run_based_by_content_key.keys()
     )
     metadata_by_key = {}
-    for record in content_metadata_list:
-        record_key = record.get('key')
-
-        # Now, check if the record_key matches either the content_key or parent_content_key in the original content_keys
-        for content_key, is_assigned_course_run in is_run_based_by_content_key.items():
-            if is_assigned_course_run:
-                metadata_by_key.update({
-                    content_key: record
-                })
-                break  # Stop searching after the match is found
-            if record_key == content_key:
-                metadata_by_key.update({
-                    record_key: record
-                })
-                break  # Stop searching after the match is found
+    for course_metadata in content_metadata_list:
+        _process_course_metadata(course_metadata, is_run_based_by_content_key, metadata_by_key)
 
     return {
         assignment.content_key: metadata_by_key.get(assignment.content_key)
