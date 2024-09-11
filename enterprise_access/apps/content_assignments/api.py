@@ -766,11 +766,8 @@ def nudge_assignments(assignments, assignment_configuration_uuid, days_before_co
             enterprise_catalog_uuid,
             [assignment],
         )
-        print('content_metadata_for_assignments?!?!', content_metadata_for_assignments)
         content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
-        print('content_metadata?!?!', content_metadata)
         normalized_metadata = get_normalized_metadata_for_assignment(assignment, content_metadata)
-        print('normalized_metadata?!?!', normalized_metadata)
 
         start_date = normalized_metadata.get('start_date')
         course_type = content_metadata.get('course_type')

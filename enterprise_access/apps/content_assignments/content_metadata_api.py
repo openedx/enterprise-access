@@ -24,7 +24,8 @@ def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
     such metadata is related to the given `enterprise_catalog_uuid`.
 
     Note that the `content_keys` of the provided assignments may be
-    either course run keys or course keys.
+    either course run keys or course keys. Regardless of the type of key,
+    the content metadata API will return the metadata at the course-level.
 
     Returns:
         A dict mapping every content key of the provided assignments
