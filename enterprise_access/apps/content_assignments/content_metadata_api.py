@@ -23,22 +23,28 @@ def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
     in bulk for the `content_keys` of the given assignments, provided
     such metadata is related to the given `enterprise_catalog_uuid`.
 
+    Note that the `content_keys` of the provided assignments may be
+    either course run keys or course keys.
+
     Returns:
         A dict mapping every content key of the provided assignments
         to a content metadata dictionary, or null if no such dictionary
         could be found for a given key.
     """
-    content_keys = {
-        (assignment.content_key, assignment.is_assigned_course_run)
+    is_run_based_by_content_key = {
+        assignment.content_key: assignment.is_assigned_course_run
         for assignment in assignments
     }
-    content_metadata_list = get_and_cache_catalog_content_metadata(enterprise_catalog_uuid, content_keys)
+    content_metadata_list = get_and_cache_catalog_content_metadata(
+        enterprise_catalog_uuid,
+        is_run_based_by_content_key.keys()
+    )
     metadata_by_key = {}
     for record in content_metadata_list:
         record_key = record.get('key')
 
         # Now, check if the record_key matches either the content_key or parent_content_key in the original content_keys
-        for content_key, is_assigned_course_run in content_keys:
+        for content_key, is_assigned_course_run in is_run_based_by_content_key.items():
             if is_assigned_course_run:
                 metadata_by_key.update({
                     content_key: record
