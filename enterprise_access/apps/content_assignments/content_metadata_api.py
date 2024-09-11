@@ -17,6 +17,22 @@ DATE_INPUT_PATTERNS = [
 DEFAULT_STRFTIME_PATTERN = '%b %d, %Y'
 
 
+def _content_metadata_for_assignment(assignment, course_metadata_list):
+    """
+    Given a list of course metadata dictionaries and an assignment,
+    find the course metadata dictionary that corresponds to the
+    assignment's content_key (course run) or parent_content_key (course).
+    """
+    return next(
+        (
+            course_metadata
+            for course_metadata in course_metadata_list
+            if course_metadata.get('key') in (assignment.content_key, assignment.parent_content_key)
+        ),
+        None
+    )
+
+
 def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
     """
     Fetches (from cache or enterprise-catalog API call) content metadata
@@ -33,8 +49,11 @@ def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
         could be found for a given key.
     """
     content_keys = {assignment.content_key for assignment in assignments}
-    content_metadata_list = get_and_cache_catalog_content_metadata(enterprise_catalog_uuid, content_keys)
-    metadata_by_key = dict(zip(content_keys, content_metadata_list))
+    course_metadata_list = get_and_cache_catalog_content_metadata(enterprise_catalog_uuid, content_keys)
+    metadata_by_key = {
+        assignment.content_key: _content_metadata_for_assignment(assignment, course_metadata_list)
+        for assignment in assignments
+    }
     return {
         assignment.content_key: metadata_by_key.get(assignment.content_key)
         for assignment in assignments
