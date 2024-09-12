@@ -54,10 +54,7 @@ def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
         assignment.content_key: _content_metadata_for_assignment(assignment, course_metadata_list)
         for assignment in assignments
     }
-    return {
-        assignment.content_key: metadata_by_key.get(assignment.content_key)
-        for assignment in assignments
-    }
+    return metadata_by_key
 
 
 def get_card_image_url(content_metadata):
