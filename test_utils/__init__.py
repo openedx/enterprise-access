@@ -78,6 +78,17 @@ def random_content_key():
     return 'course-v1:{}+{}+{}'.format(*fake_words)
 
 
+def random_parent_content_key():
+    """
+    Helper to craft a random content key.
+    """
+    fake_words = [
+        FAKER.word() + str(FAKER.random_int())
+        for _ in range(2)
+    ]
+    return '{}+{}'.format(*fake_words)
+
+
 @mark.django_db
 class APITest(APITestCase):
     """

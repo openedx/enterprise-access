@@ -19,7 +19,11 @@ from enterprise_access.apps.content_assignments.content_metadata_api import (
     get_human_readable_date
 )
 from enterprise_access.tasks import LoggedTaskWithRetry
-from enterprise_access.utils import get_automatic_expiration_date_and_reason, localized_utcnow
+from enterprise_access.utils import (
+    get_automatic_expiration_date_and_reason,
+    get_normalized_metadata_for_assignment,
+    localized_utcnow
+)
 
 from .constants import BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT, LearnerContentAssignmentStateChoices
 
@@ -152,10 +156,18 @@ class BrazeCampaignSender:
             if not self._course_metadata:
                 msg = (
                     f'Could not fetch metadata for assignment {self.assignment.uuid}, '
-                    f'content_key {self.assignment.content_key}'
+                    f'content_key {self.assignment.content_key}, '
+                    f'parent_content_key {self.assignment.parent_content_key}'
                 )
                 raise Exception(msg)
         return self._course_metadata
+
+    @property
+    def normalized_metadata(self):
+        """
+        Returns a normalized metadata dictionary for the assignment.
+        """
+        return get_normalized_metadata_for_assignment(self.assignment, self.course_metadata)
 
     @property
     def subsidy_record(self):
@@ -193,14 +205,14 @@ class BrazeCampaignSender:
         return self.assignment.content_title
 
     def _enrollment_deadline_raw(self):
-        return self.course_metadata.get('normalized_metadata', {}).get('enroll_by_date')
+        return self.normalized_metadata.get('enroll_by_date')
 
     def get_enrollment_deadline(self):
         return get_human_readable_date(self._enrollment_deadline_raw())
 
     def get_start_date(self):
         return get_human_readable_date(
-            self.course_metadata.get('normalized_metadata', {}).get('start_date')
+            self.normalized_metadata.get('start_date')
         )
 
     def get_action_required_by_timestamp(self):
@@ -208,7 +220,7 @@ class BrazeCampaignSender:
         Returns the minimum of this assignment's auto-expiration date,
         the content's enrollment deadline, and the related policy's expiration timestamp.
         """
-        action_required_by_timestamp = get_automatic_expiration_date_and_reason(self.assignment)
+        action_required_by_timestamp = get_automatic_expiration_date_and_reason(self.assignment, self.course_metadata)
         if not action_required_by_timestamp:
             return None
         return format_datetime_obj(

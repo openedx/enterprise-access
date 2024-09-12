@@ -17,26 +17,44 @@ DATE_INPUT_PATTERNS = [
 DEFAULT_STRFTIME_PATTERN = '%b %d, %Y'
 
 
+def _content_metadata_for_assignment(assignment, course_metadata_list):
+    """
+    Given a list of course metadata dictionaries and an assignment,
+    find the course metadata dictionary that corresponds to the
+    assignment's content_key (course run) or parent_content_key (course).
+    """
+    return next(
+        (
+            course_metadata
+            for course_metadata in course_metadata_list
+            if course_metadata.get('key') in (assignment.content_key, assignment.parent_content_key)
+        ),
+        None
+    )
+
+
 def get_content_metadata_for_assignments(enterprise_catalog_uuid, assignments):
     """
     Fetches (from cache or enterprise-catalog API call) content metadata
     in bulk for the `content_keys` of the given assignments, provided
     such metadata is related to the given `enterprise_catalog_uuid`.
 
+    Note that the `content_keys` of the provided assignments may be
+    either course run keys or course keys. Regardless of the type of key,
+    the content metadata API will return the metadata at the course-level.
+
     Returns:
         A dict mapping every content key of the provided assignments
         to a content metadata dictionary, or null if no such dictionary
         could be found for a given key.
     """
-    content_keys = sorted({assignment.content_key for assignment in assignments})
-    content_metadata_list = get_and_cache_catalog_content_metadata(enterprise_catalog_uuid, content_keys)
+    content_keys = {assignment.content_key for assignment in assignments}
+    course_metadata_list = get_and_cache_catalog_content_metadata(enterprise_catalog_uuid, content_keys)
     metadata_by_key = {
-        record['key']: record for record in content_metadata_list
-    }
-    return {
-        assignment.content_key: metadata_by_key.get(assignment.content_key)
+        assignment.content_key: _content_metadata_for_assignment(assignment, course_metadata_list)
         for assignment in assignments
     }
+    return metadata_by_key
 
 
 def get_card_image_url(content_metadata):

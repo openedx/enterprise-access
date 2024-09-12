@@ -23,7 +23,12 @@ from enterprise_access.apps.content_assignments.tasks import (
 )
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
-from enterprise_access.utils import chunks, get_automatic_expiration_date_and_reason, localized_utcnow
+from enterprise_access.utils import (
+    chunks,
+    get_automatic_expiration_date_and_reason,
+    get_normalized_metadata_for_assignment,
+    localized_utcnow
+)
 
 from .constants import AssignmentAutomaticExpiredReason, LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
@@ -762,7 +767,9 @@ def nudge_assignments(assignments, assignment_configuration_uuid, days_before_co
             [assignment],
         )
         content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
-        start_date = content_metadata.get('normalized_metadata', {}).get('start_date')
+        normalized_metadata = get_normalized_metadata_for_assignment(assignment, content_metadata)
+
+        start_date = normalized_metadata.get('start_date')
         course_type = content_metadata.get('course_type')
 
         # check if the course_type is an executive-education course

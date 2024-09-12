@@ -65,7 +65,8 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.enterprise_uuid = TEST_ENTERPRISE_UUID
-        cls.content_key = 'course-v1:edX+edXPrivacy101+3T2020'
+        cls.content_key = 'course-v1:edX+Privacy101+3T2020'
+        cls.parent_content_key = 'edX+Privacy101'
         cls.content_title = 'edx: Privacy 101'
 
         # Create a pair of AssignmentConfiguration + SubsidyAccessPolicy for the main test customer.
@@ -85,6 +86,8 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             learner_email='alice@foo.com',
             lms_user_id=None,
             content_key=cls.content_key,
+            parent_content_key=cls.parent_content_key,
+            is_assigned_course_run=True,
             content_title=cls.content_title,
             content_quantity=-123,
             state=LearnerContentAssignmentStateChoices.ERRORED,
@@ -94,6 +97,8 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             learner_email='bob@foo.com',
             lms_user_id=None,
             content_key=cls.content_key,
+            parent_content_key=cls.parent_content_key,
+            is_assigned_course_run=True,
             content_title=cls.content_title,
             content_quantity=-456,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
@@ -103,6 +108,8 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             learner_email='carol@foo.com',
             lms_user_id=None,
             content_key=cls.content_key,
+            parent_content_key=cls.parent_content_key,
+            is_assigned_course_run=True,
             content_title=cls.content_title,
             content_quantity=-789,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
@@ -150,13 +157,13 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
         },
         {
             'learner_emails': ['everything-valid@example.com'],
-            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',  # valid course run key
+            'content_key': 'course-v1:edX+Privacy101+3T2020',  # valid course run key
             'content_price_cents': 100,
             'error_regex': '',
         },
         {
             'learner_emails': ['everything-valid@example.com'],
-            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',  # valid course run key
+            'content_key': 'course-v1:edX+Privacy101+3T2020',  # valid course run key
             'content_price_cents': -100,
             'error_regex': 'Ensure this value is greater than or equal to 0',
         },
@@ -221,7 +228,6 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)
-
         self.assertEqual(status.HTTP_202_ACCEPTED, response.status_code)
         expected_response_payload = {
             'updated': [
@@ -230,8 +236,8 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'learner_email': 'alice@foo.com',
                     'lms_user_id': None,
                     'content_key': self.content_key,
-                    'parent_content_key': None,
-                    'is_assigned_course_run': False,
+                    'parent_content_key': self.parent_content_key,
+                    'is_assigned_course_run': True,
                     'content_title': self.content_title,
                     'content_quantity': -123,
                     'state': LearnerContentAssignmentStateChoices.ERRORED,
@@ -252,8 +258,8 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'learner_email': 'bob@foo.com',
                     'lms_user_id': None,
                     'content_key': self.content_key,
-                    'parent_content_key': None,
-                    'is_assigned_course_run': False,
+                    'parent_content_key': self.parent_content_key,
+                    'is_assigned_course_run': True,
                     'content_title': self.content_title,
                     'content_quantity': -456,
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,
@@ -274,8 +280,8 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
                     'learner_email': 'carol@foo.com',
                     'lms_user_id': None,
                     'content_key': self.content_key,
-                    'parent_content_key': None,
-                    'is_assigned_course_run': False,
+                    'parent_content_key': self.parent_content_key,
+                    'is_assigned_course_run': True,
                     'content_title': self.content_title,
                     'content_quantity': -789,
                     'state': LearnerContentAssignmentStateChoices.ALLOCATED,

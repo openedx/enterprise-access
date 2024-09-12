@@ -823,6 +823,14 @@ class TestAdminAssignmentAuthorizedCRUD(CRUDViewTestMixin, APITest):
                     'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     'content_price': self.content_metadata_one['content_quantity'],
                 },
+                'normalized_metadata_by_run': {
+                    self.content_metadata_one['content_key']: {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'end_date': end_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        'content_price': self.content_metadata_one['content_quantity'],
+                    },
+                },
                 'course_type': 'executive-education-2u',
             },
         }

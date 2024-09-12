@@ -1097,7 +1097,7 @@ class TestPolicyRedemptionAuthNAndPermissionChecks(APITestWithMocks):
         url = reverse('api:v1:policy-redemption-redeem', kwargs={'policy_uuid': self.redeemable_policy.uuid})
         payload = {
             'lms_user_id': 1234,
-            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
+            'content_key': 'course-v1:edX+Privacy101+3T2020',
         }
         response = self.client.post(url, payload)
         self.assertEqual(response.status_code, expected_response_code)
@@ -1116,7 +1116,7 @@ class TestPolicyRedemptionAuthNAndPermissionChecks(APITestWithMocks):
             kwargs={"enterprise_customer_uuid": self.enterprise_uuid},
         )
         query_params = {
-            'content_key': ['course-v1:edX+edXPrivacy101+3T2020', 'course-v1:edX+edXPrivacy101+3T2020_2'],
+            'content_key': ['course-v1:edX+Privacy101+3T2020', 'course-v1:edX+Privacy101+3T2020_2'],
         }
         response = self.client.get(url, query_params)
         self.assertEqual(response.status_code, expected_response_code)
@@ -1223,7 +1223,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         self.redeemable_policy.subsidy_client.create_subsidy_transaction.return_value = mock_transaction_record
         payload = {
             'lms_user_id': 1234,
-            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
+            'content_key': 'course-v1:edX+Privacy101+3T2020',
         }
 
         response = self.client.post(self.subsidy_access_policy_redeem_endpoint, payload)
@@ -1261,7 +1261,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         self.redeemable_policy.subsidy_client.create_subsidy_transaction.return_value = mock_transaction_record
         payload = {
             'lms_user_id': 1234,
-            'content_key': 'course-v1:edX+edXPrivacy101+3T2020',
+            'content_key': 'course-v1:edX+Privacy101+3T2020',
             'metadata': {
                 'geag_first_name': 'John'
             }
@@ -1335,7 +1335,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         self.mock_get_content_metadata.return_value = {'content_price': 5000}
 
         lms_user_id = 1234
-        content_key = 'course-v1:edX+edXPrivacy101+3T2020'
+        content_key = 'course-v1:edX+Privacy101+3T2020'
         historical_redemption_uuid = str(uuid4())
         baseline_idempotency_key = create_idempotency_key_for_transaction(
             subsidy_uuid=str(self.redeemable_policy.subsidy_uuid),
@@ -1559,7 +1559,6 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         Verify that SubsidyAccessPolicyViewset credits_available returns learner content assignments for assigned
         learner credit access policies.
         """
-        self.maxDiff = None
         parent_content_key = 'edX+DemoX'
         content_key = 'course-v1:edX+DemoX+T2024a'
         content_title = 'edx: Demo 101'
@@ -1621,12 +1620,20 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         # Mock catalog content metadata results. See LearnerContentAssignmentWithContentMetadataResponseSerializer
         # for what we expect to be in the response payload w.r.t. content metadata.
         mock_content_metadata = {
-            'key': content_key,
+            'key': parent_content_key,
             'normalized_metadata': {
                 'start_date': '2020-01-01T12:00:00Z',
                 'end_date': '2022-01-01T12:00:00Z',
                 'enroll_by_date': '2021-01-01T12:00:00Z',
                 'content_price': content_price_cents,
+            },
+            'normalized_metadata_by_run': {
+                content_key: {
+                    'start_date': '2020-01-01T12:00:00Z',
+                    'end_date': '2022-01-01T12:00:00Z',
+                    'enroll_by_date': '2021-01-01T12:00:00Z',
+                    'content_price': content_price_cents,
+                },
             },
             'course_type': 'verified-audit',
             'owners': [
@@ -1835,8 +1842,8 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
                 'total_quantity': 0,
             },
         }
-        test_content_key_1 = "course-v1:edX+edXPrivacy101+3T2020"
-        test_content_key_2 = "course-v1:edX+edXPrivacy101+3T2020_2"
+        test_content_key_1 = "course-v1:edX+Privacy101+3T2020"
+        test_content_key_2 = "course-v1:edX+Privacy101+3T2020_2"
         test_content_key_1_metadata_price = 29900
         test_content_key_2_metadata_price = 81900
         test_content_key_1_usd_price = 299
@@ -1947,8 +1954,8 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
             'unit': 'usd_cents',
             'all_transactions': [],
         }
-        test_content_key_1 = "course-v1:edX+edXPrivacy101+3T2020"
-        test_content_key_2 = "course-v1:edX+edXPrivacy101+3T2020_2"
+        test_content_key_1 = "course-v1:edX+Privacy101+3T2020"
+        test_content_key_2 = "course-v1:edX+Privacy101+3T2020_2"
         test_content_key_1_metadata_price = 29900
         test_content_key_2_metadata_price = 81900
 
