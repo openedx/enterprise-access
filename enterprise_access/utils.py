@@ -120,7 +120,7 @@ def get_automatic_expiration_date_and_reason(
 
     Arguments:
         assignment (LearnerContentAssignment): The assignment to check for expiration.
-        [metadata_for_assignment] (dict): Content metadata for the assignment's content key. If not provided, it will be
+        [content_metadata] (dict): Content metadata for the assignment's content key. If not provided, it will be
             fetched and subsequently cached from the content metadata API.
     """
     assignment_configuration = assignment.assignment_configuration
