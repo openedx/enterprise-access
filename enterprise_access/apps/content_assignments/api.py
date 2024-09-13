@@ -181,7 +181,8 @@ def get_assignment_for_learner(
     +---+------------------------+-----------------------+-------------------------------------------------+
     | 1 | course                 | course                | Simple comparison.                              |
     | 2 | course                 | course run            | Convert course run to course key, then compare. |
-    | 3 | course run             | course                | Compare utilizing the parent_content_key.       |
+    | 3 | course run             | course                | Simple comparison via the parent_content_key,   |
+    |   |                        |                       | returning first run-based assignment match.     |
     | 4 | course run             | course run            | Simple comparison.                              |
     +---+------------------------+-----------------------+-------------------------------------------------+
 
@@ -200,18 +201,40 @@ def get_assignment_for_learner(
         constraint across [assignment_configuration,lms_user_id,content_key].  BUT still technically possible if
         internal staff managed to create a duplicate assignment configuration for a single enterprise.
     """
-    content_key_to_match = _normalize_course_key_from_metadata(assignment_configuration, content_key)
-    if not content_key_to_match:
-        logger.error(f'Unable to normalize content_key {content_key} for {assignment_configuration} and {lms_user_id}')
-        return None
     queryset = LearnerContentAssignment.objects.select_related('assignment_configuration')
+
     try:
+        # First, try to find a corresponding assignment based on the specific content key,
+        # considering both assignments' content key and parent content key.
         return queryset.get(
-            Q(content_key=content_key_to_match) | Q(parent_content_key=content_key_to_match),
+            Q(content_key=content_key) | Q(parent_content_key=content_key),
             assignment_configuration=assignment_configuration,
             lms_user_id=lms_user_id,
         )
     except LearnerContentAssignment.DoesNotExist:
+        logger.info(
+            f'No assignment found with content_key or parent_content_key {content_key} '
+            f'for {assignment_configuration} and lms_user_id {lms_user_id}',
+        )
+
+    # If no exact match was found, try to normalize the content key and find a match. This happens when
+    # the content_key is a course run key and the assignment's content_key is a course key
+    content_key_to_match = _normalize_course_key_from_metadata(assignment_configuration, content_key)
+    if not content_key_to_match:
+        logger.error(f'Unable to normalize content_key {content_key} for {assignment_configuration} and {lms_user_id}')
+        return None
+
+    try:
+        return queryset.get(
+            content_key=content_key_to_match,
+            assignment_configuration=assignment_configuration,
+            lms_user_id=lms_user_id,
+        )
+    except LearnerContentAssignment.DoesNotExist:
+        logger.info(
+            f'No assignment found with normalized content_key {content_key_to_match} '
+            f'for {assignment_configuration} and lms_user_id {lms_user_id}',
+        )
         return None
 
 
