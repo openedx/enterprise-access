@@ -216,9 +216,16 @@ def get_assignment_for_learner(
             f'No assignment found with content_key or parent_content_key {content_key} '
             f'for {assignment_configuration} and lms_user_id {lms_user_id}',
         )
+    except LearnerContentAssignment.MultipleObjectsReturned as exc:
+        logger.error(
+            f'Multiple assignments found with content_key or parent_content_key {content_key} '
+            f'for {assignment_configuration} and lms_user_id {lms_user_id}',
+        )
+        raise exc
 
     # If no exact match was found, try to normalize the content key and find a match. This happens when
-    # the content_key is a course run key and the assignment's content_key is a course key
+    # the content_key is a course run key and the assignment's content_key is a course key, as depicted
+    # by row 2 in the above docstring matrix.
     content_key_to_match = _normalize_course_key_from_metadata(assignment_configuration, content_key)
     if not content_key_to_match:
         logger.error(f'Unable to normalize content_key {content_key} for {assignment_configuration} and {lms_user_id}')
