@@ -25,6 +25,7 @@ from enterprise_access.utils import format_traceback, is_none, is_not_none, loca
 
 from ..content_assignments.models import AssignmentConfiguration
 from .constants import (
+    ASSIGNED_CREDIT_POLICY_TYPE_PRIORITY,
     CREDIT_POLICY_TYPE_PRIORITY,
     FORCE_ENROLLMENT_KEYWORD,
     REASON_BEYOND_ENROLLMENT_DEADLINE,
@@ -1107,6 +1108,16 @@ class CreditPolicyMixin:
         return CREDIT_POLICY_TYPE_PRIORITY
 
 
+class AssignedCreditPolicyMixin:
+    """
+    Mixin class for assigned credit type policies.
+    """
+
+    @property
+    def priority(self):
+        return ASSIGNED_CREDIT_POLICY_TYPE_PRIORITY
+
+
 class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
     """
     Policy that limits the number of enrollments transactions for a learner in a subsidy.
@@ -1273,7 +1284,7 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         return self.per_learner_spend_limit - positive_spent_amount
 
 
-class AssignedLearnerCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
+class AssignedLearnerCreditAccessPolicy(AssignedCreditPolicyMixin, SubsidyAccessPolicy):
     """
     Policy based on LearnerContentAssignments, backed by a learner credit type of subsidy.
 
@@ -1737,7 +1748,7 @@ class ForcedPolicyRedemption(TimeStampedModel):
             assignment_configuration.enterprise_customer_uuid,
             self.course_run_key,
         )
-        course_key = content_metadata.get('content_key')
+        content_key = content_metadata.get('content_key')
         user_record = User.objects.filter(lms_user_id=self.lms_user_id).first()
         if not user_record:
             raise Exception(f'No email could be found for lms_user_id {self.lms_user_id}')
@@ -1745,7 +1756,7 @@ class ForcedPolicyRedemption(TimeStampedModel):
         return assignments_api.allocate_assignments(
             assignment_configuration,
             [user_record.email],
-            course_key,
+            content_key,
             self.content_price_cents,
         )
 

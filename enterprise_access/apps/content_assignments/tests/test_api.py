@@ -116,49 +116,136 @@ class TestContentAssignmentApi(TestCase):
         return_value=mock.MagicMock(),
     )
     @ddt.data(
-        # Standard happy path.
+        # [course run] Standard happy path.
         {
-            'assignment_content_key': 'test+course',
+            'assignment_content_key': 'course-v1:test+course+run',
+            'assignment_parent_content_key': 'test+course',
+            'assignment_is_course_run': True,
             'assignment_lms_user_id': 1,
             'request_default_assignment_configuration': True,
             'request_lms_user_id': 1,
             'request_content_key': 'course-v1:test+course+run',
             'expect_assignment_found': True,
         },
-        # Happy path, requested content is a course (with prefix).
+        # [course] Standard happy path.
         {
             'assignment_content_key': 'test+course',
+            'assignment_parent_content_key': None,
+            'assignment_is_course_run': False,
             'assignment_lms_user_id': 1,
             'request_default_assignment_configuration': True,
             'request_lms_user_id': 1,
-            'request_content_key': 'course-v1:test+course',  # This is a course! With a prefix!
+            'request_content_key': 'course-v1:test+course+run',
             'expect_assignment_found': True,
         },
-        # Happy path, requested content is a course (without prefix).
+        # [course run] Happy path, requested content is a course
         {
-            'assignment_content_key': 'test+course',
+            'assignment_content_key': 'course-v1:test+course+run',
+            'assignment_parent_content_key': 'test+course',
+            'assignment_is_course_run': True,
             'assignment_lms_user_id': 1,
             'request_default_assignment_configuration': True,
             'request_lms_user_id': 1,
-            'request_content_key': 'test+course',  # This is a course! Without a prefix!
+            'request_content_key': 'test+course',
             'expect_assignment_found': True,
         },
-        # Different lms_user_id.
+        # [course] Happy path, requested content is a course
         {
             'assignment_content_key': 'test+course',
+            'assignment_parent_content_key': None,
+            'assignment_is_course_run': False,
+            'assignment_lms_user_id': 1,
+            'request_default_assignment_configuration': True,
+            'request_lms_user_id': 1,
+            'request_content_key': 'test+course',
+            'expect_assignment_found': True,
+        },
+        # [course run] Different lms_user_id, requested content is a course
+        {
+            'assignment_content_key': 'course-v1:test+course+run',
+            'assignment_parent_content_key': 'test+course',
+            'assignment_is_course_run': True,
             'assignment_lms_user_id': 1,
             'request_default_assignment_configuration': True,
             'request_lms_user_id': 2,  # Different lms_user_id!
             'request_content_key': 'test+course',
             'expect_assignment_found': False,
         },
-        # Different customer.
+        # [course] Different lms_user_id, requested content is a course
         {
             'assignment_content_key': 'test+course',
+            'assignment_parent_content_key': None,
+            'assignment_is_course_run': False,
+            'assignment_lms_user_id': 1,
+            'request_default_assignment_configuration': True,
+            'request_lms_user_id': 2,  # Different lms_user_id!
+            'request_content_key': 'test+course',
+            'expect_assignment_found': False,
+        },
+        # [course run] Different lms_user_id
+        {
+            'assignment_content_key': 'course-v1:test+course+run',
+            'assignment_parent_content_key': 'test+course',
+            'assignment_is_course_run': True,
+            'assignment_lms_user_id': 1,
+            'request_default_assignment_configuration': True,
+            'request_lms_user_id': 2,  # Different lms_user_id!
+            'request_content_key': 'course-v1:test+course+run',
+            'expect_assignment_found': False,
+        },
+        # [course] Different lms_user_id
+        {
+            'assignment_content_key': 'test+course',
+            'assignment_parent_content_key': None,
+            'assignment_is_course_run': False,
+            'assignment_lms_user_id': 1,
+            'request_default_assignment_configuration': True,
+            'request_lms_user_id': 2,  # Different lms_user_id!
+            'request_content_key': 'course-v1:test+course+run',
+            'expect_assignment_found': False,
+        },
+        # [course run] Different customer, requested content is a course
+        {
+            'assignment_content_key': 'course-v1:test+course+run',
+            'assignment_parent_content_key': 'test+course',
+            'assignment_is_course_run': True,
             'assignment_lms_user_id': 1,
             'request_default_assignment_configuration': False,  # Different customer!
             'request_lms_user_id': 1,
             'request_content_key': 'test+course',
+            'expect_assignment_found': False,
+        },
+        # [course] Different customer, requested content is a course
+        {
+            'assignment_content_key': 'test+course',
+            'assignment_parent_content_key': None,
+            'assignment_is_course_run': False,
+            'assignment_lms_user_id': 1,
+            'request_default_assignment_configuration': False,  # Different customer!
+            'request_lms_user_id': 1,
+            'request_content_key': 'test+course',
+            'expect_assignment_found': False,
+        },
+        # [course run] Different customer
+        {
+            'assignment_content_key': 'course-v1:test+course+run',
+            'assignment_parent_content_key': 'test+course',
+            'assignment_is_course_run': True,
+            'assignment_lms_user_id': 1,
+            'request_default_assignment_configuration': False,  # Different customer!
+            'request_lms_user_id': 1,
+            'request_content_key': 'course-v1:test+course+run',
+            'expect_assignment_found': False,
+        },
+        # [course] Different customer
+        {
+            'assignment_content_key': 'test+course',
+            'assignment_parent_content_key': None,
+            'assignment_is_course_run': False,
+            'assignment_lms_user_id': 1,
+            'request_default_assignment_configuration': False,  # Different customer!
+            'request_lms_user_id': 1,
+            'request_content_key': 'course-v1:test+course+run',
             'expect_assignment_found': False,
         },
     )
@@ -167,6 +254,8 @@ class TestContentAssignmentApi(TestCase):
         self,
         mock_get_and_cache_content_metadata,
         assignment_content_key,
+        assignment_parent_content_key,
+        assignment_is_course_run,
         assignment_lms_user_id,
         request_default_assignment_configuration,
         request_lms_user_id,
@@ -182,6 +271,8 @@ class TestContentAssignmentApi(TestCase):
         LearnerContentAssignmentFactory.create(
             assignment_configuration=self.assignment_configuration,
             content_key=assignment_content_key,
+            parent_content_key=assignment_parent_content_key,
+            is_assigned_course_run=assignment_is_course_run,
             lms_user_id=assignment_lms_user_id,
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
         )

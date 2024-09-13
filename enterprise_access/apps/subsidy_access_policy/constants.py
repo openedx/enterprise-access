@@ -30,6 +30,7 @@ class SegmentEvents:
 
 # Configure the priority of each policy type here.  When given multiple redeemable policies to select for redemption,
 # the policy resolution engine will select policies with the lowest priority number.
+ASSIGNED_CREDIT_POLICY_TYPE_PRIORITY = 0
 CREDIT_POLICY_TYPE_PRIORITY = 1
 SUBSCRIPTION_POLICY_TYPE_PRIORITY = 2
 

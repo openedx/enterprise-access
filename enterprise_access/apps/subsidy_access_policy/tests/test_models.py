@@ -3,7 +3,7 @@ Tests for subsidy_access_policy models.
 """
 import contextlib
 from datetime import datetime, timedelta
-from unittest.mock import ANY, PropertyMock, patch
+from unittest.mock import ANY, patch
 from uuid import uuid4
 
 import ddt
@@ -900,6 +900,7 @@ class SubsidyAccessPolicyResolverTests(TestCase):
         self.policy_two = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
         self.policy_three = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
         self.policy_four = PerLearnerSpendCapLearnerCreditAccessPolicyFactory.create()
+        self.policy_five = AssignedLearnerCreditAccessPolicyFactory.create()
 
         policy_one_subsidy_patcher = patch.object(
             self.policy_one, 'subsidy_record'
@@ -925,10 +926,17 @@ class SubsidyAccessPolicyResolverTests(TestCase):
         self.mock_policy_four_subsidy_record = policy_four_subsidy_patcher.start()
         self.mock_policy_four_subsidy_record.return_value = self.mock_subsidy_four
 
+        policy_five_subsidy_patcher = patch.object(
+            self.policy_five, 'subsidy_record'
+        )
+        self.mock_policy_five_subsidy_record = policy_five_subsidy_patcher.start()
+        self.mock_policy_five_subsidy_record.return_value = self.mock_subsidy_one
+
         self.addCleanup(policy_one_subsidy_patcher.stop)
         self.addCleanup(policy_two_subsidy_patcher.stop)
         self.addCleanup(policy_three_subsidy_patcher.stop)
         self.addCleanup(policy_four_subsidy_patcher.stop)
+        self.addCleanup(policy_five_subsidy_patcher.stop)
 
     def test_setup(self):
         """
@@ -937,6 +945,8 @@ class SubsidyAccessPolicyResolverTests(TestCase):
         assert self.policy_one.subsidy_record() == self.mock_subsidy_one
         assert self.policy_two.subsidy_record() == self.mock_subsidy_two
         assert self.policy_three.subsidy_record() == self.mock_subsidy_three
+        assert self.policy_four.subsidy_record() == self.mock_subsidy_four
+        assert self.policy_five.subsidy_record() == self.mock_subsidy_one
 
     @override_settings(MULTI_POLICY_RESOLUTION_ENABLED=True)
     def test_resolve_one_policy(self):
@@ -965,16 +975,16 @@ class SubsidyAccessPolicyResolverTests(TestCase):
         assert SubsidyAccessPolicy.resolve_policy(policies) == self.policy_one
 
     @override_settings(MULTI_POLICY_RESOLUTION_ENABLED=True)
-    def test_resolve_two_policies_by_type_priority(self):
+    def test_resolve_policies_by_type_priority(self):
         """
         Test resolve given a two policies with same balances, same expiration
         but different type-priority.
         """
-        policies = [self.policy_four, self.policy_one]
-        # artificially set the priority attribute higher on one of the policies (lower priority takes precedent)
-        with patch.object(PerLearnerSpendCreditAccessPolicy, 'priority', new_callable=PropertyMock) as mock:
-            mock.return_value = 100
-            assert SubsidyAccessPolicy.resolve_policy(policies) == self.policy_one
+        policies = [self.policy_one, self.policy_four, self.policy_five]
+        # Assert the AssignedLearnerCreditAccessPolicy is resolved with highest
+        # priority, regardless of the ordering of the input policies.
+        assert SubsidyAccessPolicy.resolve_policy(policies) == self.policy_five
+        assert SubsidyAccessPolicy.resolve_policy(list(reversed(policies))) == self.policy_five
 
 
 @ddt.ddt
