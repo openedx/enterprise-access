@@ -55,6 +55,7 @@ ASSIGNMENT_REALLOCATION_FIELDS = [
     'lms_user_id', 'learner_email', 'allocation_batch_id',
     'content_quantity', 'state', 'preferred_course_run_key',
     'allocated_at', 'cancelled_at', 'expired_at', 'errored_at',
+    'parent_content_key', 'is_assigned_course_run',
 ]
 
 
@@ -329,8 +330,15 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     existing_assignments_needs_update = set()
 
     # This step to find and update the preferred_course_run_key is required in order
-    # for nudge emails to target the start date of the new run.
+    # for nudge emails to target the start date of the new run. For run-based assignments,
+    # the preferred_course_run_key is the same as the assignment's content_key.
     preferred_course_run_key = _get_preferred_course_run_key(assignment_configuration, content_key)
+
+    # Determine if the assignment's content_key is a course run or a course key based
+    # on an associated parent content key. If the parent content key is None, then the
+    # assignment is for a course; otherwise, it's an assignment for a course run.
+    parent_content_key = _get_parent_content_key(assignment_configuration, content_key)
+    is_assigned_course_run = bool(parent_content_key)
 
     # Split up the existing assignment records by state
     for assignment in existing_assignments:
@@ -349,13 +357,27 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
                 existing_assignments_needs_update.add(assignment)
 
         if assignment.state in LearnerContentAssignmentStateChoices.REALLOCATE_STATES:
-            _reallocate_assignment(assignment, content_quantity, allocation_batch_id, preferred_course_run_key)
+            _reallocate_assignment(
+                assignment,
+                content_quantity,
+                allocation_batch_id,
+                preferred_course_run_key,
+                parent_content_key,
+                is_assigned_course_run,
+            )
             existing_assignments_needs_update.add(assignment)
         elif assignment.state == LearnerContentAssignmentStateChoices.ALLOCATED:
             # For some already-allocated assignments being re-assigned, we might still need to update the preferred
             # course run for nudge email purposes.
             if assignment.preferred_course_run_key != preferred_course_run_key:
                 assignment.preferred_course_run_key = preferred_course_run_key
+                existing_assignments_needs_update.add(assignment)
+            # Update the parent_content_key and is_assigned_course_run fields if they have changed.
+            if assignment.parent_content_key != parent_content_key:
+                assignment.parent_content_key = parent_content_key
+                existing_assignments_needs_update.add(assignment)
+            if assignment.is_assigned_course_run != is_assigned_course_run:
+                assignment.is_assigned_course_run = is_assigned_course_run
                 existing_assignments_needs_update.add(assignment)
 
         learner_emails_with_existing_assignments.add(assignment.learner_email.lower())
@@ -505,7 +527,13 @@ def _get_existing_assignments_for_allocation(
     return existing_assignments
 
 
-def _reallocate_assignment(assignment, content_quantity, allocation_batch_id, preferred_course_run_key):
+def _reallocate_assignment(
+        assignment,
+        content_quantity,
+        allocation_batch_id,
+        preferred_course_run_key,
+        parent_content_key,
+        is_assigned_course_run):
     """
     Modifies a ``LearnerContentAssignment`` record during the allocation flow.  The record
     is **not** saved.
@@ -519,6 +547,8 @@ def _reallocate_assignment(assignment, content_quantity, allocation_batch_id, pr
     assignment.expired_at = None
     assignment.errored_at = None
     assignment.preferred_course_run_key = preferred_course_run_key
+    assignment.parent_content_key = parent_content_key
+    assignment.is_assigned_course_run = is_assigned_course_run
     # Prevent invalid data from entering the database by calling the low-level full_clean() function manually.
     assignment.full_clean()
     return assignment
