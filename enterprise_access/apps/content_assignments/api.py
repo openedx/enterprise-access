@@ -533,8 +533,7 @@ def _reallocate_assignment(
         allocation_batch_id,
         preferred_course_run_key,
         parent_content_key,
-        is_assigned_course_run,
-    ):
+        is_assigned_course_run):
     """
     Modifies a ``LearnerContentAssignment`` record during the allocation flow.  The record
     is **not** saved.

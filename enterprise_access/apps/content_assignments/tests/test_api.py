@@ -46,7 +46,7 @@ def expirable_assignments_with_content_type():
     """
     Returns a list of tuples containing expirable assignment states and the corresponding
     assignment content type (course-level or run-based).
-    
+
     Each tuple contains:
     - expirable_assignment_state: The current state of the assignment.
     - is_assigned_course_run: Boolean indicating if the assignment is course-level (True) or run-based (False).
@@ -348,6 +348,7 @@ class TestContentAssignmentApi(TestCase):
                 content_price_cents,
             )
 
+    # pylint: disable=too-many-statements
     @mock.patch('enterprise_access.apps.content_assignments.api.send_email_for_new_assignment')
     @mock.patch('enterprise_access.apps.content_assignments.api.create_pending_enterprise_learner_for_assignment_task')
     @mock.patch(
