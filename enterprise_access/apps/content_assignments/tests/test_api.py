@@ -42,6 +42,22 @@ def delta_t(as_string=False, **kwargs):
     return datetime_obj
 
 
+def expirable_assignments_with_content_type():
+    """
+    Returns a list of tuples containing expirable assignment states and the corresponding
+    assignment content type (course-level or run-based).
+    
+    Each tuple contains:
+    - expirable_assignment_state: The current state of the assignment.
+    - is_assigned_course_run: Boolean indicating if the assignment is course-level (True) or run-based (False).
+    """
+    return [
+        (expirable_assignment_state, is_assigned_course_run)
+        for expirable_assignment_state in LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
+        for is_assigned_course_run in [True, False]
+    ]
+
+
 @ddt.ddt
 class TestContentAssignmentApi(TestCase):
     """
@@ -338,17 +354,36 @@ class TestContentAssignmentApi(TestCase):
         'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
         return_value=mock.MagicMock(),
     )
+    @ddt.data(
+        {'is_assigned_course_run': False},
+        {'is_assigned_course_run': True},
+    )
+    @ddt.unpack
     def test_allocate_assignments_happy_path(
-        self, mock_get_and_cache_content_metadata, mock_pending_learner_task, mock_new_assignment_email_task
+        self,
+        mock_get_and_cache_content_metadata,
+        mock_pending_learner_task,
+        mock_new_assignment_email_task,
+        is_assigned_course_run,
     ):
         """
         Tests the allocation of new assignments against a given configuration.
         """
-        content_key = 'demoX'
-        course_run_key_old = 'demoX+1T2022'
-        course_run_key = 'demoX+2T2023'
+        course_key = 'edX+DemoX'
         content_title = 'edx: Demo 101'
         content_price_cents = 100
+
+        # Course-level assignments
+        content_key = course_key
+        parent_content_key = None
+        course_run_key_old = 'course-v1:edX+DemoX+1T2022'
+        course_run_key = 'course-v1:edX+DemoX+2T2023'
+
+        # Course run-level assignments
+        if is_assigned_course_run:
+            content_key = course_run_key
+            parent_content_key = course_key
+
         # add a duplicate email to the input list to ensure only one
         # allocation occurs.
         # We throw a couple ALL UPPER CASE emails into the requested emails to allocate
@@ -365,18 +400,25 @@ class TestContentAssignmentApi(TestCase):
                 'eugene',
                 'faythe',
                 'erin',
+                'mary',
                 'grace',
+                'xavier',
+                'steve',
+                'kian',
             )
         ]
         mock_get_and_cache_content_metadata.return_value = {
             'content_title': content_title,
+            'content_key': course_key,
             'course_run_key': course_run_key,
         }
 
         default_factory_options = {
             'assignment_configuration': self.assignment_configuration,
             'content_key': content_key,
-            'preferred_course_run_key': course_run_key,
+            'parent_content_key': parent_content_key,
+            'is_assigned_course_run': is_assigned_course_run,
+            'preferred_course_run_key': content_key if is_assigned_course_run else course_run_key,
             'content_title': content_title,
             'content_quantity': -content_price_cents,
         }
@@ -394,6 +436,22 @@ class TestContentAssignmentApi(TestCase):
             'state': LearnerContentAssignmentStateChoices.ALLOCATED,
             # outdated run should trigger update.
             'preferred_course_run_key': course_run_key_old,
+        })
+        # Allocated assignment SHOULD be updated because it had an outdated parent_content_key.
+        allocated_assignment_old_parent_content_key = LearnerContentAssignmentFactory.create(**{
+            **default_factory_options,
+            'learner_email': 'mary@foo.com',
+            'state': LearnerContentAssignmentStateChoices.ALLOCATED,
+            # outdated parent_content_key should trigger update.
+            'parent_content_key': None,
+        })
+        # Allocated assignment SHOULD be updated because it had an outdated is_assigned_course_run.
+        allocated_assignment_old_run_based = LearnerContentAssignmentFactory.create(**{
+            **default_factory_options,
+            'learner_email': 'xavier@foo.com',
+            'state': LearnerContentAssignmentStateChoices.ALLOCATED,
+            # outdated is_assigned_course_run should trigger update.
+            'is_assigned_course_run': False,
         })
         # Allocated assignment SHOULD be updated because it had a NULL run.
         allocated_assignment_null_run = LearnerContentAssignmentFactory.create(**{
@@ -423,6 +481,22 @@ class TestContentAssignmentApi(TestCase):
             # outdated run should trigger update.
             'preferred_course_run_key': course_run_key_old,
         })
+        # Cancelled assignment should be updated/re-allocated (including recieving new parent_content_key).
+        cancelled_assignment_old_parent_content_key = LearnerContentAssignmentFactory.create(**{
+            **default_factory_options,
+            'learner_email': 'steve@foo.com',
+            'state': LearnerContentAssignmentStateChoices.CANCELLED,
+            # outdated parent_content_key should trigger update.
+            'parent_content_key': None,
+        })
+        # Cancelled assignment should be updated/re-allocated (including recieving new is_assigned_course_run).
+        cancelled_assignment_old_run_based = LearnerContentAssignmentFactory.create(**{
+            **default_factory_options,
+            'learner_email': 'kian@foo.com',
+            'state': LearnerContentAssignmentStateChoices.CANCELLED,
+            # outdated is_assigned_course_run should trigger update.
+            'is_assigned_course_run': False,
+        })
         # Errored assignment should be updated/re-allocated.
         errored_assignment = LearnerContentAssignmentFactory.create(**{
             **default_factory_options,
@@ -438,26 +512,52 @@ class TestContentAssignmentApi(TestCase):
         )
 
         # Refresh from db to get any updates reflected in the python objects.
-        for record in (
+        assignments_to_refresh = (
             allocated_assignment,
             allocated_assignment_old_run,
             allocated_assignment_null_run,
             accepted_assignment,
             cancelled_assignment,
             cancelled_assignment_old_run,
+            cancelled_assignment_old_parent_content_key,
+            cancelled_assignment_old_run_based,
             errored_assignment,
-        ):
+        )
+        if is_assigned_course_run:
+            assignments_to_refresh += (
+                allocated_assignment_old_parent_content_key,
+                allocated_assignment_old_run_based,
+            )
+
+        for record in assignments_to_refresh:
             record.refresh_from_db()
 
-        # The allocated assignments with outdated runs, errored assignments, and cancelled assignments should be the
-        # only things updated.
+        # Create list of assignments expected to be updated, including:
+        #   - The allocated assignments with outdated: preferred course run, parent_content_key, is_assigned_course_run.
+        #   - Errored assignments
+        #   - Cancelled assignments
         expected_updated_assignments = (
             allocated_assignment_old_run,
             allocated_assignment_null_run,
             cancelled_assignment,
             cancelled_assignment_old_run,
+            cancelled_assignment_old_parent_content_key,
+            cancelled_assignment_old_run_based,
             errored_assignment,
         )
+
+        if is_assigned_course_run:
+            expected_updated_assignments += (
+                allocated_assignment_old_parent_content_key,
+                allocated_assignment_old_run_based,
+            )
+
+        if is_assigned_course_run:
+            expected_updated_assignments += (
+                allocated_assignment_old_parent_content_key,
+                allocated_assignment_old_run_based,
+            )
+
         self.assertEqual(
             {record.uuid for record in allocation_results['updated']},
             {assignment.uuid for assignment in expected_updated_assignments},
@@ -470,6 +570,11 @@ class TestContentAssignmentApi(TestCase):
             allocated_assignment,
             accepted_assignment,
         )
+        if not is_assigned_course_run:
+            expected_no_change_assignments += (
+                allocated_assignment_old_parent_content_key,
+                allocated_assignment_old_run_based,
+            )
         self.assertEqual(
             {record.uuid for record in allocation_results['no_change']},
             {assignment.uuid for assignment in expected_no_change_assignments},
@@ -480,10 +585,18 @@ class TestContentAssignmentApi(TestCase):
         # The existing assignments should be 'allocated' now, except for the already accepted one
         self.assertEqual(cancelled_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
         self.assertEqual(cancelled_assignment_old_run.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertEqual(
+            cancelled_assignment_old_parent_content_key.state, LearnerContentAssignmentStateChoices.ALLOCATED
+        )
+        self.assertEqual(cancelled_assignment_old_run_based.state, LearnerContentAssignmentStateChoices.ALLOCATED)
         self.assertEqual(errored_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
         self.assertEqual(allocated_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
         self.assertEqual(allocated_assignment_old_run.state, LearnerContentAssignmentStateChoices.ALLOCATED)
         self.assertEqual(allocated_assignment_null_run.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertEqual(
+            allocated_assignment_old_parent_content_key.state, LearnerContentAssignmentStateChoices.ALLOCATED
+        )
+        self.assertEqual(allocated_assignment_old_run_based.state, LearnerContentAssignmentStateChoices.ALLOCATED)
         self.assertEqual(accepted_assignment.state, LearnerContentAssignmentStateChoices.ACCEPTED)
 
         # We should have created only one new, allocated assignment for eugene@foo.com
@@ -836,23 +949,33 @@ class TestAssignmentExpiration(TestCase):
         mock_expired_email.delay.assert_called_once_with(assignment.uuid)
 
     @ddt.data(
-        *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
+        *expirable_assignments_with_content_type()
     )
+    @ddt.unpack
     @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
     def test_expire_assignments_with_passed_enroll_by_date(
         self,
-        assignment_state,
+        expirable_assignment_state,
+        is_assigned_course_run,
         mock_expired_email,
     ):
         """
         Tests that we expire assignments with a passed enroll_by_date
         """
-        content_key = 'edX+DemoX'
+        course_key = 'edX+DemoX'
         course_run_key = 'course-v1:edX+DemoX+T2024'
+        content_key = course_key
+        parent_content_key = None
+        if is_assigned_course_run:
+            content_key = course_run_key
+            parent_content_key = course_key
+
         assignment = LearnerContentAssignmentFactory.create(
-            content_key='demoX',
+            content_key=content_key,
+            parent_content_key=parent_content_key,
+            is_assigned_course_run=is_assigned_course_run,
             assignment_configuration=self.assignment_configuration,
-            state=assignment_state,
+            state=expirable_assignment_state,
             learner_email='larry@stooges.com',
             lms_user_id=12345,
         )
@@ -883,23 +1006,33 @@ class TestAssignmentExpiration(TestCase):
         mock_expired_email.delay.assert_called_once_with(assignment.uuid)
 
     @ddt.data(
-        *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
+        *expirable_assignments_with_content_type()
     )
+    @ddt.unpack
     @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
     def test_expire_assignments_with_expired_subsidy(
         self,
-        assignment_state,
+        expirable_assignment_state,
+        is_assigned_course_run,
         mock_expired_email,
     ):
         """
         Tests that we expire assignments with an underlying subsidy that has expired.
         """
-        content_key = 'edX+DemoX'
+        course_key = 'edX+DemoX'
         course_run_key = 'course-v1:edX+DemoX+T2024'
+        content_key = course_key
+        parent_content_key = None
+        if is_assigned_course_run:
+            content_key = course_run_key
+            parent_content_key = course_key
+
         assignment = LearnerContentAssignmentFactory.create(
             assignment_configuration=self.assignment_configuration,
             content_key=content_key,
-            state=assignment_state,
+            parent_content_key=parent_content_key,
+            is_assigned_course_run=is_assigned_course_run,
+            state=expirable_assignment_state,
             learner_email='larry@stooges.com',
             lms_user_id=12345,
         )

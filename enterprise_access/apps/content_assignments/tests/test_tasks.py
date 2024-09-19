@@ -39,12 +39,15 @@ from enterprise_access.cache_utils import request_cache
 from enterprise_access.utils import get_automatic_expiration_date_and_reason
 from test_utils import APITestWithMocks
 
-TEST_CONTENT_KEY = 'course:test_content'
+TEST_COURSE_KEY = 'edX+DemoX'
+TEST_COURSE_RUN_KEY = 'course-v1:edX+DemoX+Demo_Course'
 TEST_ENTERPRISE_CUSTOMER_NAME = 'test-customer-name'
 TEST_ENTERPRISE_UUID = uuid4()
 TEST_EMAIL = 'foo@bar.com'
-TEST_LMS_USER_ID = 2
+TEST_LMS_USER_ID = 1
+TEST_LMS_USER_ID_2 = 2
 TEST_ASSIGNMENT_UUID = uuid4()
+TEST_RUN_BASED_ASSIGNMENT_UUID = uuid4()
 
 
 @ddt.ddt
@@ -227,12 +230,20 @@ class TestBrazeEmailTasks(APITestWithMocks):
             'name': TEST_ENTERPRISE_CUSTOMER_NAME,
         }
         cls.mock_content_metadata = {
-            'key': TEST_CONTENT_KEY,
+            'key': TEST_COURSE_KEY,
             'normalized_metadata': {
                 'start_date': '2020-01-01T12:00:00Z',
                 'end_date': '2022-01-01 12:00:00Z',
                 'enroll_by_date': '2021-01-01T12:00:00Z',
                 'content_price': 123,
+            },
+            'normalized_metadata_by_run': {
+                TEST_COURSE_RUN_KEY: {
+                    'start_date': '2020-01-01T12:00:00Z',
+                    'end_date': '2022-01-01 12:00:00Z',
+                    'enroll_by_date': '2021-01-01T12:00:00Z',
+                    'content_price': 123,
+                },
             },
             'owners': [
                 {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
@@ -245,11 +256,22 @@ class TestBrazeEmailTasks(APITestWithMocks):
         super().setUp()
         self.course_name = 'test-course-name'
         self.enterprise_customer_name = TEST_ENTERPRISE_CUSTOMER_NAME
-        self.assignment = LearnerContentAssignmentFactory(
+        self.assignment_course = LearnerContentAssignmentFactory(
             uuid=TEST_ASSIGNMENT_UUID,
-            content_key=TEST_CONTENT_KEY,
-            learner_email='TESTING THIS EMAIL',
+            content_key=TEST_COURSE_KEY,
+            parent_content_key=None,
+            is_assigned_course_run=False,
+            learner_email='edx@example.com',
             lms_user_id=TEST_LMS_USER_ID,
+            assignment_configuration=self.assignment_configuration,
+        )
+        self.assignment_course_run = LearnerContentAssignmentFactory(
+            uuid=TEST_RUN_BASED_ASSIGNMENT_UUID,
+            content_key=TEST_COURSE_RUN_KEY,
+            parent_content_key=TEST_COURSE_KEY,
+            is_assigned_course_run=True,
+            learner_email='learner@example.com',
+            lms_user_id=TEST_LMS_USER_ID_2,
             assignment_configuration=self.assignment_configuration,
         )
 
@@ -263,9 +285,17 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.objects')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
+    @ddt.data(
+        {'is_assigned_course_run': False},
+        {'is_assigned_course_run': True},
+    )
+    @ddt.unpack
     def test_send_cancel_email_for_pending_assignment(
-        self, mock_braze_client, mock_lms_client,
+        self,
+        mock_braze_client,
+        mock_lms_client,
         mock_policy_model,  # pylint: disable=unused-argument
+        is_assigned_course_run,
     ):
         """
         Verify send_cancel_email_for_pending_assignment hits braze client with expected args
@@ -284,10 +314,12 @@ class TestBrazeEmailTasks(APITestWithMocks):
             'external_user_id': 1
         }
 
+        assignment = self.assignment_course_run if is_assigned_course_run else self.assignment_course
+
         mock_admin_mailto = f'mailto:{admin_email}'
         mock_braze_client.return_value.create_recipient.return_value = mock_recipient
         mock_braze_client.return_value.generate_mailto_link.return_value = mock_admin_mailto
-        send_cancel_email_for_pending_assignment(self.assignment.uuid)
+        send_cancel_email_for_pending_assignment(assignment.uuid)
 
         # Make sure our LMS client got called correct times and with what we expected
         mock_lms_client.return_value.get_enterprise_customer_data.assert_called_with(
@@ -300,7 +332,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
             trigger_properties={
                 'contact_admin_link': mock_admin_mailto,
                 'organization': self.enterprise_customer_name,
-                'course_title': self.assignment.content_title
+                'course_title': assignment.content_title
             },
         )
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
@@ -309,22 +341,32 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
-    @ddt.data(True, False)
+    @ddt.data(
+        {'is_logistrated': True, 'is_assigned_course_run': False},
+        {'is_logistrated': False, 'is_assigned_course_run': False},
+        {'is_logistrated': True, 'is_assigned_course_run': True},
+        {'is_logistrated': False, 'is_assigned_course_run': True},
+    )
+    @ddt.unpack
     def test_send_reminder_email_for_pending_assignment(
         self,
-        is_logistrated,
         mock_braze_client_class,
         mock_lms_client,
         mock_catalog_client,
         mock_subsidy_client,
+        is_logistrated,
+        is_assigned_course_run,
     ):
         """
         Verify send_reminder_email_for_pending_assignment hits braze client with expected args
         """
         mock_braze_client = mock_braze_client_class.return_value
+
+        assignment = self.assignment_course_run if is_assigned_course_run else self.assignment_course
+
         if not is_logistrated:
-            self.assignment.lms_user_id = None
-            self.assignment.save()
+            assignment.lms_user_id = None
+            assignment.save()
 
         admin_email = 'test@admin.com'
         mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
@@ -337,12 +379,20 @@ class TestBrazeEmailTasks(APITestWithMocks):
             'name': self.enterprise_customer_name,
         }
         mock_metadata = {
-            'key': self.assignment.content_key,
+            'key': assignment.content_key,
             'normalized_metadata': {
                 'start_date': '2020-01-01 12:00:00Z',
                 'end_date': '2022-01-01 12:00:00Z',
                 'enroll_by_date': '2021-01-01 12:00:00Z',
                 'content_price': 123,
+            },
+            'normalized_metadata_by_run': {
+                TEST_COURSE_RUN_KEY: {
+                    'start_date': '2020-01-01 12:00:00Z',
+                    'end_date': '2022-01-01 12:00:00Z',
+                    'enroll_by_date': '2021-01-01 12:00:00Z',
+                    'content_price': 123,
+                },
             },
             'owners': [
                 {'name': 'Smart Folks', 'logo_image_url': 'http://pictures.yes'},
@@ -364,7 +414,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
         mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
         mock_braze_client.generate_mailto_link.return_value = f'mailto:{admin_email}'
 
-        send_reminder_email_for_pending_assignment(self.assignment.uuid)
+        send_reminder_email_for_pending_assignment(assignment.uuid)
 
         # Make sure our LMS client got called correct times and with what we expected
         mock_lms_client.return_value.get_enterprise_customer_data.assert_called_with(
@@ -379,7 +429,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
             self.assertFalse(mock_braze_client.create_braze_alias.called)
         else:
             mock_braze_client.create_braze_alias.assert_called_once_with(
-                [self.assignment.learner_email],
+                [assignment.learner_email],
                 ENTERPRISE_BRAZE_ALIAS_LABEL,
             )
         mock_braze_client.send_campaign_message.assert_called_once_with(
@@ -388,7 +438,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
             trigger_properties={
                 'contact_admin_link': f'mailto:{admin_email}',
                 'organization': self.enterprise_customer_name,
-                'course_title': self.assignment.content_title,
+                'course_title': assignment.content_title,
                 'enrollment_deadline': 'Jan 01, 2021',
                 'start_date': 'Jan 01, 2020',
                 'course_partner': 'Smart Folks, Good People, and Fast Learners',
@@ -402,12 +452,18 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
+    @ddt.data(
+        {'is_assigned_course_run': False},
+        {'is_assigned_course_run': True},
+    )
+    @ddt.unpack
     def test_send_email_for_new_assignment(
         self,
         mock_braze_client,
         mock_lms_client,
         mock_catalog_client,
         mock_subsidy_client,
+        is_assigned_course_run,
     ):
         """
         Verify send_email_for_new_assignment hits braze client with expected args
@@ -433,7 +489,9 @@ class TestBrazeEmailTasks(APITestWithMocks):
         mock_braze_client.return_value.create_recipient.return_value = mock_recipient
         mock_braze_client.return_value.generate_mailto_link.return_value = mock_admin_mailto
 
-        send_email_for_new_assignment(self.assignment.uuid)
+        assignment = self.assignment_course_run if is_assigned_course_run else self.assignment_course
+
+        send_email_for_new_assignment(assignment.uuid)
 
         # Make sure our LMS client got called correct times and with what we expected
         mock_lms_client.return_value.get_enterprise_customer_data.assert_called_with(
@@ -446,7 +504,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
             trigger_properties={
                 'contact_admin_link': mock_admin_mailto,
                 'organization': self.enterprise_customer_name,
-                'course_title': self.assignment.content_title,
+                'course_title': assignment.content_title,
                 'enrollment_deadline': 'Jan 01, 2021',
                 'start_date': 'Jan 01, 2020',
                 'course_partner': 'Smart Folks and Good People',
@@ -464,12 +522,18 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
+    @ddt.data(
+        {'is_assigned_course_run': False},
+        {'is_assigned_course_run': True},
+    )
+    @ddt.unpack
     def test_send_email_for_new_assignment_failure(
         self,
         mock_braze_client,
         mock_lms_client,
         mock_catalog_client,
         mock_subsidy_client,
+        is_assigned_course_run,
     ):
         """
         Verify send_email_for_new_assignment does not change the state of the
@@ -499,9 +563,11 @@ class TestBrazeEmailTasks(APITestWithMocks):
         braze_client_instance.create_recipient.return_value = mock_recipient
         braze_client_instance.generate_mailto_link.return_value = mock_admin_mailto
 
-        send_email_for_new_assignment.delay(self.assignment.uuid)
-        self.assertEqual(self.assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
-        self.assertTrue(self.assignment.actions.filter(
+        assignment = self.assignment_course_run if is_assigned_course_run else self.assignment_course
+
+        send_email_for_new_assignment.delay(assignment.uuid)
+        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertTrue(assignment.actions.filter(
             error_reason=AssignmentActionErrors.EMAIL_ERROR,
             action_type=AssignmentActions.NOTIFIED,
         ).exists())
@@ -509,9 +575,17 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.objects')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
+    @ddt.data(
+        {'is_assigned_course_run': False},
+        {'is_assigned_course_run': True},
+    )
+    @ddt.unpack
     def test_send_assignment_automatically_expired_email(
-        self, mock_braze_client, mock_lms_client,
+        self,
+        mock_braze_client,
+        mock_lms_client,
         mock_subsidy_model,  # pylint: disable=unused-argument
+        is_assigned_course_run,
     ):
         """
         Verify `send_assignment_automatically_expired_email` task work as expected
@@ -534,14 +608,16 @@ class TestBrazeEmailTasks(APITestWithMocks):
         mock_braze_client.return_value.create_recipient.return_value = mock_recipient
         mock_braze_client.return_value.generate_mailto_link.return_value = mock_admin_mailto
 
-        send_assignment_automatically_expired_email(self.assignment.uuid)
+        assignment = self.assignment_course_run if is_assigned_course_run else self.assignment_course
+
+        send_assignment_automatically_expired_email(assignment.uuid)
 
         mock_braze_client.return_value.send_campaign_message.assert_any_call(
             'test-assignment-expired-campaign',
             recipients=[mock_recipient],
             trigger_properties={
                 'contact_admin_link': mock_admin_mailto,
-                'course_title': self.assignment.content_title,
+                'course_title': assignment.content_title,
                 'organization': self.enterprise_customer_name,
             },
         )
@@ -551,16 +627,26 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
+    @ddt.data(
+        {'is_assigned_course_run': False},
+        {'is_assigned_course_run': True},
+    )
+    @ddt.unpack
     def test_get_action_required_by_subsidy_expires_soonest(
+        self,
+        mock_catalog_client,
+        mock_subsidy_client,
         # pylint: disable=unused-argument
-        self, mock_catalog_client, mock_subsidy_client, mock_braze_client_class, mock_lms_client_class
+        mock_braze_client_class, mock_lms_client_class,
+        is_assigned_course_run,
     ):
         """
         Tests that the subsidy_expiration time is returned as the earliest action required by time.
         """
+        assignment = self.assignment_course_run if is_assigned_course_run else self.assignment_course
         # Set the metadata enroll_by_date to tomorrow
         mock_metadata = {
-            'key': self.assignment.content_key,
+            'key': assignment.content_key,
             'normalized_metadata': {
                 'start_date': '2020-01-01 12:00:00Z',
                 'end_date': '2022-01-01 12:00:00Z',
@@ -581,9 +667,9 @@ class TestBrazeEmailTasks(APITestWithMocks):
         mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
 
         # Add a successful notification action of now-ish
-        self.assignment.add_successful_notified_action()
+        assignment.add_successful_notified_action()
 
-        sender = BrazeCampaignSender(self.assignment)
+        sender = BrazeCampaignSender(assignment)
         action_required_by = sender.get_action_required_by_timestamp()
         expected_result = format_datetime_obj(yesterday, output_pattern=BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT)
         self.assertEqual(expected_result, action_required_by)
@@ -592,22 +678,40 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
     @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
+    @ddt.data(
+        {'is_assigned_course_run': False},
+        {'is_assigned_course_run': True},
+    )
+    @ddt.unpack
     def test_get_action_required_by_enrollment_deadline_soonest(
+        self,
+        mock_catalog_client,
+        mock_subsidy_client,
         # pylint: disable=unused-argument
-        self, mock_catalog_client, mock_subsidy_client, mock_braze_client_class, mock_lms_client_class
+        mock_braze_client_class, mock_lms_client_class,
+        is_assigned_course_run,
     ):
         """
         Tests that the enroll_by_date is returned as the earliest action required by time.
         """
         yesterday = now() - timedelta(days=1)
+        formatted_yesterday = yesterday.strftime('%Y-%m-%d %H:%M:%SZ')
+        assignment = self.assignment_course_run if is_assigned_course_run else self.assignment_course
         # Set the metadata enroll_by_date to yesterday
         mock_metadata = {
-            'key': self.assignment.content_key,
+            'key': assignment.content_key,
             'normalized_metadata': {
                 'start_date': '2020-01-01 12:00:00Z',
                 'end_date': '2022-01-01 12:00:00Z',
-                'enroll_by_date': yesterday.strftime('%Y-%m-%d %H:%M:%SZ'),
+                'enroll_by_date': formatted_yesterday,
             },
+            'normalized_metadata_by_run': {
+                TEST_COURSE_RUN_KEY: {
+                    'start_date': '2020-01-01 12:00:00Z',
+                    'end_date': '2022-01-01 12:00:00Z',
+                    'enroll_by_date': formatted_yesterday,
+                },
+            }
         }
         mock_catalog_client.return_value.catalog_content_metadata.return_value = {
             'count': 1,
@@ -622,9 +726,9 @@ class TestBrazeEmailTasks(APITestWithMocks):
         mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
 
         # Add a successful notification action of now-ish
-        self.assignment.add_successful_notified_action()
+        assignment.add_successful_notified_action()
 
-        sender = BrazeCampaignSender(self.assignment)
+        sender = BrazeCampaignSender(assignment)
         action_required_by = sender.get_action_required_by_timestamp()
         expected_result = format_datetime_obj(yesterday, output_pattern=BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT)
         self.assertEqual(expected_result, action_required_by)
@@ -633,24 +737,38 @@ class TestBrazeEmailTasks(APITestWithMocks):
     @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
     @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
-    def test_get_action_required_by_auto_cancellation_soonest(  # pylint: disable=unused-argument
+    @ddt.data(
+        {'is_assigned_course_run': False},
+        {'is_assigned_course_run': True},
+    )
+    @ddt.unpack
+    def test_get_action_required_by_auto_cancellation_soonest(
         self,
         mock_subsidy_client,
         mock_catalog_client,
-        mock_braze_client_class,
-        mock_lms_client_class,
+        # pylint: disable=unused-argument
+        mock_braze_client_class, mock_lms_client_class,
+        is_assigned_course_run,
     ):
         """
         Tests that the auto-cancellation date is returned as the earliest action required by time.
         """
         the_future = now() + timedelta(days=120)
+        assignment = self.assignment_course_run if is_assigned_course_run else self.assignment_course
         # Set the metadata enroll_by_date to far in the future
         mock_metadata = {
-            'key': self.assignment.content_key,
+            'key': assignment.content_key,
             'normalized_metadata': {
                 'start_date': '2020-01-01 12:00:00Z',
                 'end_date': '2022-01-01 12:00:00Z',
                 'enroll_by_date': the_future.strftime('%Y-%m-%d %H:%M:%SZ'),
+            },
+            'normalized_metadata_by_run': {
+                TEST_COURSE_RUN_KEY: {
+                    'start_date': '2020-01-01 12:00:00Z',
+                    'end_date': '2022-01-01 12:00:00Z',
+                    'enroll_by_date': the_future.strftime('%Y-%m-%d %H:%M:%SZ'),
+                },
             },
         }
         mock_catalog_client.return_value.catalog_content_metadata.return_value = {
@@ -666,13 +784,13 @@ class TestBrazeEmailTasks(APITestWithMocks):
         mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
 
         # Add a successful notification action of now-ish
-        self.assignment.add_successful_notified_action()
+        assignment.add_successful_notified_action()
 
-        sender = BrazeCampaignSender(self.assignment)
+        sender = BrazeCampaignSender(assignment)
         action_required_by = sender.get_action_required_by_timestamp()
 
         expected_result = format_datetime_obj(
-            get_automatic_expiration_date_and_reason(self.assignment)['date'],
+            get_automatic_expiration_date_and_reason(assignment)['date'],
             output_pattern=BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT
         )
         self.assertEqual(expected_result, action_required_by)

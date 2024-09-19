@@ -171,6 +171,7 @@ class Command(BaseCommand):
                         if datetime_start_date is not None
                         else False
                     )
+
                     if not can_send_nudge_notification_in_advance:
                         logger.info(
                             (
