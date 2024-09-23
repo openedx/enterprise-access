@@ -1,7 +1,6 @@
 """
 Tasks for content_assignments app.
 """
-
 import logging
 
 from braze.exceptions import BrazeBadRequestError
@@ -26,6 +25,7 @@ from enterprise_access.utils import (
 )
 
 from .constants import BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT, LearnerContentAssignmentStateChoices
+from .utils import get_self_paced_normalized_start_date
 
 logger = logging.getLogger(__name__)
 
@@ -211,8 +211,16 @@ class BrazeCampaignSender:
         return get_human_readable_date(self._enrollment_deadline_raw())
 
     def get_start_date(self):
+        """
+        Checks if the start_date is matches the criteria set by `get_self_paced_normalized_start_date`
+        for old start_dates, if so, return today's date, otherwise, return the start_date
+        """
+        start_date = self.normalized_metadata.get('start_date')
+        end_date = self.normalized_metadata.get('end_date')
+        course_metadata = self.course_metadata
+
         return get_human_readable_date(
-            self.normalized_metadata.get('start_date')
+            get_self_paced_normalized_start_date(start_date, end_date, course_metadata)
         )
 
     def get_action_required_by_timestamp(self):
