@@ -29,7 +29,6 @@ def has_time_to_complete(curr_date, end_date, weeks_to_complete):
     """
     end_date_datetime = parser.parse(end_date)
     offset_now_by_weeks_to_complete = curr_date + timedelta(weeks=weeks_to_complete)
-    print(offset_now_by_weeks_to_complete, end_date_datetime)
     return offset_now_by_weeks_to_complete.replace(tzinfo=UTC).strftime("%Y-%m-%d") <= \
         end_date_datetime.strftime("%Y-%m-%d")
 
@@ -50,8 +49,6 @@ def get_self_paced_normalized_start_date(start_date, end_date, course_metadata):
     weeks_to_complete = course_metadata.get('weeks_to_complete', {}) or None
     if not (start_date and end_date and pacing_type and weeks_to_complete):
         return curr_date.strftime(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT)
-    print(has_time_to_complete(curr_date, end_date, weeks_to_complete),
-          is_within_minimum_start_date_threshold(curr_date, start_date))
     if pacing_type == "self_paced":
         if has_time_to_complete(curr_date, end_date, weeks_to_complete) or \
                 is_within_minimum_start_date_threshold(curr_date, start_date):
