@@ -11,3 +11,4 @@ DISABLE+=
     consider-using-with,
     useless-option-value,
     superfluous-parens,
+    too-many-positional-arguments,
