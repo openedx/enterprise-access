@@ -39,3 +39,4 @@ redis
 rules
 drf-spectacular
 django-log-request-id
+django-ordered-model
