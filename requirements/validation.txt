@@ -19,7 +19,7 @@ asgiref==3.8.1
     #   -r requirements/test.txt
     #   django
     #   django-cors-headers
-astroid==3.3.3
+astroid==3.3.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -154,7 +154,7 @@ defusedxml==0.8.0rc2
     #   -r requirements/test.txt
     #   python3-openid
     #   social-auth-core
-dill==0.3.8
+dill==0.3.9
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -368,7 +368,7 @@ factory-boy==3.3.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==29.0.0
+faker==30.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -426,7 +426,7 @@ jaraco-context==6.0.1
     # via
     #   -r requirements/quality.txt
     #   keyring
-jaraco-functools==4.0.2
+jaraco-functools==4.1.0
     # via
     #   -r requirements/quality.txt
     #   keyring
@@ -501,7 +501,7 @@ mysqlclient==2.2.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-newrelic==9.13.0
+newrelic==10.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -561,7 +561,7 @@ ply==3.11
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   djangoql
-prompt-toolkit==3.0.47
+prompt-toolkit==3.0.48
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -595,7 +595,7 @@ pyjwt[crypto]==2.9.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==3.3.0
+pylint==3.3.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -687,7 +687,7 @@ readme-renderer==44.0
     # via
     #   -r requirements/quality.txt
     #   twine
-redis==5.0.8
+redis==5.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -809,7 +809,7 @@ typing-extensions==4.12.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-opaque-keys
-tzdata==2024.1
+tzdata==2024.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -835,7 +835,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.26.5
+virtualenv==20.26.6
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
