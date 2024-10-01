@@ -9,7 +9,7 @@ from enterprise_access.apps.workflows.models import (
     WorkflowItemThrough,
     WorkflowStepGroup
 )
-from enterprise_access.apps.workflows.registry import WorkflowActionRegistry
+from enterprise_access.apps.workflows.registry import WorkflowActionStepRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class Command(BaseCommand):
         logger.info(f'Created WorkflowDefinition: {workflow_definition.name}')
 
         # Get all registered slugs from the registry
-        registry_actions = WorkflowActionRegistry.list_actions()
+        registry_actions = WorkflowActionStepRegistry.list_actions()
 
         steps = {}
         for slug, _ in registry_actions:
@@ -43,7 +43,7 @@ class Command(BaseCommand):
                 logger.error(
                     f"WorkflowActionStep with action_reference '{slug}' not found. Ensure it is registered properly."
                 )
-        logger.info('Validated WorkflowActionSteps from registered actions in the WorkflowActionRegistry.')
+        logger.info('Validated WorkflowActionSteps from registered actions in the WorkflowActionStepRegistry.')
 
         # Example: Adding WorkflowStepGroup (retrieve subsidies)
         group_retrieve_subsidies, _ = WorkflowStepGroup.objects.get_or_create(

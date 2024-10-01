@@ -18,7 +18,7 @@ from jsonfield.fields import JSONField
 from ordered_model.models import OrderedModel, OrderedModelManager, OrderedModelQuerySet
 
 from enterprise_access.apps.workflows.constants import WorkflowStatus
-from enterprise_access.apps.workflows.registry import WorkflowActionRegistry
+from enterprise_access.apps.workflows.registry import WorkflowActionStepRegistry
 from enterprise_access.utils import localized_utcnow
 
 logger = logging.getLogger(__name__)
@@ -328,12 +328,12 @@ class WorkflowActionStep(TimeStampedModel):
         """
         Validates that the action reference exists in the registry.
         """
-        if not WorkflowActionRegistry.get(self.action_reference):
+        if not WorkflowActionStepRegistry.get(self.action_reference):
             raise ValidationError(f"Action reference '{self.action_reference}' is not registered.")
 
     def __str__(self):
         """Returns the step name and its action reference."""
-        return f"Step: {self.name} (Action: {self.action_reference})"
+        return f"{self.name} (Action: {self.action_reference})"
 
 
 class WorkflowDefinitionQuerySet(OrderedModelQuerySet):

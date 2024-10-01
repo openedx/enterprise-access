@@ -5,7 +5,10 @@ Default workflow handlers.
 from enterprise_access.apps.workflows.decorators import workflow_action_step
 
 
-@workflow_action_step(slug='activate_enterprise_customer_user', name='Activate Enterprise Customer User')
+@workflow_action_step(
+    name='Activate Enterprise Customer User',
+    slug='activate_enterprise_customer_user',
+)
 def activate_enterprise_customer_user_changed():
     """
     Activates an enterprise customer user for the specified enterprise customer.
@@ -50,7 +53,10 @@ def activate_enterprise_customer_user_changed():
     }
 
 
-@workflow_action_step(slug='activate_subscription_license', name='Activate Subscription License')
+@workflow_action_step(
+    name='Activate Subscription License',
+    slug='activate_subscription_license'
+)
 def activate_subscription_license():
     """
     Activates a subscription license for the specified subscription license.
@@ -58,7 +64,10 @@ def activate_subscription_license():
     print("Activating subscription license for subscription license UUID: TBD")
 
 
-@workflow_action_step(slug='auto_apply_subscription_license', name='Auto-apply Subscription License')
+@workflow_action_step(
+    name='Auto-apply Subscription License',
+    slug='auto_apply_subscription_license',
+)
 def auto_apply_subscription_license():
     """
     Automatically applies a subscription license to an enterprise customer user.
@@ -66,7 +75,10 @@ def auto_apply_subscription_license():
     print("Automatically applying subscription license to enterprise customer user.")
 
 
-@workflow_action_step(slug='retrieve_subscription_licenses', name='Retrieve Subscription Licenses')
+@workflow_action_step(
+    name='Retrieve Subscription Licenses',
+    slug='retrieve_subscription_licenses',
+)
 def retrieve_subscription_licenses():
     """
     Retrieves a subscription license for the specified enterprise customer.
@@ -124,7 +136,10 @@ def retrieve_subscription_licenses():
     }
 
 
-@workflow_action_step(slug='retrieve_credits_available', name='Retrieve Credits Available')
+@workflow_action_step(
+    name='Retrieve Credits Available',
+    slug='retrieve_credits_available',
+)
 def retrieve_credits_available():
     """
     Retrieves the number of credits available for the specified enterprise customer.
@@ -149,8 +164,8 @@ def retrieve_credits_available():
 
 
 @workflow_action_step(
-    slug='enroll_default_enterprise_course_enrollments',
     name='Enroll Default Enterprise Course Enrollments',
+    slug='enroll_default_enterprise_course_enrollments',
 )
 def enroll_default_enterprise_course_enrollments():
     """
@@ -173,6 +188,12 @@ def enroll_default_enterprise_course_enrollments():
     print("Enrolling enterprise customer user in default enterprise course enrollments.")
 
 
-@workflow_action_step(slug='retrieve_enterprise_course_enrollments', name='Retrieve Enterprise Course Enrollments')
+@workflow_action_step(
+    name='Retrieve Enterprise Course Enrollments',
+    slug='retrieve_enterprise_course_enrollments',
+)
 def retrieve_enterprise_course_enrollments():
+    """
+    Retrieves enterprise course enrollments for the enterprise customer user.
+    """
     print("Retrieving enterprise course enrollments for enterprise customer user.")

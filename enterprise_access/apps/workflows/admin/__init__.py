@@ -11,7 +11,7 @@ from djangoql.admin import DjangoQLSearchMixin
 from ordered_model.admin import OrderedInlineModelAdminMixin, OrderedStackedInline
 
 from enterprise_access.apps.workflows import models
-from enterprise_access.apps.workflows.registry import WorkflowActionRegistry
+from enterprise_access.apps.workflows.registry import WorkflowActionStepRegistry
 
 
 class WorkflowExecutionStatusInline(admin.TabularInline):
@@ -155,28 +155,6 @@ class WorkflowEnterpriseCustomerAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     list_filter = ('workflow_definition',)
 
 
-@admin.register(models.WorkflowActionStep)
-class WorkflowActionStepAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
-    """Admin class for the WorkflowActionStep model."""
-    list_display = ('name', 'action_reference')
-    search_fields = ('name', 'action_reference')
-    fields = ('name', 'action_reference', 'created', 'modified')
-    readonly_fields = fields
-    ordering = ['-created', 'name']  # Order by modified date first, then by name
-
-    def has_add_permission(self, request):  # pylint: disable=unused-argument
-        """Disallow adding new WorkflowActionSteps."""
-        return False
-
-    def has_delete_permission(self, request, obj=None):  # pylint: disable=unused-argument
-        """Disallow deleting WorkflowActionSteps."""
-        return False
-
-    def has_change_permission(self, request, obj=None):  # pylint: disable=unused-argument
-        """Disallow editing WorkflowActionSteps, making them read-only."""
-        return False
-
-
 @admin.register(models.WorkflowGroupActionStepThrough)
 class WorkflowGroupActionStepThroughAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     """Admin class for the WorkflowGroupActionStepThrough model."""
@@ -214,3 +192,25 @@ class WorkflowStepGroupAdmin(DjangoQLSearchMixin, OrderedInlineModelAdminMixin, 
     list_display = ('name', 'run_in_parallel')
     search_fields = ('name',)
     inlines = [WorkflowGroupActionStepThroughInline]
+
+
+@admin.register(models.WorkflowActionStep)
+class WorkflowActionStepAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
+    """Admin class for the WorkflowActionStep model."""
+    list_display = ('name', 'action_reference')
+    search_fields = ('name', 'action_reference')
+    fields = ('name', 'action_reference', 'created', 'modified')
+    readonly_fields = fields
+    ordering = ['-created', 'name']  # Order by modified date first, then by name
+
+    def has_add_permission(self, request):  # pylint: disable=unused-argument
+        """Disallow adding new WorkflowActionSteps."""
+        return False
+
+    def has_delete_permission(self, request, obj=None):  # pylint: disable=unused-argument
+        """Disallow deleting WorkflowActionSteps."""
+        return False
+
+    def has_change_permission(self, request, obj=None):  # pylint: disable=unused-argument
+        """Disallow editing WorkflowActionSteps, making them read-only."""
+        return False

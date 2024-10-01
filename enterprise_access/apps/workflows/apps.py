@@ -28,5 +28,5 @@ class WorkflowsConfig(AppConfig):
         exist in the registered action list. This is called on app startup.
         """
         # pylint: disable=import-outside-toplevel
-        from enterprise_access.apps.workflows.registry import WorkflowActionRegistry
-        WorkflowActionRegistry.cleanup_registry()
+        from enterprise_access.apps.workflows.registry import WorkflowActionStepRegistry
+        WorkflowActionStepRegistry.cleanup_registry()

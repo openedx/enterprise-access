@@ -13,7 +13,7 @@ class WorkflowActionNotRegisteredError(Exception):
     """Raised when a requested workflow action is not registered."""
 
 
-class WorkflowActionRegistry:
+class WorkflowActionStepRegistry:
     """
     Registry for workflow actions.
     """
@@ -22,38 +22,37 @@ class WorkflowActionRegistry:
     _original_names = {}
 
     @classmethod
-    def register_action_step(cls, slug, name):
+    def register_action_step(cls, slug, name, func, required_params=None):
         """
         Registers an action with the workflow registry.
         :param slug: The unique identifier
         :param name: The human-readable name
+        :param [required_params]: A list of parameters required to execute this action.
         """
-        def decorator(func):
-            # Ensure the function is callable
-            if not callable(func):
-                raise ValueError(f"Registered action '{name}' is not callable.")
+        # Ensure the function is callable
+        if not callable(func):
+            raise ValueError(f"Registered action '{name}' is not callable.")
 
-            # Handle slug changes
-            if func in cls._original_slugs and cls._original_slugs[func] != slug:
-                original_slug = cls._original_slugs[func]
-                cls.update_action_slug(original_slug, slug)
-                logger.info(f"Action slug '{original_slug}' has been renamed to '{slug}'. Updated database references.")
+        # Handle slug changes
+        if func in cls._original_slugs and cls._original_slugs[func] != slug:
+            original_slug = cls._original_slugs[func]
+            cls.update_action_slug(original_slug, slug)
+            logger.info(f"Action slug '{original_slug}' has been renamed to '{slug}'. Updated database references.")
 
-            # Handle name changes
-            if func in cls._original_names and cls._original_names[func] != name:
-                original_name = cls._original_names[func]
-                cls.update_action_name(original_name, name)
-                logger.info(f"Action name '{original_name}' has been renamed to '{name}'. Updated database references.")
+        # Handle name changes
+        if func in cls._original_names and cls._original_names[func] != name:
+            original_name = cls._original_names[func]
+            cls.update_action_name(original_name, name)
+            logger.info(f"Action name '{original_name}' has been renamed to '{name}'. Updated database references.")
 
-            # Register the action in the registry
-            cls._registry[slug] = {"name": name, "func": func}
-            cls._original_slugs[func] = slug
-            cls._original_names[func] = name
-
-            # Return the original function to allow it to be called
-            return func
-
-        return decorator
+        # Register the action in the registry
+        cls._registry[slug] = {
+            "name": name,
+            "func": func,
+            "required_params": required_params or [],
+        }
+        cls._original_slugs[func] = slug
+        cls._original_names[func] = name
 
     @classmethod
     def list_actions(cls):
