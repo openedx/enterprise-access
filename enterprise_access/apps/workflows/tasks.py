@@ -10,9 +10,9 @@ from celery.result import AsyncResult
 
 from enterprise_access.apps.workflows.constants import WorkflowStatus
 from enterprise_access.apps.workflows.models import (
-    WorkflowGroupActionStepThrough,
     WorkflowExecutionStatus,
-    WorkflowExecutionStepStatus
+    WorkflowExecutionStepStatus,
+    WorkflowGroupActionStepThrough
 )
 from enterprise_access.apps.workflows.utils import resolve_action_reference
 from enterprise_access.tasks import LoggedTaskWithRetry
@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task(base=LoggedTaskWithRetry)
-def handle_workflow_step_success(workflow_execution_step_status_id, result, *args, **kwargs):  # pylint: disable=unused-argument
+def handle_workflow_step_success(
+    workflow_execution_step_status_id, result, *args, **kwargs
+):  # pylint: disable=unused-argument
     """
     Task to handle successful workflow step execution.
     """
@@ -53,7 +55,9 @@ def handle_workflow_step_success(workflow_execution_step_status_id, result, *arg
 
 
 @shared_task(base=LoggedTaskWithRetry)
-def handle_workflow_step_failure(workflow_execution_step_status_id, exc, *args, **kwargs):  # pylint: disable=unused-argument
+def handle_workflow_step_failure(
+    workflow_execution_step_status_id, exc, *args, **kwargs
+):  # pylint: disable=unused-argument
     """
     Task to handle failed workflow step execution.
     """
@@ -116,7 +120,7 @@ def execute_workflow_step(
 
     if step_status_created:
         logger.info(
-            f"Created new WorkflowExecutionStepStatus for step {step_status.step.name} " \
+            f"Created new WorkflowExecutionStepStatus for step {step_status.step.name} "
             f"and user {workflow_execution.user}."
         )
 

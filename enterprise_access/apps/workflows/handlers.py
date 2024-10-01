@@ -2,51 +2,55 @@
 Default workflow handlers.
 """
 
+from enterprise_access.apps.workflows.decorators import workflow_action_step
 
-def activate_enterprise_customer_user():
+
+@workflow_action_step(slug='activate_enterprise_customer_user', name='Activate Enterprise Customer User')
+def activate_enterprise_customer_user_changed():
     """
     Activates an enterprise customer user for the specified enterprise customer.
     """
     print("Activating enterprise customer user for enterprise customer UUID: TBD")
     return {
-        "id":692281,
-        "enterpriseCustomer":{
-            "uuid":"852eac48-b5a9-4849-8490-743f3f2deabf",
-            "name":"Executive Education (2U) Integration QA",
-            "slug":"exec-ed-2u-integration-qa",
-            "active":True,
+        "id": 692281,
+        "enterpriseCustomer": {
+            "uuid": "852eac48-b5a9-4849-8490-743f3f2deabf",
+            "name": "Executive Education (2U) Integration QA",
+            "slug": "exec-ed-2u-integration-qa",
+            "active": True,
             "other": "fields",
         },
-        "active":True,
-        "userId":17737721,
-        "user":{
-            "id":17737721,
-            "username":"astankiewicz_edx",
-            "firstName":"Adam",
-            "lastName":"Stankiewicz",
-            "email":"astankiewicz@edx.org",
-            "isStaff":True,
-            "isActive":True,
-            "dateJoined":"2018-01-26T20:05:56Z"
+        "active": True,
+        "userId": 17737721,
+        "user": {
+            "id": 17737721,
+            "username": "astankiewicz_edx",
+            "firstName": "Adam",
+            "lastName": "Stankiewicz",
+            "email": "astankiewicz@edx.org",
+            "isStaff": True,
+            "isActive": True,
+            "dateJoined": "2018-01-26T20:05:56Z"
         },
-        "dataSharingConsentRecords":[
+        "dataSharingConsentRecords": [
             {
-                "username":"astankiewicz_edx",
-                "enterpriseCustomerUuid":"852eac48-b5a9-4849-8490-743f3f2deabf",
-                "exists":True,
-                "consentProvided":True,
-                "consentRequired":False,
-                "courseId":"course-v1:HarvardX+CS50+X"
+                "username": "astankiewicz_edx",
+                "enterpriseCustomerUuid": "852eac48-b5a9-4849-8490-743f3f2deabf",
+                "exists": True,
+                "consentProvided": True,
+                "consentRequired": False,
+                "courseId": "course-v1:HarvardX+CS50+X"
             }
         ],
-        "groups":[],
-        "created":"2022-11-08T14:49:09.494221Z",
-        "inviteKey":"b584d15d-f286-4b25-b6da-766bab654394",
-        "roleAssignments":["enterprise_learner"],
-        "enterpriseGroup":[]
+        "groups": [],
+        "created": "2022-11-08T14:49:09.494221Z",
+        "inviteKey": "b584d15d-f286-4b25-b6da-766bab654394",
+        "roleAssignments": ["enterprise_learner"],
+        "enterpriseGroup": []
     }
 
 
+@workflow_action_step(slug='activate_subscription_license', name='Activate Subscription License')
 def activate_subscription_license():
     """
     Activates a subscription license for the specified subscription license.
@@ -54,6 +58,7 @@ def activate_subscription_license():
     print("Activating subscription license for subscription license UUID: TBD")
 
 
+@workflow_action_step(slug='auto_apply_subscription_license', name='Auto-apply Subscription License')
 def auto_apply_subscription_license():
     """
     Automatically applies a subscription license to an enterprise customer user.
@@ -61,11 +66,13 @@ def auto_apply_subscription_license():
     print("Automatically applying subscription license to enterprise customer user.")
 
 
+@workflow_action_step(slug='retrieve_subscription_licenses', name='Retrieve Subscription Licenses')
 def retrieve_subscription_licenses():
     """
     Retrieves a subscription license for the specified enterprise customer.
     """
     print("Retrieving subscription license for enterprise customer UUID: TBD")
+    # learner-licenses (license-manager)
     return {
         "count": 1,
         "current_page": 1,
@@ -117,6 +124,7 @@ def retrieve_subscription_licenses():
     }
 
 
+@workflow_action_step(slug='retrieve_credits_available', name='Retrieve Credits Available')
 def retrieve_credits_available():
     """
     Retrieves the number of credits available for the specified enterprise customer.
@@ -140,17 +148,31 @@ def retrieve_credits_available():
     ]
 
 
+@workflow_action_step(
+    slug='enroll_default_enterprise_course_enrollments',
+    name='Enroll Default Enterprise Course Enrollments',
+)
 def enroll_default_enterprise_course_enrollments():
     """
     Enrolls an enterprise customer user in default enterprise course enrollments.
     """
     # 1. Fetch GET /enterprise/api/v1/enterprise-customer/{uuid}/default-course-enrollments/with-enrollment-status/
+    #
     # 2. Determine redeemability of each not-yet-enrolled default enterprise course enrollment with subscription license
     #    or Learner Credit.
+    #
     # 3. Redeem/enroll the enterprise customer user in the not-yet-enrolled and redeemable default enterprise course
     #    enrollments, using the appropriate redemption method.
+    #      - For subscriptions redemption (VSF):
+    #        * Either call `enroll_learners_in_courses` (edx-enterprise) directly OR consider the
+    #          implications of getting subscriptions into the can-redeem / redeem paradigm (redeem
+    #          uses same `enroll_learners_in_courses` already).
+    #    - For Learner Credit redemption:
+    #        * Redeem with existing can-redeem / redeem paradigm.
+
     print("Enrolling enterprise customer user in default enterprise course enrollments.")
 
 
+@workflow_action_step(slug='retrieve_enterprise_course_enrollments', name='Retrieve Enterprise Course Enrollments')
 def retrieve_enterprise_course_enrollments():
     print("Retrieving enterprise course enrollments for enterprise customer user.")

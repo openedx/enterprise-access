@@ -2,17 +2,16 @@
 Admin for workflows app.
 """
 import json
-from django.utils.safestring import mark_safe
+
 from django import forms
 from django.contrib import admin
-from django.forms.models import inlineformset_factory
-from django.http.request import HttpRequest
-from django.urls import reverse
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from djangoql.admin import DjangoQLSearchMixin
 from ordered_model.admin import OrderedInlineModelAdminMixin, OrderedStackedInline
 
 from enterprise_access.apps.workflows import models
+from enterprise_access.apps.workflows.registry import WorkflowActionRegistry
 
 
 class WorkflowExecutionStatusInline(admin.TabularInline):
@@ -26,7 +25,9 @@ class WorkflowExecutionStatusInline(admin.TabularInline):
     def has_add_permission(self, request, obj=None):  # pylint: disable=unused-argument
         return False
 
-    def has_delete_permission(self, request, obj=None, workflow_execution_status=None):  # pylint: disable=unused-argument
+    def has_delete_permission(
+        self, request, obj=None, workflow_execution_status=None
+    ):  # pylint: disable=unused-argument
         return False
 
     def admin_link(self, instance):
@@ -159,6 +160,21 @@ class WorkflowActionStepAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     """Admin class for the WorkflowActionStep model."""
     list_display = ('name', 'action_reference')
     search_fields = ('name', 'action_reference')
+    fields = ('name', 'action_reference', 'created', 'modified')
+    readonly_fields = fields
+    ordering = ['-created', 'name']  # Order by modified date first, then by name
+
+    def has_add_permission(self, request):  # pylint: disable=unused-argument
+        """Disallow adding new WorkflowActionSteps."""
+        return False
+
+    def has_delete_permission(self, request, obj=None):  # pylint: disable=unused-argument
+        """Disallow deleting WorkflowActionSteps."""
+        return False
+
+    def has_change_permission(self, request, obj=None):  # pylint: disable=unused-argument
+        """Disallow editing WorkflowActionSteps, making them read-only."""
+        return False
 
 
 @admin.register(models.WorkflowGroupActionStepThrough)
@@ -175,7 +191,7 @@ class WorkflowExecutionStepStatusAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     search_fields = ('id', 'workflow_execution__uuid', 'step__name', 'task_id')
     list_filter = ('status', 'workflow_execution__workflow_definition')
     fields = (
-        'id', 'workflow_execution', 'step', 'status', 
+        'id', 'workflow_execution', 'step', 'status',
         'task_id', 'formatted_result', 'error_message',
         'created', 'modified',
     )

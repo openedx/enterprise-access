@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 
 from enterprise_access.apps.workflows.constants import WorkflowStatus
 from enterprise_access.apps.workflows.models import WorkflowExecutionStatus
-from enterprise_access.apps.workflows.tasks import execute_workflow_step, handle_workflow_failure, handle_workflow_step_failure
+from enterprise_access.apps.workflows.tasks import execute_workflow_step, handle_workflow_failure
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -24,8 +24,7 @@ class WorkflowRunner:
             self,
             workflow_definition=None,
             lms_user_id=None,
-            workflow_execution_status=None,
-        ):
+            workflow_execution_status=None):
         # Lookup the user by the LMS ID, if provided.
         self.user = None
         self.lms_user_id = None
@@ -70,7 +69,7 @@ class WorkflowRunner:
 
         if not remaining_workflow_steps.exists():
             logger.info(
-                f"No pending steps to run for workflow {self.workflow_definition.uuid} and " \
+                f"No pending steps to run for workflow {self.workflow_definition.uuid} and "
                 f"its workflow execution status {self.workflow_execution_status.uuid}"
             )
             self.workflow_execution_status.status = WorkflowStatus.COMPLETED

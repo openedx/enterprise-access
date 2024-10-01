@@ -2,8 +2,8 @@
 Models for the workflows app.
 """
 
-import importlib
 import collections
+import importlib
 import logging
 from uuid import uuid4
 
@@ -18,6 +18,7 @@ from jsonfield.fields import JSONField
 from ordered_model.models import OrderedModel, OrderedModelManager, OrderedModelQuerySet
 
 from enterprise_access.apps.workflows.constants import WorkflowStatus
+from enterprise_access.apps.workflows.registry import WorkflowActionRegistry
 from enterprise_access.utils import localized_utcnow
 
 logger = logging.getLogger(__name__)
@@ -325,20 +326,14 @@ class WorkflowActionStep(TimeStampedModel):
 
     def clean(self):
         """
-        Validates the action reference to ensure that the specified action exists
-        and can be imported dynamically.
+        Validates that the action reference exists in the registry.
         """
-        try:
-            module_name, function_name = self.action_reference.rsplit('.', 1)
-            module = importlib.import_module(module_name)
-            if not hasattr(module, function_name):
-                raise ImportError
-        except (ImportError, ValueError) as exc:
-            raise ValidationError(f"Invalid action_reference: {self.action_reference} does not exist.") from exc
+        if not WorkflowActionRegistry.get(self.action_reference):
+            raise ValidationError(f"Action reference '{self.action_reference}' is not registered.")
 
     def __str__(self):
-        """Returns the step name and the workflow it belongs to, including its order."""
-        return self.name
+        """Returns the step name and its action reference."""
+        return f"Step: {self.name} (Action: {self.action_reference})"
 
 
 class WorkflowDefinitionQuerySet(OrderedModelQuerySet):
@@ -552,7 +547,6 @@ class WorkflowGroupActionStepThrough(OrderedModel, TimeStampedModel):
 
     def __str__(self):
         return f"{self.id}"
-
 
 
 class WorkflowItemThrough(OrderedModel, TimeStampedModel):
