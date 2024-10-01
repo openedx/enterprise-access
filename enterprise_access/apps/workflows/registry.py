@@ -62,19 +62,24 @@ class WorkflowActionStepRegistry:
         return [(slug, entry["name"]) for slug, entry in cls._registry.items()]
 
     @classmethod
-    def get(cls, identifier):
+    def is_step_registered(cls, slug):
+        """
+        Checks if a workflow action step is registered in the registry.
+        :param slug: The unique identifier for the workflow action step.
+        :return: True if the step is registered, False otherwise.
+        """
+        return slug in cls._registry
+
+    @classmethod
+    def get(cls, slug):
         """
         Returns the registered function for the given identifier.
-        :param identifier: The slug or name of the registered action
+        :param slug: The slug of the registered action
         """
-        if identifier in cls._registry:
-            return cls._registry[identifier]["func"]
+        if not cls.is_step_registered(slug):
+            raise WorkflowActionNotRegisteredError(f"Action '{slug}' is not registered.")
 
-        for _, entry in cls._registry.items():
-            if entry["name"] == identifier:
-                return entry["func"]
-
-        raise WorkflowActionNotRegisteredError(f"Action '{identifier}' is not registered.")
+        return cls._registry[slug]["func"]
 
     @classmethod
     def update_action_slug(cls, old_slug, new_slug):

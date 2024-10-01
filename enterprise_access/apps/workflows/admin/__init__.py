@@ -197,11 +197,11 @@ class WorkflowStepGroupAdmin(DjangoQLSearchMixin, OrderedInlineModelAdminMixin, 
 @admin.register(models.WorkflowActionStep)
 class WorkflowActionStepAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     """Admin class for the WorkflowActionStep model."""
-    list_display = ('name', 'action_reference')
+    list_display = ('name', 'action_reference', 'modified')
     search_fields = ('name', 'action_reference')
     fields = ('name', 'action_reference', 'created', 'modified')
     readonly_fields = fields
-    ordering = ['-created', 'name']  # Order by modified date first, then by name
+    ordering = ['name']  # Order by modified date first, then by name
 
     def has_add_permission(self, request):  # pylint: disable=unused-argument
         """Disallow adding new WorkflowActionSteps."""
