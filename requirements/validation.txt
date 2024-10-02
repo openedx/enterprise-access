@@ -19,7 +19,7 @@ asgiref==3.8.1
     #   -r requirements/test.txt
     #   django
     #   django-cors-headers
-astroid==3.3.3
+astroid==3.3.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -154,7 +154,7 @@ defusedxml==0.8.0rc2
     #   -r requirements/test.txt
     #   python3-openid
     #   social-auth-core
-dill==0.3.8
+dill==0.3.9
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -176,6 +176,7 @@ django==4.2.16
     #   django-log-request-id
     #   django-model-utils
     #   django-simple-history
+    #   django-viewflow
     #   django-waffle
     #   djangorestframework
     #   drf-jwt
@@ -221,6 +222,7 @@ django-filter==24.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
+    #   django-viewflow
 django-log-request-id==2.1.0
     # via
     #   -r requirements/quality.txt
@@ -240,6 +242,10 @@ django-rest-swagger==2.2.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
 django-simple-history==3.7.0
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+django-viewflow==2.2.7
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -317,7 +323,7 @@ edx-django-release-util==1.4.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-edx-django-utils==5.15.0
+edx-django-utils==5.16.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -368,7 +374,7 @@ factory-boy==3.3.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==29.0.0
+faker==30.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -426,7 +432,7 @@ jaraco-context==6.0.1
     # via
     #   -r requirements/quality.txt
     #   keyring
-jaraco-functools==4.0.2
+jaraco-functools==4.1.0
     # via
     #   -r requirements/quality.txt
     #   keyring
@@ -501,7 +507,7 @@ mysqlclient==2.2.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-newrelic==9.13.0
+newrelic==10.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -561,7 +567,7 @@ ply==3.11
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   djangoql
-prompt-toolkit==3.0.47
+prompt-toolkit==3.0.48
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -595,7 +601,7 @@ pyjwt[crypto]==2.9.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==3.3.0
+pylint==3.3.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -623,7 +629,7 @@ pymemcache==4.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-pymongo==4.9.1
+pymongo==4.10.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -687,7 +693,7 @@ readme-renderer==44.0
     # via
     #   -r requirements/quality.txt
     #   twine
-redis==5.0.8
+redis==5.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -722,7 +728,7 @@ rfc3986==2.0.0
     # via
     #   -r requirements/quality.txt
     #   twine
-rich==13.8.1
+rich==13.9.1
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -798,7 +804,7 @@ tomlkit==0.13.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pylint
-tox==4.20.0
+tox==4.21.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -809,7 +815,8 @@ typing-extensions==4.12.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-opaque-keys
-tzdata==2024.1
+    #   faker
+tzdata==2024.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -835,7 +842,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.26.5
+virtualenv==20.26.6
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt

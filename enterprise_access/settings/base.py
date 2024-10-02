@@ -63,6 +63,8 @@ THIRD_PARTY_APPS = (
     'simple_history',
     'social_django',
     'waffle',
+    'viewflow',
+    'viewflow.workflow',
 )
 
 PROJECT_APPS = (
