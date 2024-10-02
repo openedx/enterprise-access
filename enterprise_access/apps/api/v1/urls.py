@@ -38,4 +38,13 @@ urlpatterns = [
     ),
 ]
 
+# Workflows
+urlpatterns += [
+    path(
+        'workflows/default-enterprise-course-enrollment/',
+        FlowViewset(flows.DefaultEnterpriseCourseEnrollmentFlow).urls,
+        name='workflow-default-enterprise-course-enrollment',
+    ),
+]
+
 urlpatterns += router.urls

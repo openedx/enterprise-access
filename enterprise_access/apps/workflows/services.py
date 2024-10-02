@@ -62,7 +62,12 @@ def enroll_courses(redeemable_enrollments, *args, **kwargs):
 
     logger.info(f"Enrolling users in redeemable courses: {redeemable_enrollments}")
 
-    return {
-        "status": "success",
-        "message": "Enrolled users in redeemable courses",
-    }
+    return [
+        {
+            "uuid": str(uuid.uuid4()),
+            "status": "enrolled",
+            "enterprise_course_enrollment_uuid": str(uuid.uuid4()),
+            "course_run_key": "course-v1:edX+DemoX+Demo_Course",
+            "content_key": "edX+DemoX",
+        },
+    ]

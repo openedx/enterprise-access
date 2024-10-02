@@ -134,10 +134,12 @@ class DefaultEnterpriseCourseEnrollmentFlow(flow.Flow):
         """
         Enroll learners in redeemable courses.
         """
-        services.enroll_courses(
+        enrolled_courses = services.enroll_courses(
             redeemable_enrollments=activation.process.redeemable_default_enterprise_course_enrollments
         )
         logger.info(
             f"Enrolled learners in redeemable courses for process {activation.process.pk}: "
-            f"{activation.process.redeemable_default_enterprise_course_enrollments}"
+            f"{enrolled_courses}"
         )
+        activation.process.redeemed_default_enterprise_course_enrollments = enrolled_courses
+        activation.process.save()
