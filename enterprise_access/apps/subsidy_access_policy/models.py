@@ -1744,11 +1744,11 @@ class ForcedPolicyRedemption(TimeStampedModel):
         before redemption can occur.
         """
         assignment_configuration = self.subsidy_access_policy.assignment_configuration
-        content_metadata = get_and_cache_content_metadata(
+        # Ensure that the requested content key is available for the related customer.
+        _ = get_and_cache_content_metadata(
             assignment_configuration.enterprise_customer_uuid,
             self.course_run_key,
         )
-        content_key = content_metadata.get('content_key')
         user_record = User.objects.filter(lms_user_id=self.lms_user_id).first()
         if not user_record:
             raise Exception(f'No email could be found for lms_user_id {self.lms_user_id}')
@@ -1756,7 +1756,7 @@ class ForcedPolicyRedemption(TimeStampedModel):
         return assignments_api.allocate_assignments(
             assignment_configuration,
             [user_record.email],
-            content_key,
+            self.course_run_key,
             self.content_price_cents,
         )
 
