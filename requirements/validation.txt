@@ -19,7 +19,7 @@ asgiref==3.8.1
     #   -r requirements/test.txt
     #   django
     #   django-cors-headers
-astroid==3.3.4
+astroid==3.3.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -269,7 +269,7 @@ djangorestframework-csv==3.0.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-dnspython==2.6.1
+dnspython==2.7.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -317,7 +317,7 @@ edx-django-release-util==1.4.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-edx-django-utils==5.15.0
+edx-django-utils==5.16.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -368,7 +368,7 @@ factory-boy==3.3.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==30.0.0
+faker==30.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -623,7 +623,7 @@ pymemcache==4.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-pymongo==4.9.1
+pymongo==4.10.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -687,7 +687,7 @@ readme-renderer==44.0
     # via
     #   -r requirements/quality.txt
     #   twine
-redis==5.1.0
+redis==5.1.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -722,7 +722,7 @@ rfc3986==2.0.0
     # via
     #   -r requirements/quality.txt
     #   twine
-rich==13.8.1
+rich==13.9.2
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -798,7 +798,7 @@ tomlkit==0.13.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pylint
-tox==4.20.0
+tox==4.21.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -809,6 +809,7 @@ typing-extensions==4.12.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-opaque-keys
+    #   faker
 tzdata==2024.2
     # via
     #   -r requirements/quality.txt
