@@ -1,10 +1,7 @@
 """ API v1 URLs. """
 
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from viewflow.workflow.flow import FlowViewset
-
-from enterprise_access.apps.workflows import flows
 
 from enterprise_access.apps.api.v1 import views
 
@@ -36,15 +33,7 @@ urlpatterns = [
         views.SubsidyAccessPolicyGroupViewset.as_view({'get': 'get_group_member_data_with_aggregates'}),
         name='aggregated-subsidy-enrollments'
     ),
-]
-
-# Workflows
-urlpatterns += [
-    path(
-        'workflows/default-enterprise-course-enrollment/',
-        FlowViewset(flows.DefaultEnterpriseCourseEnrollmentFlow).urls,
-        name='workflow-default-enterprise-course-enrollment',
-    ),
+    path('bffs/learner/<str:page_route>/', views.LearnerPortalBFFAPIView.as_view(), name='learner_portal_bff')
 ]
 
 urlpatterns += router.urls
