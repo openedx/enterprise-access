@@ -35,4 +35,9 @@ urlpatterns = [
     ),
 ]
 
+# BFFs
+urlpatterns += [
+    path('bffs/learner/<page_route>/', views.LearnerPortalBFFAPIView.as_view(), name='learner-portal-bff'),
+]
+
 urlpatterns += router.urls
