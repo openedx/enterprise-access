@@ -1,6 +1,8 @@
 """
-TODO
+Response Builder Module
 """
+
+from enterprise_access.apps.bffs.serializers import LearnerDashboardResponseSerializer
 
 
 class BaseResponseBuilder:
@@ -30,17 +32,16 @@ class BaseResponseBuilder:
         """
         raise NotImplementedError("Subclasses must implement the `build` method.")
 
-    def add_errors_to_response(self, response_data):
+    def add_errors_warnings_to_response(self, response_data):
         """
         Adds any errors to the response data.
         """
         if self.context.errors:
-            response_data['errors'] = [
-                error for error in self.context.errors if error['severity'] == 'error'
-            ]
-            response_data['warnings'] = [
-                error for error in self.context.errors if error['severity'] == 'warning'
-            ]
+            response_data['errors'] = self.context.errors
+
+        if self.context.warnings:
+            response_data['warnings'] = self.context.warnings
+
         return response_data
 
     def get_status_code(self):
@@ -95,9 +96,13 @@ class BaseLearnerResponseBuilder(BaseResponseBuilder):
         response_data = self.common_response_logic(response_data)
 
         # Add any errors, etc.
-        response_data = self.add_errors_to_response(response_data)
+        response_data = self.add_errors_warnings_to_response(response_data)
 
-        return response_data
+        # Return the response data and status code
+        return response_data, self.get_status_code()
+
+
+
 
 
 class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder):
@@ -126,57 +131,11 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder):
         })
 
         # Add any errors and warnings to the response
-        response_data = self.add_errors_to_response(response_data)
+        response_data = self.add_errors_warnings_to_response(response_data)
 
-        # Retrieve the status code
-        status_code = self.get_status_code()
+        # Serialize and validate the response
+        serializer = LearnerDashboardResponseSerializer(response_data)
+        serialized_data = serializer.data
 
-        return response_data, status_code
-
-
-class BaseResponseBuilderFactory:
-    """
-    A base factory to create response builders based on route information.
-
-    The `BaseResponseBuilderFactory` provides a method to instantiate appropriate response
-    builders based on route information, allowing for shared logic between specialized factories.
-    """
-
-    _response_builder_map = {}
-
-    @classmethod
-    def get_response_builder(cls, context):
-        """
-        Returns a route-specific response builder based on the route information in the context.
-
-        Args:
-            context (HandlerContext): The context object containing data, errors, and route information.
-
-        Returns:
-            BaseResponseBuilder: An instance of the appropriate response builder class.
-
-        Raises:
-            ValueError: If no response builder is found for the given route.
-        """
-        page_route = context.page_route
-
-        response_builder_class = cls._response_builder_map.get(page_route)
-
-        if response_builder_class is not None:
-            return response_builder_class(context)
-
-        raise ValueError(f"No response builder found for route: {page_route}")
-
-
-class LearnerPortalResponseBuilderFactory(BaseResponseBuilderFactory):
-    """
-    A learner portal-specific factory to create response builders based on learner portal route information.
-
-    The `LearnerPortalResponseBuilderFactory` extends `BaseResponseBuilderFactory` and provides a
-    mapping of learner portal-specific routes to response builders.
-    """
-
-    _response_builder_map = {
-        'dashboard': LearnerDashboardResponseBuilder,
-        # Add additional routes and response builders here
-    }
+        # Return the response data and status code
+        return serialized_data, self.get_status_code()

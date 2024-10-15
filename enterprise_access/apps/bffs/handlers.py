@@ -44,16 +44,15 @@ class BaseHandler:
         """
         raise NotImplementedError("Subclasses must implement `load_and_process` method.")
 
-    def add_error(self, user_message, developer_message, severity='error'):
+    def add_error(self, user_message, developer_message):
         """
         Adds an error to the context.
 
         Args:
             user_message (str): A user-friendly error message.
             developer_message (str): A more detailed error message for debugging purposes.
-            severity (str): The severity level of the error ('error' or 'warning'). Defaults to 'error'.
         """
-        self.context.add_error(user_message, developer_message, severity)
+        self.context.add_error(user_message, developer_message)
 
     def initialize_common_context_data(self):
         """
@@ -103,7 +102,6 @@ class BaseLearnerPortalHandler(BaseHandler):
             self.add_error(
                 user_message="An error occurred while loading and processing common learner logic.",
                 developer_message=f"Error: {str(e)}",
-                severity='error'
             )
 
     def load_subscription_licenses(self):
@@ -226,7 +224,6 @@ class BaseLearnerPortalHandler(BaseHandler):
                     self.add_error(
                         user_message="An error occurred while activating a subscription license.",
                         developer_message=f"License UUID: {subscription_license.get('uuid')}, Error: {str(e)}",
-                        severity='error'
                     )
                     return
 
@@ -240,7 +237,6 @@ class BaseLearnerPortalHandler(BaseHandler):
                 self.add_error(
                     user_message="An error occurred while activating a subscription license.",
                     developer_message=f"Activation key not found for license {subscription_license.get('uuid')}",
-                    severity='error'
                 )
 
         # Update the subscriptions.subscription_licenses_by_status context with the modified licenses data
@@ -309,7 +305,6 @@ class BaseLearnerPortalHandler(BaseHandler):
             self.add_error(
                 user_message="An error occurred while auto-applying a license.",
                 developer_message=f"Customer agreement UUID: {customer_agreement.get('uuid')}, Error: {str(e)}",
-                severity='error'
             )
 
     def load_default_enterprise_courses(self):
@@ -384,7 +379,6 @@ class DashboardHandler(BaseLearnerPortalHandler):
             self.add_error(
                 user_message="An error occurred while processing the learner dashboard.",
                 developer_message=f"Error: {str(e)}",
-                severity='error'
             )
 
     def get_enterprise_course_enrollments(self):
@@ -419,36 +413,3 @@ class DashboardHandler(BaseLearnerPortalHandler):
                 "enroll_by": "2024-12-21T23:59:59Z",
             }
         ]
-
-
-class LearnerPortalHandlerFactory:
-    """
-    Factory to create learner handlers based on route information.
-
-    The `LearnerPortalHandlerFactory` provides a method to instantiate appropriate learner handlers 
-    based on the route stored in the HandlerContext.
-    """
-
-    @staticmethod
-    def get_handler(context):
-        """
-        Returns a route-specific learner handler based on the route information in the context.
-
-        Args:
-            context (HandlerContext): The context object containing data, errors, and route information.
-
-        Returns:
-            BaseLearnerHandler: An instance of the appropriate learner handler class.
-
-        Raises:
-            ValueError: If no learner handler is found for the given route.
-        """
-        page_route = context.page_route
-
-        if page_route == 'dashboard':
-            return DashboardHandler(context)
-        elif page_route == 'course':
-            # Placeholder for CourseHandler, to be implemented similarly to DashboardHandler
-            raise NotImplementedError("CourseHandler not yet implemented.")
-        else:
-            raise ValueError(f"No learner portal handler found for page route: {page_route}")

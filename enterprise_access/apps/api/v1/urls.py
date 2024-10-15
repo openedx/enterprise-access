@@ -27,17 +27,16 @@ router.register(
     'assignments',
 )
 
+# BFFs
+router.register("bffs/learner", views.LearnerPortalBFFViewSet, 'learner-portal-bff')
+
+# Other endpoints
 urlpatterns = [
     path(
         'subsidy-access-policies/<uuid>/group-members',
         views.SubsidyAccessPolicyGroupViewset.as_view({'get': 'get_group_member_data_with_aggregates'}),
         name='aggregated-subsidy-enrollments'
     ),
-]
-
-# BFFs
-urlpatterns += [
-    path('bffs/learner/<page_route>/', views.LearnerPortalBFFAPIView.as_view(), name='learner-portal-bff'),
 ]
 
 urlpatterns += router.urls
