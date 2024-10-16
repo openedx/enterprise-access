@@ -51,7 +51,7 @@ cffi==1.17.1
     #   pynacl
 chardet==5.2.0
     # via tox
-charset-normalizer==3.3.2
+charset-normalizer==3.4.0
     # via
     #   -r requirements/base.txt
     #   requests
@@ -88,7 +88,7 @@ code-annotations==1.8.0
     #   edx-toggles
 colorama==0.4.6
     # via tox
-confluent-kafka==2.5.3
+confluent-kafka==2.6.0
     # via -r requirements/base.txt
 coreapi==2.3.3
     # via
@@ -99,7 +99,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/base.txt
     #   coreapi
-coverage[toml]==7.6.1
+coverage[toml]==7.6.3
     # via
     #   -r requirements/test.in
     #   pytest-cov
@@ -117,7 +117,7 @@ defusedxml==0.8.0rc2
     #   social-auth-core
 dill==0.3.9
     # via pylint
-distlib==0.3.8
+distlib==0.3.9
     # via virtualenv
     # via
     #   -c requirements/common_constraints.txt
@@ -150,7 +150,7 @@ distlib==0.3.8
     #   social-auth-app-django
 django-celery-results==2.5.1
     # via -r requirements/base.txt
-django-cors-headers==4.4.0
+django-cors-headers==4.5.0
     # via -r requirements/base.txt
 django-crum==0.7.9
     # via
@@ -225,7 +225,7 @@ edx-celeryutils==1.3.0
     # via -r requirements/base.txt
 edx-django-release-util==1.4.0
     # via -r requirements/base.txt
-edx-django-utils==5.16.0
+edx-django-utils==6.0.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
@@ -261,7 +261,7 @@ edx-toggles==5.2.0
     #   edx-event-bus-kafka
 factory-boy==3.3.1
     # via -r requirements/test.in
-faker==30.1.0
+faker==30.3.0
     # via factory-boy
 fastavro==1.9.7
     # via
@@ -305,7 +305,7 @@ jsonschema==4.23.0
     # via
     #   -r requirements/base.txt
     #   drf-spectacular
-jsonschema-specifications==2023.12.1
+jsonschema-specifications==2024.10.1
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -313,7 +313,7 @@ kombu==5.4.2
     # via
     #   -r requirements/base.txt
     #   celery
-markupsafe==2.1.5
+markupsafe==3.0.1
     # via
     #   -r requirements/base.txt
     #   jinja2
@@ -325,7 +325,7 @@ monotonic==1.6
     #   analytics-python
 mysqlclient==2.2.4
     # via -r requirements/base.txt
-newrelic==10.0.0
+newrelic==10.1.0
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -338,7 +338,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
-openedx-events==9.14.1
+openedx-events==9.15.0
     # via
     #   -r requirements/base.txt
     #   edx-event-bus-kafka
@@ -396,7 +396,7 @@ pylint==3.3.1
     #   pylint-plugin-utils
 pylint-celery==0.3
     # via edx-lint
-pylint-django==2.5.5
+pylint-django==2.6.1
     # via edx-lint
 pylint-plugin-utils==0.8.2
     # via
