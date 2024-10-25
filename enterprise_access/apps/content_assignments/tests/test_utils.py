@@ -1,11 +1,9 @@
 """
 Tests for Enterprise Access content_assignments utils.
 """
-from datetime import datetime, timedelta
 
 import ddt
 from django.test import TestCase
-from pytz import UTC
 
 from enterprise_access.apps.content_assignments.constants import BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT
 from enterprise_access.apps.content_assignments.utils import (
@@ -13,20 +11,7 @@ from enterprise_access.apps.content_assignments.utils import (
     has_time_to_complete,
     is_within_minimum_start_date_threshold
 )
-
-
-def _curr_date(date_format=None):
-    curr_date = datetime.now()
-    if not date_format:
-        return curr_date
-    return curr_date.strftime(date_format)
-
-
-def _days_from_now(days_from_now=0, date_format=None):
-    date = datetime.now().replace(tzinfo=UTC) + timedelta(days=days_from_now)
-    if not date_format:
-        return date
-    return date.strftime(date_format)
+from enterprise_access.utils import _curr_date, _days_from_now
 
 
 @ddt.ddt
