@@ -74,6 +74,7 @@ PROJECT_APPS = (
     'enterprise_access.apps.subsidy_access_policy',
     'enterprise_access.apps.content_assignments',
     'enterprise_access.apps.enterprise_groups',
+    'enterprise_access.apps.bffs',
 )
 
 INSTALLED_APPS += THIRD_PARTY_APPS
