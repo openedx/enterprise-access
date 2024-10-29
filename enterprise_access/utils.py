@@ -229,3 +229,17 @@ def get_normalized_metadata_for_assignment(assignment, content_metadata):
 
     normalized_metadata_by_run = content_metadata.get('normalized_metadata_by_run', {})
     return normalized_metadata_by_run.get(assignment.content_key, {})
+
+
+def _curr_date(date_format=None):
+    curr_date = datetime.now()
+    if not date_format:
+        return curr_date
+    return curr_date.strftime(date_format)
+
+
+def _days_from_now(days_from_now=0, date_format=None):
+    date = datetime.now().replace(tzinfo=UTC) + timedelta(days=days_from_now)
+    if not date_format:
+        return date
+    return date.strftime(date_format)
