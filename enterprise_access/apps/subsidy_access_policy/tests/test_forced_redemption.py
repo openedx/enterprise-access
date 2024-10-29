@@ -254,5 +254,6 @@ class ForcedPolicyRedemptionAssignmentTests(BaseForcedRedemptionTestCase):
         )
 
         assignment = LearnerContentAssignment.objects.filter(lms_user_id=user.lms_user_id).first()
+        self.assertEqual(assignment.content_key, self.course_run_key)
         mock_send_email.delay.assert_called_once_with(assignment.uuid)
         mock_pending_learner_task.delay.assert_called_once_with(assignment.uuid)

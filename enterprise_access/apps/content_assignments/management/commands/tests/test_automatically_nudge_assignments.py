@@ -49,7 +49,9 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
             assignment_configuration=self.assignment_configuration,
             learner_email='alice@foo.com',
             lms_user_id=None,
-            content_key='edX+edXPrivacy101',
+            content_key='course-v1:edX+edXPrivacy101+1T2022',
+            parent_content_key='edX+edXPrivacy101',
+            is_assigned_course_run=True,
             preferred_course_run_key='course-v1:edX+edXPrivacy101+1T2022',
             content_title='edx: Privacy 101',
             content_quantity=-123,
@@ -61,6 +63,8 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
             learner_email='bob@foo.com',
             lms_user_id=None,
             content_key='edX+edXAccessibility101',
+            parent_content_key=None,
+            is_assigned_course_run=False,
             preferred_course_run_key='course-v1:edX+edXAccessibility101+1T2022',
             content_title='edx: Accessibility 101',
             content_quantity=-456,
@@ -72,6 +76,8 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
             learner_email='rob@foo.com',
             lms_user_id=None,
             content_key='edX+edXQuadrilateral306090',
+            parent_content_key=None,
+            is_assigned_course_run=False,
             preferred_course_run_key='course-v1:edX+edXQuadrilateral306090+1T2022',
             content_title='edx: Quadrilateral 306090',
             content_quantity=-456,
@@ -82,6 +88,8 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
             learner_email='richard@foo.com',
             lms_user_id=None,
             content_key='edX+edXTesseract4D',
+            parent_content_key=None,
+            is_assigned_course_run=False,
             preferred_course_run_key='course-v1:edX+edXTesseract4D+1T2022',
             content_title='edx: Tesseract 4D',
             content_quantity=-456,
@@ -93,6 +101,8 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
             learner_email='ella@foo.com',
             lms_user_id=None,
             content_key='edX+edXIsoscelesPyramid2012',
+            parent_content_key=None,
+            is_assigned_course_run=False,
             preferred_course_run_key='course-v1:edX+edXIsoscelesPyramid2012+1T2022',
             content_title='edx: IsoscelesPyramid 2012',
             content_quantity=-456,
@@ -103,6 +113,8 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
             learner_email='bella@foo.com',
             lms_user_id=None,
             content_key='edX+edXBeeHivesAlive0220',
+            parent_content_key=None,
+            is_assigned_course_run=False,
             preferred_course_run_key='course-v1:edX+edXBeeHivesAlive0220+1T2022',
             content_title='edx: BeeHivesAlive 0220',
             content_quantity=-456,
@@ -219,62 +231,76 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
         mock_content_metadata_for_assignments.return_value = {
             'edX+edXAccessibility101': {
                 'key': 'edX+edXAccessibility101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXAccessibility101+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
+                },
                 'course_type': 'executive-education-2u',
             },
-            'edX+edXPrivacy101': {
+            # `self.alice_assignment` is an assignment for a course run, so its run-based content_key
+            # should be used as the key in this dict.
+            'course-v1:edX+edXPrivacy101+1T2022': {
                 'key': 'edX+edXPrivacy101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXPrivacy101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXPrivacy101+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
+                },
                 'course_type': 'executive-education-2u',
             },
             'edX+edXTesseract4D': {
                 'key': 'edX+edXTesseract4D',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXTesseract4D+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
+                },
                 'course_type': 'executive-education-2u',
             },
             'edX+edXQuadrilateral306090': {
                 'key': 'edX+edXQuadrilateral306090',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXQuadrilateral306090+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
+                },
                 'course_type': 'executive-education-2u',
             },
             'edX+edXIsoscelesPyramid2012': {
                 'key': 'edX+edXIsoscelesPyramid2012',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXIsoscelesPyramid2012+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
+                },
                 'course_type': 'executive-education-2u',
             },
             'edX+edXBeeHivesAlive0220': {
                 'key': 'edX+edXBeeHivesAlive0220',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXBeeHivesAlive0220+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
+                },
                 'course_type': 'executive-education-2u',
             },
         }
@@ -321,35 +347,43 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
         mock_content_metadata_for_assignments.return_value = {
             'edX+edXAccessibility101': {
                 'key': 'edX+edXAccessibility101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start': start_date_between_30_and_14_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date_between_30_and_14_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXAccessibility101+1T2022': {
+                        'start_date': start_date_between_30_and_14_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
             'edX+edXTesseract4D': {
                 'key': 'edX+edXTesseract4D',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start': start_date_already_started.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date_already_started.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXTesseract4D+1T2022': {
+                        'start_date': start_date_already_started.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
             'edX+edXQuadrilateral306090': {
                 'key': 'edX+edXQuadrilateral306090',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start': start_date_beyond_30_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'normalized_metadata': {
+                    'start_date': start_date_beyond_30_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXQuadrilateral306090+1T2022': {
+                        'start_date': start_date_beyond_30_days.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
+                },
                 'course_type': 'executive-education-2u',
             },
-            'edX+edXPrivacy101': {
+            # `self.alice_assignment` is an assignment for a course run, so its run-based content_key
+            # should be used as the key in this dict.
+            'course-v1:edX+edXPrivacy101+1T2022': {
                 'key': 'edX+edXPrivacy101',
                 'course_runs': [
                     {
@@ -358,16 +392,26 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                     },
                 ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXPrivacy101+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
             'edX+edXIsoscelesPyramid2012': {
                 'key': 'edX+edXIsoscelesPyramid2012',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXIsoscelesPyramid2012+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
             'edX+edXBeeHivesAlive0220': {
                 'key': 'edX+edXBeeHivesAlive0220',
@@ -378,6 +422,14 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
                     },
                 ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXBeeHivesAlive0220+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
         }
 
@@ -412,63 +464,77 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
         mock_content_metadata_for_assignments.return_value = {
             'edX+edXAccessibility101': {
                 'key': 'edX+edXAccessibility101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'verified-audit',
-            },
-            'edX+edXPrivacy101': {
-                'key': 'edX+edXPrivacy101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXPrivacy101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXAccessibility101+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
-                ],
+                },
+            },
+            # `self.alice_assignment` is an assignment for a course run, so its run-based content_key
+            # should be used as the key in this dict.
+            'course-v1:edX+edXPrivacy101+1T2022': {
+                'key': 'edX+edXPrivacy101',
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXPrivacy101+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
             'edX+edXTesseract4D': {
                 'key': 'edX+edXTesseract4D',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'professional',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXTesseract4D+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
             'edX+edXQuadrilateral306090': {
                 'key': 'edX+edXQuadrilateral306090',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'bootcamp-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXQuadrilateral306090+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
             'edX+edXIsoscelesPyramid2012': {
                 'key': 'edX+edXIsoscelesPyramid2012',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXIsoscelesPyramid2012+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
             'edX+edXBeeHivesAlive0220': {
                 'key': 'edX+edXBeeHivesAlive0220',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXBeeHivesAlive0220+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
         }
 
@@ -505,63 +571,77 @@ class TestAutomaticallyNudgeAssignmentCommand(TestCase):
         mock_content_metadata_for_assignments.return_value = {
             'edX+edXAccessibility101': {
                 'key': 'edX+edXAccessibility101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXAccessibility101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXAccessibility101+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
             'edX+edXTesseract4D': {
                 'key': 'edX+edXTesseract4D',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXTesseract4D+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXTesseract4D+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
             'edX+edXQuadrilateral306090': {
                 'key': 'edX+edXQuadrilateral306090',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXQuadrilateral306090+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXQuadrilateral306090+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
-            'edX+edXPrivacy101': {
+            # `self.alice_assignment` is an assignment for a course run, so its run-based content_key
+            # should be used as the key in this dict.
+            'course-v1:edX+edXPrivacy101+1T2022': {
                 'key': 'edX+edXPrivacy101',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXPrivacy101+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXPrivacy101+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
             'edX+edXIsoscelesPyramid2012': {
                 'key': 'edX+edXIsoscelesPyramid2012',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXIsoscelesPyramid2012+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXIsoscelesPyramid2012+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
             'edX+edXBeeHivesAlive0220': {
                 'key': 'edX+edXBeeHivesAlive0220',
-                'course_runs': [
-                    {
-                        'key': 'course-v1:edX+edXBeeHivesAlive0220+1T2022',
-                        'start': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                ],
                 'course_type': 'executive-education-2u',
+                'normalized_metadata': {
+                    'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                'normalized_metadata_by_run': {
+                    'course-v1:edX+edXBeeHivesAlive0220+1T2022': {
+                        'start_date': start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                },
             },
         }
 
@@ -688,6 +768,7 @@ class TestAutomaticallyNudgeAssignmentCommand2(TestCase):
             learner_email='alice@foo.com',
             lms_user_id=None,
             content_key=self.COURSE_KEY,
+            is_assigned_course_run=False,
             preferred_course_run_key=assignment_preferred_course_run_key,
             content_title='edx: Privacy 101',
             content_quantity=-123,
@@ -700,11 +781,15 @@ class TestAutomaticallyNudgeAssignmentCommand2(TestCase):
             mock_content_metadata_for_assignments.return_value = {
                 self.COURSE_KEY: {
                     'key': self.COURSE_KEY,
-                    'course_runs': [{
-                        'key': self.COURSE_RUN_KEY,
-                        'start': course_start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    }],
                     'course_type': course_type,
+                    'normalized_metadata': {
+                        'start_date': course_start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    },
+                    'normalized_metadata_by_run': {
+                        self.COURSE_RUN_KEY: {
+                            'start_date': course_start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        },
+                    },
                 },
             }
         call_command(self.command, days_before_course_start_date=14)

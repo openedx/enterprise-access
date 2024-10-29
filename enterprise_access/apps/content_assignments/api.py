@@ -23,7 +23,12 @@ from enterprise_access.apps.content_assignments.tasks import (
 )
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
-from enterprise_access.utils import chunks, get_automatic_expiration_date_and_reason, localized_utcnow
+from enterprise_access.utils import (
+    chunks,
+    get_automatic_expiration_date_and_reason,
+    get_normalized_metadata_for_assignment,
+    localized_utcnow
+)
 
 from .constants import AssignmentAutomaticExpiredReason, LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
@@ -50,6 +55,7 @@ ASSIGNMENT_REALLOCATION_FIELDS = [
     'lms_user_id', 'learner_email', 'allocation_batch_id',
     'content_quantity', 'state', 'preferred_course_run_key',
     'allocated_at', 'cancelled_at', 'expired_at', 'errored_at',
+    'parent_content_key', 'is_assigned_course_run',
 ]
 
 
@@ -137,7 +143,7 @@ def get_assignments_for_admin(
         assignment_configuration (AssignmentConfiguration):
             The assignment configuration within which to search for assignments.
         learner_emails (list of str): A list of emails for which the admin intends to find existing assignments.
-        content_key (str): A content key representing a course which the assignments are for.
+        content_key (str): A content key representing a course or course run which the assignments are for.
 
     Returns:
         queryset of ``LearnerContentAssignment``: Existing records relevant to an admin's allocation request.
@@ -171,20 +177,21 @@ def get_assignment_for_learner(
     both course run keys, so a simple string comparison may not always suffice.  Method of content_key comparison for
     assignment lookup:
 
-    +---+------------------------+-----------------------+----------------------------------------------+
-    | # | assignment content_key | requested content_key |              How to compare?                 |
-    +---+------------------------+-----------------------+----------------------------------------------+
-    | 1 | course                 | course                | Simple comparison.                           |
-    | 2 | course                 | course run            | Convert everything to courses, then compare. | (most common)
-    | 3 | course run             | course                | Not supported.                               |
-    | 4 | course run             | course run            | Not supported.                               |
-    +---+------------------------+-----------------------+----------------------------------------------+
+    +---+------------------------+-----------------------+-------------------------------------------------+
+    | # | assignment content_key | requested content_key |                     How to compare?             |
+    +---+------------------------+-----------------------+-------------------------------------------------+
+    | 1 | course                 | course                | Simple comparison.                              |
+    | 2 | course                 | course run            | Convert course run to course key, then compare. |
+    | 3 | course run             | course                | Simple comparison via the parent_content_key,   |
+    |   |                        |                       | returning first run-based assignment match.     |
+    | 4 | course run             | course run            | Simple comparison.                              |
+    +---+------------------------+-----------------------+-------------------------------------------------+
 
     Args:
         assignment_configuration (AssignmentConfiguration):
             The assignment configuration within which to search for assignments.
         lms_user_id (int): One lms_user_id which the assignments are for.
-        content_key (str): A content key representing a course which the assignments are for.
+        content_key (str): A content key representing a course or course run which the assignments are for.
 
     Returns:
         ``LearnerContentAssignment``: Existing assignment relevant to a learner's redemption request, or None if not
@@ -195,19 +202,47 @@ def get_assignment_for_learner(
         constraint across [assignment_configuration,lms_user_id,content_key].  BUT still technically possible if
         internal staff managed to create a duplicate assignment configuration for a single enterprise.
     """
+    queryset = LearnerContentAssignment.objects.select_related('assignment_configuration')
+
+    try:
+        # First, try to find a corresponding assignment based on the specific content key,
+        # considering both assignments' content key and parent content key.
+        return queryset.get(
+            Q(content_key=content_key) | Q(parent_content_key=content_key),
+            assignment_configuration=assignment_configuration,
+            lms_user_id=lms_user_id,
+        )
+    except LearnerContentAssignment.DoesNotExist:
+        logger.info(
+            f'No assignment found with content_key or parent_content_key {content_key} '
+            f'for {assignment_configuration} and lms_user_id {lms_user_id}',
+        )
+    except LearnerContentAssignment.MultipleObjectsReturned as exc:
+        logger.error(
+            f'Multiple assignments found with content_key or parent_content_key {content_key} '
+            f'for {assignment_configuration} and lms_user_id {lms_user_id}',
+        )
+        raise exc
+
+    # If no exact match was found, try to normalize the content key and find a match. This happens when
+    # the content_key is a course run key and the assignment's content_key is a course key, as depicted
+    # by row 2 in the above docstring matrix.
     content_key_to_match = _normalize_course_key_from_metadata(assignment_configuration, content_key)
     if not content_key_to_match:
         logger.error(f'Unable to normalize content_key {content_key} for {assignment_configuration} and {lms_user_id}')
         return None
-    queryset = LearnerContentAssignment.objects.select_related('assignment_configuration')
+
     try:
         return queryset.get(
+            content_key=content_key_to_match,
             assignment_configuration=assignment_configuration,
             lms_user_id=lms_user_id,
-            # assignment content_key is assumed to always be a course with no namespace prefix.
-            content_key=content_key_to_match,
         )
     except LearnerContentAssignment.DoesNotExist:
+        logger.info(
+            f'No assignment found with normalized content_key {content_key_to_match} '
+            f'for {assignment_configuration} and lms_user_id {lms_user_id}',
+        )
         return None
 
 
@@ -240,7 +275,7 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     Params:
       - ``assignment_configuration``: The AssignmentConfiguration record under which assignments should be allocated.
       - ``learner_emails``: A list of learner email addresses to whom assignments should be allocated.
-      - ``content_key``: Typically a *course* key to which the learner is assigned.
+      - ``content_key``: Either a course or course run key, representing the content to be allocated.
       - ``content_price_cents``: The cost of redeeming the content, in USD cents, at the time of allocation. Should
         always be an integer >= 0.
 
@@ -295,8 +330,15 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     existing_assignments_needs_update = set()
 
     # This step to find and update the preferred_course_run_key is required in order
-    # for nudge emails to target the start date of the new run.
+    # for nudge emails to target the start date of the new run. For run-based assignments,
+    # the preferred_course_run_key is the same as the assignment's content_key.
     preferred_course_run_key = _get_preferred_course_run_key(assignment_configuration, content_key)
+
+    # Determine if the assignment's content_key is a course run or a course key based
+    # on an associated parent content key. If the parent content key is None, then the
+    # assignment is for a course; otherwise, it's an assignment for a course run.
+    parent_content_key = _get_parent_content_key(assignment_configuration, content_key)
+    is_assigned_course_run = bool(parent_content_key)
 
     # Split up the existing assignment records by state
     for assignment in existing_assignments:
@@ -315,13 +357,27 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
                 existing_assignments_needs_update.add(assignment)
 
         if assignment.state in LearnerContentAssignmentStateChoices.REALLOCATE_STATES:
-            _reallocate_assignment(assignment, content_quantity, allocation_batch_id, preferred_course_run_key)
+            _reallocate_assignment(
+                assignment,
+                content_quantity,
+                allocation_batch_id,
+                preferred_course_run_key,
+                parent_content_key,
+                is_assigned_course_run,
+            )
             existing_assignments_needs_update.add(assignment)
         elif assignment.state == LearnerContentAssignmentStateChoices.ALLOCATED:
             # For some already-allocated assignments being re-assigned, we might still need to update the preferred
             # course run for nudge email purposes.
             if assignment.preferred_course_run_key != preferred_course_run_key:
                 assignment.preferred_course_run_key = preferred_course_run_key
+                existing_assignments_needs_update.add(assignment)
+            # Update the parent_content_key and is_assigned_course_run fields if they have changed.
+            if assignment.parent_content_key != parent_content_key:
+                assignment.parent_content_key = parent_content_key
+                existing_assignments_needs_update.add(assignment)
+            if assignment.is_assigned_course_run != is_assigned_course_run:
+                assignment.is_assigned_course_run = is_assigned_course_run
                 existing_assignments_needs_update.add(assignment)
 
         learner_emails_with_existing_assignments.add(assignment.learner_email.lower())
@@ -441,7 +497,7 @@ def _get_lms_user_ids_by_email(emails):
 
 
 def _get_existing_assignments_for_allocation(
-        assignment_configuration, learner_emails_to_allocate, content_key, lms_user_ids_by_email,
+    assignment_configuration, learner_emails_to_allocate, content_key, lms_user_ids_by_email,
 ):
     """
     Finds any existing assignments records related to the provided ``assignment_cofiguration``,
@@ -471,7 +527,13 @@ def _get_existing_assignments_for_allocation(
     return existing_assignments
 
 
-def _reallocate_assignment(assignment, content_quantity, allocation_batch_id, preferred_course_run_key):
+def _reallocate_assignment(
+        assignment,
+        content_quantity,
+        allocation_batch_id,
+        preferred_course_run_key,
+        parent_content_key,
+        is_assigned_course_run):
     """
     Modifies a ``LearnerContentAssignment`` record during the allocation flow.  The record
     is **not** saved.
@@ -485,6 +547,8 @@ def _reallocate_assignment(assignment, content_quantity, allocation_batch_id, pr
     assignment.expired_at = None
     assignment.errored_at = None
     assignment.preferred_course_run_key = preferred_course_run_key
+    assignment.parent_content_key = parent_content_key
+    assignment.is_assigned_course_run = is_assigned_course_run
     # Prevent invalid data from entering the database by calling the low-level full_clean() function manually.
     assignment.full_clean()
     return assignment
@@ -762,7 +826,9 @@ def nudge_assignments(assignments, assignment_configuration_uuid, days_before_co
             [assignment],
         )
         content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
-        start_date = content_metadata.get('normalized_metadata', {}).get('start_date')
+        normalized_metadata = get_normalized_metadata_for_assignment(assignment, content_metadata)
+
+        start_date = normalized_metadata.get('start_date')
         course_type = content_metadata.get('course_type')
 
         # check if the course_type is an executive-education course

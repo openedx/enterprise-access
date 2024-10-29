@@ -83,14 +83,14 @@ def _get_subsidy_expiration(assignment):
     return subsidy_expiration_datetime
 
 
-def _get_enrollment_deadline_date(content_metadata):
+def _get_enrollment_deadline_date(assignment, content_metadata):
     """
     Helper to get the enrollment end date from a content metadata record.
     """
     if not content_metadata:
         return None
 
-    normalized_metadata = content_metadata.get('normalized_metadata') or {}
+    normalized_metadata = get_normalized_metadata_for_assignment(assignment, content_metadata)
     enrollment_end_date_str = normalized_metadata.get('enroll_by_date')
     try:
         datetime_obj = parse_datetime_string(enrollment_end_date_str)
@@ -138,7 +138,7 @@ def get_automatic_expiration_date_and_reason(
             assignments=[assignment],
         )
         content_metadata = content_metadata_by_key.get(content_key)
-    enrollment_deadline_datetime = _get_enrollment_deadline_date(content_metadata)
+    enrollment_deadline_datetime = _get_enrollment_deadline_date(assignment, content_metadata)
     if enrollment_deadline_datetime:
         enrollment_deadline_datetime = enrollment_deadline_datetime.replace(tzinfo=UTC)
 
@@ -209,3 +209,37 @@ def should_send_email_to_pecu(recent_action):
         is_65_days_since_invited or
         is_85_days_since_invited
     )
+
+
+def get_normalized_metadata_for_assignment(assignment, content_metadata):
+    """
+    Retrieve normalized metadata for a given object. If the object is associated
+    with a specific course run, return the metadata for that run. If metadata
+    for the run is missing, log a warning and return an empty dictionary.
+
+    Args:
+        assignment (dict): The assignment object.
+        content_metadata (dict): The content metadata object
+
+    Returns:
+        dict: Normalized metadata, either for a specific course run or the advertised course run, if any.
+    """
+    if not assignment.is_assigned_course_run:
+        return content_metadata.get('normalized_metadata', {})
+
+    normalized_metadata_by_run = content_metadata.get('normalized_metadata_by_run', {})
+    return normalized_metadata_by_run.get(assignment.content_key, {})
+
+
+def _curr_date(date_format=None):
+    curr_date = datetime.now()
+    if not date_format:
+        return curr_date
+    return curr_date.strftime(date_format)
+
+
+def _days_from_now(days_from_now=0, date_format=None):
+    date = datetime.now().replace(tzinfo=UTC) + timedelta(days=days_from_now)
+    if not date_format:
+        return date
+    return date.strftime(date_format)

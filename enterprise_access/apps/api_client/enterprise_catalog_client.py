@@ -65,7 +65,7 @@ class EnterpriseCatalogApiClient(BaseOAuthClient):
             'traverse_pagination': traverse_pagination,
             **kwargs,
         }
-        endpoint = self.enterprise_catalog_endpoint + str(catalog_uuid) + '/get_content_metadata/'
+        endpoint = f'{self.enterprise_catalog_endpoint}{catalog_uuid}/get_content_metadata/'
 
         response = self.client.get(endpoint, params=query_params)
         response.raise_for_status()
