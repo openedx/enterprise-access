@@ -11,9 +11,12 @@ class HandlerContext:
 
     Attributes:
         request: The original request object containing information about the incoming HTTP request.
-        route: The route for which the response is being generated.
+        user: The authenticated user associated with the request.
         data: A dictionary to store data loaded and processed by the handlers.
         errors: A list to store errors that occur during request processing.
+        warnings: A list to store warnings that occur during request processing.
+        enterprise_customer_uuid: The UUID of the enterprise customer associated with the request.
+        lms_user_id: The LMS user ID associated with the request.
     """
 
     def __init__(self, request):
@@ -43,6 +46,18 @@ class HandlerContext:
             raise ValueError("User message and developer message are required for errors.")
 
         self.errors.append({
+            "user_message": user_message,
+            "developer_message": developer_message,
+        })
+
+    def add_warning(self, user_message, developer_message):
+        """
+        Adds a warning to the context.
+        """
+        if not (user_message and developer_message):
+            raise ValueError("User message and developer message are required for warnings.")
+
+        self.warnings.append({
             "user_message": user_message,
             "developer_message": developer_message,
         })
