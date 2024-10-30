@@ -44,6 +44,13 @@ class BaseUserApiClient(requests.Session):
             if self.headers.get(settings.REQUEST_ID_RESPONSE_HEADER) is None and request_id is not None:
                 self.headers[settings.REQUEST_ID_RESPONSE_HEADER] = request_id
 
+    @property
+    def request_user(self):
+        """
+        Returns the user associated with the original request.
+        """
+        return self.original_request.user
+
     def request(self, method, url, headers=None, **kwargs):  # pylint: disable=arguments-differ
         if headers:
             headers.update(self.headers)

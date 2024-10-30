@@ -3,16 +3,19 @@ Tests for License Manager client.
 """
 from datetime import datetime, timedelta
 from unittest import mock
+from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 import ddt
 import requests
 from django.conf import settings
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
+from faker import Faker
 from rest_framework import status
 
-from enterprise_access.apps.api_client.lms_client import LmsApiClient
+from enterprise_access.apps.api_client.lms_client import LmsApiClient, LmsUserApiClient
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
+from enterprise_access.apps.core.tests.factories import UserFactory
 from test_utils import TEST_ENTERPRISE_UUID, TEST_USER_ID, TEST_USER_RECORD
 
 TEST_USER_EMAILS = [
@@ -294,3 +297,129 @@ class TestLmsApiClient(TestCase):
             timeout=settings.LMS_CLIENT_TIMEOUT
         )
         assert pending_enterprise_group_memberships == expected_return
+
+
+class TestLmsUserApiClient(TestCase):
+    """
+    Test LmsUserApiClient.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+        self.faker = Faker()
+        self.request_id_key = settings.REQUEST_ID_RESPONSE_HEADER
+
+        self.user = UserFactory()
+
+        self.mock_enterprise_customer_uuid = self.faker.uuid4()
+        self.mock_course_key = 'edX+DemoX'
+        self.mock_course_run_key = 'course-v1:edX+DemoX+Demo_Course'
+        self.mock_enterprise_catalog_uuid = self.faker.uuid4()
+
+        self.mock_default_enterprise_enrollment_intentions_learner_status = {
+            "uuid": self.faker.uuid4(),
+            "content_key": self.mock_course_key,
+            "enterprise_customer": self.mock_enterprise_customer_uuid,
+            "course_key": self.mock_course_key,
+            "course_run_key": self.mock_course_run_key,
+            "is_course_run_enrollable": True,
+            "best_mode_for_course_run": "verified",
+            "applicable_enterprise_catalog_uuids": [
+                self.mock_enterprise_catalog_uuid
+            ],
+            "course_run_normalized_metadata": {
+                "start_date": "2024-09-17T14:00:00Z",
+                "end_date": "2025-09-15T22:30:00Z",
+                "enroll_by_date": "2025-09-05T23:59:59Z",
+                "enroll_start_date": "2024-08-17T14:00:00Z",
+                "content_price": 49
+            },
+            "created": "2024-10-25T13:20:04.082376Z",
+            "modified": "2024-10-29T22:04:56.731518Z",
+            "has_existing_enrollment": False,
+            "is_existing_enrollment_active": None,
+            "is_existing_enrollment_audit": None
+        }
+
+    @mock.patch('requests.Session.send')
+    @mock.patch('crum.get_current_request')
+    def test_get_default_enterprise_enrollment_intentions_learner_status(
+        self,
+        mock_crum_get_current_request,
+        mock_send,
+    ):
+        """
+        Verify client hits the right URL for default enterprise enrollment intentions learner status.
+        """
+        expected_url = LmsUserApiClient.default_enterprise_enrollment_intentions_learner_status_endpoint
+        request = self.factory.get(expected_url)
+        request.headers = {
+            "Authorization": 'test-auth',
+            self.request_id_key: 'test-request-id'
+        }
+        request.user = self.user
+        context = {
+            "request": request
+        }
+
+        mock_crum_get_current_request.return_value = request
+
+        expected_result = {
+            "lms_user_id": self.user.id,
+            "user_email": self.user.email,
+            "enterprise_customer_uuid": self.mock_enterprise_customer_uuid,
+            "enrollment_statuses": {
+                "needs_enrollment": {
+                    "enrollable": [
+                        self.mock_default_enterprise_enrollment_intentions_learner_status
+                    ],
+                    "not_enrollable": []
+                },
+                "already_enrolled": []
+            },
+            "metadata": {
+                "total_default_enterprise_enrollment_intentions": 1,
+                "total_needs_enrollment": {
+                    "enrollable": 1,
+                    "not_enrollable": 0
+                },
+                "total_already_enrolled": 0
+            }
+        }
+        mock_response = mock.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = expected_result
+
+        mock_send.return_value = mock_response
+
+        client = LmsUserApiClient(context['request'])
+        result = client.get_default_enterprise_enrollment_intentions_learner_status(
+            self.mock_enterprise_customer_uuid
+        )
+
+        mock_send.assert_called_once()
+
+        prepared_request = mock_send.call_args[0][0]
+        prepared_request_kwargs = mock_send.call_args[1]
+
+        # Assert base request URL/method is correct
+        parsed_url = urlparse(prepared_request.url)
+        self.assertEqual(f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}", expected_url)
+        self.assertEqual(prepared_request.method, 'GET')
+
+        # Assert query parameters are correctly set
+        parsed_params = parse_qs(parsed_url.query)
+        expected_params = {'enterprise_customer_uuid': [self.mock_enterprise_customer_uuid]}
+        self.assertEqual(parsed_params, expected_params)
+
+        # Assert headers are correctly set
+        self.assertEqual(prepared_request.headers['Authorization'], 'test-auth')
+        self.assertEqual(prepared_request.headers[self.request_id_key], 'test-request-id')
+
+        # Assert timeout is set
+        self.assertIn('timeout', prepared_request_kwargs)
+        self.assertEqual(prepared_request_kwargs['timeout'], settings.LICENSE_MANAGER_CLIENT_TIMEOUT)
+
+        # Assert the response is as expected
+        self.assertEqual(result, expected_result)
