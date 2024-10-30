@@ -157,24 +157,10 @@ start-devstack: ## run a local development copy of the server
 open-devstack: ## open a shell on the server started by start-devstack
 	docker exec -it enterprise-access /edx/app/enterprise-access/devstack.sh open
 
-pkg-devstack: ## build the enterprise-access image from the latest configuration and code
-	docker build -t enterprise-access:latest -f docker/build/enterprise-access/Dockerfile git://github.com/edx/configuration
-
 detect_changed_source_translations: ## check if translation files are up-to-date
 	cd enterprise_access && i18n_tool changed
 
 validate_translations: fake_translations detect_changed_source_translations ## install fake translations and check if translation files are up-to-date
-
-docker_build_no_cache:
-	docker-compose build --no-cache
-
-docker_build:
-	docker build . -f Dockerfile --target app -t openedx/enterprise-access
-	docker build . -f Dockerfile --target app -t openedx/enterprise-access.worker
-	docker build . -f Dockerfile --target newrelic -t openedx/enterprise-access:latest-newrelic
-
-	docker build . -f Dockerfile --target devstack -t openedx/enterprise-access:latest-devstack
-	docker build . -f Dockerfile --target devstack -t openedx/enterprise-access.worker:latest-devstack
 
 travis_docker_tag: docker_build
 	docker tag openedx/enterprise-access openedx/enterprise-access:$$TRAVIS_COMMIT
@@ -195,12 +181,6 @@ dev.provision:
 # devstack-themed shortcuts
 # Starts all containers
 dev.up: dev.up.redis
-	docker-compose up -d
-
-dev.up.build: docker_build dev.up.redis
-	docker-compose up -d
-
-dev.up.build-no-cache: docker_build_no_cache dev.up.redis
 	docker-compose up -d
 
 dev.up.with-events: dev.up.kafka-control-center dev.up
@@ -274,22 +254,8 @@ dev.static:
 dev.migrate:
 	docker-compose exec -u 0 app python manage.py migrate
 
-github_docker_build:
-	docker build . -f Dockerfile --target app -t openedx/enterprise-access
-	docker build . -f Dockerfile --target newrelic -t openedx/enterprise-access:latest-newrelic
-
-github_docker_tag: github_docker_build
-	docker tag openedx/enterprise-access openedx/enterprise-access:${GITHUB_SHA}
-	docker tag openedx/enterprise-access:latest-newrelic openedx/enterprise-access:${GITHUB_SHA}-newrelic
-
 github_docker_auth:
 	echo "$$DOCKERHUB_PASSWORD" | docker login -u "$$DOCKERHUB_USERNAME" --password-stdin
-
-github_docker_push: github_docker_tag github_docker_auth ## push to docker hub
-	docker push 'openedx/enterprise-access:latest'
-	docker push "openedx/enterprise-access:${GITHUB_SHA}"
-	docker push 'openedx/enterprise-access:latest-newrelic'
-	docker push "openedx/enterprise-access:${GITHUB_SHA}-newrelic"
 
 selfcheck: ## check that the Makefile is well-formed
 	@echo "The Makefile is well-formed."

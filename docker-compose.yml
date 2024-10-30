@@ -22,9 +22,7 @@ services:
     command: memcached -vv
 
   app:
-    # Uncomment this line to use the official enterprise_access base image
-    image: openedx/enterprise-access:latest-devstack
-
+    image: edxops/enterprise-access-dev
     container_name: enterprise_access.app
     volumes:
       - .:/edx/app/enterprise-access/
@@ -51,10 +49,7 @@ services:
       ENABLE_DJANGO_TOOLBAR: 1
 
   worker:
-    image: openedx/enterprise-access.worker:latest-devstack
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: edxops/enterprise-access-dev
     command: bash -c 'cd /edx/app/enterprise-access/ && celery -A enterprise_access worker -l DEBUG'
     container_name: enterprise_access.worker
     depends_on:

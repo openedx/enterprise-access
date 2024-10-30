@@ -11,10 +11,7 @@ services:
       - enterprise_access_mysql:/var/lib/mysql
 
   app:
-    image: openedx/enterprise-access
-    build:
-      context: ..
-      dockerfile: Dockerfile
+    image: edxops/enterprise-access-dev
     container_name: enterprise_access.app
     volumes:
       - ..:/edx/app/enterprise-access/enterprise_access
