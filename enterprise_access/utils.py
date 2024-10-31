@@ -224,11 +224,18 @@ def get_normalized_metadata_for_assignment(assignment, content_metadata):
     Returns:
         dict: Normalized metadata, either for a specific course run or the advertised course run, if any.
     """
-    if not assignment.is_assigned_course_run:
-        return content_metadata.get('normalized_metadata', {})
-
-    normalized_metadata_by_run = content_metadata.get('normalized_metadata_by_run', {})
-    return normalized_metadata_by_run.get(assignment.content_key, {})
+    if assignment.is_assigned_course_run:
+        # Course run-based assignment
+        normalized_metadata_by_run = content_metadata.get('normalized_metadata_by_run', {})
+        return normalized_metadata_by_run.get(assignment.content_key, {})
+    elif assignment.preferred_course_run_key:
+        # Course-based assignment with a perferred coruse run key
+        normalized_metadata = content_metadata.get('normalized_metadata_by_run', {})
+        return normalized_metadata.get(assignment.preferred_course_run_key, {})
+    else:
+        # Old style assignment assigned by a course key
+        normalized_metadata_by_run = content_metadata.get('normalized_metadata', {})
+        return normalized_metadata_by_run.get(assignment.content_key, {})
 
 
 def _curr_date(date_format=None):
