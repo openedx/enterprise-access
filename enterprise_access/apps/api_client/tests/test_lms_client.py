@@ -468,5 +468,6 @@ class TestLmsUserApiClient(TestCase):
         # Verify that logger.exception was called with the expected message
         mock_logger.exception.assert_called_once_with(
             f"Failed to fetch default enterprise enrollment intentions for enterprise customer "
-            f"{self.mock_enterprise_customer_uuid} and learner {self.user.lms_user_id}: HTTPError"
+            f"{self.mock_enterprise_customer_uuid} and learner {self.user.lms_user_id}: HTTPError "
+            f"Response content: {mock_response.content}"
         )

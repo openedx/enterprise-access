@@ -430,6 +430,7 @@ class LmsUserApiClient(BaseUserApiClient):
         except requests.exceptions.HTTPError as exc:
             logger.exception(
                 f"Failed to fetch default enterprise enrollment intentions for enterprise customer "
-                f"{enterprise_customer_uuid} and learner {self.request_user.lms_user_id}: {exc}"
+                f"{enterprise_customer_uuid} and learner {self.request_user.lms_user_id}: {exc} "
+                f"Response content: {response.content}"
             )
             raise
