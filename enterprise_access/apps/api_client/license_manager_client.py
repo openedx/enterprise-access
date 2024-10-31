@@ -93,6 +93,7 @@ class LicenseManagerUserApiClient(BaseUserApiClient):
         url = self.learner_licenses_endpoint
         try:
             response = self.get(url, params=query_params, timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT)
+            response.raise_for_status()
             return response.json()
         except requests.exceptions.HTTPError as exc:
             logger.exception(f"Failed to get subscription licenses for learner: {exc}")

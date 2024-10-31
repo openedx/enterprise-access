@@ -179,9 +179,7 @@ class TestLicenseManagerUserApiClient(TestCase):
             "request": request
         }
 
-        mock_request = mock.MagicMock()
-        mock_request.headers.get.return_value = request.headers.get(self.request_id_key)
-        mock_crum_get_current_request.return_value = mock_request
+        mock_crum_get_current_request.return_value = request
 
         mock_response = mock.Mock()
         mock_response.status_code = 200
@@ -207,12 +205,15 @@ class TestLicenseManagerUserApiClient(TestCase):
         expected_params = {'enterprise_customer_uuid': [self.mock_enterprise_customer_uuid]}
         self.assertEqual(parsed_params, expected_params)
 
+        # Assert headers are correctly set
         self.assertEqual(prepared_request.headers['Authorization'], 'test-auth')
         self.assertEqual(prepared_request.headers[self.request_id_key], 'test-request-id')
 
+        # Assert timeout is set
         self.assertIn('timeout', prepared_request_kwargs)
         self.assertEqual(prepared_request_kwargs['timeout'], settings.LICENSE_MANAGER_CLIENT_TIMEOUT)
 
+        # Assert result is as expected
         self.assertEqual(result, expected_result)
 
     @mock.patch('requests.Session.send')
@@ -230,9 +231,7 @@ class TestLicenseManagerUserApiClient(TestCase):
             "request": request
         }
 
-        mock_request = mock.MagicMock()
-        mock_request.headers.get.return_value = request.headers.get(self.request_id_key)
-        mock_crum_get_current_request.return_value = mock_request
+        mock_crum_get_current_request.return_value = request
 
         mock_response = mock.Mock()
         mock_response.status_code = 200
@@ -281,9 +280,7 @@ class TestLicenseManagerUserApiClient(TestCase):
             "request": request
         }
 
-        mock_request = mock.MagicMock()
-        mock_request.headers.get.return_value = request.headers.get(self.request_id_key)
-        mock_crum_get_current_request.return_value = mock_request
+        mock_crum_get_current_request.return_value = request
 
         mock_response = mock.Mock()
         mock_response.status_code = 200

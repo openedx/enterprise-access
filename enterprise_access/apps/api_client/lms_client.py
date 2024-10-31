@@ -10,6 +10,7 @@ from edx_django_utils.cache import TieredCache
 from rest_framework import status
 
 from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
+from enterprise_access.apps.api_client.base_user import BaseUserApiClient
 from enterprise_access.apps.api_client.exceptions import FetchGroupMembersConflictingParamsException
 from enterprise_access.apps.enterprise_groups.constants import GROUP_MEMBERSHIP_EMAIL_ERROR_STATUS
 from enterprise_access.cache_utils import versioned_cache_key
@@ -396,3 +397,41 @@ class LmsApiClient(BaseOAuthClient):
         except KeyError:
             logger.exception('failed to update group membership status. [%s]', url)
         return None
+
+
+class LmsUserApiClient(BaseUserApiClient):
+    """
+    API client for user-specific calls to the LMS service.
+    """
+    enterprise_api_base_url = f"{settings.LMS_URL}/enterprise/api/v1/"
+    default_enterprise_enrollment_intentions_learner_status_endpoint = (
+        f'{enterprise_api_base_url}default-enterprise-enrollment-intentions/learner-status/'
+    )
+
+    def get_default_enterprise_enrollment_intentions_learner_status(self, enterprise_customer_uuid):
+        """
+        Fetches learner status from the default enterprise enrollment intentions endpoint.
+
+        Arguments:
+            enterprise_customer_uuid (str): UUID of the enterprise customer
+
+        Returns:
+            dict: Dictionary representation of the JSON response from the API
+        """
+        query_params = {'enterprise_customer_uuid': enterprise_customer_uuid}
+        response = None
+        try:
+            response = self.get(
+                self.default_enterprise_enrollment_intentions_learner_status_endpoint,
+                params=query_params,
+                timeout=settings.LMS_CLIENT_TIMEOUT
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                f"Failed to fetch default enterprise enrollment intentions for enterprise customer "
+                f"{enterprise_customer_uuid} and learner {self.request_user.lms_user_id}: {exc} "
+                f"Response content: {response.content if response else None}"
+            )
+            raise
