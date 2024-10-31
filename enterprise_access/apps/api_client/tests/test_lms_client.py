@@ -423,3 +423,50 @@ class TestLmsUserApiClient(TestCase):
 
         # Assert the response is as expected
         self.assertEqual(result, expected_result)
+
+    @mock.patch('requests.Session.send')
+    @mock.patch('crum.get_current_request')
+    @mock.patch('enterprise_access.apps.api_client.lms_client.logger', return_value=mock.MagicMock())
+    def test_get_default_enterprise_enrollment_intentions_learner_status_http_error(
+        self,
+        mock_logger,
+        mock_crum_get_current_request,
+        mock_send,
+    ):
+        """
+        Verify client raises HTTPError on non-200 response.
+        """
+        expected_url = LmsUserApiClient.default_enterprise_enrollment_intentions_learner_status_endpoint
+        request = self.factory.get(expected_url)
+        request.headers = {
+            "Authorization": 'test-auth',
+            self.request_id_key: 'test-request-id'
+        }
+        request.user = self.user
+        context = {
+            "request": request
+        }
+
+        mock_crum_get_current_request.return_value = request
+
+        mock_response = mock.Mock()
+        mock_response.status_code = 400
+        mock_response.json.return_value = {'detail': 'Bad Request'}
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("HTTPError")
+
+        mock_send.return_value = mock_response
+
+        client = LmsUserApiClient(context['request'])
+
+        with self.assertRaises(requests.exceptions.HTTPError):
+            client.get_default_enterprise_enrollment_intentions_learner_status(
+                self.mock_enterprise_customer_uuid
+            )
+
+        mock_send.assert_called_once()
+
+        # Verify that logger.exception was called with the expected message
+        mock_logger.exception.assert_called_once_with(
+            f"Failed to fetch default enterprise enrollment intentions for enterprise customer "
+            f"{self.mock_enterprise_customer_uuid} and learner {self.user.lms_user_id}: HTTPError"
+        )
