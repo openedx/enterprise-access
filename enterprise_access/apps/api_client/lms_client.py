@@ -419,6 +419,7 @@ class LmsUserApiClient(BaseUserApiClient):
             dict: Dictionary representation of the JSON response from the API
         """
         query_params = {'enterprise_customer_uuid': enterprise_customer_uuid}
+        response = None
         try:
             response = self.get(
                 self.default_enterprise_enrollment_intentions_learner_status_endpoint,
@@ -431,6 +432,6 @@ class LmsUserApiClient(BaseUserApiClient):
             logger.exception(
                 f"Failed to fetch default enterprise enrollment intentions for enterprise customer "
                 f"{enterprise_customer_uuid} and learner {self.request_user.lms_user_id}: {exc} "
-                f"Response content: {response.content}"
+                f"Response content: {response.content if response else None}"
             )
             raise
