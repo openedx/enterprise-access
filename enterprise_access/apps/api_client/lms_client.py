@@ -404,8 +404,13 @@ class LmsUserApiClient(BaseUserApiClient):
     API client for user-specific calls to the LMS service.
     """
     enterprise_api_base_url = f"{settings.LMS_URL}/enterprise/api/v1/"
+    enterprise_learner_portal_api_base_url = f"{settings.LMS_URL}/enterprise_learner_portal/api/v1/"
+
     default_enterprise_enrollment_intentions_learner_status_endpoint = (
         f'{enterprise_api_base_url}default-enterprise-enrollment-intentions/learner-status/'
+    )
+    enterprise_course_enrollments_endpoint = (
+        f'{enterprise_learner_portal_api_base_url}enterprise_course_enrollments/'
     )
 
     def get_default_enterprise_enrollment_intentions_learner_status(self, enterprise_customer_uuid):
@@ -431,6 +436,38 @@ class LmsUserApiClient(BaseUserApiClient):
         except requests.exceptions.HTTPError as exc:
             logger.exception(
                 f"Failed to fetch default enterprise enrollment intentions for enterprise customer "
+                f"{enterprise_customer_uuid} and learner {self.request_user.lms_user_id}: {exc} "
+                f"Response content: {response.content if response else None}"
+            )
+            raise
+
+    def get_enterprise_course_enrollments(self, enterprise_customer_uuid, **params):
+        """
+        Fetches course enrollments for a given enterprise customer.
+
+        Arguments:
+            enterprise_customer_uuid (str): UUID of the enterprise customer
+            params (dict): Additional query parameters to include in the request
+
+        Returns:
+            dict: Dictionary representation of the JSON response from the API
+        """
+        query_params = {
+            'enterprise_id': enterprise_customer_uuid,
+            **params,
+        }
+        response = None
+        try:
+            response = self.get(
+                self.enterprise_course_enrollments_endpoint,
+                params=query_params,
+                timeout=settings.LMS_CLIENT_TIMEOUT
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                f"Failed to fetch enterprise course enrollments for enterprise customer "
                 f"{enterprise_customer_uuid} and learner {self.request_user.lms_user_id}: {exc} "
                 f"Response content: {response.content if response else None}"
             )
