@@ -174,7 +174,7 @@ django==4.2.16
     #   social-auth-app-django
 django-celery-results==2.5.1
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
-django-cors-headers==4.5.0
+django-cors-headers==4.6.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
 django-crum==0.7.9
     # via
@@ -273,7 +273,7 @@ edx-event-bus-kafka==6.0.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
 edx-i18n-tools==1.6.3
     # via -r requirements/dev.in
-edx-lint==5.4.0
+edx-lint==5.4.1
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
 edx-opaque-keys[django]==2.11.0
     # via
@@ -293,7 +293,7 @@ edx-toggles==5.2.0
     #   edx-event-bus-kafka
 factory-boy==3.3.1
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
-faker==30.8.1
+faker==30.8.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   factory-boy
@@ -545,7 +545,7 @@ pytest==8.3.3
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   pytest-cov
     #   pytest-django
-pytest-cov==5.0.0
+pytest-cov==6.0.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
 pytest-django==4.9.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
@@ -610,11 +610,11 @@ rfc3986==2.0.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   twine
-rich==13.9.3
+rich==13.9.4
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   twine
-rpds-py==0.20.0
+rpds-py==0.20.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   jsonschema
@@ -706,7 +706,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.27.0
+virtualenv==20.27.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   tox
