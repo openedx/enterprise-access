@@ -317,6 +317,28 @@ class TestLmsUserApiClient(TestCase):
         self.mock_course_run_key = 'course-v1:edX+DemoX+Demo_Course'
         self.mock_enterprise_catalog_uuid = self.faker.uuid4()
 
+        self.mock_enterprise_course_enrollment = {
+            "certificate_download_url": None,
+            "emails_enabled": True,
+            "course_run_id": "course-v1:BabsonX+MIS01x+1T2019",
+            "course_run_status": "in_progress",
+            "created": "2023-09-29T14:24:45.409031+00:00",
+            "start_date": "2019-03-19T10:00:00Z",
+            "end_date": "2025-12-31T04:30:00Z",
+            "display_name": "AI for Leaders",
+            "course_run_url": "https://learning.edx.org/course/course-v1:BabsonX+MIS01x+1T2019/home",
+            "due_dates": [],
+            "pacing": "self",
+            "org_name": "BabsonX",
+            "is_revoked": False,
+            "is_enrollment_active": True,
+            "mode": "verified",
+            "resume_course_run_url": None,
+            "course_key": "BabsonX+MIS01x",
+            "course_type": "verified-audit",
+            "product_source": "edx",
+            "enroll_by": "2025-12-21T23:59:59.099999Z"
+        }
         self.mock_default_enterprise_enrollment_intentions_learner_status = {
             "uuid": self.faker.uuid4(),
             "content_key": self.mock_course_key,
@@ -341,6 +363,120 @@ class TestLmsUserApiClient(TestCase):
             "is_existing_enrollment_active": None,
             "is_existing_enrollment_audit": None
         }
+
+    @mock.patch('requests.Session.send')
+    @mock.patch('crum.get_current_request')
+    def test_get_enterprise_course_enrollments(
+        self,
+        mock_crum_get_current_request,
+        mock_send,
+    ):
+        """
+        Verify client hits the right URL for enterprise course enrollments.
+        """
+        expected_url = LmsUserApiClient.enterprise_course_enrollments_endpoint
+        request = self.factory.get(expected_url)
+        request.headers = {
+            "Authorization": 'test-auth',
+            self.request_id_key: 'test-request-id'
+        }
+        request.user = self.user
+        context = {
+            "request": request
+        }
+
+        mock_crum_get_current_request.return_value = request
+
+        expected_result = [self.mock_enterprise_course_enrollment]
+        mock_response = mock.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = expected_result
+
+        mock_send.return_value = mock_response
+
+        client = LmsUserApiClient(context['request'])
+        additional_params = {'is_active': True}
+        result = client.get_enterprise_course_enrollments(
+            enterprise_customer_uuid=self.mock_enterprise_customer_uuid,
+            **additional_params
+        )
+
+        mock_send.assert_called_once()
+
+        prepared_request = mock_send.call_args[0][0]
+        prepared_request_kwargs = mock_send.call_args[1]
+
+        # Assert base request URL/method is correct
+        parsed_url = urlparse(prepared_request.url)
+        self.assertEqual(f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}", expected_url)
+        self.assertEqual(prepared_request.method, 'GET')
+
+        # Assert query parameters are correctly set
+        parsed_params = parse_qs(parsed_url.query)
+        expected_params = {
+            'enterprise_id': [self.mock_enterprise_customer_uuid],
+            'is_active': ['True']
+        }
+        self.assertEqual(parsed_params, expected_params)
+
+        # Assert headers are correctly set
+        self.assertEqual(prepared_request.headers['Authorization'], 'test-auth')
+        self.assertEqual(prepared_request.headers[self.request_id_key], 'test-request-id')
+
+        # Assert timeout is set
+        self.assertIn('timeout', prepared_request_kwargs)
+        self.assertEqual(prepared_request_kwargs['timeout'], settings.LMS_CLIENT_TIMEOUT)
+
+        # Assert the response is as expected
+        self.assertEqual(result, expected_result)
+
+    @mock.patch('requests.Session.send')
+    @mock.patch('crum.get_current_request')
+    @mock.patch('enterprise_access.apps.api_client.lms_client.logger', return_value=mock.MagicMock())
+    def test_get_enterprise_course_enrollments_http_error(
+        self,
+        mock_logger,
+        mock_crum_get_current_request,
+        mock_send,
+    ):
+        """
+        Verify client raises HTTPError on non-200 response.
+        """
+        expected_url = LmsUserApiClient.enterprise_course_enrollments_endpoint
+        request = self.factory.get(expected_url)
+        request.headers = {
+            "Authorization": 'test-auth',
+            self.request_id_key: 'test-request-id'
+        }
+        request.user = self.user
+        context = {
+            "request": request
+        }
+
+        mock_crum_get_current_request.return_value = request
+
+        mock_response = mock.Mock()
+        mock_response.status_code = 400
+        mock_response.json.return_value = {'detail': 'Bad Request'}
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("HTTPError")
+
+        mock_send.return_value = mock_response
+
+        client = LmsUserApiClient(context['request'])
+
+        with self.assertRaises(requests.exceptions.HTTPError):
+            client.get_enterprise_course_enrollments(
+                enterprise_customer_uuid=self.mock_enterprise_customer_uuid
+            )
+
+        mock_send.assert_called_once()
+
+        # Verify that logger.exception was called with the expected message
+        mock_logger.exception.assert_called_once_with(
+            f"Failed to fetch enterprise course enrollments for enterprise customer "
+            f"{self.mock_enterprise_customer_uuid} and learner {self.user.lms_user_id}: HTTPError "
+            f"Response content: {mock_response.content}"
+        )
 
     @mock.patch('requests.Session.send')
     @mock.patch('crum.get_current_request')
@@ -419,7 +555,7 @@ class TestLmsUserApiClient(TestCase):
 
         # Assert timeout is set
         self.assertIn('timeout', prepared_request_kwargs)
-        self.assertEqual(prepared_request_kwargs['timeout'], settings.LICENSE_MANAGER_CLIENT_TIMEOUT)
+        self.assertEqual(prepared_request_kwargs['timeout'], settings.LMS_CLIENT_TIMEOUT)
 
         # Assert the response is as expected
         self.assertEqual(result, expected_result)
