@@ -98,7 +98,7 @@ django==4.2.16
     #   social-auth-app-django
 django-celery-results==2.5.1
     # via -r requirements/base.in
-django-cors-headers==4.5.0
+django-cors-headers==4.6.0
     # via -r requirements/base.in
 django-crum==0.7.9
     # via
@@ -296,7 +296,7 @@ requests==2.32.3
     #   social-auth-core
 requests-oauthlib==2.0.0
     # via social-auth-core
-rpds-py==0.20.0
+rpds-py==0.20.1
     # via
     #   jsonschema
     #   referencing
