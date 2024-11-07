@@ -214,8 +214,8 @@ def should_send_email_to_pecu(recent_action):
 def get_normalized_metadata_for_assignment(assignment, content_metadata):
     """
     Retrieve normalized metadata for a given object. If the object is associated
-    with a specific course run, return the metadata for that run. If metadata
-    for the run is missing, log a warning and return an empty dictionary.
+    with a specific course run or a preferred course run key, return the metadata for that run.
+    If metadata for the run is missing, return the normalized metadata for the advertised run.
 
     Args:
         assignment (dict): The assignment object.
@@ -224,11 +224,13 @@ def get_normalized_metadata_for_assignment(assignment, content_metadata):
     Returns:
         dict: Normalized metadata, either for a specific course run or the advertised course run, if any.
     """
-    if not assignment.is_assigned_course_run:
-        return content_metadata.get('normalized_metadata', {})
-
     normalized_metadata_by_run = content_metadata.get('normalized_metadata_by_run', {})
-    return normalized_metadata_by_run.get(assignment.content_key, {})
+    # Return the content metadata for a specific course run based on the preferred_course_run_key
+    if preferred_course_run_key := assignment.preferred_course_run_key:
+        return normalized_metadata_by_run.get(preferred_course_run_key, {})
+    # Return current advertised course run metadata if preferred_course_run_key is NULL (i.e.,
+    # impacting legacy course-based assignments created pre-May 2024).
+    return content_metadata.get('normalized_metadata', {})
 
 
 def _curr_date(date_format=None):
