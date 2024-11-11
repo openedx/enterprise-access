@@ -526,7 +526,7 @@ openedx-events==9.15.0
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-event-bus-kafka
-packaging==24.1
+packaging==24.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -726,7 +726,7 @@ rich==13.9.4
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   twine
-rpds-py==0.20.1
+rpds-py==0.21.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -846,7 +846,7 @@ wcwidth==0.2.13
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   prompt-toolkit
-zipp==3.20.2
+zipp==3.21.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   importlib-metadata

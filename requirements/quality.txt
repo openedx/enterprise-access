@@ -394,7 +394,7 @@ openedx-events==9.15.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-event-bus-kafka
-packaging==24.1
+packaging==24.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   drf-yasg
@@ -550,7 +550,7 @@ rfc3986==2.0.0
     # via twine
 rich==13.9.4
     # via twine
-rpds-py==0.20.1
+rpds-py==0.21.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   jsonschema
@@ -645,7 +645,7 @@ wcwidth==0.2.13
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   prompt-toolkit
-zipp==3.20.2
+zipp==3.21.0
     # via importlib-metadata
 
 # The following packages are considered to be unsafe in a requirements file:

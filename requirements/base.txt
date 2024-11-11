@@ -235,7 +235,7 @@ openedx-events==9.15.0
     # via
     #   -r requirements/base.in
     #   edx-event-bus-kafka
-packaging==24.1
+packaging==24.2
     # via drf-yasg
 pbr==6.1.0
     # via stevedore
@@ -296,7 +296,7 @@ requests==2.32.3
     #   social-auth-core
 requests-oauthlib==2.0.0
     # via social-auth-core
-rpds-py==0.20.1
+rpds-py==0.21.0
     # via
     #   jsonschema
     #   referencing

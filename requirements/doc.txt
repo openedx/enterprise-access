@@ -388,7 +388,7 @@ openedx-events==9.15.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-event-bus-kafka
-packaging==24.1
+packaging==24.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   drf-yasg
@@ -539,7 +539,7 @@ requests-oauthlib==2.0.0
     #   social-auth-core
 restructuredtext-lint==1.4.0
     # via doc8
-rpds-py==0.20.1
+rpds-py==0.21.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   jsonschema
