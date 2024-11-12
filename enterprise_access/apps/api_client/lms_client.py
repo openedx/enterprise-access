@@ -64,21 +64,31 @@ class LmsApiClient(BaseOAuthClient):
             "learners/",
         )
 
-    def get_enterprise_customer_data(self, enterprise_customer_uuid):
+    def get_enterprise_customer_data(self, enterprise_customer_uuid=None, enterprise_customer_slug=None):
         """
-        Gets the data for an EnterpriseCustomer for the given uuid.
+        Gets the data for an EnterpriseCustomer for the given uuid or slug.
 
         Arguments:
             enterprise_customer_uuid (string): id of the enterprise customer
+            enterprise_customer_slug (string): slug of the enterprise customer
         Returns:
             dictionary containing enterprise customer metadata
         """
+        if enterprise_customer_uuid:
+            endpoint = f'{self.enterprise_customer_endpoint}{enterprise_customer_uuid}/'
+        elif enterprise_customer_slug:
+            endpoint = f'{self.enterprise_customer_endpoint}?slug={enterprise_customer_slug}'
+        else:
+            raise ValueError('Either enterprise_customer_uuid or enterprise_customer_slug is required.')
 
         try:
-            endpoint = f'{self.enterprise_customer_endpoint}{enterprise_customer_uuid}/'
             response = self.client.get(endpoint, timeout=settings.LMS_CLIENT_TIMEOUT)
             response.raise_for_status()
-            return response.json()
+            if enterprise_customer_uuid:
+                # If we're fetching by UUID, we expect a single result
+                return response.json()
+            # If we're fetching by slug, we expect a list of results
+            return response.json().get('results', [])[0]
         except requests.exceptions.HTTPError as exc:
             logger.exception(exc)
             raise
@@ -406,12 +416,66 @@ class LmsUserApiClient(BaseUserApiClient):
     enterprise_api_base_url = f"{settings.LMS_URL}/enterprise/api/v1/"
     enterprise_learner_portal_api_base_url = f"{settings.LMS_URL}/enterprise_learner_portal/api/v1/"
 
+    enterprise_learner_endpoint = f"{enterprise_api_base_url}enterprise-learner/"
     default_enterprise_enrollment_intentions_learner_status_endpoint = (
         f'{enterprise_api_base_url}default-enterprise-enrollment-intentions/learner-status/'
     )
     enterprise_course_enrollments_endpoint = (
         f'{enterprise_learner_portal_api_base_url}enterprise_course_enrollments/'
     )
+
+    def get_enterprise_customers_for_user(self, username, traverse_pagination=False):
+        """
+        Fetches enterprise learner data for a given username.
+
+        Arguments:
+            username (str): Username of the learner
+
+        Returns:
+            dict: Dictionary representation of the JSON response from the API
+        """
+        query_params = {
+            'username': username,
+        }
+        results = []
+        initial_response_data = None
+        current_response = None
+        next_url = self.enterprise_learner_endpoint
+        try:
+            while next_url:
+                current_response = self.get(
+                    next_url,
+                    params=query_params,
+                    timeout=settings.LMS_CLIENT_TIMEOUT
+                )
+                current_response.raise_for_status()
+                data = current_response.json()
+
+                if not initial_response_data:
+                    # Store the initial response data (first page) for later use
+                    initial_response_data = data
+
+                # Collect results from the current page
+                results.extend(data.get('results', []))
+
+                # If pagination is enabled, continue with the next page; otherwise, break
+                next_url = data.get('next') if traverse_pagination else None
+
+            consolidated_response = {
+                **initial_response_data,
+                'next': None,
+                'previous': None,
+                'count': len(results),
+                'num_pages': 1,
+                'results': results,
+            }
+            return consolidated_response
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                f"Failed to fetch enterprise learner for learner {username}: {exc} "
+                f"Response content: {current_response.content if current_response else None}"
+            )
+            raise
 
     def get_default_enterprise_enrollment_intentions_learner_status(self, enterprise_customer_uuid):
         """
