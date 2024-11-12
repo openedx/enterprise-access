@@ -5,13 +5,39 @@ Tests for Enterprise Access content_assignments utils.
 import ddt
 from django.test import TestCase
 
+from enterprise_access.apps.api_client.tests.test_constants import DATE_FORMAT_ISO_8601
 from enterprise_access.apps.content_assignments.constants import BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT
+from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
 from enterprise_access.apps.content_assignments.utils import (
     get_self_paced_normalized_start_date,
     has_time_to_complete,
     is_within_minimum_start_date_threshold
 )
-from enterprise_access.utils import _curr_date, _days_from_now
+from enterprise_access.utils import _curr_date, _days_from_now, get_normalized_metadata_for_assignment
+
+mock_course_run_1 = {
+    'start_date': _days_from_now(-370, DATE_FORMAT_ISO_8601),
+    'end_date': _days_from_now(350, DATE_FORMAT_ISO_8601),
+    'enroll_by_date': _days_from_now(-363, DATE_FORMAT_ISO_8601),
+    'enroll_start_date': _days_from_now(-380, DATE_FORMAT_ISO_8601),
+    'content_price': 100,
+}
+
+mock_course_run_2 = {
+    'start_date': _days_from_now(-70, DATE_FORMAT_ISO_8601),
+    'end_date': _days_from_now(50, DATE_FORMAT_ISO_8601),
+    'enroll_by_date': _days_from_now(-63, DATE_FORMAT_ISO_8601),
+    'enroll_start_date': _days_from_now(-80, DATE_FORMAT_ISO_8601),
+    'content_price': 100,
+}
+
+mock_advertised_course_run = {
+    'start_date': _days_from_now(-10, DATE_FORMAT_ISO_8601),
+    'end_date': _days_from_now(10, DATE_FORMAT_ISO_8601),
+    'enroll_by_date': _days_from_now(-3, DATE_FORMAT_ISO_8601),
+    'enroll_start_date': _days_from_now(-20, DATE_FORMAT_ISO_8601),
+    'content_price': 100,
+}
 
 
 @ddt.ddt
@@ -19,36 +45,53 @@ class UtilsTests(TestCase):
     """
     Tests related to utility functions for content assignments
     """
+    def setUp(self):
+        super().setUp()
+        self.mock_course_key = "edX+DemoX"
+        self.mock_course_run_key_1 = "course-v1:edX+DemoX+1T360"
+        self.mock_course_run_key_2 = "course-v1:edX+DemoX+1T60"
+        self.mock_advertised_course_run_key = 'course-v1:edX+DemoX+1T0'
+        self.mock_course_run_1 = mock_course_run_1
+        self.mock_course_run_2 = mock_course_run_2
+        self.mock_advertised_course_run = mock_advertised_course_run
+        self.mock_content_metadata = {
+            'normalized_metadata': self.mock_advertised_course_run,
+            'normalized_metadata_by_run': {
+                "course-v1:edX+DemoX+1T360": self.mock_course_run_1,
+                "course-v1:edX+DemoX+1T60": self.mock_course_run_2,
+                'course-v1:edX+DemoX+1T0': self.mock_advertised_course_run
+            }
+        }
 
     @ddt.data(
         # Start after is before the curr_date - START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
         {
-            "start_date": _days_from_now(5, '%Y-%m-%dT%H:%M:%SZ'),
+            "start_date": _days_from_now(5, DATE_FORMAT_ISO_8601),
             "curr_date": _curr_date(),
             "expected_output": False
         },
         # Start after is before the curr_date - START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
 
         {
-            "start_date": _days_from_now(-5, '%Y-%m-%dT%H:%M:%SZ'),
+            "start_date": _days_from_now(-5, DATE_FORMAT_ISO_8601),
             "curr_date": _curr_date(),
             "expected_output": False
         },
         # Start after is before the curr_date - START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
         {
-            "start_date": _days_from_now(15, '%Y-%m-%dT%H:%M:%SZ'),
+            "start_date": _days_from_now(15, DATE_FORMAT_ISO_8601),
             "curr_date": _curr_date(),
             "expected_output": False
         },
         # Start date is before the curr_date - START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
         {
-            "start_date": _days_from_now(-15, '%Y-%m-%dT%H:%M:%SZ'),
+            "start_date": _days_from_now(-15, DATE_FORMAT_ISO_8601),
             "curr_date": _curr_date(),
             "expected_output": True
         },
         # Start after is before the curr_date - START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
         {
-            "start_date": _curr_date('%Y-%m-%dT%H:%M:%SZ'),
+            "start_date": _curr_date(DATE_FORMAT_ISO_8601),
             "curr_date": _curr_date(),
             "expected_output": False
         }
@@ -60,28 +103,28 @@ class UtilsTests(TestCase):
     @ddt.data(
         # endDate is the exact day as weeks to complete offset
         {
-            "end_date": _days_from_now(49, '%Y-%m-%dT%H:%M:%SZ'),
+            "end_date": _days_from_now(49, DATE_FORMAT_ISO_8601),
             "curr_date": _curr_date(),
             "weeks_to_complete": 7,
             "expected_output": True
         },
         # weeks to complete is within endDate
         {
-            "end_date": _days_from_now(49, '%Y-%m-%dT%H:%M:%SZ'),
+            "end_date": _days_from_now(49, DATE_FORMAT_ISO_8601),
             "curr_date": _curr_date(),
             "weeks_to_complete": 4,
             "expected_output": True
         },
         # weeks to complete is beyond end date
         {
-            "end_date": _days_from_now(49, '%Y-%m-%dT%H:%M:%SZ'),
+            "end_date": _days_from_now(49, DATE_FORMAT_ISO_8601),
             "curr_date": _curr_date(),
             "weeks_to_complete": 8,
             "expected_output": False
         },
         # end date is current date
         {
-            "end_date": _curr_date('%Y-%m-%dT%H:%M:%SZ'),
+            "end_date": _curr_date(DATE_FORMAT_ISO_8601),
             "curr_date": _curr_date(),
             "weeks_to_complete": 1,
             "expected_output": False
@@ -94,14 +137,14 @@ class UtilsTests(TestCase):
     @ddt.data(
         {
             "start_date": None,
-            "end_date": _days_from_now(10, '%Y-%m-%dT%H:%M:%SZ'),
+            "end_date": _days_from_now(10, DATE_FORMAT_ISO_8601),
             "course_metadata": {
                 "pacing_type": "self_paced",
                 "weeks_to_complete": 8,
             },
         },
         {
-            "start_date": _days_from_now(5, '%Y-%m-%dT%H:%M:%SZ'),
+            "start_date": _days_from_now(5, DATE_FORMAT_ISO_8601),
             "end_date": None,
             "course_metadata": {
                 "pacing_type": "self_paced",
@@ -109,16 +152,16 @@ class UtilsTests(TestCase):
             },
         },
         {
-            "start_date": _days_from_now(5, '%Y-%m-%dT%H:%M:%SZ'),
-            "end_date": _days_from_now(10, '%Y-%m-%dT%H:%M:%SZ'),
+            "start_date": _days_from_now(5, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(10, DATE_FORMAT_ISO_8601),
             "course_metadata": {
                 "pacing_type": None,
                 "weeks_to_complete": 8,
             },
         },
         {
-            "start_date": _days_from_now(5, '%Y-%m-%dT%H:%M:%SZ'),
-            "end_date": _days_from_now(10, '%Y-%m-%dT%H:%M:%SZ'),
+            "start_date": _days_from_now(5, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(10, DATE_FORMAT_ISO_8601),
             "course_metadata": {
                 "pacing_type": "self_paced",
                 "weeks_to_complete": None,
@@ -141,8 +184,8 @@ class UtilsTests(TestCase):
     @ddt.data(
         # self-paced, has time to complete
         {
-            "start_date": _days_from_now(5, '%Y-%m-%dT%H:%M:%SZ'),
-            "end_date": _days_from_now(28, '%Y-%m-%dT%H:%M:%SZ'),
+            "start_date": _days_from_now(5, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(28, DATE_FORMAT_ISO_8601),
             "course_metadata": {
                 "pacing_type": "self_paced",
                 "weeks_to_complete": 3,
@@ -151,8 +194,8 @@ class UtilsTests(TestCase):
         # self-paced, does not have time to complete, but start date older than
         # START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
         {
-            "start_date": _days_from_now(-15, '%Y-%m-%dT%H:%M:%SZ'),
-            "end_date": _days_from_now(10, '%Y-%m-%dT%H:%M:%SZ'),
+            "start_date": _days_from_now(-15, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(10, DATE_FORMAT_ISO_8601),
             "course_metadata": {
                 "pacing_type": "self_paced",
                 "weeks_to_complete": 300,
@@ -161,8 +204,8 @@ class UtilsTests(TestCase):
         # self-paced, does not have time to complete, start date within
         # START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
         {
-            "start_date": _days_from_now(-5, '%Y-%m-%dT%H:%M:%SZ'),
-            "end_date": _days_from_now(10, '%Y-%m-%dT%H:%M:%SZ'),
+            "start_date": _days_from_now(-5, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(10, DATE_FORMAT_ISO_8601),
             "course_metadata": {
                 "pacing_type": "self_paced",
                 "weeks_to_complete": 300,
@@ -170,8 +213,8 @@ class UtilsTests(TestCase):
         },
         # instructor paced
         {
-            "start_date": _days_from_now(5, '%Y-%m-%dT%H:%M:%SZ'),
-            "end_date": _days_from_now(10, '%Y-%m-%dT%H:%M:%SZ'),
+            "start_date": _days_from_now(5, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(10, DATE_FORMAT_ISO_8601),
             "course_metadata": {
                 "pacing_type": "instructor_paced",
                 "weeks_to_complete": 8,
@@ -192,3 +235,41 @@ class UtilsTests(TestCase):
         else:
             assert get_self_paced_normalized_start_date(start_date, end_date, course_metadata) == \
                    start_date
+
+    @ddt.data(
+        # Expects course run associated with configured content_key for run-based assignment
+        {
+            'assignment': {
+                'is_assigned_course_run': True,
+                'preferred_course_run_key': 'course-v1:edX+DemoX+1T60',
+                'content_key': 'course-v1:edX+DemoX+1T60',
+            },
+            'expected_output': mock_course_run_2,
+        },
+        # Expects the preferred content_key
+        {
+            'assignment': {
+                'is_assigned_course_run': False,
+                'preferred_course_run_key': 'course-v1:edX+DemoX+1T360',
+                'content_key': 'edX+DemoX',
+            },
+            'expected_output': mock_course_run_1,
+        },
+        # Expects the top level course key
+        {
+            'assignment': {
+                'is_assigned_course_run': False,
+                'preferred_course_run_key': None,
+                'content_key': 'edX+DemoX',
+            },
+            'expected_output': mock_advertised_course_run,
+        },
+    )
+    @ddt.unpack
+    def test_get_normalized_metadata_for_assignment(self, assignment, expected_output):
+        assignment_obj = LearnerContentAssignmentFactory(**assignment)
+        normalized_metadata = get_normalized_metadata_for_assignment(
+            assignment=assignment_obj,
+            content_metadata=self.mock_content_metadata
+        )
+        self.assertEqual(normalized_metadata, expected_output)
