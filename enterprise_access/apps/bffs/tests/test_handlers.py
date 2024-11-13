@@ -1,4 +1,9 @@
+"""
+Tests for BFF handlers
+"""
 from unittest import mock
+
+from rest_framework import status
 
 from enterprise_access.apps.bffs.context import HandlerContext
 from enterprise_access.apps.bffs.handlers import BaseHandler, BaseLearnerPortalHandler, DashboardHandler
@@ -21,36 +26,28 @@ class TestBaseHandler(TestHandlerContextMixin):
         mock_get_enterprise_customers_for_user.return_value = {'results': []}
         context = HandlerContext(self.request)
         base_handler = BaseHandler(context)
-        expected_output = {
-            "developer_message": "No enterprise uuid associated to the user mock-uuid",
-            "user_message": "You may not be associated with the enterprise.",
-        }
         # Define kwargs for add_error
         arguments = {
-            **expected_output,
-            "status": 403  # Add an attribute that is not explicitly defined in the serializer to verify
+            **self.mock_error,
+            "status_code": status.HTTP_400_BAD_REQUEST
         }
         base_handler.add_error(
             **arguments
         )
-        self.assertEqual(expected_output, base_handler.context.errors[0])
+        self.assertEqual(self.mock_error, base_handler.context.errors[0])
 
     def test_base_handler_add_warning(self):
         context = HandlerContext(self.request)
         base_handler = BaseHandler(context)
-        expected_output = {
-            "developer_message": "Heuristic Expiration",
-            "user_message": "The data received might be out-dated",
-        }
         # Define kwargs for add_warning
         arguments = {
-            **expected_output,
+            **self.mock_warning,
             "status": 113  # Add an attribute that is not explicitly defined in the serializer to verify
         }
         base_handler.add_warning(
             **arguments
         )
-        self.assertEqual(expected_output, base_handler.context.warnings[0])
+        self.assertEqual(self.mock_warning, base_handler.context.warnings[0])
 
 
 class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
@@ -150,7 +147,7 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
         self.assertEqual(actual_staff_enterprise_customer, expected_staff_enterprise_customer)
 
         # Base subscriptions related assertions
-        actual_subscriptions = handler.context.data.get('subscriptions')
+        actual_subscriptions = handler.context.data['enterprise_customer_user_subsidies']['subscriptions']
         expected_subscriptions = {
             'customer_agreement': None,
             'subscription_licenses': [],

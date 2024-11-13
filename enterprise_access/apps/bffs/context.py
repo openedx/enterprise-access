@@ -2,6 +2,8 @@
 HandlerContext for bffs app.
 """
 
+from rest_framework import status
+
 from enterprise_access.apps.api_client.lms_client import LmsApiClient, LmsUserApiClient
 from enterprise_access.apps.bffs import serializers
 
@@ -30,13 +32,13 @@ class HandlerContext:
             request: The incoming HTTP request.
         """
         self._request = request
+        self._status_code = status.HTTP_200_OK
         self._errors = []  # Stores any errors that occur during processing
         self._warnings = []  # Stores any warnings that occur during processing
         self._enterprise_customer_uuid = None
         self._enterprise_customer_slug = None
         self._lms_user_id = getattr(self.user, 'lms_user_id', None)
         self._enterprise_features = {}
-
         self.data = {}  # Stores processed data for the response
 
         # API clients
@@ -49,6 +51,10 @@ class HandlerContext:
     @property
     def request(self):
         return self._request
+
+    @property
+    def status_code(self):
+        return self._status_code
 
     @property
     def user(self):

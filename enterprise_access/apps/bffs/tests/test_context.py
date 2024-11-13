@@ -1,5 +1,5 @@
 """
-Text for the BFF context
+Tests for the BFF context
 """
 
 from unittest import mock
