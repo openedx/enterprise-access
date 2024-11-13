@@ -226,7 +226,7 @@ class TestDashboardHandler(TestHandlerContextMixin):
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_course_enrollments')
     def test_load_and_process(self, mock_get_enterprise_course_enrollments):
         mock_get_enterprise_course_enrollments.return_value = self.mock_enterprise_course_enrollments
-        
+
         context = HandlerContext(self.request)
         dashboard_handler = DashboardHandler(context)
 
