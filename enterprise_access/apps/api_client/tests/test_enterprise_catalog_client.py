@@ -34,7 +34,7 @@ class TestEnterpriseCatalogApiClient(TestCase):
         assert contains_content_items
 
         mock_oauth_client.return_value.get.assert_called_with(
-            f'http://enterprise-catalog.example.com/api/v1/enterprise-catalogs/{ent_uuid}/contains_content_items/',
+            f'http://enterprise-catalog.example.com/api/v2/enterprise-catalogs/{ent_uuid}/contains_content_items/',
             params={'course_run_ids': ['AB+CD101']},
         )
 
@@ -65,7 +65,7 @@ class TestEnterpriseCatalogApiClient(TestCase):
 
         self.assertEqual(fetched_metadata['results'], mock_response_json['results'])
         mock_oauth_client.return_value.get.assert_called_with(
-            f'http://enterprise-catalog.example.com/api/v1/enterprise-catalogs/{customer_uuid}/get_content_metadata/',
+            f'http://enterprise-catalog.example.com/api/v2/enterprise-catalogs/{customer_uuid}/get_content_metadata/',
             params={
                 'content_keys': content_keys,
                 'traverse_pagination': True,
@@ -87,7 +87,7 @@ class TestEnterpriseCatalogApiClient(TestCase):
             client.catalog_content_metadata(customer_uuid, content_keys)
 
         mock_oauth_client.return_value.get.assert_called_with(
-            f'http://enterprise-catalog.example.com/api/v1/enterprise-catalogs/{customer_uuid}/get_content_metadata/',
+            f'http://enterprise-catalog.example.com/api/v2/enterprise-catalogs/{customer_uuid}/get_content_metadata/',
             params={
                 'content_keys': content_keys,
                 'traverse_pagination': True,
@@ -109,5 +109,5 @@ class TestEnterpriseCatalogApiClient(TestCase):
 
         self.assertEqual(fetched_metadata, mock_response_json['count'])
         mock_oauth_client.return_value.get.assert_called_with(
-            f'http://enterprise-catalog.example.com/api/v1/enterprise-catalogs/{catalog_uuid}/get_content_metadata/',
+            f'http://enterprise-catalog.example.com/api/v2/enterprise-catalogs/{catalog_uuid}/get_content_metadata/',
         )
