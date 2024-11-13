@@ -7,7 +7,10 @@ from requests import Response
 
 from enterprise_access.apps.api_client.constants import LicenseStatuses
 from enterprise_access.apps.api_client.tests.test_constants import DATE_FORMAT_ISO_8601, DATE_FORMAT_ISO_8601_MS
+<<<<<<< HEAD
 from enterprise_access.apps.core.tests.factories import UserFactory
+=======
+>>>>>>> e155f13 (feat: add response builder to the BFF)
 from enterprise_access.utils import _days_from_now
 
 
@@ -52,7 +55,6 @@ class MockLicenseManagerMetadataMixin(MockEnterpriseMetadata):
     """
     def setUp(self):
         super().setUp()
-
         self.mock_learner_license_uuid = self.faker.uuid4()
         self.mock_learner_license_activation_uuid = self.faker.uuid4()
         self.mock_license_activation_key = self.faker.uuid4()

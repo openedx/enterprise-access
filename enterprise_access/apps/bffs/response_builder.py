@@ -1,6 +1,7 @@
 """
 Response Builder Module for bffs app
 """
+
 from enterprise_access.apps.bffs.serializers import LearnerDashboardResponseSerializer
 
 
@@ -70,8 +71,10 @@ class BaseLearnerResponseBuilder(BaseResponseBuilder):
         """
         if not response_data:
             response_data = {}
+
         response_data['enterprise_customer_user_subsidies'] =\
             self.context.data.get('enterprise_customer_user_subsidies', {})
+
         return response_data
 
     def build(self):

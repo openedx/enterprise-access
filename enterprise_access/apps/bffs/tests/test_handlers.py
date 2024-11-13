@@ -1,9 +1,14 @@
 """
 Tests for BFF handlers
 """
+<<<<<<< HEAD
 from unittest import mock
 
 from rest_framework import status
+=======
+from django.test import RequestFactory, TestCase
+from faker import Faker
+>>>>>>> e155f13 (feat: add response builder to the BFF)
 
 from enterprise_access.apps.bffs.context import HandlerContext
 from enterprise_access.apps.bffs.handlers import BaseHandler, BaseLearnerPortalHandler, DashboardHandler
@@ -42,7 +47,7 @@ class TestBaseHandler(TestHandlerContextMixin):
         # Define kwargs for add_warning
         arguments = {
             **self.mock_warning,
-            "status": 113  # Add an attribute that is not explicitly defined in the serializer to verify
+            "status_code": 113  # Add an attribute that is not explicitly defined in the serializer to verify
         }
         base_handler.add_warning(
             **arguments

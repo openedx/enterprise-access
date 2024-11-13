@@ -1,6 +1,8 @@
 """
 Serializers for bffs.
 """
+from collections import OrderedDict
+
 from rest_framework import serializers
 
 
@@ -131,9 +133,7 @@ class SubscriptionsSerializer(serializers.Serializer):
     Serializer for enterprise customer user subsidies.
     """
 
-    customer_agreement = CustomerAgreementSerializer(
-        required=False,
-    )
+    customer_agreement = CustomerAgreementSerializer(required=False)
     subscription_licenses = SubscriptionLicenseSerializer(
         many=True,
         required=False,

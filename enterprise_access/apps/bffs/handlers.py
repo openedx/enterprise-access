@@ -1,5 +1,5 @@
 """"
-Handlers for bffs app.
+BFF Handlers for bffs app.
 """
 
 import logging
