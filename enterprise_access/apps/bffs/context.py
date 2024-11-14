@@ -257,7 +257,6 @@ class HandlerContext:
             slug_matches_active_enterprise_customer or uuid_matches_active_enterprise_customer
         )
 
-    
     def _enterprise_customer_matches_slug_or_uuid(self, enterprise_customer):
         """
         Check if the enterprise customer matches the slug or UUID.
