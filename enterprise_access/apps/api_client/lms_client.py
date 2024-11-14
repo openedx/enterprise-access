@@ -74,8 +74,10 @@ class LmsApiClient(BaseOAuthClient):
             dictionary containing enterprise customer metadata
         """
         if enterprise_customer_uuid:
+            # Returns a dict
             endpoint = f'{self.enterprise_customer_endpoint}{enterprise_customer_uuid}/'
         elif enterprise_customer_slug:
+            # Returns a list of dicts
             endpoint = f'{self.enterprise_customer_endpoint}?slug={enterprise_customer_slug}'
         else:
             raise ValueError('Either enterprise_customer_uuid or enterprise_customer_slug is required.')
@@ -83,11 +85,10 @@ class LmsApiClient(BaseOAuthClient):
         try:
             response = self.client.get(endpoint, timeout=settings.LMS_CLIENT_TIMEOUT)
             response.raise_for_status()
-            if enterprise_customer_uuid:
-                # If we're fetching by UUID, we expect a single result
-                return response.json()
-            # If we're fetching by slug, we expect a list of results
-            return response.json().get('results', [])[0]
+            payload = response.json()
+            if results := payload.get('results'):
+                return results[0]
+            return payload
         except requests.exceptions.HTTPError as exc:
             logger.exception(exc)
             raise

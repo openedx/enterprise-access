@@ -93,19 +93,16 @@ class BaseLearnerPortalHandler(BaseHandler):
         """
         Transform enterprise customer metadata retrieved by self.context.
         """
-        if enterprise_customer := self.context.data.get('enterprise_customer'):
-            self.context.data['enterprise_customer'] = self.transform_enterprise_customer(enterprise_customer)
-        if active_enterprise_customer := self.context.data.get('active_enterprise_customer'):
-            self.context.data['active_enterprise_customer'] =\
-                self.transform_enterprise_customer(active_enterprise_customer)
+        for customer_record_key in ('enterprise_customer', 'active_enterprise_customer', 'staff_enterprise_customer'):
+            if not (customer_record := self.context.data.get(customer_record_key)):
+                continue
+            self.context.data[customer_record_key] = self.transform_enterprise_customer(customer_record)
+
         if enterprise_customer_users := self.context.data.get('all_linked_enterprise_customer_users'):
             self.context.data['all_linked_enterprise_customer_users'] = [
                 self.transform_enterprise_customer_user(enterprise_customer_user)
                 for enterprise_customer_user in enterprise_customer_users
             ]
-        if staff_enterprise_customer := self.context.data.get('staff_enterprise_customer'):
-            self.context.data['staff_enterprise_customer'] =\
-                self.transform_enterprise_customer(staff_enterprise_customer)
 
     def transform_enterprise_customer_user(self, enterprise_customer_user):
         """
