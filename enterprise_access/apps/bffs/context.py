@@ -188,13 +188,12 @@ class HandlerContext:
         )
 
         # Update the context data with the enterprise customer user information
-        self.data = {
-            **self.data,
+        self.data.update({
             'enterprise_customer': enterprise_customer,
             'active_enterprise_customer': active_enterprise_customer,
             'all_linked_enterprise_customer_users': enterprise_customer_users,
             'staff_enterprise_customer': staff_enterprise_customer,
-        }
+        })
 
     def _determine_enterprise_customer_for_display(
         self,

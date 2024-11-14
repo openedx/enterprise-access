@@ -103,6 +103,9 @@ class BaseLearnerPortalHandler(BaseHandler):
                 self.transform_enterprise_customer_user(enterprise_customer_user)
                 for enterprise_customer_user in enterprise_customer_users
             ]
+        if staff_enterprise_customer := self.context.data.get('staff_enterprise_customer'):
+            self.context.data['staff_enterprise_customer'] =\
+                self.transform_enterprise_customer(staff_enterprise_customer)
 
     def transform_enterprise_customer_user(self, enterprise_customer_user):
         """

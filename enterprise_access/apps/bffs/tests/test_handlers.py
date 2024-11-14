@@ -185,10 +185,38 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
         }
         context = HandlerContext(self.request)
         handler = BaseLearnerPortalHandler(context)
-        handler.transform_enterprise_customers()
+
+        handler.load_and_process()
+
         actual_enterprise_customer = handler.context.data.get('enterprise_customer')
         expected_enterprise_customer = None
         self.assertEqual(actual_enterprise_customer, expected_enterprise_customer)
+
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.get_enterprise_customer_data')
+    def test_load_and_process_staff_enterprise_customer(
+        self,
+        mock_get_enterprise_customer_data,
+        mock_get_enterprise_customers_for_user,
+    ):
+        mock_get_enterprise_customers_for_user.return_value = {
+            **self.mock_enterprise_learner_response_data,
+            'results': [],
+        }
+        mock_get_enterprise_customer_data.return_value = self.mock_enterprise_customer
+        request = self.request
+        request.user = self.mock_staff_user
+        context = HandlerContext(request)
+        handler = BaseLearnerPortalHandler(context)
+
+        handler.load_and_process()
+
+        actual_enterprise_customer = handler.context.data.get('enterprise_customer')
+        expected_enterprise_customer = self.expected_enterprise_customer
+        self.assertEqual(actual_enterprise_customer, expected_enterprise_customer)
+        actual_staff_enterprise_customer = handler.context.data.get('staff_enterprise_customer')
+        expected_staff_enterprise_customer = self.expected_enterprise_customer
+        self.assertEqual(actual_staff_enterprise_customer, expected_staff_enterprise_customer)
 
 
 class TestDashboardHandler(TestHandlerContextMixin):
