@@ -42,7 +42,6 @@ def all_pages_enterprise_group_members_cache_key(
 
 
 class LmsApiClient(BaseOAuthClient):
-
     """
     API client for calls to the LMS service.
     """

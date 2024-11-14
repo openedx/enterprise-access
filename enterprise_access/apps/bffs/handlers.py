@@ -79,7 +79,7 @@ class BaseLearnerPortalHandler(BaseHandler):
             # Retrieve and process subscription licenses. Handles activation and auto-apply logic.
             self.load_and_process_subscription_licenses()
 
-            # # Retrieve default enterprise courses and enroll in the redeemable ones
+            # Retrieve default enterprise courses and enroll in the redeemable ones
             self.load_default_enterprise_enrollment_intentions()
             self.enroll_in_redeemable_default_enterprise_enrollment_intentions()
         except Exception as e:  # pylint: disable=broad-exception-caught

@@ -39,7 +39,7 @@ class HandlerContext:
 
         self.data = {}  # Stores processed data for the response
 
-        # Common API clients
+        # API clients
         self.lms_api_client = LmsApiClient()
         self.lms_user_api_client = LmsUserApiClient(request)
 
@@ -134,18 +134,7 @@ class HandlerContext:
 
         # Parse the enterprise customer user data
         enterprise_customer_users = enterprise_customer_users_data.get('results', [])
-        active_enterprise_customer_user = next(
-            (
-                enterprise_customer_user
-                for enterprise_customer_user in enterprise_customer_users
-                if enterprise_customer_user.get('active', False)
-            ),
-            None
-        )
-        active_enterprise_customer = (
-            active_enterprise_customer_user.get('enterprise_customer')
-            if active_enterprise_customer_user else None
-        )
+        active_enterprise_customer = self._get_active_enterprise_customer(enterprise_customer_users)
         enterprise_customer_user_for_requested_customer = next(
             (
                 enterprise_customer_user
@@ -158,23 +147,7 @@ class HandlerContext:
         # If no enterprise customer user is found for the requested customer (i.e., request user not explicitly
         # linked), but the request user is staff, attempt to retrieve enterprise customer metadata from the
         # `/enterprise-customer/` LMS API endpoint instead.
-        staff_enterprise_customer = None
-        has_enterprise_customer_slug_or_uuid = self.enterprise_customer_slug or self.enterprise_customer_uuid
-        if (
-            not enterprise_customer_user_for_requested_customer and
-            has_enterprise_customer_slug_or_uuid and
-            self.user.is_staff
-        ):
-            try:
-                staff_enterprise_customer = self.lms_api_client.get_enterprise_customer_data(
-                    enterprise_customer_uuid=self.enterprise_customer_uuid,
-                    enterprise_customer_slug=self.enterprise_customer_slug,
-                )
-            except Exception as e:  # pylint: disable=broad-except
-                self.add_error(
-                    user_message='Error retrieving enterprise customer data',
-                    developer_message=str(e)
-                )
+        staff_enterprise_customer = self._get_staff_enterprise_customer(enterprise_customer_user_for_requested_customer)
 
         # Determine the enterprise customer user to display
         requested_enterprise_customer = (
@@ -195,6 +168,48 @@ class HandlerContext:
             'staff_enterprise_customer': staff_enterprise_customer,
         })
 
+    def _get_active_enterprise_customer(self, enterprise_customer_users):
+        """
+        Get the active enterprise customer user from the list of enterprise customer users.
+        """
+        active_enterprise_customer_user = next(
+            (
+                enterprise_customer_user
+                for enterprise_customer_user in enterprise_customer_users
+                if enterprise_customer_user.get('active', False)
+            ),
+            None
+        )
+        active_enterprise_customer = (
+            active_enterprise_customer_user.get('enterprise_customer')
+            if active_enterprise_customer_user else None
+        )
+        return active_enterprise_customer
+
+    def _get_staff_enterprise_customer(self, enterprise_customer_user_for_requested_customer):
+        """
+        Retrieve enterprise customer metadata from `enterprise-customer` LMS API endpoint
+        if there is no enterprise customer user for the request enterprise and the user is staff.
+        """
+        staff_enterprise_customer = None
+        has_enterprise_customer_slug_or_uuid = self.enterprise_customer_slug or self.enterprise_customer_uuid
+        if (
+            not enterprise_customer_user_for_requested_customer and
+            has_enterprise_customer_slug_or_uuid and
+            self.user.is_staff
+        ):
+            try:
+                staff_enterprise_customer = self.lms_api_client.get_enterprise_customer_data(
+                    enterprise_customer_uuid=self.enterprise_customer_uuid,
+                    enterprise_customer_slug=self.enterprise_customer_slug,
+                )
+            except Exception as e:  # pylint: disable=broad-except
+                self.add_error(
+                    user_message='Error retrieving enterprise customer data',
+                    developer_message=str(e)
+                )
+        return staff_enterprise_customer
+
     def _determine_enterprise_customer_for_display(
         self,
         active_enterprise_customer=None,
@@ -211,19 +226,12 @@ class HandlerContext:
             # No enterprise customer specified in the request, so return the active enterprise customer user
             return active_enterprise_customer
 
-        slug_matches_active_enterprise_customer = (
-            active_enterprise_customer and active_enterprise_customer.get('slug') == self.enterprise_customer_slug
-        )
-        uuid_matches_active_enterprise_customer = (
-            active_enterprise_customer and active_enterprise_customer.get('uuid') == self.enterprise_customer_uuid
-        )
-        request_matches_active_enterprise_customer = (
-            slug_matches_active_enterprise_customer or uuid_matches_active_enterprise_customer
-        )
-
         # If the requested enterprise does not match the active enterprise customer user's slug/uuid
         # and there is a linked enterprise customer user for the requested enterprise, return the
         # linked enterprise customer.
+        request_matches_active_enterprise_customer = self._request_matches_active_enterprise_customer(
+            active_enterprise_customer
+        )
         if not request_matches_active_enterprise_customer and requested_enterprise_customer:
             return requested_enterprise_customer
 
@@ -235,6 +243,21 @@ class HandlerContext:
         # Otherwise, return the active enterprise customer.
         return active_enterprise_customer
 
+    def _request_matches_active_enterprise_customer(self, active_enterprise_customer):
+        """
+        Check if the request matches the active enterprise customer.
+        """
+        slug_matches_active_enterprise_customer = (
+            active_enterprise_customer and active_enterprise_customer.get('slug') == self.enterprise_customer_slug
+        )
+        uuid_matches_active_enterprise_customer = (
+            active_enterprise_customer and active_enterprise_customer.get('uuid') == self.enterprise_customer_uuid
+        )
+        return (
+            slug_matches_active_enterprise_customer or uuid_matches_active_enterprise_customer
+        )
+
+    
     def _enterprise_customer_matches_slug_or_uuid(self, enterprise_customer):
         """
         Check if the enterprise customer matches the slug or UUID.
