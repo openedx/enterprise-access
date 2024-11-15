@@ -109,21 +109,48 @@ class TestLmsApiClient(TestCase):
             timeout=settings.LMS_CLIENT_TIMEOUT,
         )
 
+    @ddt.data(
+        {
+            'enterprise_uuid': 'some-uuid',
+            'enterprise_slug': None
+        },
+        {
+            'enterprise_uuid': None,
+            'enterprise_slug': 'some-slug',
+        },
+        {
+            'enterprise_uuid': 'some-uuid',
+            'enterprise_slug': 'some-slug',
+        },
+    )
     @mock.patch('requests.Response.json')
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
-    def test_get_enterprise_customer_data(self, mock_oauth_client, mock_json):
+    @ddt.unpack
+    def test_get_enterprise_customer_data(
+        self,
+        mock_oauth_client,
+        mock_json,
+        enterprise_uuid,
+        enterprise_slug,
+    ):
         """
         Verify client hits the right URL for entepriseCustomer data.
         """
-        mock_json.return_value = {
+        mock_enterprise_customer = {
             'uuid': 'some-uuid',
             'slug': 'some-test-slug',
         }
+        mock_json.return_value = mock_enterprise_customer
+        if not enterprise_uuid and enterprise_slug:
+            mock_json.return_value = {'results': [mock_enterprise_customer]}
         mock_oauth_client.return_value.get.return_value = requests.Response()
         mock_oauth_client.return_value.get.return_value.status_code = 200
 
         client = LmsApiClient()
-        customer_data = client.get_enterprise_customer_data('some-uuid')
+        customer_data = client.get_enterprise_customer_data(
+            enterprise_customer_uuid=enterprise_uuid,
+            enterprise_customer_slug=enterprise_slug,
+        )
 
         assert customer_data['uuid'] == 'some-uuid'
         assert customer_data['slug'] == 'some-test-slug'
@@ -132,8 +159,16 @@ class TestLmsApiClient(TestCase):
             'http://edx-platform.example.com/'
             'enterprise/api/v1/'
             'enterprise-customer/'
-            'some-uuid/'
+            f'{enterprise_uuid}/'
         )
+        if not enterprise_uuid and enterprise_slug:
+            expected_url = (
+                'http://edx-platform.example.com/'
+                'enterprise/api/v1/'
+                'enterprise-customer/'
+                f'?slug={enterprise_slug}'
+            )
+
         mock_oauth_client.return_value.get.assert_called_with(
             expected_url,
             timeout=settings.LMS_CLIENT_TIMEOUT,
