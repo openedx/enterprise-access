@@ -55,6 +55,7 @@ class BaseLearnerPortalHandler(BaseHandler):
     The `BaseLearnerHandler` extends `BaseHandler` and provides shared core functionality
     across all learner-focused page routes, such as the learner dashboard, search, and course routes.
     """
+
     def __init__(self, context):
         """
          Initializes the BaseLearnerPortalHandler with a HandlerContext and API clients.
@@ -66,6 +67,41 @@ class BaseLearnerPortalHandler(BaseHandler):
         # API Clients
         self.license_manager_client = LicenseManagerUserApiClient(self.context.request)
         self.lms_user_api_client = LmsUserApiClient(self.context.request)
+
+    @property
+    def enterprise_customer_user_subsidies(self):
+        """
+        Get enterprise customer user subsidies from the context.
+        """
+        return self.context.data.get('enterprise_customer_user_subsidies', {})
+
+    @property
+    def subscriptions(self):
+        """
+        Get subscriptions from the context.
+        """
+        return self.enterprise_customer_user_subsidies.get('subscriptions', {})
+
+    @property
+    def customer_agreement(self):
+        """
+        Get customer agreement from the context.
+        """
+        return self.subscriptions.get('customer_agreement', {})
+
+    @property
+    def subscription_licenses(self):
+        """
+        Get subscription licenses from the context.
+        """
+        return self.subscriptions.get('subscription_licenses', [])
+
+    @property
+    def subscription_licenses_by_status(self):
+        """
+        Get subscription licenses by status from the context.
+        """
+        return self.subscriptions.get('subscription_licenses_by_status', {})
 
     def load_and_process(self):
         """
@@ -236,8 +272,7 @@ class BaseLearnerPortalHandler(BaseHandler):
         Returns:
             bool: True if the user has an activated license, False otherwise.
         """
-        subscription_licenses_by_status = self.get_subscription_licenses_by_status()
-        return bool(subscription_licenses_by_status.get('activated'))
+        return bool(self.subscription_licenses_by_status.get('activated'))
 
     def process_subscription_licenses(self):
         """
@@ -279,8 +314,7 @@ class BaseLearnerPortalHandler(BaseHandler):
         """
         Check if there are assigned licenses that need to be activated.
         """
-        subscription_licenses = self.get_subscription_licenses()
-        subscription_licenses_by_status = self.get_subscription_licenses_by_status()
+        subscription_licenses_by_status = self.subscription_licenses_by_status
         assigned_licenses = subscription_licenses_by_status.get('assigned', [])
         activated_licenses = []
         for subscription_license in assigned_licenses:
@@ -308,7 +342,7 @@ class BaseLearnerPortalHandler(BaseHandler):
                     developer_message=f"Activation key not found for license {subscription_license.get('uuid')}",
                 )
 
-        # Update the subscriptions.subscription_licenses_by_status context with the modified licenses data
+        # Update the subscription_licenses_by_status data with the activated licenses
         updated_activated_licenses = subscription_licenses_by_status.get('activated', [])
         updated_activated_licenses.extend(activated_licenses)
         if updated_activated_licenses:
@@ -323,13 +357,14 @@ class BaseLearnerPortalHandler(BaseHandler):
             subscription_licenses_by_status['assigned'] = remaining_assigned_licenses
         else:
             subscription_licenses_by_status.pop('assigned', None)
+
         self.context.data[
             'enterprise_customer_user_subsidies'
         ]['subscriptions']['subscription_licenses_by_status'] = subscription_licenses_by_status
 
-        # Update the subscriptions.subscription_licenses context with the modified licenses data
+        # Determine which licenses were updated
         updated_subscription_licenses = []
-        for subscription_license in subscription_licenses:
+        for subscription_license in self.subscription_licenses:
             for activated_license in activated_licenses:
                 if subscription_license.get('uuid') == activated_license.get('uuid'):
                     updated_subscription_licenses.append(activated_license)
@@ -344,11 +379,13 @@ class BaseLearnerPortalHandler(BaseHandler):
         """
         Check if auto-apply licenses are available and apply them to the user.
         """
-        subscription_licenses_by_status = self.get_subscription_licenses_by_status()
+        subscription_licenses_by_status = self.subscription_licenses_by_status
         has_assigned_licenses = subscription_licenses_by_status.get('assigned', [])
+
         if has_assigned_licenses or self.check_has_activated_license():
             # Skip auto-apply if user already has an activated license or assigned licenses
             return
+
         enterprise_customer_user_subsidies = self.context.data['enterprise_customer_user_subsidies']
         customer_agreement = enterprise_customer_user_subsidies['subscriptions'].get('customer_agreement') or {}
         has_subscription_plan_for_auto_apply = (

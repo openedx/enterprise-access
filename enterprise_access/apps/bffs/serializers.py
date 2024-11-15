@@ -1,7 +1,6 @@
 """
 Serializers for bffs.
 """
-from collections import OrderedDict
 
 from rest_framework import serializers
 
@@ -134,11 +133,7 @@ class SubscriptionsSerializer(serializers.Serializer):
     """
 
     customer_agreement = CustomerAgreementSerializer(required=False)
-    subscription_licenses = SubscriptionLicenseSerializer(
-        many=True,
-        required=False,
-        default=list
-    )
+    subscription_licenses = SubscriptionLicenseSerializer(many=True, required=False, default=list)
     subscription_licenses_by_status = SubscriptionLicenseStatusSerializer()
 
     def create(self, validated_data):
@@ -200,6 +195,33 @@ class EnterpriseCourseEnrollmentSerializer(serializers.Serializer):
 
     def update(self, instance, validated_data):
         return validated_data
+
+
+class BFFRequestSerializer(serializers.Serializer):
+    """
+    Serializer for the BFF request.
+    """
+
+    enterprise_customer_uuid = serializers.UUIDField(
+        required=False,
+        help_text="The UUID of the enterprise customer.",
+    )
+    enterprise_customer_slug = serializers.CharField(
+        required=False,
+        help_text="The slug of the enterprise customer.",
+    )
+
+    def create(self, validated_data):
+        return validated_data
+
+    def update(self, instance, validated_data):
+        return validated_data
+
+
+class LearnerDashboardRequestSerializer(BFFRequestSerializer):
+    """
+    Serializer for the learner dashboard request.
+    """
 
 
 class LearnerDashboardResponseSerializer(BaseLearnerPortalResponseSerializer, serializers.Serializer):

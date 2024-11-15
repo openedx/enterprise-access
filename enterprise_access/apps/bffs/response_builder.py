@@ -113,8 +113,8 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder):
         Returns:
             dict: A tuple containing the learner dashboard serialized response data and status code.
         """
-        # Initialize the response data with common learner-related fields
-        response_data = self.common_response_logic()
+        # Build common response data
+        response_data, __ = super().build()
 
         # Add specific fields related to the learner dashboard
         response_data.update({
