@@ -12,7 +12,7 @@ class EnterpriseCatalogApiClient(BaseOAuthClient):
     """
     API client for calls to the enterprise catalog service.
     """
-    api_base_url = settings.ENTERPRISE_CATALOG_URL + '/api/v1/'
+    api_base_url = settings.ENTERPRISE_CATALOG_URL + '/api/v2/'
     enterprise_catalog_endpoint = api_base_url + 'enterprise-catalogs/'
 
     @backoff.on_exception(wait_gen=backoff.expo, exception=autoretry_for_exceptions)
