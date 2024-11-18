@@ -4,7 +4,7 @@
 #
 #    make upgrade
 #
-amqp==5.2.0
+amqp==5.3.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   kombu
@@ -94,7 +94,7 @@ click-repl==0.3.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   celery
-code-annotations==1.8.0
+code-annotations==1.8.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   edx-lint
@@ -114,7 +114,7 @@ coreschema==0.0.4
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   coreapi
-coverage[toml]==7.6.4
+coverage[toml]==7.6.7
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   pytest-cov
@@ -203,7 +203,7 @@ django-rest-swagger==2.2.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
 django-simple-history==3.7.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
-django-waffle==4.1.0
+django-waffle==4.2.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   edx-django-utils
@@ -293,7 +293,7 @@ edx-toggles==5.2.0
     #   edx-event-bus-kafka
 factory-boy==3.3.1
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
-faker==30.8.2
+faker==33.0.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   factory-boy
@@ -382,7 +382,7 @@ lxml[html-clean,html_clean]==5.3.0
     # via
     #   edx-i18n-tools
     #   lxml-html-clean
-lxml-html-clean==0.3.1
+lxml-html-clean==0.4.1
     # via lxml
 markdown-it-py==3.0.0
     # via
@@ -409,7 +409,7 @@ more-itertools==10.5.0
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   jaraco-classes
     #   jaraco-functools
-mysqlclient==2.2.5
+mysqlclient==2.2.6
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
 newrelic==10.2.0
     # via
@@ -493,7 +493,7 @@ pygments==2.18.0
     #   diff-cover
     #   readme-renderer
     #   rich
-pyjwt[crypto]==2.9.0
+pyjwt[crypto]==2.10.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   drf-jwt
@@ -656,7 +656,7 @@ social-auth-core==4.5.4
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   edx-auth-backends
     #   social-auth-app-django
-sqlparse==0.5.1
+sqlparse==0.5.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   django
