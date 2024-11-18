@@ -199,7 +199,7 @@ class BaseLearnerPortalHandler(BaseHandler):
             )
             subscriptions_data = self.transform_subscriptions_result(subscriptions_result)
             self.context.data['enterprise_customer_user_subsidies'] = {
-                **self.context.data['enterprise_customer_user_subsidies'],
+                **self.enterprise_customer_user_subsidies,
                 'subscriptions': subscriptions_data,
             }
         except Exception as e:  # pylint: disable=broad-exception-caught
@@ -208,22 +208,6 @@ class BaseLearnerPortalHandler(BaseHandler):
                 user_message="An error occurred while loading subscription licenses.",
                 developer_message=f"Error: {e}",
             )
-
-    def get_subscription_licenses(self):
-        """
-        Get subscription licenses.
-        """
-        return self.context.data[
-            'enterprise_customer_user_subsidies'
-        ]['subscriptions'].get('subscription_licenses', [])
-
-    def get_subscription_licenses_by_status(self):
-        """
-        Get subscription licenses by status.
-        """
-        return self.context.data[
-            'enterprise_customer_user_subsidies'
-        ]['subscriptions'].get('subscription_licenses_by_status', {})
 
     def transform_subscription_licenses(self, subscription_licenses):
         """
@@ -284,10 +268,7 @@ class BaseLearnerPortalHandler(BaseHandler):
         This method is called after `load_subscription_licenses` to handle further actions based
         on the loaded data.
         """
-        if not (
-            self.context.data['enterprise_customer_user_subsidies']['subscriptions'] or
-            self.check_has_activated_license()
-        ):
+        if not (self.subscriptions or self.check_has_activated_license()):
             # Skip processing if:
             # - there is no subscriptions data
             # - user already has an activated license
@@ -358,9 +339,10 @@ class BaseLearnerPortalHandler(BaseHandler):
         else:
             subscription_licenses_by_status.pop('assigned', None)
 
-        self.context.data[
-            'enterprise_customer_user_subsidies'
-        ]['subscriptions']['subscription_licenses_by_status'] = subscription_licenses_by_status
+        self.context.data['enterprise_customer_user_subsidies']['subscriptions'] = {
+            **self.subscriptions,
+            'subscription_licenses_by_status': subscription_licenses_by_status,
+        }
 
         # Determine which licenses were updated
         updated_subscription_licenses = []
@@ -371,9 +353,10 @@ class BaseLearnerPortalHandler(BaseHandler):
                     break
                 updated_subscription_licenses.append(subscription_license)
 
-        self.context.data[
-            'enterprise_customer_user_subsidies'
-        ]['subscriptions']['subscription_licenses'] = updated_subscription_licenses
+        self.context.data['enterprise_customer_user_subsidies']['subscriptions'] = {
+            **self.subscriptions,
+            'subscription_licenses': updated_subscription_licenses,
+        }
 
     def check_and_auto_apply_license(self):
         """
@@ -386,8 +369,7 @@ class BaseLearnerPortalHandler(BaseHandler):
             # Skip auto-apply if user already has an activated license or assigned licenses
             return
 
-        enterprise_customer_user_subsidies = self.context.data['enterprise_customer_user_subsidies']
-        customer_agreement = enterprise_customer_user_subsidies['subscriptions'].get('customer_agreement') or {}
+        customer_agreement = self.subscriptions.get('customer_agreement') or {}
         has_subscription_plan_for_auto_apply = (
             bool(customer_agreement.get('subscription_for_auto_applied_licenses')) and
             customer_agreement.get('net_days_until_expiration') > 0
@@ -409,9 +391,13 @@ class BaseLearnerPortalHandler(BaseHandler):
                 # Update the context with the auto-applied license data
                 subscription_licenses_by_status['activated'] =\
                     self.transform_subscription_licenses([auto_applied_license])
-                self.context.data[
-                    'enterprise_customer_user_subsidies'
-                ]['subscriptions']['subscription_licenses_by_status'] = subscription_licenses_by_status
+                self.context.data['enterprise_customer_user_subsidies'] = {
+                    **self.enterprise_customer_user_subsidies,
+                    'subscriptions': {
+                        **self.subscriptions,
+                        'subscription_licenses_by_status': subscription_licenses_by_status,
+                    }
+                }
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.exception("Error auto-applying license")
             self.add_error(
@@ -444,7 +430,7 @@ class BaseLearnerPortalHandler(BaseHandler):
         needs_enrollment = default_enterprise_enrollment_intentions.get('needs_enrollment', {})
         needs_enrollment_enrollable = needs_enrollment.get('enrollable', [])
 
-        activated_subscription_licenses = self.get_subscription_licenses_by_status().get('activated', [])
+        activated_subscription_licenses = self.subscription_licenses_by_status.get('activated', [])
 
         if not (needs_enrollment_enrollable or activated_subscription_licenses):
             # Skip enrollment if there are no:
