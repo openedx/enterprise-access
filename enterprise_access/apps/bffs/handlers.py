@@ -1,5 +1,5 @@
 """"
-BFF Handlers for bffs app.
+Handlers for bffs app.
 """
 
 import logging
@@ -102,6 +102,13 @@ class BaseLearnerPortalHandler(BaseHandler):
         Get subscription licenses by status from the context.
         """
         return self.subscriptions.get('subscription_licenses_by_status', {})
+
+    @property
+    def default_enterprise_enrollment_intentions(self):
+        """
+        Get default enterprise enrollment intentions from the context.
+        """
+        return self.context.data.get('default_enterprise_enrollment_intentions', {})
 
     def load_and_process(self):
         """
@@ -353,20 +360,21 @@ class BaseLearnerPortalHandler(BaseHandler):
                     break
                 updated_subscription_licenses.append(subscription_license)
 
-        self.context.data['enterprise_customer_user_subsidies']['subscriptions'] = {
-            **self.subscriptions,
-            'subscription_licenses': updated_subscription_licenses,
-        }
+        if updated_subscription_licenses:
+            self.context.data['enterprise_customer_user_subsidies']['subscriptions'] = {
+                **self.subscriptions,
+                'subscription_licenses': updated_subscription_licenses,
+            }
 
     def check_and_auto_apply_license(self):
         """
         Check if auto-apply licenses are available and apply them to the user.
         """
         subscription_licenses_by_status = self.subscription_licenses_by_status
-        has_assigned_licenses = subscription_licenses_by_status.get('assigned', [])
+        assigned_licenses = subscription_licenses_by_status.get('assigned', [])
 
-        if has_assigned_licenses or self.check_has_activated_license():
-            # Skip auto-apply if user already has an activated license or assigned licenses
+        if assigned_licenses or self.check_has_activated_license():
+            # Skip auto-apply if user already has assigned license(s) or an already-activated license
             return
 
         customer_agreement = self.subscriptions.get('customer_agreement') or {}
@@ -374,12 +382,11 @@ class BaseLearnerPortalHandler(BaseHandler):
             bool(customer_agreement.get('subscription_for_auto_applied_licenses')) and
             customer_agreement.get('net_days_until_expiration') > 0
         )
-        enterprise_customer = self.context.data.get('enterprise_customer', {})
-        idp_or_univeral_link_enabled = (
-            enterprise_customer.get('identity_provider') or
+        has_idp_or_univeral_link_enabled = (
+            self.context.enterprise_customer.get('identity_provider') or
             customer_agreement.get('enable_auto_applied_subscriptions_with_universal_link')
         )
-        is_eligible_for_auto_apply = has_subscription_plan_for_auto_apply and idp_or_univeral_link_enabled
+        is_eligible_for_auto_apply = has_subscription_plan_for_auto_apply and has_idp_or_univeral_link_enabled
         if not is_eligible_for_auto_apply:
             # Skip auto-apply if the customer agreement does not have a subscription plan for auto-apply
             return
@@ -426,8 +433,7 @@ class BaseLearnerPortalHandler(BaseHandler):
         """
         Enroll in redeemable courses.
         """
-        default_enterprise_enrollment_intentions = self.context.data.get('default_enterprise_enrollment_intentions', {})
-        needs_enrollment = default_enterprise_enrollment_intentions.get('needs_enrollment', {})
+        needs_enrollment = self.default_enterprise_enrollment_intentions.get('needs_enrollment', {})
         needs_enrollment_enrollable = needs_enrollment.get('enrollable', [])
 
         activated_subscription_licenses = self.subscription_licenses_by_status.get('activated', [])
@@ -439,7 +445,7 @@ class BaseLearnerPortalHandler(BaseHandler):
             return
 
         redeemable_default_courses = []
-        for enrollment_intention in default_enterprise_enrollment_intentions:
+        for enrollment_intention in needs_enrollment_enrollable:
             for subscription_license in activated_subscription_licenses:
                 subscription_plan = subscription_license.get('subscription_plan', {})
                 subscription_catalog = subscription_plan.get('enterprise_catalog_uuid')

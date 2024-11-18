@@ -86,7 +86,7 @@ class HandlerContext:
 
     @property
     def enterprise_customer(self):
-        return self.data.get('enterprise_customer')
+        return self.data.get('enterprise_customer', {})
 
     def _initialize_common_context_data(self):
         """

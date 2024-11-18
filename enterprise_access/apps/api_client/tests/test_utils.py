@@ -52,6 +52,7 @@ class MockLicenseManagerMetadataMixin(MockEnterpriseMetadata):
     """
     def setUp(self):
         super().setUp()
+
         self.mock_learner_license_uuid = self.faker.uuid4()
         self.mock_learner_license_activation_uuid = self.faker.uuid4()
         self.mock_license_activation_key = self.faker.uuid4()

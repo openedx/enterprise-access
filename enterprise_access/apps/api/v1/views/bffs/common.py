@@ -3,8 +3,8 @@ Base classes for BFF views.
 """
 
 import logging
-
 from collections import OrderedDict
+
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from rest_framework import status
@@ -32,6 +32,7 @@ COMMON_BFF_QUERY_PARAMETERS = [
         location=OpenApiParameter.QUERY,
     ),
 ]
+
 
 class BaseBFFViewSet(ViewSet):
     """
