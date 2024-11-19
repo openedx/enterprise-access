@@ -53,9 +53,10 @@ class CustomerAgreementSerializer(serializers.Serializer):
 
     uuid = serializers.UUIDField()
     available_subscription_catalogs = serializers.ListField(child=serializers.UUIDField())
-    default_enterprise_catalog_uuid = serializers.UUIDField()
+    default_enterprise_catalog_uuid = serializers.UUIDField(allow_null=True)
     net_days_until_expiration = serializers.IntegerField()
     disable_expiration_notifications = serializers.BooleanField()
+    disable_onboarding_notifications = serializers.BooleanField()
     enable_auto_applied_subscriptions_with_universal_link = serializers.BooleanField()
     subscription_for_auto_applied_licenses = serializers.UUIDField(allow_null=True)
 
@@ -80,7 +81,7 @@ class SubscriptionPlanSerializer(serializers.Serializer):
     expiration_date = serializers.DateTimeField()
     days_until_expiration = serializers.IntegerField()
     days_until_expiration_including_renewals = serializers.IntegerField()
-    should_auto_apply_licenses = serializers.BooleanField()
+    should_auto_apply_licenses = serializers.BooleanField(allow_null=True)
 
     def create(self, validated_data):
         return validated_data
@@ -96,11 +97,11 @@ class SubscriptionLicenseSerializer(serializers.Serializer):
 
     uuid = serializers.UUIDField()
     status = serializers.CharField()
-    user_email = serializers.EmailField()
+    user_email = serializers.EmailField(allow_null=True)
     activation_date = serializers.DateTimeField(allow_null=True)
     last_remind_date = serializers.DateTimeField(allow_null=True)
     revoked_date = serializers.DateTimeField(allow_null=True)
-    activation_key = serializers.CharField()
+    activation_key = serializers.CharField(allow_null=True)
     subscription_plan = SubscriptionPlanSerializer()
 
     def create(self, validated_data):
@@ -177,14 +178,14 @@ class EnterpriseCourseEnrollmentSerializer(serializers.Serializer):
     course_run_status = serializers.CharField()
     display_name = serializers.CharField()
     emails_enabled = serializers.BooleanField()
-    certificate_download_url = serializers.URLField(allow_null=True)
+    certificate_download_url = serializers.CharField(allow_null=True)
     created = serializers.DateTimeField()
-    start_date = serializers.DateTimeField()
-    end_date = serializers.DateTimeField()
+    start_date = serializers.DateTimeField(allow_null=True)
+    end_date = serializers.DateTimeField(allow_null=True)
     mode = serializers.CharField()
     is_enrollment_active = serializers.BooleanField()
     product_source = serializers.CharField()
-    enroll_by = serializers.DateTimeField()
+    enroll_by = serializers.DateTimeField(allow_null=True)
     pacing = serializers.CharField()
     course_run_url = serializers.URLField()
     resume_course_run_url = serializers.URLField(allow_null=True)
