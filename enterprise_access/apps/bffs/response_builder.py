@@ -1,6 +1,8 @@
 """
 Response Builder Module for bffs app
 """
+
+from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin, LearnerDashboardDataMixin
 from enterprise_access.apps.bffs.serializers import LearnerDashboardResponseSerializer
 
 
@@ -50,7 +52,7 @@ class BaseResponseBuilder:
         return self.context.status_code
 
 
-class BaseLearnerResponseBuilder(BaseResponseBuilder):
+class BaseLearnerResponseBuilder(BaseResponseBuilder, BaseLearnerDataMixin):
     """
     A base response builder class for learner-focused routes.
 
@@ -70,8 +72,9 @@ class BaseLearnerResponseBuilder(BaseResponseBuilder):
         """
         if not response_data:
             response_data = {}
-        response_data['enterprise_customer_user_subsidies'] =\
-            self.context.data.get('enterprise_customer_user_subsidies', {})
+
+        response_data['enterprise_customer_user_subsidies'] = self.enterprise_customer_user_subsidies
+
         return response_data
 
     def build(self):
@@ -93,7 +96,7 @@ class BaseLearnerResponseBuilder(BaseResponseBuilder):
         return response_data, self.get_status_code()
 
 
-class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder):
+class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboardDataMixin):
     """
     A response builder for the learner dashboard route.
 
@@ -110,12 +113,12 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder):
         Returns:
             dict: A tuple containing the learner dashboard serialized response data and status code.
         """
-        # Initialize the response data with common learner-related fields
-        response_data = self.common_response_logic()
+        # Build common response data
+        response_data, __ = super().build()
 
         # Add specific fields related to the learner dashboard
         response_data.update({
-            'enterprise_course_enrollments': self.context.data.get('enterprise_course_enrollments', []),
+            'enterprise_course_enrollments': self.enterprise_course_enrollments,
         })
 
         # Add any errors and warnings to the response

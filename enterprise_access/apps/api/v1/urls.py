@@ -27,6 +27,10 @@ router.register(
     'assignments',
 )
 
+# BFFs
+router.register('bffs/learner', views.LearnerPortalBFFViewSet, 'learner-portal-bff')
+
+# Other endpoints
 urlpatterns = [
     path(
         'subsidy-access-policies/<uuid>/group-members',

@@ -88,6 +88,18 @@ class HandlerContext:
     def enterprise_customer(self):
         return self.data.get('enterprise_customer')
 
+    @property
+    def active_enterprise_customer(self):
+        return self.data.get('active_enterprise_customer')
+
+    @property
+    def all_linked_enterprise_customer_users(self):
+        return self.data.get('all_linked_enterprise_customer_users')
+
+    @property
+    def staff_enterprise_customer(self):
+        return self.data.get('staff_enterprise_customer')
+
     def _initialize_common_context_data(self):
         """
         Initializes common context data, like enterprise customer UUID and user ID.

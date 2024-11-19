@@ -42,7 +42,7 @@ class TestBaseHandler(TestHandlerContextMixin):
         # Define kwargs for add_warning
         arguments = {
             **self.mock_warning,
-            "status": 113  # Add an attribute that is not explicitly defined in the serializer to verify
+            "status_code": 113  # Add an attribute that is not explicitly defined in the serializer to verify
         }
         base_handler.add_warning(
             **arguments
