@@ -161,7 +161,9 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         try:
             subscriptions_result = self.license_manager_client.get_subscription_licenses_for_learner(
-                enterprise_customer_uuid=self.context.enterprise_customer_uuid
+                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+                include_revoked=True,
+                current_plans_only=False,
             )
             subscriptions_data = self.transform_subscriptions_result(subscriptions_result)
             self.context.data['enterprise_customer_user_subsidies'].update({
