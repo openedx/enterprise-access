@@ -7,6 +7,7 @@ import logging
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerUserApiClient
 from enterprise_access.apps.api_client.lms_client import LmsUserApiClient
 from enterprise_access.apps.bffs.context import HandlerContext
+from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin
 from enterprise_access.apps.bffs.serializers import EnterpriseCustomerUserSubsidiesSerializer
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ class BaseHandler:
         self.context.add_warning(**kwargs)
 
 
-class BaseLearnerPortalHandler(BaseHandler):
+class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
     """
     A base handler class for learner-focused routes.
 
@@ -67,48 +68,6 @@ class BaseLearnerPortalHandler(BaseHandler):
         # API Clients
         self.license_manager_client = LicenseManagerUserApiClient(self.context.request)
         self.lms_user_api_client = LmsUserApiClient(self.context.request)
-
-    @property
-    def enterprise_customer_user_subsidies(self):
-        """
-        Get enterprise customer user subsidies from the context.
-        """
-        return self.context.data.get('enterprise_customer_user_subsidies', {})
-
-    @property
-    def subscriptions(self):
-        """
-        Get subscriptions from the context.
-        """
-        return self.enterprise_customer_user_subsidies.get('subscriptions', {})
-
-    @property
-    def customer_agreement(self):
-        """
-        Get customer agreement from the context.
-        """
-        return self.subscriptions.get('customer_agreement', {})
-
-    @property
-    def subscription_licenses(self):
-        """
-        Get subscription licenses from the context.
-        """
-        return self.subscriptions.get('subscription_licenses', [])
-
-    @property
-    def subscription_licenses_by_status(self):
-        """
-        Get subscription licenses by status from the context.
-        """
-        return self.subscriptions.get('subscription_licenses_by_status', {})
-
-    @property
-    def default_enterprise_enrollment_intentions(self):
-        """
-        Get default enterprise enrollment intentions from the context.
-        """
-        return self.context.data.get('default_enterprise_enrollment_intentions', {})
 
     def load_and_process(self):
         """
@@ -137,11 +96,11 @@ class BaseLearnerPortalHandler(BaseHandler):
         Transform enterprise customer metadata retrieved by self.context.
         """
         for customer_record_key in ('enterprise_customer', 'active_enterprise_customer', 'staff_enterprise_customer'):
-            if not (customer_record := self.context.data.get(customer_record_key)):
+            if not (customer_record := getattr(self.context, customer_record_key, None)):
                 continue
             self.context.data[customer_record_key] = self.transform_enterprise_customer(customer_record)
 
-        if enterprise_customer_users := self.context.data.get('all_linked_enterprise_customer_users'):
+        if enterprise_customer_users := self.context.all_linked_enterprise_customer_users:
             self.context.data['all_linked_enterprise_customer_users'] = [
                 self.transform_enterprise_customer_user(enterprise_customer_user)
                 for enterprise_customer_user in enterprise_customer_users
@@ -205,10 +164,9 @@ class BaseLearnerPortalHandler(BaseHandler):
                 enterprise_customer_uuid=self.context.enterprise_customer_uuid
             )
             subscriptions_data = self.transform_subscriptions_result(subscriptions_result)
-            self.context.data['enterprise_customer_user_subsidies'] = {
-                **self.enterprise_customer_user_subsidies,
+            self.context.data['enterprise_customer_user_subsidies'].update({
                 'subscriptions': subscriptions_data,
-            }
+            })
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.exception("Error loading subscription licenses")
             self.add_error(
@@ -346,10 +304,9 @@ class BaseLearnerPortalHandler(BaseHandler):
         else:
             subscription_licenses_by_status.pop('assigned', None)
 
-        self.context.data['enterprise_customer_user_subsidies']['subscriptions'] = {
-            **self.subscriptions,
+        self.context.data['enterprise_customer_user_subsidies']['subscriptions'].update({
             'subscription_licenses_by_status': subscription_licenses_by_status,
-        }
+        })
 
         # Determine which licenses were updated
         updated_subscription_licenses = []
@@ -361,10 +318,9 @@ class BaseLearnerPortalHandler(BaseHandler):
                 updated_subscription_licenses.append(subscription_license)
 
         if updated_subscription_licenses:
-            self.context.data['enterprise_customer_user_subsidies']['subscriptions'] = {
-                **self.subscriptions,
+            self.context.data['enterprise_customer_user_subsidies']['subscriptions'].update({
                 'subscription_licenses': updated_subscription_licenses,
-            }
+            })
 
     def check_and_auto_apply_license(self):
         """
@@ -398,13 +354,9 @@ class BaseLearnerPortalHandler(BaseHandler):
                 # Update the context with the auto-applied license data
                 subscription_licenses_by_status['activated'] =\
                     self.transform_subscription_licenses([auto_applied_license])
-                self.context.data['enterprise_customer_user_subsidies'] = {
-                    **self.enterprise_customer_user_subsidies,
-                    'subscriptions': {
-                        **self.subscriptions,
-                        'subscription_licenses_by_status': subscription_licenses_by_status,
-                    }
-                }
+                self.context.data['enterprise_customer_user_subsidies']['subscriptions'].update({
+                    'subscription_licenses_by_status': subscription_licenses_by_status,
+                })
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.exception("Error auto-applying license")
             self.add_error(
