@@ -56,7 +56,6 @@ class CustomerAgreementSerializer(serializers.Serializer):
     default_enterprise_catalog_uuid = serializers.UUIDField(allow_null=True)
     net_days_until_expiration = serializers.IntegerField()
     disable_expiration_notifications = serializers.BooleanField()
-    disable_onboarding_notifications = serializers.BooleanField()
     enable_auto_applied_subscriptions_with_universal_link = serializers.BooleanField()
     subscription_for_auto_applied_licenses = serializers.UUIDField(allow_null=True)
 
