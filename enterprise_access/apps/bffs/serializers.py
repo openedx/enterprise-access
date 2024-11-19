@@ -53,7 +53,7 @@ class CustomerAgreementSerializer(serializers.Serializer):
 
     uuid = serializers.UUIDField()
     available_subscription_catalogs = serializers.ListField(child=serializers.UUIDField())
-    default_enterprise_catalog_uuid = serializers.UUIDField(required=False)
+    default_enterprise_catalog_uuid = serializers.UUIDField(allow_null=True)
     net_days_until_expiration = serializers.IntegerField()
     disable_expiration_notifications = serializers.BooleanField()
     enable_auto_applied_subscriptions_with_universal_link = serializers.BooleanField()
