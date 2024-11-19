@@ -78,7 +78,7 @@ class LicenseManagerUserApiClient(BaseUserApiClient):
     def auto_apply_license_endpoint(self, customer_agreement_uuid):
         return f"{self.api_base_url}customer-agreement/{customer_agreement_uuid}/auto-apply/"
 
-    def get_subscription_licenses_for_learner(self, enterprise_customer_uuid):
+    def get_subscription_licenses_for_learner(self, enterprise_customer_uuid, **kwargs):
         """
         Get subscription licenses for a learner.
 
@@ -89,6 +89,7 @@ class LicenseManagerUserApiClient(BaseUserApiClient):
         """
         query_params = {
             'enterprise_customer_uuid': enterprise_customer_uuid,
+            **kwargs,
         }
         url = self.learner_licenses_endpoint
         try:
