@@ -4,7 +4,7 @@
 #
 #    make upgrade
 #
-amqp==5.2.0
+amqp==5.3.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   kombu
@@ -80,7 +80,7 @@ click-repl==0.3.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   celery
-code-annotations==1.8.0
+code-annotations==1.8.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   -r requirements/test.in
@@ -99,7 +99,7 @@ coreschema==0.0.4
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   coreapi
-coverage[toml]==7.6.4
+coverage[toml]==7.6.7
     # via
     #   -r requirements/test.in
     #   pytest-cov
@@ -177,7 +177,7 @@ django-rest-swagger==2.2.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
 django-simple-history==3.7.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
-django-waffle==4.1.0
+django-waffle==4.2.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   edx-django-utils
@@ -261,7 +261,7 @@ edx-toggles==5.2.0
     #   edx-event-bus-kafka
 factory-boy==3.3.1
     # via -r requirements/test.in
-faker==30.8.2
+faker==33.0.0
     # via factory-boy
 fastavro==1.9.7
     # via
@@ -323,7 +323,7 @@ monotonic==1.6
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   analytics-python
-mysqlclient==2.2.5
+mysqlclient==2.2.6
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
 newrelic==10.2.0
     # via
@@ -380,7 +380,7 @@ pycparser==2.22
     #   cffi
 pygments==2.18.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
-pyjwt[crypto]==2.9.0
+pyjwt[crypto]==2.10.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   drf-jwt
@@ -502,7 +502,7 @@ social-auth-core==4.5.4
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   edx-auth-backends
     #   social-auth-app-django
-sqlparse==0.5.1
+sqlparse==0.5.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   django
