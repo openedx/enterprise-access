@@ -24,9 +24,9 @@ class TestHandlerContextMixin(TestCase):
         self.mock_staff_user = UserFactory(is_staff=True)
         self.faker = Faker()
 
-        self.mock_enterprise_customer_uuid = self.faker.uuid4()
+        self.mock_enterprise_customer_uuid = str(self.faker.uuid4())
         self.mock_enterprise_customer_slug = 'mock-slug'
-        self.mock_enterprise_customer_uuid_2 = self.faker.uuid4()
+        self.mock_enterprise_customer_uuid_2 = str(self.faker.uuid4())
         self.mock_enterprise_customer_slug_2 = 'mock-slug-2'
 
         # Mock request

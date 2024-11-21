@@ -56,7 +56,6 @@ SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:subsidy-access-policies-li
 TEST_ENTERPRISE_UUID = uuid4()
 
 
-# pylint: disable=missing-function-docstring
 class CRUDViewTestMixin:
     """
     Mixin to set some basic state for test classes that cover the

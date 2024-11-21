@@ -140,12 +140,12 @@ class HandlerContext:
                 self.user.username,
                 traverse_pagination=True
             )
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as exc:
             self.add_error(
                 user_message='Error retrieving linked enterprise customers',
-                developer_message=str(e)
+                developer_message=f'Error: {exc}'
             )
-            return
+            raise exc
 
         # Set enterprise features from the response
         self._enterprise_features = enterprise_customer_users_data.get('enterprise_features', {})

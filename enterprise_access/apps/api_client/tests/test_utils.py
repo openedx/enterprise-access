@@ -53,12 +53,12 @@ class MockLicenseManagerMetadataMixin(MockEnterpriseMetadata):
     def setUp(self):
         super().setUp()
 
-        self.mock_learner_license_uuid = self.faker.uuid4()
-        self.mock_learner_license_activation_uuid = self.faker.uuid4()
-        self.mock_license_activation_key = self.faker.uuid4()
-        self.mock_auto_apply_uuid = self.faker.uuid4()
-        self.mock_subscription_plan_uuid = self.faker.uuid4()
-        self.mock_customer_agreement_uuid = self.faker.uuid4()
+        self.mock_learner_license_uuid = str(self.faker.uuid4())
+        self.mock_learner_license_activation_uuid = str(self.faker.uuid4())
+        self.mock_license_activation_key = str(self.faker.uuid4())
+        self.mock_auto_apply_uuid = str(self.faker.uuid4())
+        self.mock_subscription_plan_uuid = str(self.faker.uuid4())
+        self.mock_customer_agreement_uuid = str(self.faker.uuid4())
 
         self.mock_subscription_plan = {
             "title": "mock_title",
@@ -88,11 +88,11 @@ class MockLicenseManagerMetadataMixin(MockEnterpriseMetadata):
                 self.mock_enterprise_catalog_uuid,
             ],
             "enable_auto_applied_subscriptions_with_universal_link": False,
-            "has_custom_license_expiration_messaging": False,
-            "modal_header_text": None,
-            "expired_subscription_modal_messaging": None,
-            "button_label_in_modal": None,
-            "url_for_button_in_modal": None
+            "has_custom_license_expiration_messaging_v2": False,
+            "modal_header_text_v2": None,
+            "expired_subscription_modal_messaging_v2": None,
+            "button_label_in_modal_v2": None,
+            "url_for_button_in_modal_v2": None
         }
         self.mock_subscription_license = {
             "uuid": self.mock_learner_license_activation_uuid,
@@ -104,10 +104,6 @@ class MockLicenseManagerMetadataMixin(MockEnterpriseMetadata):
             "revoked_date": None,
             "activation_key": self.mock_license_activation_key,
             "subscription_plan": self.mock_subscription_plan
-        }
-        self.mock_learner_license_activation_response = {
-            **self.mock_subscription_license,
-            "uuid": self.mock_learner_license_activation_uuid,
         }
         self.mock_learner_license_auto_apply_response = {
             **self.mock_subscription_license,

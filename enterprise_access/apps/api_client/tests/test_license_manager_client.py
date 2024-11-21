@@ -121,7 +121,7 @@ class TestLicenseManagerUserApiClient(MockLicenseManagerMetadataMixin):
     @mock.patch('requests.Session.send')
     @mock.patch('crum.get_current_request')
     def test_activate_license(self, mock_crum_get_current_request, mock_send):
-        expected_result = self.mock_learner_license_activation_response
+        expected_result = self.mock_subscription_license
         expected_url = LicenseManagerUserApiClient.license_activation_endpoint
 
         request = self.factory.post(expected_url)

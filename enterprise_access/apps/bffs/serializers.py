@@ -58,6 +58,10 @@ class CustomerAgreementSerializer(serializers.Serializer):
     disable_expiration_notifications = serializers.BooleanField()
     enable_auto_applied_subscriptions_with_universal_link = serializers.BooleanField()
     subscription_for_auto_applied_licenses = serializers.UUIDField(allow_null=True)
+    has_custom_license_expiration_messaging_v2 = serializers.BooleanField()
+    button_label_in_modal_v2 = serializers.CharField(allow_null=True)
+    expired_subscription_modal_messaging_v2 = serializers.CharField(allow_null=True)
+    modal_header_text_v2 = serializers.CharField(allow_null=True)
 
     def create(self, validated_data):
         return validated_data
@@ -132,9 +136,9 @@ class SubscriptionsSerializer(serializers.Serializer):
     Serializer for enterprise customer user subsidies.
     """
 
-    customer_agreement = CustomerAgreementSerializer(required=False)
+    customer_agreement = CustomerAgreementSerializer(required=False, allow_null=True)
     subscription_licenses = SubscriptionLicenseSerializer(many=True, required=False, default=list)
-    subscription_licenses_by_status = SubscriptionLicenseStatusSerializer()
+    subscription_licenses_by_status = SubscriptionLicenseStatusSerializer(required=False)
 
     def create(self, validated_data):
         return validated_data
@@ -189,6 +193,10 @@ class EnterpriseCourseEnrollmentSerializer(serializers.Serializer):
     course_run_url = serializers.URLField()
     resume_course_run_url = serializers.URLField(allow_null=True)
     is_revoked = serializers.BooleanField()
+    due_dates = serializers.ListField(
+        child=serializers.DictField(),
+        allow_empty=True,
+    )
 
     def create(self, validated_data):
         return validated_data

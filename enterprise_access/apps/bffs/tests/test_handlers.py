@@ -102,17 +102,17 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
 
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     @mock.patch(
-        'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
-        '.get_default_enterprise_enrollment_intentions_learner_status'
-    )
-    @mock.patch(
         'enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient'
         '.get_subscription_licenses_for_learner'
     )
+    @mock.patch(
+        'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
+        '.get_default_enterprise_enrollment_intentions_learner_status'
+    )
     def test_load_and_process(
         self,
-        mock_get_subscription_licenses_for_learner,
         mock_get_default_enrollment_intentions_learner_status,
+        mock_get_subscription_licenses_for_learner,
         mock_get_enterprise_customers_for_user,
     ):
         """
