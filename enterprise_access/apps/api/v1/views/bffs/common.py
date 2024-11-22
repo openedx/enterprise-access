@@ -78,10 +78,12 @@ class BaseBFFViewSet(ViewSet):
 
         ordered_representation = OrderedDict(response_data)
 
-        # Remove errors and warnings from the response, and add them back at the end
+        # Remove errors/warnings & enterprise_features from the response, and add them back at the end
         errors = ordered_representation.pop('errors', [])
         warnings = ordered_representation.pop('warnings', [])
+        enterprise_features = ordered_representation.pop('enterprise_features', {})
         ordered_representation['errors'] = errors
         ordered_representation['warnings'] = warnings
+        ordered_representation['enterprise_features'] = enterprise_features
 
         return dict(ordered_representation), status_code

@@ -14,13 +14,27 @@ from enterprise_access.apps.bffs.tests.utils import TestHandlerContextMixin
 
 @ddt.ddt
 class TestBaseResponseBuilder(TestHandlerContextMixin):
+    """
+    Tests for BaseResponseBuilder.
+    """
 
     @mock.patch('enterprise_access.apps.bffs.context.HandlerContext')
     def test_base_build_error(self, mock_handler_context):
-        mock_handler_context.return_value = self.mock_handler_context
-        base_response_builder = BaseResponseBuilder(mock_handler_context)
-        with self.assertRaises(NotImplementedError):
-            base_response_builder.build()
+        mock_context_data = {
+            'enterprise_customer': self.mock_enterprise_customer,
+        }
+        mock_handler_context.return_value = self.get_mock_handler_context(
+            data=mock_context_data,
+        )
+        mock_handler_context_instance = mock_handler_context.return_value
+        base_response_builder = BaseResponseBuilder(mock_handler_context_instance)
+        response_data, status_code = base_response_builder.build()
+        expected_response_data = {
+            'enterprise_customer': self.mock_enterprise_customer,
+            'enterprise_features': {'feature_flag': True},
+        }
+        self.assertEqual(response_data, expected_response_data)
+        self.assertEqual(status_code, status.HTTP_200_OK)
 
     @ddt.data(
         {
@@ -43,14 +57,17 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
     @mock.patch('enterprise_access.apps.bffs.context.HandlerContext')
     @ddt.unpack
     def test_add_errors_warnings_to_response(self, mock_handler_context, errors, warnings):
-        mock_handler_context.return_value = self.mock_handler_context
+        mock_context_data = {
+            'enterprise_customer': self.mock_enterprise_customer,
+        }
+        mock_handler_context.return_value = self.get_mock_handler_context(
+            data=mock_context_data,
+        )
         mock_handler_context_instance = mock_handler_context.return_value
         base_response_builder = BaseResponseBuilder(mock_handler_context_instance)
-        sample_response = {
-            "some_existing_metadata": "should_still_exist"
-        }
         expected_output = {
-            **sample_response,
+            'enterprise_customer': self.mock_enterprise_customer,
+            'enterprise_features': {'feature_flag': True},
             'errors': [],
             'warnings': [],
         }
@@ -61,7 +78,8 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
         if warnings:
             mock_handler_context_instance.warnings.append(self.mock_warning)
             expected_output['warnings'] = [self.mock_warning]
-        response_data = base_response_builder.add_errors_warnings_to_response(sample_response)
+        base_response_builder.add_errors_warnings_to_response()
+        response_data, _ = base_response_builder.build()
         self.assertEqual(response_data, expected_output)
 
     # TODO Revisit this function in ENT-9633 to determine if 200 is ok for a nested errored response
@@ -75,7 +93,7 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
     )
     @mock.patch('enterprise_access.apps.bffs.context.HandlerContext')
     @ddt.unpack
-    def test_get_status_code(self, mock_handler_context, status_code):
+    def test_status_code(self, mock_handler_context, status_code):
         if status_code:
             mock_handler_context.return_value = self.get_mock_handler_context(
                 _status_code=status_code
@@ -85,7 +103,7 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
         mock_handler_context_instance = mock_handler_context.return_value
         base_response_builder = BaseResponseBuilder(mock_handler_context_instance)
         expected_output = status_code if status_code else status.HTTP_200_OK
-        response_status_code = base_response_builder.get_status_code()
+        response_status_code = base_response_builder.status_code
         self.assertEqual(response_status_code, expected_output)
 
 
@@ -109,9 +127,13 @@ class TestBaseLearnerResponseBuilder(TestBaseResponseBuilder, MockLicenseManager
     @mock.patch('enterprise_access.apps.bffs.context.HandlerContext')
     @ddt.unpack
     def test_build(self, mock_handler_context, has_subscriptions_data):
-        mock_handler_context.return_value = self.mock_handler_context
+        mock_context_data = {
+            'enterprise_customer': self.mock_enterprise_customer,
+        }
+        mock_handler_context.return_value = self.get_mock_handler_context(
+            data=mock_context_data,
+        )
         mock_handler_context_instance = mock_handler_context.return_value
-
         base_learner_response_builder = BaseLearnerResponseBuilder(mock_handler_context_instance)
         mock_subscriptions_data = {
             "customer_agreement": None,
@@ -139,6 +161,8 @@ class TestBaseLearnerResponseBuilder(TestBaseResponseBuilder, MockLicenseManager
         }
 
         expected_response = {
+            'enterprise_customer': self.mock_enterprise_customer,
+            'enterprise_features': {'feature_flag': True},
             'enterprise_customer_user_subsidies': {
                 'subscriptions': mock_subscriptions_data,
             },

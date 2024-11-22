@@ -5,7 +5,19 @@ Serializers for bffs.
 from rest_framework import serializers
 
 
-class BaseBFFMessageSerializer(serializers.Serializer):
+class BaseBffSerializer(serializers.Serializer):
+    """
+    Base Serializer for BFF.
+    """
+
+    def create(self, validated_data):
+        return validated_data
+
+    def update(self, instance, validated_data):
+        return validated_data
+
+
+class BaseBFFMessageSerializer(BaseBffSerializer):
     """
     Base Serializer for BFF messages.
 
@@ -16,12 +28,6 @@ class BaseBFFMessageSerializer(serializers.Serializer):
     developer_message = serializers.CharField()
     user_message = serializers.CharField()
 
-    def create(self, validated_data):
-        return validated_data
-
-    def update(self, instance, validated_data):
-        return validated_data
-
 
 class ErrorSerializer(BaseBFFMessageSerializer):
     pass
@@ -31,22 +37,133 @@ class WarningSerializer(BaseBFFMessageSerializer):
     pass
 
 
-class BaseResponseSerializer(serializers.Serializer):
+class EnterpriseCustomerSiteSerializer(BaseBffSerializer):
+    """
+    Serializer for enterprise customer site.
+    """
+
+    domain = serializers.CharField()
+    name = serializers.CharField()
+
+
+class EnterpriseCustomerBrandingConfiguration(BaseBffSerializer):
+    """
+    Serializer for enterprise customer branding configuration.
+    """
+
+    logo = serializers.URLField(required=False, allow_null=True)
+    primary_color = serializers.CharField()
+    secondary_color = serializers.CharField()
+    tertiary_color = serializers.CharField()
+
+
+class EnterpriseCustomerNotificationBanner(BaseBffSerializer):
+    """
+    Serializer for enterprise customer notification banner.
+    """
+    title = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    text = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+
+
+class EnterpriseCustomerAdminUser(BaseBffSerializer):
+    """
+    Serializer for enterprise customer admin user.
+    """
+    email = serializers.EmailField(required=False, allow_null=True)
+    lms_user_id = serializers.IntegerField()
+
+
+class EnterpriseCustomerActiveIntegration(BaseBffSerializer):
+    """
+    Serializer for enterprise customer integration.
+    """
+    channel_code = serializers.CharField()
+    created = serializers.DateTimeField()
+    modified = serializers.DateTimeField()
+    display_name = serializers.CharField()
+    active = serializers.BooleanField()
+
+
+class EnterpriseCustomerIdentityProvider(BaseBffSerializer):
+    """
+    Serializer for enterprise customer identity provider.
+    """
+    provider_id = serializers.CharField()
+    default_provider = serializers.BooleanField()
+
+
+class EnterpriseCustomerSerializer(BaseBffSerializer):
+    """
+    Serializer for enterprise customer.
+    """
+
+    uuid = serializers.UUIDField()
+    slug = serializers.CharField()
+    name = serializers.CharField()
+    active = serializers.BooleanField()
+    auth_org_id = serializers.CharField(required=False, allow_null=True)
+    site = EnterpriseCustomerSiteSerializer()
+    branding_configuration = EnterpriseCustomerBrandingConfiguration()
+    identity_provider = serializers.CharField(required=False, allow_null=True)
+    identity_providers = serializers.ListField(child=EnterpriseCustomerIdentityProvider(), required=False, default=list)
+    enable_data_sharing_consent = serializers.BooleanField()
+    enforce_data_sharing_consent = serializers.CharField()
+    disable_expiry_messaging_for_learner_credit = serializers.BooleanField()
+    enable_audit_enrollment = serializers.BooleanField()
+    replace_sensitive_sso_username = serializers.BooleanField()
+    enable_portal_code_management_screen = serializers.BooleanField()
+    sync_learner_profile_data = serializers.BooleanField()
+    enable_audit_data_reporting = serializers.BooleanField()
+    enable_learner_portal = serializers.BooleanField()
+    enable_learner_portal_offers = serializers.BooleanField()
+    enable_portal_learner_credit_management_screen = serializers.BooleanField()
+    enable_executive_education_2U_fulfillment = serializers.BooleanField()
+    enable_portal_reporting_config_screen = serializers.BooleanField()
+    enable_portal_saml_configuration_screen = serializers.BooleanField()
+    contact_email = serializers.EmailField(required=False, allow_null=True)
+    enable_portal_subscription_management_screen = serializers.BooleanField()
+    hide_course_original_price = serializers.BooleanField()
+    enable_analytics_screen = serializers.BooleanField()
+    enable_integrated_customer_learner_portal_search = serializers.BooleanField()
+    enable_generation_of_api_credentials = serializers.BooleanField()
+    enable_portal_lms_configurations_screen = serializers.BooleanField()
+    sender_alias = serializers.CharField(required=False, allow_null=True)
+    enterprise_customer_catalogs = serializers.ListField(child=serializers.UUIDField(), required=False, default=list)
+    reply_to = serializers.EmailField(required=False, allow_null=True)
+    enterprise_notification_banner = EnterpriseCustomerNotificationBanner(required=False, allow_null=True)
+    hide_labor_market_data = serializers.BooleanField()
+    modified = serializers.DateTimeField()
+    enable_universal_link = serializers.BooleanField()
+    enable_browse_and_request = serializers.BooleanField()
+    admin_users = EnterpriseCustomerAdminUser(many=True, required=False, default=list)
+    enable_learner_portal_sidebar_message = serializers.BooleanField()
+    learner_portal_sidebar_content = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    enable_pathways = serializers.BooleanField()
+    enable_programs = serializers.BooleanField()
+    enable_demo_data_for_analytics_and_lpr = serializers.BooleanField()
+    enable_academies = serializers.BooleanField()
+    enable_one_academy = serializers.BooleanField()
+    active_integrations = EnterpriseCustomerActiveIntegration(many=True, required=False, default=list)
+    show_videos_in_learner_portal_search_results = serializers.BooleanField()
+    default_language = serializers.CharField(required=False, allow_null=True)
+    country = serializers.CharField()
+    enable_slug_login = serializers.BooleanField()
+    disable_search = serializers.BooleanField()
+    show_integration_warning = serializers.BooleanField()
+
+
+class BaseResponseSerializer(BaseBffSerializer):
     """
     Serializer for base response.
     """
 
+    enterprise_customer = EnterpriseCustomerSerializer()
     errors = ErrorSerializer(many=True, required=False, default=list)
     warnings = WarningSerializer(many=True, required=False, default=list)
-
-    def create(self, validated_data):
-        return validated_data
-
-    def update(self, instance, validated_data):
-        return validated_data
+    enterprise_features = serializers.DictField(required=False, default=dict)
 
 
-class CustomerAgreementSerializer(serializers.Serializer):
+class CustomerAgreementSerializer(BaseBffSerializer):
     """
     Serializer for customer agreement.
     """
@@ -58,19 +175,13 @@ class CustomerAgreementSerializer(serializers.Serializer):
     disable_expiration_notifications = serializers.BooleanField()
     enable_auto_applied_subscriptions_with_universal_link = serializers.BooleanField()
     subscription_for_auto_applied_licenses = serializers.UUIDField(allow_null=True)
-    has_custom_license_expiration_messaging_v2 = serializers.BooleanField()
-    button_label_in_modal_v2 = serializers.CharField(allow_null=True)
-    expired_subscription_modal_messaging_v2 = serializers.CharField(allow_null=True)
-    modal_header_text_v2 = serializers.CharField(allow_null=True)
-
-    def create(self, validated_data):
-        return validated_data
-
-    def update(self, instance, validated_data):
-        return validated_data
+    has_custom_license_expiration_messaging_v2 = serializers.BooleanField(required=False, default=False)
+    button_label_in_modal_v2 = serializers.CharField(required=False, allow_null=True)
+    expired_subscription_modal_messaging_v2 = serializers.CharField(required=False, allow_null=True)
+    modal_header_text_v2 = serializers.CharField(required=False, allow_null=True)
 
 
-class SubscriptionPlanSerializer(serializers.Serializer):
+class SubscriptionPlanSerializer(BaseBffSerializer):
     """
     Serializer for subscription plan.
     """
@@ -86,14 +197,8 @@ class SubscriptionPlanSerializer(serializers.Serializer):
     days_until_expiration_including_renewals = serializers.IntegerField()
     should_auto_apply_licenses = serializers.BooleanField(allow_null=True)
 
-    def create(self, validated_data):
-        return validated_data
 
-    def update(self, instance, validated_data):
-        return validated_data
-
-
-class SubscriptionLicenseSerializer(serializers.Serializer):
+class SubscriptionLicenseSerializer(BaseBffSerializer):
     """
     Serializer for subscription license.
     """
@@ -107,14 +212,8 @@ class SubscriptionLicenseSerializer(serializers.Serializer):
     activation_key = serializers.CharField(allow_null=True)
     subscription_plan = SubscriptionPlanSerializer()
 
-    def create(self, validated_data):
-        return validated_data
 
-    def update(self, instance, validated_data):
-        return validated_data
-
-
-class SubscriptionLicenseStatusSerializer(serializers.Serializer):
+class SubscriptionLicenseStatusSerializer(BaseBffSerializer):
     """
     Serializer for subscription license status.
     """
@@ -124,14 +223,8 @@ class SubscriptionLicenseStatusSerializer(serializers.Serializer):
     expired = SubscriptionLicenseSerializer(many=True, required=False, default=list)
     revoked = SubscriptionLicenseSerializer(many=True, required=False, default=list)
 
-    def create(self, validated_data):
-        return validated_data
 
-    def update(self, instance, validated_data):
-        return validated_data
-
-
-class SubscriptionsSerializer(serializers.Serializer):
+class SubscriptionsSerializer(BaseBffSerializer):
     """
     Serializer for enterprise customer user subsidies.
     """
@@ -140,28 +233,16 @@ class SubscriptionsSerializer(serializers.Serializer):
     subscription_licenses = SubscriptionLicenseSerializer(many=True, required=False, default=list)
     subscription_licenses_by_status = SubscriptionLicenseStatusSerializer(required=False)
 
-    def create(self, validated_data):
-        return validated_data
 
-    def update(self, instance, validated_data):
-        return validated_data
-
-
-class EnterpriseCustomerUserSubsidiesSerializer(serializers.Serializer):
+class EnterpriseCustomerUserSubsidiesSerializer(BaseBffSerializer):
     """
     Serializer for enterprise customer user subsidies.
     """
 
     subscriptions = SubscriptionsSerializer()
 
-    def create(self, validated_data):
-        return validated_data
 
-    def update(self, instance, validated_data):
-        return validated_data
-
-
-class BaseLearnerPortalResponseSerializer(BaseResponseSerializer, serializers.Serializer):
+class BaseLearnerPortalResponseSerializer(BaseResponseSerializer):
     """
     Serializer for base learner portal response.
     """
@@ -169,7 +250,7 @@ class BaseLearnerPortalResponseSerializer(BaseResponseSerializer, serializers.Se
     enterprise_customer_user_subsidies = EnterpriseCustomerUserSubsidiesSerializer()
 
 
-class EnterpriseCourseEnrollmentSerializer(serializers.Serializer):
+class EnterpriseCourseEnrollmentSerializer(BaseBffSerializer):
     """
     Serializer for enterprise course enrollment.
     """
@@ -198,14 +279,8 @@ class EnterpriseCourseEnrollmentSerializer(serializers.Serializer):
         allow_empty=True,
     )
 
-    def create(self, validated_data):
-        return validated_data
 
-    def update(self, instance, validated_data):
-        return validated_data
-
-
-class BFFRequestSerializer(serializers.Serializer):
+class BFFRequestSerializer(BaseBffSerializer):
     """
     Serializer for the BFF request.
     """
@@ -219,12 +294,6 @@ class BFFRequestSerializer(serializers.Serializer):
         help_text="The slug of the enterprise customer.",
     )
 
-    def create(self, validated_data):
-        return validated_data
-
-    def update(self, instance, validated_data):
-        return validated_data
-
 
 class LearnerDashboardRequestSerializer(BFFRequestSerializer):
     """
@@ -232,7 +301,7 @@ class LearnerDashboardRequestSerializer(BFFRequestSerializer):
     """
 
 
-class LearnerDashboardResponseSerializer(BaseLearnerPortalResponseSerializer, serializers.Serializer):
+class LearnerDashboardResponseSerializer(BaseLearnerPortalResponseSerializer):
     """
     Serializer for the learner dashboard response.
     """

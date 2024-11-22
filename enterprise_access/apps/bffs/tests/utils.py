@@ -44,12 +44,75 @@ class TestHandlerContextMixin(TestCase):
         self.mock_enterprise_customer = {
             'uuid': self.mock_enterprise_customer_uuid,
             'slug': self.mock_enterprise_customer_slug,
+            'active': True,
+            'name': 'Mock Enterprise Customer',
             'enable_learner_portal': True,
+            'site': {
+                'domain': 'edX.org',
+                'name': 'edX',
+            },
+            'branding_configuration': {
+                'logo': 'https://edx.org/logo.png',
+                'primary_color': '#000000',
+                'secondary_color': '#000000',
+                'tertiary_color': '#000000',
+            },
+            'enable_data_sharing_consent': True,
+            'enforce_data_sharing_consent': 'at_enrollment',
+            'disable_expiry_messaging_for_learner_credit': False,
+            'enable_audit_enrollment': False,
+            'replace_sensitive_sso_username': False,
+            'enable_portal_code_management_screen': True,
+            'sync_learner_profile_data': False,
+            'enable_audit_data_reporting': False,
+            'enable_learner_portal_offers': False,
+            'enable_portal_learner_credit_management_screen': True,
+            'enable_executive_education_2U_fulfillment': True,
+            'enable_portal_reporting_config_screen': True,
+            'enable_portal_saml_configuration_screen': True,
+            'enable_portal_subscription_management_screen': True,
+            'hide_course_original_price': False,
+            'enable_analytics_screen': True,
+            'enable_integrated_customer_learner_portal_search': True,
+            'enable_generation_of_api_credentials': False,
+            'enable_portal_lms_configurations_screen': True,
+            'hide_labor_market_data': False,
+            'modified': '2024-11-22T12:00:00Z',
+            'enable_universal_link': True,
+            'enable_browse_and_request': True,
+            'enable_learner_portal_sidebar_message': False,
+            'learner_portal_sidebar_content': None,
+            'enable_pathways': True,
+            'enable_programs': True,
+            'enable_demo_data_for_analytics_and_lpr': False,
+            'enable_academies': True,
+            'enable_one_academy': False,
+            'show_videos_in_learner_portal_search_results': True,
+            'country': 'US',
+            'enable_slug_login': False,
+            'admin_users': [{
+                'email': 'admin@example.com',
+                'lms_user_id': 12,
+            }],
+            'active_integrations': [],
+            'enterprise_customer_catalogs': [],
+            'identity_provider': 'mock_idp',
+            'identity_providers': [{
+                'provider_id': 'mock_idp',
+                'default_provider': True,
+            }],
+            'contact_email': None,
+            'auth_org_id': None,
+            'default_language': None,
+            'enterprise_notification_banner': None,
+            'reply_to': None,
+            'sender_alias': None,
         }
         self.mock_enterprise_customer_2 = {
+            **self.mock_enterprise_customer,
             'uuid': self.mock_enterprise_customer_uuid_2,
             'slug': self.mock_enterprise_customer_slug_2,
-            'enable_learner_portal': True,
+            'name': 'Mock Enterprise Customer 2',
         }
         self.mock_enterprise_learner_response_data = {
             'results': [
@@ -87,7 +150,7 @@ class TestHandlerContextMixin(TestCase):
             '_enterprise_customer_uuid': self.mock_enterprise_customer_uuid,
             '_enterprise_customer_slug': self.mock_enterprise_customer_slug,
             '_lms_user_id': self.request.user.lms_user_id,
-            '_enterprise_features': {'feature_a': True},
+            '_enterprise_features': {'feature_flag': True},
             'data': {},
         }
 
@@ -98,6 +161,7 @@ class TestHandlerContextMixin(TestCase):
         mock_handler_context = mock.MagicMock(**default_values)
 
         # Define a dictionary of private attributes to property names
+        mock_property_enterprise_customer = getattr(mock_handler_context, 'data').get('enterprise_customer')
         property_mocks = {
             'request': getattr(mock_handler_context, '_request'),
             'status_code': getattr(mock_handler_context, '_status_code'),
@@ -105,6 +169,7 @@ class TestHandlerContextMixin(TestCase):
             'warnings': getattr(mock_handler_context, '_warnings'),
             'enterprise_customer_uuid': getattr(mock_handler_context, '_enterprise_customer_uuid'),
             'enterprise_customer_slug': getattr(mock_handler_context, '_enterprise_customer_slug'),
+            'enterprise_customer': mock_property_enterprise_customer,
             'lms_user_id': getattr(mock_handler_context, '_lms_user_id'),
             'enterprise_features': getattr(mock_handler_context, '_enterprise_features'),
         }
