@@ -26,6 +26,7 @@ class BaseResponseBuilder:
             context (HandlerContext): The context object containing data, errors, and request information.
         """
         self.context = context
+        self.response_data = {}
 
     def build(self):
         """
@@ -35,15 +36,16 @@ class BaseResponseBuilder:
         Returns:
             dict: A dictionary containing the response data.
         """
-        raise NotImplementedError("Subclasses must implement the `build` method.")
+        self.response_data['enterprise_customer'] = self.context.enterprise_customer
+        self.response_data['enterprise_features'] = self.context.enterprise_features
+        return self.response_data, self.get_status_code()
 
-    def add_errors_warnings_to_response(self, response_data):
+    def add_errors_warnings_to_response(self):
         """
         Adds any errors to the response data.
         """
-        response_data['errors'] = self.context.errors
-        response_data['warnings'] = self.context.warnings
-        return response_data
+        self.response_data['errors'] = self.context.errors
+        self.response_data['warnings'] = self.context.warnings
 
     # TODO Revisit this function in ENT-9633 to determine if 200 is ok for a nested errored response
     def get_status_code(self):
@@ -64,7 +66,7 @@ class BaseLearnerResponseBuilder(BaseResponseBuilder, BaseLearnerDataMixin):
     for building responses across all learner-focused page routes.
     """
 
-    def common_response_logic(self, response_data=None):
+    def common_response_logic(self):
         """
         Applies common response logic for learner-related responses.
 
@@ -74,12 +76,7 @@ class BaseLearnerResponseBuilder(BaseResponseBuilder, BaseLearnerDataMixin):
         Returns:
             dict: The modified response data with common logic applied.
         """
-        if not response_data:
-            response_data = {}
-
-        response_data['enterprise_customer_user_subsidies'] = self.enterprise_customer_user_subsidies
-
-        return response_data
+        self.response_data['enterprise_customer_user_subsidies'] = self.enterprise_customer_user_subsidies
 
     def build(self):
         """
@@ -90,14 +87,16 @@ class BaseLearnerResponseBuilder(BaseResponseBuilder, BaseLearnerDataMixin):
         Returns:
             dict: A tuple containing the base response data and status code.
         """
+        super().build()
+
         # Initialize response data with common learner-related logic
-        response_data = self.common_response_logic()
+        self.common_response_logic()
 
         # Add any errors, etc.
-        response_data = self.add_errors_warnings_to_response(response_data)
+        self.add_errors_warnings_to_response()
 
         # Return the response data and status code
-        return response_data, self.get_status_code()
+        return self.response_data, self.get_status_code()
 
 
 class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboardDataMixin):
@@ -118,19 +117,21 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
             dict: A tuple containing the learner dashboard serialized response data and status code.
         """
         # Build common response data
-        response_data, __ = super().build()
+        super().build()
 
         # Add specific fields related to the learner dashboard
-        response_data.update({
+        self.response_data.update({
             'enterprise_course_enrollments': self.enterprise_course_enrollments,
         })
 
+        print('DEBUG?! LearnerDashboardResponseBuilder response_data:', self.response_data)
+
         # Add any errors and warnings to the response
-        response_data = self.add_errors_warnings_to_response(response_data)
+        self.add_errors_warnings_to_response()
 
         # Serialize and validate the response
         try:
-            serializer = LearnerDashboardResponseSerializer(data=response_data)
+            serializer = LearnerDashboardResponseSerializer(data=self.response_data)
             serializer.is_valid(raise_exception=True)
             serialized_data = serializer.validated_data
 
@@ -142,5 +143,7 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
                 user_message='An error occurred while processing the response data.',
                 developer_message=f'Could not serialize the response data. Error: {exc}',
             )
-            response_data = self.add_errors_warnings_to_response(response_data)
-            return response_data, self.get_status_code()
+            self.add_errors_warnings_to_response()
+            serializer = LearnerDashboardResponseSerializer(self.response_data)
+            serialized_data = serializer.data
+            return serialized_data, self.get_status_code()

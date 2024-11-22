@@ -80,6 +80,12 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         }
         self.mock_enterprise_course_enrollments = []
 
+        self.expected_enterprise_customer = {
+            **self.mock_enterprise_customer,
+            'disable_search': False,
+            'show_integration_warning': False,
+        }
+
         self.expected_customer_agreement = {
             'uuid': self.mock_customer_agreement_uuid,
             'available_subscription_catalogs': self.mock_customer_agreement.get('available_subscription_catalogs'),
@@ -126,7 +132,8 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         }
 
         # Mock base response data
-        self.mock_dashboard_route_response_data = {
+        self.mock_common_response_data = {
+            'enterprise_customer': self.expected_enterprise_customer,
             'enterprise_customer_user_subsidies': {
                 'subscriptions': {
                     'customer_agreement': None,
@@ -139,9 +146,13 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     },
                 },
             },
-            'enterprise_course_enrollments': [],
             'errors': [],
             'warnings': [],
+            'enterprise_features': {'feature_flag': True},
+        }
+        self.mock_dashboard_route_response_data = {
+            **self.mock_common_response_data,
+            'enterprise_course_enrollments': [],
         }
 
     @ddt.data(
@@ -434,9 +445,21 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
             'context': self.mock_enterprise_customer_uuid,
         }])
+        mock_identity_provider = 'mock_idp' if identity_provider else None
+        mock_identity_providers = (
+            [
+                    {
+                        'provider_id': 'mock_idp',
+                        'default_provider': True,
+                    },
+                ]
+                if identity_provider
+                else []
+        )
         mock_enterprise_customer_with_auto_apply = {
             **self.mock_enterprise_customer,
-            'identity_provider': identity_provider,
+            'identity_provider': mock_identity_provider,
+            'identity_providers': mock_identity_providers,
         }
         mock_enterprise_learner_response_data = {
             **self.mock_enterprise_learner_response_data,
@@ -494,6 +517,11 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         expected_licenses = [expected_activated_subscription_license] if should_auto_apply else []
         expected_response_data = self.mock_dashboard_route_response_data.copy()
         expected_response_data.update({
+            'enterprise_customer': {
+                **self.expected_enterprise_customer,
+                'identity_provider': mock_identity_provider,
+                'identity_providers': mock_identity_providers,
+            },
             'enterprise_customer_user_subsidies': {
                 'subscriptions': {
                     'customer_agreement': expected_customer_agreement,
