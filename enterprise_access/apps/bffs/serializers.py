@@ -175,10 +175,10 @@ class CustomerAgreementSerializer(BaseBffSerializer):
     disable_expiration_notifications = serializers.BooleanField()
     enable_auto_applied_subscriptions_with_universal_link = serializers.BooleanField()
     subscription_for_auto_applied_licenses = serializers.UUIDField(allow_null=True)
-    has_custom_license_expiration_messaging_v2 = serializers.BooleanField()
-    button_label_in_modal_v2 = serializers.CharField(allow_null=True)
-    expired_subscription_modal_messaging_v2 = serializers.CharField(allow_null=True)
-    modal_header_text_v2 = serializers.CharField(allow_null=True)
+    has_custom_license_expiration_messaging_v2 = serializers.BooleanField(required=False, default=False)
+    button_label_in_modal_v2 = serializers.CharField(required=False, allow_null=True)
+    expired_subscription_modal_messaging_v2 = serializers.CharField(required=False, allow_null=True)
+    modal_header_text_v2 = serializers.CharField(required=False, allow_null=True)
 
 
 class SubscriptionPlanSerializer(BaseBffSerializer):
