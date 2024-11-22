@@ -284,7 +284,8 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         mock_activate_license,
     ):
         """
-        Test the dashboard route with subscriptions.
+        Test the dashboard route with subscriptions, handling
+        activation of assigned licenses.
         """
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
@@ -427,7 +428,8 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         should_auto_apply,
     ):
         """
-        Test the dashboard route with subscriptions.
+        Test the dashboard route with subscriptions, auto-applying a subscription
+        license based on the customer agreement and enterprise customer settings.
         """
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
