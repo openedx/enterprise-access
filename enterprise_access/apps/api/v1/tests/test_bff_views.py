@@ -125,6 +125,25 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             },
         }
 
+        # Mock base response data
+        self.mock_dashboard_route_response_data = {
+            'enterprise_customer_user_subsidies': {
+                'subscriptions': {
+                    'customer_agreement': None,
+                    'subscription_licenses': [],
+                    'subscription_licenses_by_status': {
+                        'activated': [],
+                        'assigned': [],
+                        'expired': [],
+                        'revoked': [],
+                    },
+                },
+            },
+            'enterprise_course_enrollments': [],
+            'errors': [],
+            'warnings': [],
+        }
+
     @ddt.data(
         {
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
@@ -195,23 +214,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         expected_status_code = status.HTTP_200_OK
         if is_linked_user or system_wide_role == SYSTEM_ENTERPRISE_OPERATOR_ROLE:
             self.assertEqual(response.status_code, status.HTTP_200_OK)
-            expected_response_data = {
-                'enterprise_customer_user_subsidies': {
-                    'subscriptions': {
-                        'customer_agreement': None,
-                        'subscription_licenses': [],
-                        'subscription_licenses_by_status': {
-                            'activated': [],
-                            'assigned': [],
-                            'expired': [],
-                            'revoked': [],
-                        },
-                    },
-                },
-                'enterprise_course_enrollments': [],
-                'errors': [],
-                'warnings': [],
-            }
+            expected_response_data = self.mock_dashboard_route_response_data
         else:
             expected_status_code = status.HTTP_403_FORBIDDEN
             expected_response_data = {
@@ -254,7 +257,8 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
 
         response = self.client.post(dashboard_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected_response_data = {
+        expected_response_data = self.mock_dashboard_route_response_data.copy()
+        expected_response_data.update({
             'enterprise_customer_user_subsidies': {
                 'subscriptions': {
                     'customer_agreement': self.expected_customer_agreement,
@@ -267,10 +271,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     },
                 },
             },
-            'enterprise_course_enrollments': [],
-            'errors': [],
-            'warnings': [],
-        }
+        })
         self.assertEqual(response.json(), expected_response_data)
 
     @mock_dashboard_dependencies
@@ -325,7 +326,8 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'status': 'activated',
             'activation_date': '2024-01-01T00:00:00Z',
         }
-        expected_response_data = {
+        expected_response_data = self.mock_dashboard_route_response_data.copy()
+        expected_response_data.update({
             'enterprise_customer_user_subsidies': {
                 'subscriptions': {
                     'customer_agreement': self.expected_customer_agreement,
@@ -338,10 +340,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     },
                 },
             },
-            'enterprise_course_enrollments': [],
-            'errors': [],
-            'warnings': [],
-        }
+        })
         self.assertEqual(response.json(), expected_response_data)
 
     @ddt.data(
@@ -493,7 +492,8 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'activation_date': '2024-01-01T00:00:00Z',
         }
         expected_licenses = [expected_activated_subscription_license] if should_auto_apply else []
-        expected_response_data = {
+        expected_response_data = self.mock_dashboard_route_response_data.copy()
+        expected_response_data.update({
             'enterprise_customer_user_subsidies': {
                 'subscriptions': {
                     'customer_agreement': expected_customer_agreement,
@@ -506,10 +506,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     },
                 },
             },
-            'enterprise_course_enrollments': [],
-            'errors': [],
-            'warnings': [],
-        }
+        })
         self.assertEqual(response.json(), expected_response_data)
 
     @mock_dashboard_dependencies
@@ -541,23 +538,10 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
 
         response = self.client.post(dashboard_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected_response_data = {
-            'enterprise_customer_user_subsidies': {
-                'subscriptions': {
-                    'customer_agreement': None,
-                    'subscription_licenses': [],
-                    'subscription_licenses_by_status': {
-                        'activated': [],
-                        'assigned': [],
-                        'expired': [],
-                        'revoked': [],
-                    },
-                },
-            },
+        expected_response_data = self.mock_dashboard_route_response_data.copy()
+        expected_response_data.update({
             'enterprise_course_enrollments': [
                 self.mock_enterprise_course_enrollment,
             ],
-            'errors': [],
-            'warnings': [],
-        }
+        })
         self.assertEqual(response.json(), expected_response_data)
