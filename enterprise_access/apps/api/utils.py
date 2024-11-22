@@ -7,6 +7,10 @@ from uuid import UUID
 
 from rest_framework.exceptions import ParseError
 
+from enterprise_access.apps.bffs.api import (
+    get_and_cache_enterprise_customer_users,
+    transform_enterprise_customer_users_data
+)
 from enterprise_access.apps.content_assignments.api import get_assignment_configuration
 from enterprise_access.apps.subsidy_access_policy.api import get_subsidy_access_policy
 
@@ -74,4 +78,41 @@ def get_assignment_config_customer_uuid(assignment_configuration_uuid):
     assignment_config = get_assignment_configuration(assignment_configuration_uuid)
     if assignment_config:
         return str(assignment_config.enterprise_customer_uuid)
+    return None
+
+
+def get_bff_enterprise_customer_uuid(request):
+    """
+    Extracts enterprise_customer_uuid from query params or request data.
+    """
+    enterprise_customer_uuid = (
+        get_enterprise_uuid_from_query_params(request) or
+        get_enterprise_uuid_from_request_data(request)
+    )
+    if enterprise_customer_uuid:
+        return enterprise_customer_uuid
+
+    enterprise_customer_slug = (
+        request.query_params.get('enterprise_customer_slug') or
+        request.data.get('enterprise_customer_slug')
+    )
+    if enterprise_customer_slug:
+        try:
+            enterprise_customer_users_data = get_and_cache_enterprise_customer_users(
+                request,
+                traverse_pagination=True
+            )
+            transformed_data = transform_enterprise_customer_users_data(
+                enterprise_customer_users_data,
+                request=request,
+                enterprise_customer_slug=enterprise_customer_slug,
+                enterprise_customer_uuid=enterprise_customer_uuid,
+            )
+            enterprise_customer = transformed_data.get('enterprise_customer') or {}
+            return enterprise_customer.get('uuid')
+        except Exception:  # pylint: disable=broad-except
+            logger.exception('Error retrieving linked enterprise customers')
+            return None
+
+    # Could not derive enterprise_customer_uuid for the BFF request.
     return None

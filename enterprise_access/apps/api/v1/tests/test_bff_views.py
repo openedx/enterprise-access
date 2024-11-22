@@ -5,12 +5,14 @@ from unittest import mock
 from urllib.parse import urlencode
 
 import ddt
+from django.core.cache import cache as django_cache
 from rest_framework import status
 from rest_framework.reverse import reverse
 
 from enterprise_access.apps.api_client.tests.test_utils import MockLicenseManagerMetadataMixin
-from enterprise_access.apps.bffs.tests.utils import TestHandlerContextMixin
+from enterprise_access.apps.bffs.tests.utils import TestHandlerContextMixin, mock_dashboard_dependencies
 from enterprise_access.apps.core.constants import (
+    BFF_READ_PERMISSION,
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
@@ -26,9 +28,10 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
 
     def setUp(self):
         """
-        TODO
+        Set up the tests.
         """
         super().setUp()
+        self.addCleanup(django_cache.clear)  # clear any leftover policy locks.
         self.mock_subscription_licenses_data = {
             'customer_agreement': None,
             'results': [],
@@ -122,29 +125,59 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             },
         }
 
-    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
-    @mock.patch(
-        'enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient'
-        '.get_subscription_licenses_for_learner'
+    @ddt.data(
+        {
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'is_linked_user': True,
+        },
+        {
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'is_linked_user': True,
+        },
+        {
+            'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+            'is_linked_user': True,
+        },
+        {
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'is_linked_user': False,
+        },
+        {
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'is_linked_user': False,
+        },
+        {
+            'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+            'is_linked_user': False,
+        },
     )
-    @mock.patch(
-        'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
-        '.get_default_enterprise_enrollment_intentions_learner_status'
-    )
-    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_course_enrollments')
+    @ddt.unpack
+    @mock_dashboard_dependencies
     def test_dashboard_empty_state(
         self,
-        mock_get_enterprise_course_enrollments,
-        mock_get_default_enrollment_intentions_learner_status,
-        mock_get_subscription_licenses_for_learner,
         mock_get_enterprise_customers_for_user,
+        mock_get_subscription_licenses_for_learner,
+        mock_get_default_enrollment_intentions_learner_status,
+        mock_get_enterprise_course_enrollments,
+        system_wide_role,
+        is_linked_user,
     ):
         """
         Test the dashboard route.
         """
+        enterprise_customer_uuid_for_context = (
+            self.mock_enterprise_customer_uuid
+            if is_linked_user
+            else self.mock_enterprise_customer_uuid_2
+        )
+        role_context = (
+            '*'
+            if system_wide_role == SYSTEM_ENTERPRISE_OPERATOR_ROLE
+            else enterprise_customer_uuid_for_context
+        )
         self.set_jwt_cookie([{
-            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
-            'context': str(self.mock_enterprise_customer_uuid),
+            'system_wide_role': system_wide_role,
+            'context': role_context,
         }])
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
         mock_get_subscription_licenses_for_learner.return_value = self.mock_subscription_licenses_data
@@ -153,48 +186,48 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         mock_get_enterprise_course_enrollments.return_value = self.mock_enterprise_course_enrollments
 
         query_params = {
-            'enterprie_customer_slug': self.mock_enterprise_customer_slug,
+            'enterprise_customer_slug': self.mock_enterprise_customer_slug,
         }
         dashboard_url = reverse('api:v1:learner-portal-bff-dashboard')
         dashboard_url += f"?{urlencode(query_params)}"
 
         response = self.client.post(dashboard_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        expected_response_data = {
-            'enterprise_customer_user_subsidies': {
-                'subscriptions': {
-                    'customer_agreement': None,
-                    'subscription_licenses': [],
-                    'subscription_licenses_by_status': {
-                        'activated': [],
-                        'assigned': [],
-                        'expired': [],
-                        'revoked': [],
+        expected_status_code = status.HTTP_200_OK
+        if is_linked_user or system_wide_role == SYSTEM_ENTERPRISE_OPERATOR_ROLE:
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            expected_response_data = {
+                'enterprise_customer_user_subsidies': {
+                    'subscriptions': {
+                        'customer_agreement': None,
+                        'subscription_licenses': [],
+                        'subscription_licenses_by_status': {
+                            'activated': [],
+                            'assigned': [],
+                            'expired': [],
+                            'revoked': [],
+                        },
                     },
                 },
-            },
-            'enterprise_course_enrollments': [],
-            'errors': [],
-            'warnings': [],
-        }
+                'enterprise_course_enrollments': [],
+                'errors': [],
+                'warnings': [],
+            }
+        else:
+            expected_status_code = status.HTTP_403_FORBIDDEN
+            expected_response_data = {
+                'detail': f'Missing: {BFF_READ_PERMISSION}',
+            }
+
+        self.assertEqual(response.status_code, expected_status_code)
         self.assertEqual(response.json(), expected_response_data)
 
-    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
-    @mock.patch(
-        'enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient'
-        '.get_subscription_licenses_for_learner'
-    )
-    @mock.patch(
-        'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
-        '.get_default_enterprise_enrollment_intentions_learner_status'
-    )
-    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_course_enrollments')
+    @mock_dashboard_dependencies
     def test_dashboard_with_subscriptions(
         self,
-        mock_get_enterprise_course_enrollments,
+        mock_get_enterprise_customers_for_user,
         mock_get_default_enrollment_intentions_learner_status,
         mock_get_subscription_licenses_for_learner,
-        mock_get_enterprise_customers_for_user,
+        mock_get_enterprise_course_enrollments,
     ):
         """
         Test the dashboard route with subscriptions.
@@ -214,7 +247,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         mock_get_enterprise_course_enrollments.return_value = self.mock_enterprise_course_enrollments
 
         query_params = {
-            'enterprie_customer_slug': self.mock_enterprise_customer_slug,
+            'enterprise_customer_slug': self.mock_enterprise_customer_slug,
         }
         dashboard_url = reverse('api:v1:learner-portal-bff-dashboard')
         dashboard_url += f"?{urlencode(query_params)}"
@@ -240,24 +273,15 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         }
         self.assertEqual(response.json(), expected_response_data)
 
-    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
-    @mock.patch(
-        'enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient'
-        '.get_subscription_licenses_for_learner'
-    )
+    @mock_dashboard_dependencies
     @mock.patch('enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient.activate_license')
-    @mock.patch(
-        'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
-        '.get_default_enterprise_enrollment_intentions_learner_status'
-    )
-    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_course_enrollments')
     def test_dashboard_with_subscriptions_license_activation(
         self,
-        mock_get_enterprise_course_enrollments,
-        mock_get_default_enrollment_intentions_learner_status,
-        mock_activate_license,
-        mock_get_subscription_licenses_for_learner,
         mock_get_enterprise_customers_for_user,
+        mock_get_default_enrollment_intentions_learner_status,
+        mock_get_subscription_licenses_for_learner,
+        mock_get_enterprise_course_enrollments,
+        mock_activate_license,
     ):
         """
         Test the dashboard route with subscriptions.
@@ -288,7 +312,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         mock_get_enterprise_course_enrollments.return_value = self.mock_enterprise_course_enrollments
 
         query_params = {
-            'enterprie_customer_slug': self.mock_enterprise_customer_slug,
+            'enterprise_customer_slug': self.mock_enterprise_customer_slug,
         }
         dashboard_url = reverse('api:v1:learner-portal-bff-dashboard')
         dashboard_url += f"?{urlencode(query_params)}"
@@ -385,27 +409,18 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'should_auto_apply': True,
         },
     )
-    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
-    @mock.patch(
-        'enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient'
-        '.get_subscription_licenses_for_learner'
-    )
+    @ddt.unpack
+    @mock_dashboard_dependencies
     @mock.patch(
         'enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient.auto_apply_license'
     )
-    @mock.patch(
-        'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
-        '.get_default_enterprise_enrollment_intentions_learner_status'
-    )
-    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_course_enrollments')
-    @ddt.unpack
     def test_dashboard_with_subscriptions_license_auto_apply(
         self,
-        mock_get_enterprise_course_enrollments,
-        mock_get_default_enrollment_intentions_learner_status,
-        mock_auto_apply_license,
-        mock_get_subscription_licenses_for_learner,
         mock_get_enterprise_customers_for_user,
+        mock_get_default_enrollment_intentions_learner_status,
+        mock_get_subscription_licenses_for_learner,
+        mock_get_enterprise_course_enrollments,
+        mock_auto_apply_license,
         identity_provider,
         auto_apply_with_universal_link,
         has_plan_for_auto_apply,
@@ -455,7 +470,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         mock_get_enterprise_course_enrollments.return_value = self.mock_enterprise_course_enrollments
 
         query_params = {
-            'enterprie_customer_slug': self.mock_enterprise_customer_slug,
+            'enterprise_customer_slug': self.mock_enterprise_customer_slug,
         }
         dashboard_url = reverse('api:v1:learner-portal-bff-dashboard')
         dashboard_url += f"?{urlencode(query_params)}"
@@ -495,22 +510,13 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         }
         self.assertEqual(response.json(), expected_response_data)
 
-    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
-    @mock.patch(
-        'enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient'
-        '.get_subscription_licenses_for_learner'
-    )
-    @mock.patch(
-        'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
-        '.get_default_enterprise_enrollment_intentions_learner_status'
-    )
-    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_course_enrollments')
+    @mock_dashboard_dependencies
     def test_dashboard_with_enrollments(
         self,
-        mock_get_enterprise_course_enrollments,
-        mock_get_default_enrollment_intentions_learner_status,
-        mock_get_subscription_licenses_for_learner,
         mock_get_enterprise_customers_for_user,
+        mock_get_subscription_licenses_for_learner,
+        mock_get_default_enrollment_intentions_learner_status,
+        mock_get_enterprise_course_enrollments,
     ):
         """
         Test the dashboard route with enrollments.
@@ -525,9 +531,8 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             self.mock_default_enterprise_enrollment_intentions_learner_status_data
         mock_get_enterprise_course_enrollments.return_value = [self.mock_enterprise_course_enrollment]
 
-
         query_params = {
-            'enterprie_customer_slug': self.mock_enterprise_customer_slug,
+            'enterprise_customer_slug': self.mock_enterprise_customer_slug,
         }
         dashboard_url = reverse('api:v1:learner-portal-bff-dashboard')
         dashboard_url += f"?{urlencode(query_params)}"

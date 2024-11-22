@@ -52,11 +52,11 @@ class BaseBFFViewSet(ViewSet):
             context = HandlerContext(request=request)
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception("Could not create the handler context.")
-            errors = {
+            error = {
                 'user_message': 'An error occurred while processing the request.',
                 'developer_message': f'Could not create the handler context. Error: {exc}',
             }
-            response_data = BaseResponseSerializer({'errors': [errors]}).data
+            response_data = BaseResponseSerializer({'errors': [error]}).data
             return response_data, status.HTTP_500_INTERNAL_SERVER_ERROR
 
         try:

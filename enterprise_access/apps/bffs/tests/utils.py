@@ -118,3 +118,49 @@ class TestHandlerContextMixin(TestCase):
             )
 
         return mock_handler_context
+
+
+def mock_enterprise_learner_dependency(func):
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
+    def wrapper(self, *args, **kwargs):
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
+def mock_subsidy_dependencies(func):
+    """
+    Mock the service dependencies for the subsidies.
+    """
+    @mock.patch(
+        'enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient'
+        '.get_subscription_licenses_for_learner'
+    )
+    @mock.patch(
+        'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
+        '.get_default_enterprise_enrollment_intentions_learner_status'
+    )
+    def wrapper(self, *args, **kwargs):
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
+def mock_common_dependencies(func):
+    """
+    Mock the common service dependencies.
+    """
+    @mock_enterprise_learner_dependency
+    @mock_subsidy_dependencies
+    def wrapper(self, *args, **kwargs):
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
+def mock_dashboard_dependencies(func):
+    """
+    Mock the service dependencies for the dashboard route.
+    """
+    @mock_common_dependencies
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_course_enrollments')
+    def wrapper(self, *args, **kwargs):
+        return func(self, *args, **kwargs)
+    return wrapper

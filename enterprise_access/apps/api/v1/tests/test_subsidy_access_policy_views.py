@@ -63,6 +63,9 @@ class CRUDViewTestMixin:
     """
     @classmethod
     def setUpTestData(cls):
+        """
+        Set up some basic state for the test class.
+        """
         super().setUpTestData()
 
         cls.enterprise_uuid = TEST_ENTERPRISE_UUID

@@ -209,6 +209,75 @@ def has_explicit_access_to_content_assignments_learner(user, enterprise_customer
     return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.CONTENT_ASSIGNMENTS_LEARNER_ROLE)
 
 
+@rules.predicate
+def has_implicit_access_to_bff_learner(_, enterprise_customer_uuid):
+    """
+    Check that if request user has implicit access to the given enterprise UUID for the
+    `BFF_LEARNER_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.BFF_LEARNER_ROLE)
+
+
+@rules.predicate
+def has_explicit_access_to_bff_learner(user, enterprise_customer_uuid):
+    """
+    Check that if request user has explicit access to `BFF_LEARNER_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.BFF_LEARNER_ROLE)
+
+
+@rules.predicate
+def has_implicit_access_to_bff_admin(_, enterprise_customer_uuid):
+    """
+    Check that if request user has implicit access to the given enterprise UUID for the
+    `BFF_ADMIN_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.BFF_ADMIN_ROLE)
+
+
+@rules.predicate
+def has_explicit_access_to_bff_admin(user, enterprise_customer_uuid):
+    """
+    Check that if request user has explicit access to `BFF_ADMIN_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.BFF_ADMIN_ROLE)
+
+
+@rules.predicate
+def has_implicit_access_to_bff_operator(_, enterprise_customer_uuid):
+    """
+    Check that if request user has implicit access to the given enterprise UUID for the
+    `BFF_OPERATOR_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.BFF_OPERATOR_ROLE)
+
+
+@rules.predicate
+def has_explicit_access_to_bff_operator(user, enterprise_customer_uuid):
+    """
+    Check that if request user has explicit access to `BFF_OPERATOR_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.BFF_OPERATOR_ROLE)
+
+
 ######################################################
 # Consolidate implicit and explicit rule predicates. #
 ######################################################
@@ -245,6 +314,18 @@ has_content_assignments_admin_access = (
 
 has_content_assignments_learner_access = (
     has_implicit_access_to_content_assignments_learner | has_explicit_access_to_content_assignments_learner
+)
+
+has_bff_learner_access = (
+    has_implicit_access_to_bff_learner | has_explicit_access_to_bff_learner
+)
+
+has_bff_admin_access = (
+    has_implicit_access_to_bff_admin | has_explicit_access_to_bff_admin
+)
+
+has_bff_operator_access = (
+    has_implicit_access_to_bff_operator | has_explicit_access_to_bff_operator
 )
 
 
@@ -342,5 +423,14 @@ rules.add_perm(
         has_content_assignments_operator_access |
         has_content_assignments_admin_access |
         has_content_assignments_learner_access
+    ),
+)
+
+rules.add_perm(
+    constants.BFF_READ_PERMISSION,
+    (
+        has_bff_learner_access |
+        has_bff_admin_access |
+        has_bff_operator_access
     ),
 )
