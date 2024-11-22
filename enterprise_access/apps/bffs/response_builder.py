@@ -121,8 +121,6 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
             'enterprise_course_enrollments': self.enterprise_course_enrollments,
         })
 
-        print('DEBUG?! LearnerDashboardResponseBuilder response_data:', self.response_data)
-
         # Add any errors and warnings to the response
         self.add_errors_warnings_to_response()
 

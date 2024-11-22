@@ -448,13 +448,13 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         mock_identity_provider = 'mock_idp' if identity_provider else None
         mock_identity_providers = (
             [
-                    {
-                        'provider_id': 'mock_idp',
-                        'default_provider': True,
-                    },
-                ]
-                if identity_provider
-                else []
+                {
+                    'provider_id': 'mock_idp',
+                    'default_provider': True,
+                },
+            ]
+            if identity_provider
+            else []
         )
         mock_enterprise_customer_with_auto_apply = {
             **self.mock_enterprise_customer,
@@ -516,9 +516,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         }
         expected_licenses = [expected_activated_subscription_license] if should_auto_apply else []
         expected_response_data = self.mock_dashboard_route_response_data.copy()
-        expected_show_integration_warning = (
-            True if identity_provider else False
-        )
+        expected_show_integration_warning = bool(identity_provider)
         expected_response_data.update({
             'enterprise_customer': {
                 **self.expected_enterprise_customer,
