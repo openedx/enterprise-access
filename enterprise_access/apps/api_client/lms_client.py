@@ -51,6 +51,12 @@ class LmsApiClient(BaseOAuthClient):
     pending_enterprise_learner_endpoint = enterprise_api_base_url + 'pending-enterprise-learner/'
     enterprise_group_membership_endpoint = enterprise_api_base_url + 'enterprise-group/'
 
+    def enterprise_customer_url(self, enterprise_customer_uuid):
+        return os.path.join(
+            self.enterprise_customer_endpoint,
+            f"{enterprise_customer_uuid}/",
+        )
+
     def enterprise_group_endpoint(self, group_uuid):
         return os.path.join(
             self.enterprise_api_base_url + 'enterprise-group/',
@@ -61,6 +67,12 @@ class LmsApiClient(BaseOAuthClient):
         return os.path.join(
             self.enterprise_group_endpoint(group_uuid),
             "learners/",
+        )
+
+    def enterprise_customer_bulk_enrollment_url(self, enterprise_customer_uuid):
+        return os.path.join(
+            self.enterprise_customer_url(enterprise_customer_uuid),
+            "enroll_learners_in_courses/",
         )
 
     def get_enterprise_customer_data(self, enterprise_customer_uuid=None, enterprise_customer_slug=None):
@@ -407,6 +419,58 @@ class LmsApiClient(BaseOAuthClient):
         except KeyError:
             logger.exception('failed to update group membership status. [%s]', url)
         return None
+
+    def bulk_enroll_enterprise_learners(self, enterprise_customer_uuid, enrollments_info):
+        """
+        Calls the Enterprise Bulk Enrollment API to enroll learners in courses.
+
+        Arguments:
+            enterprise_customer_uuid (UUID): UUID representation of the customer that the enrollment will be linked to
+            enrollment_info (list[dicts]): List of enrollment information required to enroll.
+                Each entry must contain key/value pairs as follows:
+                    user_id: ID of the learner to be enrolled
+                    course_run_key: the course run key to be enrolled in by the user
+                    [transaction_id,license_uuid]: uuid representation of the subsidy identifier
+                      that allows the enrollment
+                    is_default_auto_enrollment (optional): boolean indicating whether the enrollment
+                      is the realization of a default enrollment intention.
+                Example::
+                    [
+                        {
+                            'user_id': 1234,
+                            'course_run_key': 'course-v2:edX+FunX+Fun_Course',
+                            'transaction_id': '84kdbdbade7b4fcb838f8asjke8e18ae',
+                        },
+                        {
+                            'user_id': 1234,
+                            'course_run_key': 'course-v2:edX+FunX+Fun_Course',
+                            'license_uuid': '00001111de7b4fcb838f8asjke8effff',
+                            'is_default_auto_enrollment': True,
+                        },
+                        ...
+                    ]
+        Returns:
+            response (dict): JSON response data
+        Raises:
+            requests.exceptions.HTTPError: if service is down/unavailable or status code comes back >= 300,
+            the method will log and throw an HTTPError exception.
+        """
+        bulk_enrollment_url = self.enterprise_customer_bulk_enrollment_url(enterprise_customer_uuid)
+        options = {'enrollments_info': enrollments_info}
+        response = self.client.post(
+            bulk_enrollment_url,
+            json=options,
+        )
+        try:
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.error(
+                f'Failed to generate enterprise enrollments for enterprise: {enterprise_customer_uuid} '
+                f'with options: {options}. Failed with error: {exc} and payload %s',
+                response.json(),
+            )
+            raise exc
 
 
 class LmsUserApiClient(BaseUserApiClient):

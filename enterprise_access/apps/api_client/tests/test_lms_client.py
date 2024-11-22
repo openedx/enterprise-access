@@ -333,6 +333,88 @@ class TestLmsApiClient(TestCase):
         )
         assert pending_enterprise_group_memberships == expected_return
 
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_bulk_enroll_enterprise_learners(self, mock_oauth_client, mock_json):
+        """
+        Tests that the ``bulk_enroll_enterprise_learners`` endpoint can be
+        requested via the LmsApiClient.
+        """
+        mock_oauth_client.return_value.post.return_value = requests.Response()
+        mock_oauth_client.return_value.post.return_value.status_code = 200
+
+        mock_result = {
+            'successes': [{'what': 'ever'}],
+            'failures': [],
+        }
+        mock_json.return_value = mock_result
+
+        enrollments_info = [
+            {
+                'user_id': 1234,
+                'course_run_key': 'course-v2:edX+FunX+Fun_Course',
+                'transaction_id': '84kdbdbade7b4fcb838f8asjke8e18ae',
+            },
+            {
+                'user_id': 1234,
+                'course_run_key': 'course-v2:edX+FunX+Fun_Course',
+                'license_uuid': '00001111de7b4fcb838f8asjke8effff',
+                'is_default_auto_enrollment': True,
+            },
+        ]
+
+        client = LmsApiClient()
+        response_payload = client.bulk_enroll_enterprise_learners(
+            str(TEST_ENTERPRISE_UUID),
+            enrollments_info,
+        )
+
+        url = (
+            'http://edx-platform.example.com/enterprise/api/v1/enterprise-customer/'
+            f'{TEST_ENTERPRISE_UUID}/enroll_learners_in_courses/'
+        )
+        mock_oauth_client.return_value.post.assert_called_with(
+            url,
+            json={'enrollments_info': enrollments_info},
+        )
+        self.assertEqual(response_payload, mock_result)
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_bulk_enroll_enterprise_learners_exception(self, mock_oauth_client):
+        """
+        Tests that the ``bulk_enroll_enterprise_learners`` endpoint can be
+        requested via the LmsApiClient, and errors are raised to the caller.
+        """
+        mock_oauth_client.return_value.post.return_value = MockResponse(
+            {'detail': 'Bad Request'},
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        enrollments_info = [
+            {
+                'user_id': 1234,
+                'course_run_key': 'course-v2:edX+FunX+Fun_Course',
+                'transaction_id': '84kdbdbade7b4fcb838f8asjke8e18ae',
+            },
+        ]
+
+        client = LmsApiClient()
+
+        with self.assertRaises(requests.exceptions.HTTPError):
+            client.bulk_enroll_enterprise_learners(
+                str(TEST_ENTERPRISE_UUID),
+                enrollments_info,
+            )
+
+        url = (
+            'http://edx-platform.example.com/enterprise/api/v1/enterprise-customer/'
+            f'{TEST_ENTERPRISE_UUID}/enroll_learners_in_courses/'
+        )
+        mock_oauth_client.return_value.post.assert_called_with(
+            url,
+            json={'enrollments_info': enrollments_info},
+        )
+
 
 class TestLmsUserApiClient(TestCase):
     """
