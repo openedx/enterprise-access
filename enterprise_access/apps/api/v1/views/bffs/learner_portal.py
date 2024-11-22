@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from enterprise_access.apps.api.utils import get_bff_enterprise_customer_uuid
+from enterprise_access.apps.api.utils import get_or_fetch_enterprise_uuid_for_bff_request
 from enterprise_access.apps.api.v1.views.bffs.common import COMMON_BFF_QUERY_PARAMETERS, BaseBFFViewSet
 from enterprise_access.apps.bffs.handlers import DashboardHandler
 from enterprise_access.apps.bffs.response_builder import LearnerDashboardResponseBuilder
@@ -38,7 +38,7 @@ class LearnerPortalBFFViewSet(BaseBFFViewSet):
         description='Retrieves, transforms, and processes data for the learner dashboard route.',
     )
     @action(detail=False, methods=['post'])
-    @permission_required(BFF_READ_PERMISSION, fn=get_bff_enterprise_customer_uuid)
+    @permission_required(BFF_READ_PERMISSION, fn=get_or_fetch_enterprise_uuid_for_bff_request)
     def dashboard(self, request, *args, **kwargs):
         """
         Retrieves, transforms, and processes data for the learner dashboard route.

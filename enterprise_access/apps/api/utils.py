@@ -81,7 +81,7 @@ def get_assignment_config_customer_uuid(assignment_configuration_uuid):
     return None
 
 
-def get_bff_enterprise_customer_uuid(request):
+def get_or_fetch_enterprise_uuid_for_bff_request(request):
     """
     Extracts enterprise_customer_uuid from query params or request data.
     """
