@@ -18,6 +18,13 @@ class BaseResponseBuilder:
     response builders like `LearnerDashboardResponseBuilder` or `CourseResponseBuilder`.
     """
 
+    @property
+    def status_code(self):
+        """
+        Returns the HTTP status code for the response from HandlerContext.
+        """
+        return self.context.status_code
+
     def __init__(self, context):
         """
         Initializes the BaseResponseBuilder with a HandlerContext.
@@ -38,7 +45,7 @@ class BaseResponseBuilder:
         """
         self.response_data['enterprise_customer'] = self.context.enterprise_customer
         self.response_data['enterprise_features'] = self.context.enterprise_features
-        return self.response_data, self.get_status_code()
+        return self.response_data, self.status_code
 
     def add_errors_warnings_to_response(self):
         """
@@ -46,16 +53,6 @@ class BaseResponseBuilder:
         """
         self.response_data['errors'] = self.context.errors
         self.response_data['warnings'] = self.context.warnings
-
-    # TODO Revisit this function in ENT-9633 to determine if 200 is ok for a nested errored response
-    def get_status_code(self):
-        """
-        Gets the current status code from the context.
-
-        Returns:
-            int: The HTTP status code.
-        """
-        return self.context.status_code
 
 
 class BaseLearnerResponseBuilder(BaseResponseBuilder, BaseLearnerDataMixin):
@@ -96,7 +93,7 @@ class BaseLearnerResponseBuilder(BaseResponseBuilder, BaseLearnerDataMixin):
         self.add_errors_warnings_to_response()
 
         # Return the response data and status code
-        return self.response_data, self.get_status_code()
+        return self.response_data, self.status_code
 
 
 class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboardDataMixin):
@@ -136,7 +133,7 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
             serialized_data = serializer.validated_data
 
             # Return the response data and status code
-            return serialized_data, self.get_status_code()
+            return serialized_data, self.status_code
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception('Could not serialize the response data.')
             self.context.add_error(
@@ -146,4 +143,4 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
             self.add_errors_warnings_to_response()
             serializer = LearnerDashboardResponseSerializer(self.response_data)
             serialized_data = serializer.data
-            return serialized_data, self.get_status_code()
+            return serialized_data, self.status_code

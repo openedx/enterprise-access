@@ -93,7 +93,7 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
     )
     @mock.patch('enterprise_access.apps.bffs.context.HandlerContext')
     @ddt.unpack
-    def test_get_status_code(self, mock_handler_context, status_code):
+    def test_status_code(self, mock_handler_context, status_code):
         if status_code:
             mock_handler_context.return_value = self.get_mock_handler_context(
                 _status_code=status_code
@@ -103,7 +103,7 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
         mock_handler_context_instance = mock_handler_context.return_value
         base_response_builder = BaseResponseBuilder(mock_handler_context_instance)
         expected_output = status_code if status_code else status.HTTP_200_OK
-        response_status_code = base_response_builder.get_status_code()
+        response_status_code = base_response_builder.status_code
         self.assertEqual(response_status_code, expected_output)
 
 
