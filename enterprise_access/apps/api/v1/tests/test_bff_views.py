@@ -31,7 +31,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         Set up the tests.
         """
         super().setUp()
-        self.addCleanup(django_cache.clear)  # clear any leftover policy locks.
+        self.addCleanup(django_cache.clear)
         self.mock_subscription_licenses_data = {
             'customer_agreement': None,
             'results': [],
