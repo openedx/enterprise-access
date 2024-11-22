@@ -234,7 +234,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         """
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
-            'context': str(self.mock_enterprise_customer_uuid),
+            'context': self.mock_enterprise_customer_uuid,
         }])
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
         mock_subscription_licenses_data = {
@@ -288,7 +288,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         """
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
-            'context': str(self.mock_enterprise_customer_uuid),
+            'context': self.mock_enterprise_customer_uuid,
         }])
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
         mock_assigned_subscription_license = {
@@ -431,7 +431,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         """
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
-            'context': str(self.mock_enterprise_customer_uuid),
+            'context': self.mock_enterprise_customer_uuid,
         }])
         mock_enterprise_customer_with_auto_apply = {
             **self.mock_enterprise_customer,
@@ -523,7 +523,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         """
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
-            'context': str(self.mock_enterprise_customer_uuid),
+            'context': self.mock_enterprise_customer_uuid,
         }])
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
         mock_get_subscription_licenses_for_learner.return_value = self.mock_subscription_licenses_data
