@@ -1,11 +1,11 @@
 """"
 Handlers for bffs app.
 """
-
+import json
 import logging
 
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerUserApiClient
-from enterprise_access.apps.api_client.lms_client import LmsUserApiClient
+from enterprise_access.apps.api_client.lms_client import LmsApiClient, LmsUserApiClient
 from enterprise_access.apps.bffs.context import HandlerContext
 from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin
 from enterprise_access.apps.bffs.serializers import EnterpriseCustomerUserSubsidiesSerializer
@@ -408,38 +408,62 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         Enroll in redeemable courses.
         """
-        needs_enrollment = self.default_enterprise_enrollment_intentions.get('needs_enrollment', {})
+        enrollment_statuses = self.default_enterprise_enrollment_intentions.get('enrollment_statuses', {})
+        needs_enrollment = enrollment_statuses.get('needs_enrollment', {})
         needs_enrollment_enrollable = needs_enrollment.get('enrollable', [])
 
-        activated_subscription_licenses = self.subscription_licenses_by_status.get('activated', [])
-
-        if not (needs_enrollment_enrollable or activated_subscription_licenses):
-            # Skip enrollment if there are no:
-            # - default enterprise enrollment intentions that should be enrolled OR
-            # - activated subscription licenses
+        if not (needs_enrollment_enrollable and self.current_active_license):
             return
 
-        redeemable_default_courses = []
+        license_uuids_by_course_run_key = {}
         for enrollment_intention in needs_enrollment_enrollable:
-            for subscription_license in activated_subscription_licenses:
-                subscription_plan = subscription_license.get('subscription_plan', {})
-                subscription_catalog = subscription_plan.get('enterprise_catalog_uuid')
-                applicable_catalog_to_enrollment_intention = enrollment_intention.get(
-                    'applicable_enterprise_catalog_uuids'
-                )
-                if subscription_catalog in applicable_catalog_to_enrollment_intention:
-                    redeemable_default_courses.append((enrollment_intention, subscription_license))
-                    break
+            subscription_plan = self.current_active_license.get('subscription_plan', {})
+            subscription_catalog = subscription_plan.get('enterprise_catalog_uuid')
+            applicable_catalog_to_enrollment_intention = enrollment_intention.get(
+                'applicable_enterprise_catalog_uuids'
+            )
+            if subscription_catalog in applicable_catalog_to_enrollment_intention:
+                course_run_key = enrollment_intention['course_run_key']
+                license_uuids_by_course_run_key[course_run_key] = self.current_active_license['uuid']
+                break
 
-        for redeemable_course, subscription_license in redeemable_default_courses:
-            # TODO: enroll in redeemable courses (stubbed)
-            if not self.context.data.get('default_enterprise_enrollment_realizations'):
-                self.context.data['default_enterprise_enrollment_realizations'] = []
+        bulk_enrollment_payload = []
+        for course_run_key, license_uuid in license_uuids_by_course_run_key.items():
+            bulk_enrollment_payload.append({
+                'user_id': self.context.lms_user_id,
+                'course_run_key': course_run_key,
+                'license_uuid': license_uuid,
+                'is_default_auto_enrollment': True,
+            })
 
+        client = LmsApiClient()
+        try:
+            response_payload = client.bulk_enroll_enterprise_learners(
+                self.context.enterprise_customer_uuid,
+                bulk_enrollment_payload,
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.exception('Error actualizing default enrollments')
+            self.add_error(
+                user_message='There was an exception realizing default enrollments',
+                developer_message=f'Default realization enrollment exception: {exc}',
+            )
+
+        if failures := response_payload.get('failures'):
+            self.add_error(
+                user_message='There were failures realizing default enrollments',
+                developer_message='Default realization enrollment failures: ' + json.dumps(failures),
+            )
+
+        if not self.context.data.get('default_enterprise_enrollment_realizations'):
+            self.context.data['default_enterprise_enrollment_realizations'] = []
+
+        for enrollment in response_payload['successes']:
+            course_run_key = enrollment.get('course_run_key')
             self.context.data['default_enterprise_enrollment_realizations'].append({
-                'course_key': redeemable_course.get('key'),
+                'course_key': course_run_key,
                 'enrollment_status': 'enrolled',
-                'subscription_license_uuid': subscription_license.get('uuid'),
+                'subscription_license_uuid': license_uuids_by_course_run_key.get(course_run_key),
             })
 
 
