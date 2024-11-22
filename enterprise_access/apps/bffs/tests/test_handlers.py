@@ -15,7 +15,9 @@ class TestBaseHandler(TestHandlerContextMixin):
     Test BaseHandler
     """
 
-    def test_base_handler_load_and_process_not_implemented(self):
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
+    def test_base_handler_load_and_process_not_implemented(self, mock_get_enterprise_customers_for_user):
+        mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
         context = HandlerContext(self.request)
         base_handler = BaseHandler(context)
         with self.assertRaises(NotImplementedError):
@@ -23,7 +25,7 @@ class TestBaseHandler(TestHandlerContextMixin):
 
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     def test_base_handler_add_error(self, mock_get_enterprise_customers_for_user):
-        mock_get_enterprise_customers_for_user.return_value = {'results': []}
+        mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
         context = HandlerContext(self.request)
         base_handler = BaseHandler(context)
         # Define kwargs for add_error
@@ -36,7 +38,9 @@ class TestBaseHandler(TestHandlerContextMixin):
         )
         self.assertEqual(self.mock_error, base_handler.context.errors[0])
 
-    def test_base_handler_add_warning(self):
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
+    def test_base_handler_add_warning(self, mock_get_enterprise_customers_for_user):
+        mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
         context = HandlerContext(self.request)
         base_handler = BaseHandler(context)
         # Define kwargs for add_warning
@@ -102,17 +106,17 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
 
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     @mock.patch(
-        'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
-        '.get_default_enterprise_enrollment_intentions_learner_status'
-    )
-    @mock.patch(
         'enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient'
         '.get_subscription_licenses_for_learner'
     )
+    @mock.patch(
+        'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
+        '.get_default_enterprise_enrollment_intentions_learner_status'
+    )
     def test_load_and_process(
         self,
-        mock_get_subscription_licenses_for_learner,
         mock_get_default_enrollment_intentions_learner_status,
+        mock_get_subscription_licenses_for_learner,
         mock_get_enterprise_customers_for_user,
     ):
         """
@@ -248,8 +252,14 @@ class TestDashboardHandler(TestHandlerContextMixin):
         }
         self.mock_enterprise_course_enrollments = [self.mock_enterprise_course_enrollment]
 
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_course_enrollments')
-    def test_load_and_process(self, mock_get_enterprise_course_enrollments):
+    def test_load_and_process(
+        self,
+        mock_get_enterprise_course_enrollments,
+        mock_get_enterprise_customers_for_user,
+    ):
+        mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
         mock_get_enterprise_course_enrollments.return_value = self.mock_enterprise_course_enrollments
 
         context = HandlerContext(self.request)

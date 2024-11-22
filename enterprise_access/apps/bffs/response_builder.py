@@ -2,8 +2,12 @@
 Response Builder Module for bffs app
 """
 
+import logging
+
 from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin, LearnerDashboardDataMixin
 from enterprise_access.apps.bffs.serializers import LearnerDashboardResponseSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class BaseResponseBuilder:
@@ -125,9 +129,18 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
         response_data = self.add_errors_warnings_to_response(response_data)
 
         # Serialize and validate the response
-        serializer = LearnerDashboardResponseSerializer(data=response_data)
-        serializer.is_valid(raise_exception=True)
-        serialized_data = serializer.validated_data
+        try:
+            serializer = LearnerDashboardResponseSerializer(data=response_data)
+            serializer.is_valid(raise_exception=True)
+            serialized_data = serializer.validated_data
 
-        # Return the response data and status code
-        return serialized_data, self.get_status_code()
+            # Return the response data and status code
+            return serialized_data, self.get_status_code()
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception('Could not serialize the response data.')
+            self.context.add_error(
+                user_message='An error occurred while processing the response data.',
+                developer_message=f'Could not serialize the response data. Error: {exc}',
+            )
+            response_data = self.add_errors_warnings_to_response(response_data)
+            return response_data, self.get_status_code()

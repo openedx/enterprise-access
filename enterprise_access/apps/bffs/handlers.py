@@ -75,9 +75,17 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
 
         The method in this class simply calls common learner logic to ensure the context is set up.
         """
+        if not self.context.enterprise_customer:
+            self.add_error(
+                user_message="An error occurred while loading the learner portal handler.",
+                developer_message="Enterprise customer not found in the context.",
+            )
+            return
+
         try:
             # Transform enterprise customer data
             self.transform_enterprise_customers()
+
             # Retrieve and process subscription licenses. Handles activation and auto-apply logic.
             self.load_and_process_subsidies()
 
@@ -110,7 +118,13 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         Load and process subsidies for learners
         """
-        self.context.data['enterprise_customer_user_subsidies'] = EnterpriseCustomerUserSubsidiesSerializer().data
+        empty_subsidies = {
+            'subscriptions': {
+                'customer_agreement': None,
+            },
+        }
+        self.context.data['enterprise_customer_user_subsidies'] =\
+            EnterpriseCustomerUserSubsidiesSerializer(empty_subsidies).data
         self.load_and_process_subscription_licenses()
 
     def transform_enterprise_customer_user(self, enterprise_customer_user):
@@ -207,11 +221,10 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             status = subscription_license.get('status')
             if status not in subscription_licenses_by_status:
                 subscription_licenses_by_status[status] = []
-
             subscription_licenses_by_status[status].append(subscription_license)
 
         return {
-            'customer_agreement': subscriptions_result.get('customer_agreement', {}),
+            'customer_agreement': subscriptions_result.get('customer_agreement'),
             'subscription_licenses': transformed_licenses,
             'subscription_licenses_by_status': subscription_licenses_by_status,
         }
@@ -281,8 +294,8 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
 
                 # Update the subscription_license data with the activation status and date; the activated license is not
                 # returned from the API, so we need to manually update the license object we have available.
-                transformed_activated_subscription_license = self.transform_subscription_licenses(activated_license)
-                activated_licenses.append(transformed_activated_subscription_license)
+                transformed_activated_subscription_licenses = self.transform_subscription_licenses([activated_license])
+                activated_licenses.append(transformed_activated_subscription_licenses[0])
             else:
                 logger.error(f"Activation key not found for license {subscription_license.get('uuid')}")
                 self.add_error(
@@ -296,10 +309,11 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         if updated_activated_licenses:
             subscription_licenses_by_status['activated'] = updated_activated_licenses
 
+        activated_license_uuids = {license['uuid'] for license in activated_licenses}
         remaining_assigned_licenses = [
             subscription_license
             for subscription_license in assigned_licenses
-            if subscription_license not in activated_licenses
+            if subscription_license['uuid'] not in activated_license_uuids
         ]
         if remaining_assigned_licenses:
             subscription_licenses_by_status['assigned'] = remaining_assigned_licenses
@@ -310,7 +324,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             'subscription_licenses_by_status': subscription_licenses_by_status,
         })
 
-        # Determine which licenses were updated
+        # Update the subscription_licenses data with the activated licenses
         updated_subscription_licenses = []
         for subscription_license in self.subscription_licenses:
             for activated_license in activated_licenses:
@@ -354,9 +368,11 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             auto_applied_license = self.license_manager_client.auto_apply_license(customer_agreement.get('uuid'))
             if auto_applied_license:
                 # Update the context with the auto-applied license data
-                subscription_licenses_by_status['activated'] =\
-                    self.transform_subscription_licenses([auto_applied_license])
+                transformed_auto_applied_licenses = self.transform_subscription_licenses([auto_applied_license])
+                licenses = self.subscription_licenses + transformed_auto_applied_licenses
+                subscription_licenses_by_status['activated'] = transformed_auto_applied_licenses
                 self.context.data['enterprise_customer_user_subsidies']['subscriptions'].update({
+                    'subscription_licenses': licenses,
                     'subscription_licenses_by_status': subscription_licenses_by_status,
                 })
         except Exception as e:  # pylint: disable=broad-exception-caught

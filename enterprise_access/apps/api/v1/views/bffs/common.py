@@ -12,6 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ViewSet
 
 from enterprise_access.apps.bffs.context import HandlerContext
+from enterprise_access.apps.bffs.serializers import BaseResponseSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -49,23 +50,30 @@ class BaseBFFViewSet(ViewSet):
         try:
             # Create the context based on the request
             context = HandlerContext(request=request)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception("Could not create the handler context.")
+            error = {
+                'user_message': 'An error occurred while processing the request.',
+                'developer_message': f'Could not create the handler context. Error: {exc}',
+            }
+            response_data = BaseResponseSerializer({'errors': [error]}).data
+            return response_data, status.HTTP_500_INTERNAL_SERVER_ERROR
 
-            # Create the response builder
-            response_builder = response_builder_class(context)
-
+        try:
             # Create the route handler
             handler = handler_class(context)
 
-            # Load and process data using the handler
+            # Load and process route data
             handler.load_and_process()
         except Exception as exc:  # pylint: disable=broad-except
-            logger.exception("Could not load route data and build response.")
+            logger.exception("Could not create route handler or load/process route data.")
             context.add_error(
-                user_message="An error occurred while processing the request.",
-                developer_message=f"Error: {exc}",
+                user_message='An error occurred while processing the request.',
+                developer_message=f'Could not create route handler or load/process route data. Error: {exc}',
             )
 
         # Build the response data and status code
+        response_builder = response_builder_class(context)
         response_data, status_code = response_builder.build()
 
         ordered_representation = OrderedDict(response_data)
@@ -76,4 +84,4 @@ class BaseBFFViewSet(ViewSet):
         ordered_representation['errors'] = errors
         ordered_representation['warnings'] = warnings
 
-        return ordered_representation, status_code
+        return dict(ordered_representation), status_code

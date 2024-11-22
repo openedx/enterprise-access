@@ -28,6 +28,11 @@ CONTENT_ASSIGNMENT_ADMIN_READ_PERMISSION = 'content_assignment.has_admin_read_ac
 CONTENT_ASSIGNMENT_ADMIN_WRITE_PERMISSION = 'content_assignment.has_admin_write_access'
 CONTENT_ASSIGNMENT_LEARNER_READ_PERMISSION = 'content_assignment.has_learner_read_access'
 
+BFF_LEARNER_ROLE = 'enterprise_access_bff_learner'
+BFF_ADMIN_ROLE = 'enterprise_access_bff_admin'
+BFF_OPERATOR_ROLE = 'enterprise_access_bff_operator'
+BFF_READ_PERMISSION = 'bff.has_read_access'
+
 ALL_ACCESS_CONTEXT = '*'
 
 

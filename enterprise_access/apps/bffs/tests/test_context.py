@@ -65,7 +65,7 @@ class TestHandlerContext(TestHandlerContextMixin):
         expected_errors = (
             [
                 {
-                    'developer_message': 'Mock exception',
+                    'developer_message': 'Could not fetch enterprise customer users. Error: Mock exception',
                     'user_message': 'Error retrieving linked enterprise customers'
                 }
             ] if raises_exception else []
@@ -124,8 +124,11 @@ class TestHandlerContext(TestHandlerContextMixin):
         expected_errors = (
             [
                 {
-                    'developer_message': 'Mock exception',
-                    'user_message': 'Error retrieving enterprise customer data'
+                    'user_message': 'Error transforming enterprise customer users data',
+                    'developer_message': (
+                        'Could not transform enterprise customer users data. '
+                        'Error: Error retrieving enterprise customer data'
+                    ),
                 }
             ] if raises_exception else []
         )
