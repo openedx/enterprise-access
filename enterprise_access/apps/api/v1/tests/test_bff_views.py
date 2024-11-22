@@ -83,7 +83,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         self.expected_enterprise_customer = {
             **self.mock_enterprise_customer,
             'disable_search': False,
-            'show_integration_warning': False,
+            'show_integration_warning': True,
         }
 
         self.expected_customer_agreement = {
@@ -516,11 +516,15 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         }
         expected_licenses = [expected_activated_subscription_license] if should_auto_apply else []
         expected_response_data = self.mock_dashboard_route_response_data.copy()
+        expected_show_integration_warning = (
+            True if identity_provider else False
+        )
         expected_response_data.update({
             'enterprise_customer': {
                 **self.expected_enterprise_customer,
                 'identity_provider': mock_identity_provider,
                 'identity_providers': mock_identity_providers,
+                'show_integration_warning': expected_show_integration_warning,
             },
             'enterprise_customer_user_subsidies': {
                 'subscriptions': {
