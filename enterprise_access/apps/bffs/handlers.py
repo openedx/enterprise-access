@@ -229,14 +229,19 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             'subscription_licenses_by_status': subscription_licenses_by_status,
         }
 
-    def check_has_activated_license(self):
+    @property
+    def current_active_license(self):
         """
-        Check if the user has an activated license.
-
-        Returns:
-            bool: True if the user has an activated license, False otherwise.
+        Returns an activated license for the user iff the related subscription plan is current,
+        otherwise returns None.
         """
-        return bool(self.subscription_licenses_by_status.get('activated'))
+        current_active_licenses = [
+            _license for _license in self.subscription_licenses_by_status.get('activated', [])
+            if _license['subscription_plan']['is_current']
+        ]
+        if current_active_licenses:
+            return current_active_licenses[0]
+        return None
 
     def process_subscription_licenses(self):
         """
@@ -248,7 +253,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         This method is called after `load_subscription_licenses` to handle further actions based
         on the loaded data.
         """
-        if not (self.subscriptions or self.check_has_activated_license()):
+        if not self.subscriptions or self.current_active_license:
             # Skip processing if:
             # - there is no subscriptions data
             # - user already has an activated license
@@ -345,7 +350,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         subscription_licenses_by_status = self.subscription_licenses_by_status
         assigned_licenses = subscription_licenses_by_status.get('assigned', [])
 
-        if assigned_licenses or self.check_has_activated_license():
+        if assigned_licenses or self.current_active_license:
             # Skip auto-apply if user already has assigned license(s) or an already-activated license
             return
 
