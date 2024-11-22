@@ -150,7 +150,7 @@ class TestHandlerContextMixin(TestCase):
             '_enterprise_customer_uuid': self.mock_enterprise_customer_uuid,
             '_enterprise_customer_slug': self.mock_enterprise_customer_slug,
             '_lms_user_id': self.request.user.lms_user_id,
-            '_enterprise_features': {'feature_a': True},
+            '_enterprise_features': {'feature_flag': True},
             'data': {},
         }
 
@@ -161,6 +161,7 @@ class TestHandlerContextMixin(TestCase):
         mock_handler_context = mock.MagicMock(**default_values)
 
         # Define a dictionary of private attributes to property names
+        mock_property_enterprise_customer = getattr(mock_handler_context, 'data').get('enterprise_customer')
         property_mocks = {
             'request': getattr(mock_handler_context, '_request'),
             'status_code': getattr(mock_handler_context, '_status_code'),
@@ -168,6 +169,7 @@ class TestHandlerContextMixin(TestCase):
             'warnings': getattr(mock_handler_context, '_warnings'),
             'enterprise_customer_uuid': getattr(mock_handler_context, '_enterprise_customer_uuid'),
             'enterprise_customer_slug': getattr(mock_handler_context, '_enterprise_customer_slug'),
+            'enterprise_customer': mock_property_enterprise_customer,
             'lms_user_id': getattr(mock_handler_context, '_lms_user_id'),
             'enterprise_features': getattr(mock_handler_context, '_enterprise_features'),
         }
