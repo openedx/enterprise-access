@@ -5,7 +5,7 @@ import json
 import logging
 
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerUserApiClient
-from enterprise_access.apps.api_client.lms_client import LmsApiClient, LmsUserApiClient
+from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.bffs.api import (
     get_and_cache_default_enterprise_enrollment_intentions,
     get_and_cache_enterprise_course_enrollments,
