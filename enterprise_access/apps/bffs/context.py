@@ -48,9 +48,6 @@ class HandlerContext:
         self._enterprise_features = {}
         self.data = {}  # Stores processed data for the response
 
-        # API clients
-        self.lms_api_client = LmsApiClient()
-
         # Initialize common context data
         self._initialize_common_context_data()
 
