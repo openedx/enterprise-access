@@ -6,6 +6,7 @@ import logging
 from django.conf import settings
 from edx_django_utils.cache import TieredCache
 
+from enterprise_access.apps.api_client.license_manager_client import LicenseManagerUserApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient, LmsUserApiClient
 from enterprise_access.cache_utils import versioned_cache_key
 
@@ -22,6 +23,18 @@ def enterprise_customer_users_cache_key(username):
 
 def enterprise_customer_cache_key(enterprise_customer_slug, enterprise_customer_uuid):
     return versioned_cache_key('enterprise_customer', enterprise_customer_slug, enterprise_customer_uuid)
+
+
+def subscription_licenses_cache_key(enterprise_customer_uuid):
+    return versioned_cache_key('get_subscription_licenses_for_learner', enterprise_customer_uuid)
+
+
+def default_enterprise_enrollment_intentions_cache_key(enterprise_customer_uuid):
+    return versioned_cache_key('get_default_enterprise_enrollment_intentions', enterprise_customer_uuid)
+
+
+def enterprise_course_enrollments_cache_key(enterprise_customer_uuid):
+    return versioned_cache_key('get_enterprise_course_enrollments', enterprise_customer_uuid)
 
 
 def get_and_cache_enterprise_customer_users(request, **kwargs):
@@ -72,6 +85,93 @@ def get_and_cache_enterprise_customer(
     )
     TieredCache.set_all_tiers(cache_key, response_payload, settings.LMS_CLIENT_TIMEOUT)
     return response_payload
+
+
+def get_and_cache_subscription_licenses_for_learner(request, enterprise_customer_uuid, **kwargs):
+    """
+    Retrieves and caches subscription licenses for a learner.
+    """
+    cache_key = subscription_licenses_cache_key(enterprise_customer_uuid)
+    cached_response = TieredCache.get_cached_response(cache_key)
+    if cached_response.is_found:
+        logger.info(
+            f'subscription_licenses cache hit for enterprise_customer_uuid {enterprise_customer_uuid}'
+        )
+        return cached_response.value
+
+    client = LicenseManagerUserApiClient(request)
+    response_payload = client.get_subscription_licenses_for_learner(
+        enterprise_customer_uuid=enterprise_customer_uuid,
+        **kwargs,
+    )
+    TieredCache.set_all_tiers(cache_key, response_payload, settings.LICENSE_MANAGER_CLIENT_TIMEOUT)
+    return response_payload
+
+
+def get_and_cache_default_enterprise_enrollment_intentions(request, enterprise_customer_uuid):
+    """
+    Retrieves and caches default enterprise enrollment intentions for a learner.
+    """
+    cache_key = default_enterprise_enrollment_intentions_cache_key(enterprise_customer_uuid)
+    cached_response = TieredCache.get_cached_response(cache_key)
+    if cached_response.is_found:
+        logger.info(
+            f'default_enterprise_enrollment_intentions cache hit '
+            f'for enterprise_customer_uuid {enterprise_customer_uuid}'
+        )
+        return cached_response.value
+
+    client = LmsUserApiClient(request)
+    response_payload = client.get_default_enterprise_enrollment_intentions_learner_status(
+        enterprise_customer_uuid=enterprise_customer_uuid,
+    )
+    TieredCache.set_all_tiers(cache_key, response_payload, settings.LMS_CLIENT_TIMEOUT)
+    return response_payload
+
+
+def get_and_cache_enterprise_course_enrollments(request, enterprise_customer_uuid, **kwargs):
+    """
+    Retrieves and caches enterprise course enrollments for a learner.
+    """
+    cache_key = enterprise_course_enrollments_cache_key(enterprise_customer_uuid)
+    cached_response = TieredCache.get_cached_response(cache_key)
+    if cached_response.is_found:
+        logger.info(
+            f'enterprise_course_enrollments cache hit for enterprise_customer_uuid {enterprise_customer_uuid}'
+        )
+        return cached_response.value
+
+    client = LmsUserApiClient(request)
+    response_payload = client.get_enterprise_course_enrollments(
+        enterprise_customer_uuid=enterprise_customer_uuid,
+        **kwargs,
+    )
+    TieredCache.set_all_tiers(cache_key, response_payload, settings.LMS_CLIENT_TIMEOUT)
+    return response_payload
+
+
+def invalidate_default_enterprise_enrollment_intentions(enterprise_customer_uuid):
+    """
+    Invalidates the default enterprise enrollment intentions cache for a learner.
+    """
+    cache_key = default_enterprise_enrollment_intentions_cache_key(enterprise_customer_uuid)
+    TieredCache.delete_all_tiers(cache_key)
+
+
+def invalidate_enterprise_course_enrollments(enterprise_customer_uuid):
+    """
+    Invalidates the enterprise course enrollments cache for a learner.
+    """
+    cache_key = enterprise_course_enrollments_cache_key(enterprise_customer_uuid)
+    TieredCache.delete_all_tiers(cache_key)
+
+
+def invalidate_subscription_licenses_cache(enterprise_customer_uuid):
+    """
+    Invalidates the subscription licenses cache for a learner.
+    """
+    cache_key = subscription_licenses_cache_key(enterprise_customer_uuid)
+    TieredCache.delete_all_tiers(cache_key)
 
 
 def _get_active_enterprise_customer(enterprise_customer_users):
