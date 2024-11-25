@@ -10,8 +10,8 @@ from enterprise_access.apps.bffs.api import (
     get_and_cache_default_enterprise_enrollment_intentions,
     get_and_cache_enterprise_course_enrollments,
     get_and_cache_subscription_licenses_for_learner,
-    invalidate_default_enterprise_enrollment_intentions,
-    invalidate_enterprise_course_enrollments,
+    invalidate_default_enterprise_enrollment_intentions_cache,
+    invalidate_enterprise_course_enrollments_cache,
     invalidate_subscription_licenses_cache
 )
 from enterprise_access.apps.bffs.context import HandlerContext
@@ -487,10 +487,10 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
 
             # Invalidate the default enterprise enrollment intentions and enterprise course enrollments cache
             #  as the previously redeemable enrollment intentions have been processed/enrolled.
-            invalidate_default_enterprise_enrollment_intentions(
+            invalidate_default_enterprise_enrollment_intentions_cache(
                 enterprise_customer_uuid=self.context.enterprise_customer_uuid
             )
-            invalidate_enterprise_course_enrollments(
+            invalidate_enterprise_course_enrollments_cache(
                 enterprise_customer_uuid=self.context.enterprise_customer_uuid
             )
 

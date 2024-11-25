@@ -150,7 +150,7 @@ def get_and_cache_enterprise_course_enrollments(request, enterprise_customer_uui
     return response_payload
 
 
-def invalidate_default_enterprise_enrollment_intentions(enterprise_customer_uuid):
+def invalidate_default_enterprise_enrollment_intentions_cache(enterprise_customer_uuid):
     """
     Invalidates the default enterprise enrollment intentions cache for a learner.
     """
@@ -158,7 +158,7 @@ def invalidate_default_enterprise_enrollment_intentions(enterprise_customer_uuid
     TieredCache.delete_all_tiers(cache_key)
 
 
-def invalidate_enterprise_course_enrollments(enterprise_customer_uuid):
+def invalidate_enterprise_course_enrollments_cache(enterprise_customer_uuid):
     """
     Invalidates the enterprise course enrollments cache for a learner.
     """
