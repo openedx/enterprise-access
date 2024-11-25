@@ -5,7 +5,6 @@ import logging
 
 from rest_framework import status
 
-from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.bffs import serializers
 from enterprise_access.apps.bffs.api import (
     get_and_cache_enterprise_customer_users,

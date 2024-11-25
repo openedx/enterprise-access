@@ -37,7 +37,7 @@ def enterprise_course_enrollments_cache_key(enterprise_customer_uuid):
     return versioned_cache_key('get_enterprise_course_enrollments', enterprise_customer_uuid)
 
 
-def get_and_cache_enterprise_customer_users(request, **kwargs):
+def get_and_cache_enterprise_customer_users(request, timeout=settings.ENTERPRISE_USER_RECORD_CACHE_TIMEOUT, **kwargs):
     """
     Retrieves and caches enterprise learner data.
     """
@@ -55,13 +55,14 @@ def get_and_cache_enterprise_customer_users(request, **kwargs):
         username=username,
         **kwargs,
     )
-    TieredCache.set_all_tiers(cache_key, response_payload, settings.LMS_CLIENT_TIMEOUT)
+    TieredCache.set_all_tiers(cache_key, response_payload, timeout)
     return response_payload
 
 
 def get_and_cache_enterprise_customer(
     enterprise_customer_slug=None,
     enterprise_customer_uuid=None,
+    timeout=settings.ENTERPRISE_USER_RECORD_CACHE_TIMEOUT,
 ):
     """
     Retrieves and caches enterprise customer data.
@@ -83,11 +84,16 @@ def get_and_cache_enterprise_customer(
         enterprise_customer_uuid=enterprise_customer_uuid,
         enterprise_customer_slug=enterprise_customer_slug,
     )
-    TieredCache.set_all_tiers(cache_key, response_payload, settings.LMS_CLIENT_TIMEOUT)
+    TieredCache.set_all_tiers(cache_key, response_payload, timeout)
     return response_payload
 
 
-def get_and_cache_subscription_licenses_for_learner(request, enterprise_customer_uuid, **kwargs):
+def get_and_cache_subscription_licenses_for_learner(
+    request,
+    enterprise_customer_uuid,
+    timeout=settings.SUBSCRIPTION_LICENSES_LEARNER_CACHE_TIMEOUT,
+    **kwargs
+):
     """
     Retrieves and caches subscription licenses for a learner.
     """
@@ -104,11 +110,15 @@ def get_and_cache_subscription_licenses_for_learner(request, enterprise_customer
         enterprise_customer_uuid=enterprise_customer_uuid,
         **kwargs,
     )
-    TieredCache.set_all_tiers(cache_key, response_payload, settings.LICENSE_MANAGER_CLIENT_TIMEOUT)
+    TieredCache.set_all_tiers(cache_key, response_payload, timeout)
     return response_payload
 
 
-def get_and_cache_default_enterprise_enrollment_intentions(request, enterprise_customer_uuid):
+def get_and_cache_default_enterprise_enrollment_intentions(
+    request,
+    enterprise_customer_uuid,
+    timeout=settings.DEFAULT_ENTERPRISE_ENROLLMENT_INTENTIONS_CACHE_TIMEOUT,
+):
     """
     Retrieves and caches default enterprise enrollment intentions for a learner.
     """
@@ -125,11 +135,16 @@ def get_and_cache_default_enterprise_enrollment_intentions(request, enterprise_c
     response_payload = client.get_default_enterprise_enrollment_intentions_learner_status(
         enterprise_customer_uuid=enterprise_customer_uuid,
     )
-    TieredCache.set_all_tiers(cache_key, response_payload, settings.LMS_CLIENT_TIMEOUT)
+    TieredCache.set_all_tiers(cache_key, response_payload, timeout)
     return response_payload
 
 
-def get_and_cache_enterprise_course_enrollments(request, enterprise_customer_uuid, **kwargs):
+def get_and_cache_enterprise_course_enrollments(
+    request,
+    enterprise_customer_uuid,
+    timeout=settings.ENTERPRISE_COURSE_ENROLLMENTS_CACHE_TIMEOUT,
+    **kwargs
+):
     """
     Retrieves and caches enterprise course enrollments for a learner.
     """
@@ -146,7 +161,7 @@ def get_and_cache_enterprise_course_enrollments(request, enterprise_customer_uui
         enterprise_customer_uuid=enterprise_customer_uuid,
         **kwargs,
     )
-    TieredCache.set_all_tiers(cache_key, response_payload, settings.LMS_CLIENT_TIMEOUT)
+    TieredCache.set_all_tiers(cache_key, response_payload, timeout)
     return response_payload
 
 
