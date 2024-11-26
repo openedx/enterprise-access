@@ -25,16 +25,20 @@ def enterprise_customer_cache_key(enterprise_customer_slug, enterprise_customer_
     return versioned_cache_key('enterprise_customer', enterprise_customer_slug, enterprise_customer_uuid)
 
 
-def subscription_licenses_cache_key(enterprise_customer_uuid):
-    return versioned_cache_key('get_subscription_licenses_for_learner', enterprise_customer_uuid)
+def subscription_licenses_cache_key(enterprise_customer_uuid, lms_user_id):
+    return versioned_cache_key('get_subscription_licenses_for_learner', enterprise_customer_uuid, lms_user_id)
 
 
-def default_enterprise_enrollment_intentions_cache_key(enterprise_customer_uuid):
-    return versioned_cache_key('get_default_enterprise_enrollment_intentions', enterprise_customer_uuid)
+def default_enterprise_enrollment_intentions_learner_status_cache_key(enterprise_customer_uuid, lms_user_id):
+    return versioned_cache_key(
+        'get_default_enterprise_enrollment_intentions_learner_status',
+        enterprise_customer_uuid,
+        lms_user_id
+    )
 
 
-def enterprise_course_enrollments_cache_key(enterprise_customer_uuid):
-    return versioned_cache_key('get_enterprise_course_enrollments', enterprise_customer_uuid)
+def enterprise_course_enrollments_cache_key(enterprise_customer_uuid, lms_user_id):
+    return versioned_cache_key('get_enterprise_course_enrollments', enterprise_customer_uuid, lms_user_id)
 
 
 def get_and_cache_enterprise_customer_users(request, timeout=settings.ENTERPRISE_USER_RECORD_CACHE_TIMEOUT, **kwargs):
@@ -97,7 +101,7 @@ def get_and_cache_subscription_licenses_for_learner(
     """
     Retrieves and caches subscription licenses for a learner.
     """
-    cache_key = subscription_licenses_cache_key(enterprise_customer_uuid)
+    cache_key = subscription_licenses_cache_key(enterprise_customer_uuid, request.user.id)
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
         logger.info(
@@ -114,7 +118,7 @@ def get_and_cache_subscription_licenses_for_learner(
     return response_payload
 
 
-def get_and_cache_default_enterprise_enrollment_intentions(
+def get_and_cache_default_enterprise_enrollment_intentions_learner_status(
     request,
     enterprise_customer_uuid,
     timeout=settings.DEFAULT_ENTERPRISE_ENROLLMENT_INTENTIONS_CACHE_TIMEOUT,
@@ -122,7 +126,10 @@ def get_and_cache_default_enterprise_enrollment_intentions(
     """
     Retrieves and caches default enterprise enrollment intentions for a learner.
     """
-    cache_key = default_enterprise_enrollment_intentions_cache_key(enterprise_customer_uuid)
+    cache_key = default_enterprise_enrollment_intentions_learner_status_cache_key(
+        enterprise_customer_uuid,
+        request.user.id,
+    )
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
         logger.info(
@@ -148,7 +155,7 @@ def get_and_cache_enterprise_course_enrollments(
     """
     Retrieves and caches enterprise course enrollments for a learner.
     """
-    cache_key = enterprise_course_enrollments_cache_key(enterprise_customer_uuid)
+    cache_key = enterprise_course_enrollments_cache_key(enterprise_customer_uuid, request.user.id)
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
         logger.info(
@@ -165,27 +172,30 @@ def get_and_cache_enterprise_course_enrollments(
     return response_payload
 
 
-def invalidate_default_enterprise_enrollment_intentions_cache(enterprise_customer_uuid):
+def invalidate_default_enterprise_enrollment_intentions_learner_status_cache(enterprise_customer_uuid, lms_user_id):
     """
     Invalidates the default enterprise enrollment intentions cache for a learner.
     """
-    cache_key = default_enterprise_enrollment_intentions_cache_key(enterprise_customer_uuid)
+    cache_key = default_enterprise_enrollment_intentions_learner_status_cache_key(
+        enterprise_customer_uuid,
+        lms_user_id,
+    )
     TieredCache.delete_all_tiers(cache_key)
 
 
-def invalidate_enterprise_course_enrollments_cache(enterprise_customer_uuid):
+def invalidate_enterprise_course_enrollments_cache(enterprise_customer_uuid, lms_user_id):
     """
     Invalidates the enterprise course enrollments cache for a learner.
     """
-    cache_key = enterprise_course_enrollments_cache_key(enterprise_customer_uuid)
+    cache_key = enterprise_course_enrollments_cache_key(enterprise_customer_uuid, lms_user_id)
     TieredCache.delete_all_tiers(cache_key)
 
 
-def invalidate_subscription_licenses_cache(enterprise_customer_uuid):
+def invalidate_subscription_licenses_cache(enterprise_customer_uuid, lms_user_id):
     """
     Invalidates the subscription licenses cache for a learner.
     """
-    cache_key = subscription_licenses_cache_key(enterprise_customer_uuid)
+    cache_key = subscription_licenses_cache_key(enterprise_customer_uuid, lms_user_id)
     TieredCache.delete_all_tiers(cache_key)
 
 

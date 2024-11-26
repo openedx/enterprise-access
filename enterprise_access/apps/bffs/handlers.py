@@ -7,10 +7,10 @@ import logging
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerUserApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.bffs.api import (
-    get_and_cache_default_enterprise_enrollment_intentions,
+    get_and_cache_default_enterprise_enrollment_intentions_learner_status,
     get_and_cache_enterprise_course_enrollments,
     get_and_cache_subscription_licenses_for_learner,
-    invalidate_default_enterprise_enrollment_intentions_cache,
+    invalidate_default_enterprise_enrollment_intentions_learner_status_cache,
     invalidate_enterprise_course_enrollments_cache,
     invalidate_subscription_licenses_cache
 )
@@ -301,7 +301,8 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                     # Invalidate the subscription licenses cache as the cached data changed
                     # with the now-activated license.
                     invalidate_subscription_licenses_cache(
-                        enterprise_customer_uuid=self.context.enterprise_customer_uuid
+                        enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+                        lms_user_id=self.context.lms_user_id,
                     )
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     logger.exception(f"Error activating license {subscription_license.get('uuid')}")
@@ -389,7 +390,8 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             )
             # Invalidate the subscription licenses cache as the cached data changed with the auto-applied license.
             invalidate_subscription_licenses_cache(
-                enterprise_customer_uuid=self.context.enterprise_customer_uuid
+                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+                lms_user_id=self.context.lms_user_id,
             )
             # Update the context with the auto-applied license data
             transformed_auto_applied_licenses = self.transform_subscription_licenses([auto_applied_license])
@@ -411,10 +413,11 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         Load default enterprise course enrollments (stubbed)
         """
         try:
-            default_enterprise_enrollment_intentions = get_and_cache_default_enterprise_enrollment_intentions(
-                request=self.context.request,
-                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
-            )
+            default_enterprise_enrollment_intentions =\
+                get_and_cache_default_enterprise_enrollment_intentions_learner_status(
+                    request=self.context.request,
+                    enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+                )
             self.context.data['default_enterprise_enrollment_intentions'] = default_enterprise_enrollment_intentions
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.exception("Error loading default enterprise courses")
@@ -487,11 +490,13 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
 
             # Invalidate the default enterprise enrollment intentions and enterprise course enrollments cache
             #  as the previously redeemable enrollment intentions have been processed/enrolled.
-            invalidate_default_enterprise_enrollment_intentions_cache(
-                enterprise_customer_uuid=self.context.enterprise_customer_uuid
+            invalidate_default_enterprise_enrollment_intentions_learner_status_cache(
+                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+                lms_user_id=self.context.lms_user_id,
             )
             invalidate_enterprise_course_enrollments_cache(
-                enterprise_customer_uuid=self.context.enterprise_customer_uuid
+                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+                lms_user_id=self.context.lms_user_id,
             )
 
 

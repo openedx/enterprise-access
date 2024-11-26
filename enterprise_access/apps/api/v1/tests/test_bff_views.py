@@ -183,7 +183,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
     )
     @ddt.unpack
     @mock_dashboard_dependencies
-    def test_dashboard_empty_state(
+    def test_dashboard_empty_state_with_permissions(
         self,
         mock_get_enterprise_customers_for_user,
         mock_get_subscription_licenses_for_learner,
