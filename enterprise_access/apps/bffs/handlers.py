@@ -75,6 +75,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
 
         # API Clients
         self.license_manager_user_api_client = LicenseManagerUserApiClient(self.context.request)
+        self.lms_api_client = LmsApiClient()
 
     def load_and_process(self):
         """
@@ -458,9 +459,8 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 'is_default_auto_enrollment': True,
             })
 
-        client = LmsApiClient()
         try:
-            response_payload = client.bulk_enroll_enterprise_learners(
+            response_payload = self.lms_api_client.bulk_enroll_enterprise_learners(
                 self.context.enterprise_customer_uuid,
                 bulk_enrollment_payload,
             )
