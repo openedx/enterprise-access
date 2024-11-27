@@ -222,7 +222,6 @@ class SubscriptionLicenseStatusSerializer(BaseBffSerializer):
 
     activated = SubscriptionLicenseSerializer(many=True, required=False, default=list)
     assigned = SubscriptionLicenseSerializer(many=True, required=False, default=list)
-    expired = SubscriptionLicenseSerializer(many=True, required=False, default=list)
     revoked = SubscriptionLicenseSerializer(many=True, required=False, default=list)
 
 
@@ -252,6 +251,17 @@ class BaseLearnerPortalResponseSerializer(BaseResponseSerializer):
     enterprise_customer_user_subsidies = EnterpriseCustomerUserSubsidiesSerializer()
 
 
+
+class EnrollmentDueDateSerializer(BaseBffSerializer):
+    """
+    Serializer for enrollment due date.
+    """
+
+    name = serializers.CharField()
+    date = serializers.CharField()
+    url = serializers.URLField()
+
+
 class EnterpriseCourseEnrollmentSerializer(BaseBffSerializer):
     """
     Serializer for enterprise course enrollment.
@@ -277,7 +287,7 @@ class EnterpriseCourseEnrollmentSerializer(BaseBffSerializer):
     resume_course_run_url = serializers.URLField(allow_null=True)
     is_revoked = serializers.BooleanField()
     due_dates = serializers.ListField(
-        child=serializers.DictField(),
+        child=EnrollmentDueDateSerializer(),
         allow_empty=True,
     )
 

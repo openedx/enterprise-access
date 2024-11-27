@@ -141,7 +141,6 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     'subscription_licenses_by_status': {
                         'activated': [],
                         'assigned': [],
-                        'expired': [],
                         'revoked': [],
                     },
                 },
@@ -277,7 +276,6 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     'subscription_licenses_by_status': {
                         'activated': [self.expected_subscription_license],
                         'assigned': [],
-                        'expired': [],
                         'revoked': [],
                     },
                 },
@@ -346,7 +344,6 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     'subscription_licenses_by_status': {
                         'activated': [expected_activated_subscription_license],
                         'assigned': [],
-                        'expired': [],
                         'revoked': [],
                     },
                 },
@@ -531,7 +528,6 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     'subscription_licenses_by_status': {
                         'activated': expected_licenses,
                         'assigned': [],
-                        'expired': [],
                         'revoked': [],
                     },
                 },

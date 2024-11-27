@@ -141,7 +141,6 @@ class TestBaseLearnerResponseBuilder(TestBaseResponseBuilder, MockLicenseManager
             "subscription_licenses_by_status": {
                 'activated': [],
                 'assigned': [],
-                'expired': [],
                 'revoked': [],
             },
         }
