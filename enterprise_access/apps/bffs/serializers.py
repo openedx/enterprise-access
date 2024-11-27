@@ -251,7 +251,6 @@ class BaseLearnerPortalResponseSerializer(BaseResponseSerializer):
     enterprise_customer_user_subsidies = EnterpriseCustomerUserSubsidiesSerializer()
 
 
-
 class EnrollmentDueDateSerializer(BaseBffSerializer):
     """
     Serializer for enrollment due date.
