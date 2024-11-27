@@ -106,7 +106,7 @@ click-repl==0.3.0
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   celery
-code-annotations==1.8.1
+code-annotations==1.8.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -117,7 +117,7 @@ colorama==0.4.6
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   tox
-confluent-kafka==2.6.0
+confluent-kafka==2.6.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -132,7 +132,7 @@ coreschema==0.0.4
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   coreapi
-coverage[toml]==7.6.7
+coverage[toml]==7.6.8
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -317,7 +317,7 @@ edx-django-release-util==1.4.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-edx-django-utils==7.0.0
+edx-django-utils==7.0.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -501,7 +501,7 @@ mysqlclient==2.2.6
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-newrelic==10.2.0
+newrelic==10.3.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -781,7 +781,7 @@ sqlparse==0.5.2
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   django
-stevedore==5.3.0
+stevedore==5.4.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
