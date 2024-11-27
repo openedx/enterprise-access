@@ -13,10 +13,12 @@ from enterprise_access.cache_utils import versioned_cache_key
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CACHE_TIMEOUT = settings.ENTERPRISE_USER_RECORD_CACHE_TIMEOUT
 
-
-def get_and_cache_enterprise_learner_record(enterprise_customer_uuid, learner_id, timeout=DEFAULT_CACHE_TIMEOUT):
+def get_and_cache_enterprise_learner_record(
+    enterprise_customer_uuid,
+    learner_id,
+    timeout=settings.ENTERPRISE_USER_RECORD_CACHE_TIMEOUT,
+):
     """
     Fetches the enterprise learner record from the Lms client if it exists.
     Uses the `learner_id` and `enterprise_customer_uuid` to determine if

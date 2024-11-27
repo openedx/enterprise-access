@@ -15,10 +15,12 @@ from ..api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CACHE_TIMEOUT = getattr(settings, 'CONTENT_METADATA_CACHE_TIMEOUT', 60 * 5)
 
-
-def get_and_cache_catalog_content_metadata(enterprise_catalog_uuid, content_keys, timeout=None):
+def get_and_cache_catalog_content_metadata(
+    enterprise_catalog_uuid,
+    content_keys,
+    timeout=settings.CONTENT_METADATA_CACHE_TIMEOUT,
+):
     """
     Returns the metadata corresponding to the requested
     ``content_keys`` within the provided ``enterprise_catalog_uuid``,
@@ -70,7 +72,7 @@ def get_and_cache_catalog_content_metadata(enterprise_catalog_uuid, content_keys
         cache_key = cache_keys_by_content_key.get(fetched_record.get('key'))
         content_metadata_to_cache[cache_key] = fetched_record
 
-    cache.set_many(content_metadata_to_cache, timeout or DEFAULT_CACHE_TIMEOUT)
+    cache.set_many(content_metadata_to_cache, timeout)
 
     # Add to our results list everything we just had to fetch
     metadata_results_list.extend(fetched_metadata)

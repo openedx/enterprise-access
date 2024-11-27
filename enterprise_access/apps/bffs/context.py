@@ -5,7 +5,6 @@ import logging
 
 from rest_framework import status
 
-from enterprise_access.apps.api_client.lms_client import LmsApiClient, LmsUserApiClient
 from enterprise_access.apps.bffs import serializers
 from enterprise_access.apps.bffs.api import (
     get_and_cache_enterprise_customer_users,
@@ -47,10 +46,6 @@ class HandlerContext:
         self._lms_user_id = getattr(self.user, 'lms_user_id', None)
         self._enterprise_features = {}
         self.data = {}  # Stores processed data for the response
-
-        # API clients
-        self.lms_api_client = LmsApiClient()
-        self.lms_user_api_client = LmsUserApiClient(request)
 
         # Initialize common context data
         self._initialize_common_context_data()

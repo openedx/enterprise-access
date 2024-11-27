@@ -5,7 +5,15 @@ import json
 import logging
 
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerUserApiClient
-from enterprise_access.apps.api_client.lms_client import LmsApiClient, LmsUserApiClient
+from enterprise_access.apps.api_client.lms_client import LmsApiClient
+from enterprise_access.apps.bffs.api import (
+    get_and_cache_default_enterprise_enrollment_intentions_learner_status,
+    get_and_cache_enterprise_course_enrollments,
+    get_and_cache_subscription_licenses_for_learner,
+    invalidate_default_enterprise_enrollment_intentions_learner_status_cache,
+    invalidate_enterprise_course_enrollments_cache,
+    invalidate_subscription_licenses_cache
+)
 from enterprise_access.apps.bffs.context import HandlerContext
 from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin
 from enterprise_access.apps.bffs.serializers import EnterpriseCustomerUserSubsidiesSerializer
@@ -66,8 +74,8 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         super().__init__(context)
 
         # API Clients
-        self.license_manager_client = LicenseManagerUserApiClient(self.context.request)
-        self.lms_user_api_client = LmsUserApiClient(self.context.request)
+        self.license_manager_user_api_client = LicenseManagerUserApiClient(self.context.request)
+        self.lms_api_client = LmsApiClient()
 
     def load_and_process(self):
         """
@@ -174,7 +182,8 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         Load subscription licenses for the learner.
         """
         try:
-            subscriptions_result = self.license_manager_client.get_subscription_licenses_for_learner(
+            subscriptions_result = get_and_cache_subscription_licenses_for_learner(
+                request=self.context.request,
                 enterprise_customer_uuid=self.context.enterprise_customer_uuid,
                 include_revoked=True,
                 current_plans_only=False,
@@ -288,7 +297,14 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             if activation_key:
                 try:
                     # Perform side effect: Activate the assigned license
-                    activated_license = self.license_manager_client.activate_license(activation_key)
+                    activated_license = self.license_manager_user_api_client.activate_license(activation_key)
+
+                    # Invalidate the subscription licenses cache as the cached data changed
+                    # with the now-activated license.
+                    invalidate_subscription_licenses_cache(
+                        enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+                        lms_user_id=self.context.lms_user_id,
+                    )
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     logger.exception(f"Error activating license {subscription_license.get('uuid')}")
                     self.add_error(
@@ -370,16 +386,22 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
 
         try:
             # Perform side effect: Auto-apply license
-            auto_applied_license = self.license_manager_client.auto_apply_license(customer_agreement.get('uuid'))
-            if auto_applied_license:
-                # Update the context with the auto-applied license data
-                transformed_auto_applied_licenses = self.transform_subscription_licenses([auto_applied_license])
-                licenses = self.subscription_licenses + transformed_auto_applied_licenses
-                subscription_licenses_by_status['activated'] = transformed_auto_applied_licenses
-                self.context.data['enterprise_customer_user_subsidies']['subscriptions'].update({
-                    'subscription_licenses': licenses,
-                    'subscription_licenses_by_status': subscription_licenses_by_status,
-                })
+            auto_applied_license = self.license_manager_user_api_client.auto_apply_license(
+                customer_agreement.get('uuid')
+            )
+            # Invalidate the subscription licenses cache as the cached data changed with the auto-applied license.
+            invalidate_subscription_licenses_cache(
+                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+                lms_user_id=self.context.lms_user_id,
+            )
+            # Update the context with the auto-applied license data
+            transformed_auto_applied_licenses = self.transform_subscription_licenses([auto_applied_license])
+            licenses = self.subscription_licenses + transformed_auto_applied_licenses
+            subscription_licenses_by_status['activated'] = transformed_auto_applied_licenses
+            self.context.data['enterprise_customer_user_subsidies']['subscriptions'].update({
+                'subscription_licenses': licenses,
+                'subscription_licenses_by_status': subscription_licenses_by_status,
+            })
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.exception("Error auto-applying license")
             self.add_error(
@@ -391,12 +413,13 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         Load default enterprise course enrollments (stubbed)
         """
-        client = self.lms_user_api_client
         try:
-            default_enrollment_intentions = client.get_default_enterprise_enrollment_intentions_learner_status(
-                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
-            )
-            self.context.data['default_enterprise_enrollment_intentions'] = default_enrollment_intentions
+            default_enterprise_enrollment_intentions =\
+                get_and_cache_default_enterprise_enrollment_intentions_learner_status(
+                    request=self.context.request,
+                    enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+                )
+            self.context.data['default_enterprise_enrollment_intentions'] = default_enterprise_enrollment_intentions
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.exception("Error loading default enterprise courses")
             self.add_error(
@@ -436,9 +459,8 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 'is_default_auto_enrollment': True,
             })
 
-        client = LmsApiClient()
         try:
-            response_payload = client.bulk_enroll_enterprise_learners(
+            response_payload = self.lms_api_client.bulk_enroll_enterprise_learners(
                 self.context.enterprise_customer_uuid,
                 bulk_enrollment_payload,
             )
@@ -465,6 +487,17 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 'enrollment_status': 'enrolled',
                 'subscription_license_uuid': license_uuids_by_course_run_key.get(course_run_key),
             })
+
+            # Invalidate the default enterprise enrollment intentions and enterprise course enrollments cache
+            #  as the previously redeemable enrollment intentions have been processed/enrolled.
+            invalidate_default_enterprise_enrollment_intentions_learner_status_cache(
+                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+                lms_user_id=self.context.lms_user_id,
+            )
+            invalidate_enterprise_course_enrollments_cache(
+                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+                lms_user_id=self.context.lms_user_id,
+            )
 
 
 class DashboardHandler(BaseLearnerPortalHandler):
@@ -501,7 +534,8 @@ class DashboardHandler(BaseLearnerPortalHandler):
             list: A list of enterprise course enrollments.
         """
         try:
-            enterprise_course_enrollments = self.lms_user_api_client.get_enterprise_course_enrollments(
+            enterprise_course_enrollments = get_and_cache_enterprise_course_enrollments(
+                request=self.context.request,
                 enterprise_customer_uuid=self.context.enterprise_customer_uuid,
                 is_active=True,
             )
