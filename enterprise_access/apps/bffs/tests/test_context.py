@@ -78,6 +78,8 @@ class TestHandlerContext(TestHandlerContextMixin):
         self.assertEqual(context.lms_user_id, self.mock_user.lms_user_id)
         expected_enterprise_customer = None if raises_exception else self.mock_enterprise_customer
         self.assertEqual(context.enterprise_customer, expected_enterprise_customer)
+        expected_is_linked_user = False if raises_exception else True
+        self.assertEqual(context.is_request_user_linked_to_enterprise_customer, expected_is_linked_user)
 
     @ddt.data(
         {'raises_exception': False},
@@ -141,6 +143,7 @@ class TestHandlerContext(TestHandlerContextMixin):
         self.assertEqual(context.lms_user_id, self.mock_staff_user.lms_user_id)
         expected_enterprise_customer = None if raises_exception else self.mock_enterprise_customer
         self.assertEqual(context.enterprise_customer, expected_enterprise_customer)
+        self.assertEqual(context.is_request_user_linked_to_enterprise_customer, False)
 
     @ddt.data(
         # No enterprise customer uuid/slug in the request; returns active enterprise customer user

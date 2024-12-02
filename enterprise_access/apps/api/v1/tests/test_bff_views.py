@@ -352,73 +352,142 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         self.assertEqual(response.json(), expected_response_data)
 
     @ddt.data(
-        # No identity provider, no universal link auto-apply, no plan for auto-apply.
+        # No existing licenses, identity provider, no universal link auto-apply, no plan for auto-apply,
+        # and not a staff request user.
         # Expected: Should not auto-apply.
         {
+            'has_existing_activated_license': False,
+            'has_existing_revoked_license': False,
+            'is_staff_request_user': False,
             'identity_provider': False,
             'auto_apply_with_universal_link': False,
             'has_plan_for_auto_apply': False,
             'should_auto_apply': False,
         },
-        # Identity provider exists, but no universal link auto-apply, no plan for auto-apply.
+        # No existing licenses, identity provider exists, but no universal link auto-apply, no plan for auto-apply,
+        # and not a staff request user.
         # Expected: Should not auto-apply.
         {
+            'has_existing_activated_license': False,
+            'has_existing_revoked_license': False,
+            'is_staff_request_user': False,
             'identity_provider': True,
             'auto_apply_with_universal_link': False,
             'has_plan_for_auto_apply': False,
             'should_auto_apply': False,
         },
-        # No identity provider, universal link auto-apply is enabled, no plan for auto-apply.
+        # No existing licenses, no identity provider, universal link auto-apply is enabled, no plan for auto-apply,
+        # and not a staff request user.
         # Expected: Should not auto-apply.
         {
+            'has_existing_activated_license': False,
+            'has_existing_revoked_license': False,
+            'is_staff_request_user': False,
             'identity_provider': False,
             'auto_apply_with_universal_link': True,
             'has_plan_for_auto_apply': False,
             'should_auto_apply': False,
         },
-        # Identity provider exists, universal link auto-apply is enabled, no plan for auto-apply.
+        # No existing licenses, identity provider exists, universal link auto-apply is enabled, no plan for auto-apply,
+        # and not a staff request user.
         # Expected: Should not auto-apply.
         {
+            'has_existing_activated_license': False,
+            'has_existing_revoked_license': False,
+            'is_staff_request_user': False,
             'identity_provider': True,
             'auto_apply_with_universal_link': True,
             'has_plan_for_auto_apply': False,
             'should_auto_apply': False,
         },
-        # No identity provider, no universal link auto-apply, but a plan for auto-apply exists.
+        # No existing licenses, no identity provider, no universal link auto-apply, a plan for auto-apply exists,
+        # and not a staff request user.
         # Expected: Should not auto-apply.
         {
+            'has_existing_activated_license': False,
+            'has_existing_revoked_license': False,
+            'is_staff_request_user': False,
             'identity_provider': False,
             'auto_apply_with_universal_link': False,
             'has_plan_for_auto_apply': True,
             'should_auto_apply': False,
         },
-        # Identity provider exists, no universal link auto-apply, but a plan for auto-apply exists.
+        # No existing licenses, identity provider exists, no universal link auto-apply,
+        # a plan for auto-apply exists, and not a staff request user.
         # Expected: Should auto-apply.
         {
+            'has_existing_activated_license': False,
+            'has_existing_revoked_license': False,
+            'is_staff_request_user': False,
             'identity_provider': True,
             'auto_apply_with_universal_link': False,
             'has_plan_for_auto_apply': True,
             'should_auto_apply': True,
         },
-        # No identity provider, universal link auto-apply is enabled, and a plan for auto-apply exists.
+        # No existing licenses, no identity provider, universal link auto-apply is enabled,
+        # a plan for auto-apply exists, and not a staff request user.
         # Expected: Should auto-apply.
         {
+            'has_existing_activated_license': False,
+            'has_existing_revoked_license': False,
+            'is_staff_request_user': False,
             'identity_provider': False,
             'auto_apply_with_universal_link': True,
             'has_plan_for_auto_apply': True,
             'should_auto_apply': True,
         },
-        # Identity provider exists, universal link auto-apply is enabled, and a plan for auto-apply exists.
+        # No existing licenses, identity provider exists, universal link auto-apply is enabled,
+        # a plan for auto-apply exists, and not a staff request user.
         # Expected: Should auto-apply.
         {
+            'has_existing_activated_license': False,
+            'has_existing_revoked_license': False,
+            'is_staff_request_user': False,
             'identity_provider': True,
             'auto_apply_with_universal_link': True,
             'has_plan_for_auto_apply': True,
             'should_auto_apply': True,
+        },
+        # Existing activated license, identity provider exists, universal link auto-apply is enabled,
+        # a plan for auto-apply exists, and not a staff request user.
+        # Expected: Should not auto-apply.
+        {
+            'has_existing_activated_license': True,
+            'has_existing_revoked_license': False,
+            'is_staff_request_user': False,
+            'identity_provider': True,
+            'auto_apply_with_universal_link': True,
+            'has_plan_for_auto_apply': True,
+            'should_auto_apply': False,
+        },
+        # Existing revoked license, identity provider exists, universal link auto-apply is enabled,
+        # a plan for auto-apply exists, and not a staff request user.
+        # Expected: Should not auto-apply.
+        {
+            'has_existing_activated_license': False,
+            'has_existing_revoked_license': True,
+            'is_staff_request_user': False,
+            'identity_provider': True,
+            'auto_apply_with_universal_link': True,
+            'has_plan_for_auto_apply': True,
+            'should_auto_apply': False,
+        },
+        # No existing licenses, identity provider exists, universal link auto-apply is enabled,
+        # a plan for auto-apply exists, and is a staff request user.
+        # Expected: Should not auto-apply.
+        {
+            'has_existing_activated_license': False,
+            'has_existing_revoked_license': False,
+            'is_staff_request_user': True,
+            'identity_provider': True,
+            'auto_apply_with_universal_link': True,
+            'has_plan_for_auto_apply': True,
+            'should_auto_apply': False,
         },
     )
     @ddt.unpack
     @mock_dashboard_dependencies
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.get_enterprise_customer_data')
     @mock.patch(
         'enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient.auto_apply_license'
     )
@@ -429,6 +498,10 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         mock_get_subscription_licenses_for_learner,
         mock_get_enterprise_course_enrollments,
         mock_auto_apply_license,
+        mock_get_enterprise_customer_data,
+        has_existing_activated_license,
+        has_existing_revoked_license,
+        is_staff_request_user,
         identity_provider,
         auto_apply_with_universal_link,
         has_plan_for_auto_apply,
@@ -442,6 +515,13 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
             'context': self.mock_enterprise_customer_uuid,
         }])
+
+        if is_staff_request_user:
+            # Set the request user as a staff user and mock the enterprise customer response data.
+            self.user.is_staff = True
+            self.user.save()
+            mock_get_enterprise_customer_data.return_value = self.mock_enterprise_customer
+
         mock_identity_provider = 'mock_idp' if identity_provider else None
         mock_identity_providers = (
             [
@@ -458,14 +538,17 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'identity_provider': mock_identity_provider,
             'identity_providers': mock_identity_providers,
         }
+        mock_linked_enterprise_customer_users = (
+            []
+            if is_staff_request_user
+            else [{
+                'active': True,
+                'enterprise_customer': mock_enterprise_customer_with_auto_apply,
+            }]
+        )
         mock_enterprise_learner_response_data = {
             **self.mock_enterprise_learner_response_data,
-            'results': [
-                {
-                    'active': True,
-                    'enterprise_customer': mock_enterprise_customer_with_auto_apply,
-                },
-            ],
+            'results': mock_linked_enterprise_customer_users,
         }
         mock_get_enterprise_customers_for_user.return_value = mock_enterprise_learner_response_data
         mock_auto_applied_subscription_license = {
@@ -484,6 +567,17 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 ),
             },
         }
+        if has_existing_activated_license:
+            mock_subscription_licenses_data['results'].append({
+                **self.mock_subscription_license,
+                'status': 'activated',
+                'activation_date': '2024-01-01T00:00:00Z',
+            })
+        if has_existing_revoked_license:
+            mock_subscription_licenses_data['results'].append({
+                **self.mock_subscription_license,
+                'status': 'revoked',
+            })
         mock_get_subscription_licenses_for_learner.return_value = mock_subscription_licenses_data
         mock_auto_apply_license.return_value = mock_auto_applied_subscription_license
         mock_get_default_enrollment_intentions_learner_status.return_value =\
@@ -511,7 +605,23 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'status': 'activated',
             'activation_date': '2024-01-01T00:00:00Z',
         }
-        expected_licenses = [expected_activated_subscription_license] if should_auto_apply else []
+        expected_activated_licenses = (
+            [expected_activated_subscription_license]
+            if should_auto_apply or has_existing_activated_license
+            else []
+        )
+        expected_revoked_subscription_license = {
+            **self.expected_subscription_license,
+            'status': 'revoked',
+        }
+        expected_revoked_licenses = (
+            [expected_revoked_subscription_license]
+            if has_existing_revoked_license
+            else []
+        )
+        expected_licenses = []
+        expected_licenses.extend(expected_activated_licenses)
+        expected_licenses.extend(expected_revoked_licenses)
         expected_response_data = self.mock_dashboard_route_response_data.copy()
         expected_show_integration_warning = bool(identity_provider)
         expected_response_data.update({
@@ -526,9 +636,9 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     'customer_agreement': expected_customer_agreement,
                     'subscription_licenses': expected_licenses,
                     'subscription_licenses_by_status': {
-                        'activated': expected_licenses,
+                        'activated': expected_activated_licenses,
                         'assigned': [],
-                        'revoked': [],
+                        'revoked': expected_revoked_licenses,
                     },
                 },
             },

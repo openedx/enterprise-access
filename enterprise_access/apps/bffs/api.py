@@ -229,9 +229,6 @@ def _get_staff_enterprise_customer(
     if has_enterprise_customer_slug_or_uuid and user.is_staff:
         try:
             staff_enterprise_customer = get_and_cache_enterprise_customer(
-
-            )
-            staff_enterprise_customer = LmsApiClient().get_enterprise_customer_data(
                 enterprise_customer_uuid=enterprise_customer_uuid,
                 enterprise_customer_slug=enterprise_customer_slug,
             )

@@ -99,6 +99,22 @@ class HandlerContext:
         return self.data.get('all_linked_enterprise_customer_users')
 
     @property
+    def is_request_user_linked_to_enterprise_customer(self):
+        """
+        Returns True if the request user is linked to the resolved enterprise customer, False otherwise.
+        Primary use case is to determine if the request user is explicitly linked to the enterprise customer versus
+        being a staff user with access.
+        """
+        if not self.enterprise_customer:
+            return False
+
+        enterprise_customer_uuid = self.enterprise_customer.get('uuid')
+        return any(
+            enterprise_customer_user.get('enterprise_customer', {}).get('uuid') == enterprise_customer_uuid
+            for enterprise_customer_user in self.all_linked_enterprise_customer_users
+        )
+
+    @property
     def staff_enterprise_customer(self):
         return self.data.get('staff_enterprise_customer')
 

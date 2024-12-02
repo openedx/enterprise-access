@@ -170,6 +170,8 @@ class TestHandlerContextMixin(TestCase):
             'enterprise_customer_uuid': getattr(mock_handler_context, '_enterprise_customer_uuid'),
             'enterprise_customer_slug': getattr(mock_handler_context, '_enterprise_customer_slug'),
             'enterprise_customer': mock_property_enterprise_customer,
+            'active_enterprise_customer': mock_property_enterprise_customer,
+            'staff_enterprise_customer': None,
             'lms_user_id': getattr(mock_handler_context, '_lms_user_id'),
             'enterprise_features': getattr(mock_handler_context, '_enterprise_features'),
         }
@@ -186,6 +188,9 @@ class TestHandlerContextMixin(TestCase):
 
 
 def mock_enterprise_learner_dependency(func):
+    """
+    Mock the enterprise customer related service dependencies.
+    """
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     def wrapper(self, *args, **kwargs):
         return func(self, *args, **kwargs)
