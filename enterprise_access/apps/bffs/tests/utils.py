@@ -191,7 +191,6 @@ def mock_enterprise_learner_dependency(func):
     """
     Mock the enterprise customer related service dependencies.
     """
-
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     def wrapper(self, *args, **kwargs):
         return func(self, *args, **kwargs)

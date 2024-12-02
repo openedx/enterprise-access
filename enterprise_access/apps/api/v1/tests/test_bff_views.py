@@ -364,7 +364,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'has_plan_for_auto_apply': False,
             'should_auto_apply': False,
         },
-        # No existing licenses, identity provider exists, but no universal link auto-apply, no plan for auto-apply.
+        # No existing licenses, identity provider exists, but no universal link auto-apply, no plan for auto-apply,
         # and not a staff request user.
         # Expected: Should not auto-apply.
         {

@@ -290,7 +290,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         This method is called after `load_subscription_licenses` to handle further actions based
         on the loaded data.
         """
-        if not self.subscriptions or self.current_activated_licenses:
+        if not self.subscriptions or self.current_activated_license:
             # Skip processing if:
             # - there is no subscriptions data
             # - user already has an activated license(s)
