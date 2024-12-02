@@ -68,7 +68,7 @@ click-repl==0.3.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   celery
-code-annotations==1.8.2
+code-annotations==2.0.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   edx-toggles
@@ -83,7 +83,7 @@ coreschema==0.0.4
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   coreapi
-cryptography==43.0.3
+cryptography==44.0.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   pyjwt
@@ -177,7 +177,7 @@ drf-jwt==1.19.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   edx-drf-extensions
-drf-spectacular==0.27.2
+drf-spectacular==0.28.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
 drf-yasg==1.21.8
     # via
@@ -287,7 +287,7 @@ mysqlclient==2.2.6
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   -r requirements/production.in
-newrelic==10.3.0
+newrelic==10.3.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   edx-django-utils
@@ -331,7 +331,7 @@ pycparser==2.22
     #   cffi
 pygments==2.18.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
-pyjwt[crypto]==2.10.0
+pyjwt[crypto]==2.10.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   drf-jwt
@@ -474,7 +474,7 @@ wcwidth==0.2.13
     #   prompt-toolkit
 zope-event==5.0
     # via gevent
-zope-interface==7.1.1
+zope-interface==7.2
     # via gevent
 
 # The following packages are considered to be unsafe in a requirements file:

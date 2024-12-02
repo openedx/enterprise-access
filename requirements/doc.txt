@@ -97,7 +97,7 @@ click-repl==0.3.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   celery
-code-annotations==1.8.2
+code-annotations==2.0.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-lint
@@ -121,7 +121,7 @@ coverage[toml]==7.6.8
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   pytest-cov
-cryptography==43.0.3
+cryptography==44.0.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   pyjwt
@@ -237,7 +237,7 @@ drf-jwt==1.19.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-drf-extensions
-drf-spectacular==0.27.2
+drf-spectacular==0.28.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
 drf-yasg==1.21.8
     # via
@@ -293,7 +293,7 @@ edx-toggles==5.2.0
     #   edx-event-bus-kafka
 factory-boy==3.3.1
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-faker==33.0.0
+faker==33.1.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   factory-boy
@@ -369,11 +369,11 @@ monotonic==1.6
     #   analytics-python
 mysqlclient==2.2.6
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-newrelic==10.3.0
+newrelic==10.3.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-django-utils
-nh3==0.2.18
+nh3==0.2.19
     # via readme-renderer
 oauthlib==3.2.2
     # via
@@ -437,7 +437,7 @@ pygments==2.18.0
     #   pydata-sphinx-theme
     #   readme-renderer
     #   sphinx
-pyjwt[crypto]==2.10.0
+pyjwt[crypto]==2.10.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   drf-jwt
@@ -445,7 +445,7 @@ pyjwt[crypto]==2.10.0
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==3.3.1
+pylint==3.3.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-lint
@@ -479,7 +479,7 @@ pyproject-api==1.8.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   tox
-pytest==8.3.3
+pytest==8.3.4
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   pytest-cov
@@ -644,7 +644,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.27.1
+virtualenv==20.28.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   tox
