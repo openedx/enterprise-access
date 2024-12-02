@@ -238,19 +238,47 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             'subscription_licenses_by_status': subscription_licenses_by_status,
         }
 
+    def _current_subscription_licenses_for_status(self, status):
+        """
+        Filter subscription licenses by license status and current subscription plan.
+        """
+        current_licenses_for_status = [
+            _license for _license in self.subscription_licenses_by_status.get(status, [])
+            if _license['subscription_plan']['is_current']
+        ]
+        return current_licenses_for_status
+
     @property
-    def current_active_license(self):
+    def current_activated_licenses(self):
+        """
+        Returns list of current, activated licenses, if any, for the user.
+        """
+        activated_licenses = self._current_subscription_licenses_for_status('activated')
+        return activated_licenses
+
+    @property
+    def current_activated_license(self):
         """
         Returns an activated license for the user iff the related subscription plan is current,
         otherwise returns None.
         """
-        current_active_licenses = [
-            _license for _license in self.subscription_licenses_by_status.get('activated', [])
-            if _license['subscription_plan']['is_current']
-        ]
-        if current_active_licenses:
-            return current_active_licenses[0]
-        return None
+        return self.current_activated_licenses[0] if self.current_activated_licenses else None
+
+    @property
+    def current_revoked_licenses(self):
+        """
+        Returns a revoked license for the user iff the related subscription plan is current,
+        otherwise returns None.
+        """
+        return self._current_subscription_licenses_for_status('revoked')
+
+    @property
+    def current_assigned_licenses(self):
+        """
+        Returns an assigned license for the user iff the related subscription plan is current,
+        otherwise returns None.
+        """
+        return self._current_subscription_licenses_for_status('assigned')
 
     def process_subscription_licenses(self):
         """
@@ -262,10 +290,10 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         This method is called after `load_subscription_licenses` to handle further actions based
         on the loaded data.
         """
-        if not self.subscriptions or self.current_active_license:
+        if not self.subscriptions or self.current_activated_licenses:
             # Skip processing if:
             # - there is no subscriptions data
-            # - user already has an activated license
+            # - user already has an activated license(s)
             return
 
         # Check if there are 'assigned' licenses that need to be activated
@@ -290,9 +318,8 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         Check if there are assigned licenses that need to be activated.
         """
         subscription_licenses_by_status = self.subscription_licenses_by_status
-        assigned_licenses = subscription_licenses_by_status.get('assigned', [])
         activated_licenses = []
-        for subscription_license in assigned_licenses:
+        for subscription_license in self.current_assigned_licenses:
             activation_key = subscription_license.get('activation_key')
             if activation_key:
                 try:
@@ -325,7 +352,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 )
 
         # Update the subscription_licenses_by_status data with the activated licenses
-        updated_activated_licenses = subscription_licenses_by_status.get('activated', [])
+        updated_activated_licenses = self.current_activated_licenses
         updated_activated_licenses.extend(activated_licenses)
         if updated_activated_licenses:
             subscription_licenses_by_status['activated'] = updated_activated_licenses
@@ -333,7 +360,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         activated_license_uuids = {license['uuid'] for license in activated_licenses}
         remaining_assigned_licenses = [
             subscription_license
-            for subscription_license in assigned_licenses
+            for subscription_license in self.current_assigned_licenses
             if subscription_license['uuid'] not in activated_license_uuids
         ]
         if remaining_assigned_licenses:
@@ -363,13 +390,20 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         Check if auto-apply licenses are available and apply them to the user.
         """
-        subscription_licenses_by_status = self.subscription_licenses_by_status
-        assigned_licenses = subscription_licenses_by_status.get('assigned', [])
-
-        if assigned_licenses or self.current_active_license:
-            # Skip auto-apply if user already has assigned license(s) or an already-activated license
+        if (
+            self.current_assigned_licenses or
+            self.current_activated_licenses or
+            self.current_revoked_licenses or
+            not self.context.is_request_user_linked_to_enterprise_customer
+        ):
+            # Skip auto-apply if:
+            #   - User has assigned/current license(s)
+            #   - User has activated/current license(s)
+            #   - User has revoked/current license(s)
+            #   - User is not explicitly linked to the enterprise customer (e.g., staff request user)
             return
 
+        subscription_licenses_by_status = self.subscription_licenses_by_status
         customer_agreement = self.subscriptions.get('customer_agreement') or {}
         has_subscription_plan_for_auto_apply = (
             bool(customer_agreement.get('subscription_for_auto_applied_licenses')) and
@@ -435,19 +469,19 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         needs_enrollment = enrollment_statuses.get('needs_enrollment', {})
         needs_enrollment_enrollable = needs_enrollment.get('enrollable', [])
 
-        if not (needs_enrollment_enrollable and self.current_active_license):
+        if not (needs_enrollment_enrollable and self.current_activated_license):
             return
 
         license_uuids_by_course_run_key = {}
         for enrollment_intention in needs_enrollment_enrollable:
-            subscription_plan = self.current_active_license.get('subscription_plan', {})
+            subscription_plan = self.current_activated_license.get('subscription_plan', {})
             subscription_catalog = subscription_plan.get('enterprise_catalog_uuid')
             applicable_catalog_to_enrollment_intention = enrollment_intention.get(
                 'applicable_enterprise_catalog_uuids'
             )
             if subscription_catalog in applicable_catalog_to_enrollment_intention:
                 course_run_key = enrollment_intention['course_run_key']
-                license_uuids_by_course_run_key[course_run_key] = self.current_active_license['uuid']
+                license_uuids_by_course_run_key[course_run_key] = self.current_activated_license['uuid']
 
         response_payload = self._request_default_enrollment_realizations(license_uuids_by_course_run_key)
 
