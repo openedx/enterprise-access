@@ -390,12 +390,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         Check if auto-apply licenses are available and apply them to the user.
         """
-        if (
-            self.current_assigned_licenses or
-            self.current_activated_licenses or
-            self.current_revoked_licenses or
-            not self.context.is_request_user_linked_to_enterprise_customer
-        ):
+        if (self.subscription_licenses or not self.context.is_request_user_linked_to_enterprise_customer):
             # Skip auto-apply if:
             #   - User has assigned/current license(s)
             #   - User has activated/current license(s)

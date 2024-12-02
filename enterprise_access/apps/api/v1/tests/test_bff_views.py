@@ -448,7 +448,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'has_plan_for_auto_apply': True,
             'should_auto_apply': True,
         },
-        # Existing activated license, identity provider exists, no universal link auto-apply,
+        # Existing activated license, identity provider exists, universal link auto-apply is enabled,
         # a plan for auto-apply exists, and not a staff request user.
         # Expected: Should not auto-apply.
         {
@@ -460,7 +460,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'has_plan_for_auto_apply': True,
             'should_auto_apply': False,
         },
-        # Existing revoked license, identity provider exists, no universal link auto-apply,
+        # Existing revoked license, identity provider exists, universal link auto-apply is enabled,
         # a plan for auto-apply exists, and not a staff request user.
         # Expected: Should not auto-apply.
         {
