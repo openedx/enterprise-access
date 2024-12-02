@@ -571,3 +571,75 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             ],
         })
         self.assertEqual(response.json(), expected_response_data)
+
+    @mock_dashboard_dependencies
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.bulk_enroll_enterprise_learners')
+    def test_dashboard_with_default_enrollment_realizations(
+        self,
+        mock_get_enterprise_customers_for_user,
+        mock_get_default_enrollment_intentions_learner_status,
+        mock_get_subscription_licenses_for_learner,
+        mock_get_enterprise_course_enrollments,
+        mock_bulk_enroll,
+    ):
+        """
+        Test the dashboard route with enrollments.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': self.mock_enterprise_customer_uuid,
+        }])
+        mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+
+        mock_activated_subscription_license = {
+            **self.mock_subscription_license,
+            'status': 'activated',
+            'activation_date': '2024-01-01T00:00:00Z',
+        }
+        mock_subscription_licenses_data = {
+            'customer_agreement': self.mock_customer_agreement,
+            'results': [mock_activated_subscription_license],
+        }
+        mock_get_subscription_licenses_for_learner.return_value = mock_subscription_licenses_data
+
+        mock_get_default_enrollment_intentions_learner_status.return_value = {
+            "lms_user_id": self.mock_user.id,
+            "user_email": self.mock_user.email,
+            "enterprise_customer_uuid": self.mock_enterprise_customer_uuid,
+            "enrollment_statuses": {
+                "needs_enrollment": {
+                    "enrollable": [
+                        {
+                            'applicable_enterprise_catalog_uuids': [self.mock_enterprise_catalog_uuid],
+                            'course_run_key': 'course-run-1',
+                        },
+                    ],
+                    "not_enrollable": [],
+                },
+                'already_enrolled': [],
+            },
+        }
+        mock_bulk_enroll.return_value = {
+            'successes': [
+                {'course_run_key': 'course-run-1'},
+            ],
+            'failures': [],
+        }
+        mock_get_enterprise_course_enrollments.return_value = [self.mock_enterprise_course_enrollment]
+
+        query_params = {
+            'enterprise_customer_slug': self.mock_enterprise_customer_slug,
+        }
+        dashboard_url = reverse('api:v1:learner-portal-bff-dashboard')
+        dashboard_url += f"?{urlencode(query_params)}"
+
+        response = self.client.post(dashboard_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        actual_customer_uuid_arg, actual_payload_arg = mock_bulk_enroll.call_args_list[0][0]
+        self.assertEqual(actual_customer_uuid_arg, self.mock_enterprise_customer_uuid)
+        expected_payload = [
+            {'user_id': self.user.lms_user_id, 'course_run_key': 'course-run-1',
+             'license_uuid': mock_activated_subscription_license['uuid'], 'is_default_auto_enrollment': True},
+        ]
+        self.assertEqual(expected_payload, actual_payload_arg)

@@ -219,6 +219,154 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
         expected_staff_enterprise_customer = self.expected_enterprise_customer
         self.assertEqual(actual_staff_enterprise_customer, expected_staff_enterprise_customer)
 
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.bulk_enroll_enterprise_learners')
+    def test_request_default_enrollment_realizations(self, mock_bulk_enroll, mock_get_customers):
+        mock_get_customers.return_value = {
+            **self.mock_enterprise_learner_response_data,
+            'results': [],
+        }
+        license_uuids_by_course_run_key = {
+            'course-run-1': 'license-1',
+            'course-run-2': 'license-2',
+        }
+        context = HandlerContext(self.request)
+        handler = BaseLearnerPortalHandler(context)
+
+        response = handler._request_default_enrollment_realizations(license_uuids_by_course_run_key)
+
+        self.assertEqual(response, mock_bulk_enroll.return_value)
+        actual_customer_uuid_arg, actual_payload_arg = mock_bulk_enroll.call_args_list[0][0]
+        self.assertEqual(actual_customer_uuid_arg, context.enterprise_customer_uuid)
+        expected_payload = [
+            {'user_id': context.lms_user_id, 'course_run_key': 'course-run-1',
+             'license_uuid': 'license-1', 'is_default_auto_enrollment': True},
+            {'user_id': context.lms_user_id, 'course_run_key': 'course-run-2',
+             'license_uuid': 'license-2', 'is_default_auto_enrollment': True},
+        ]
+        self.assertCountEqual(expected_payload, actual_payload_arg)
+        self.assertEqual(context.errors, [])
+
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
+    @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.bulk_enroll_enterprise_learners')
+    def test_request_default_enrollment_realizations_exception(self, mock_bulk_enroll, mock_get_customers):
+        mock_get_customers.return_value = {
+            **self.mock_enterprise_learner_response_data,
+            'results': [],
+        }
+        license_uuids_by_course_run_key = {
+            'course-run-1': 'license-1',
+            'course-run-2': 'license-2',
+        }
+        context = HandlerContext(self.request)
+        handler = BaseLearnerPortalHandler(context)
+        mock_bulk_enroll.side_effect = Exception('foobar')
+
+        response = handler._request_default_enrollment_realizations(license_uuids_by_course_run_key)
+
+        self.assertEqual(response, {})
+        self.assertEqual(
+            context.errors,
+            [{
+                'developer_message': 'Default realization enrollment exception: foobar',
+                'user_message': 'There was an exception realizing default enrollments',
+            }],
+        )
+
+    @mock.patch(
+        'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
+        '.get_enterprise_customers_for_user')
+    @mock.patch(
+        'enterprise_access.apps.api_client.lms_client.LmsApiClient'
+        '.bulk_enroll_enterprise_learners')
+    @mock.patch(
+        'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
+        '.get_default_enterprise_enrollment_intentions_learner_status'
+    )
+    def test_realize_default_enrollments(
+        self, mock_get_intentions, mock_bulk_enroll, mock_get_customers
+    ):
+        mock_get_customers.return_value = {
+            **self.mock_enterprise_learner_response_data,
+            'results': [],
+        }
+        mock_get_intentions.return_value = {
+            "lms_user_id": self.mock_user.id,
+            "user_email": self.mock_user.email,
+            "enterprise_customer_uuid": self.mock_enterprise_customer_uuid,
+            "enrollment_statuses": {
+                "needs_enrollment": {
+                    "enrollable": [
+                        {
+                            'applicable_enterprise_catalog_uuids': ['catalog-55', 'catalog-1'],
+                            'course_run_key': 'course-run-1',
+                        },
+                        {
+                            'applicable_enterprise_catalog_uuids': ['catalog-88', 'catalog-1'],
+                            'course_run_key': 'course-run-2',
+                        },
+                    ],
+                    "not_enrollable": [],
+                },
+                'already_enrolled': [],
+            },
+        }
+        mock_bulk_enroll.return_value = {
+            'successes': [
+                {'course_run_key': 'course-run-1'},
+            ],
+            'failures': [
+                {'course_run_key': 'course-run-2'},
+            ],
+        }
+
+        context = HandlerContext(self.request)
+        context.data['enterprise_customer_user_subsidies'] = {
+            'subscriptions': {
+                'subscription_licenses_by_status': {
+                    'activated': [{
+                        'uuid': 'license-1',
+                        'subscription_plan': {
+                            'is_current': True,
+                            'uuid': 'subscription-plan-1',
+                            'enterprise_catalog_uuid': 'catalog-1',
+                        },
+                    }]
+                }
+            }
+        }
+        handler = BaseLearnerPortalHandler(context)
+
+        handler.load_default_enterprise_enrollment_intentions()
+        handler.enroll_in_redeemable_default_enterprise_enrollment_intentions()
+
+        actual_customer_uuid_arg, actual_payload_arg = mock_bulk_enroll.call_args_list[0][0]
+        self.assertEqual(actual_customer_uuid_arg, context.enterprise_customer_uuid)
+        expected_payload = [
+            {'user_id': context.lms_user_id, 'course_run_key': 'course-run-1',
+             'license_uuid': 'license-1', 'is_default_auto_enrollment': True},
+            {'user_id': context.lms_user_id, 'course_run_key': 'course-run-2',
+             'license_uuid': 'license-1', 'is_default_auto_enrollment': True},
+        ]
+        self.assertCountEqual(expected_payload, actual_payload_arg)
+        self.assertEqual(
+            handler.context.data['default_enterprise_enrollment_realizations'],
+            [{
+                'course_key': 'course-run-1',
+                'enrollment_status': 'enrolled',
+                'subscription_license_uuid': 'license-1',
+            }],
+        )
+        self.assertEqual(
+            handler.context.errors,
+            [{
+                'developer_message': (
+                    'Default realization enrollment failures: [{"course_run_key": "course-run-2"}]'
+                ),
+                'user_message': 'There were failures realizing default enrollments',
+            }],
+        )
+
 
 class TestDashboardHandler(TestHandlerContextMixin):
     """

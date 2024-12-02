@@ -448,8 +448,37 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             if subscription_catalog in applicable_catalog_to_enrollment_intention:
                 course_run_key = enrollment_intention['course_run_key']
                 license_uuids_by_course_run_key[course_run_key] = self.current_active_license['uuid']
-                break
 
+        response_payload = self._request_default_enrollment_realizations(license_uuids_by_course_run_key)
+
+        if failures := response_payload.get('failures'):
+            self.add_error(
+                user_message='There were failures realizing default enrollments',
+                developer_message='Default realization enrollment failures: ' + json.dumps(failures),
+            )
+
+        if not self.context.data.get('default_enterprise_enrollment_realizations'):
+            self.context.data['default_enterprise_enrollment_realizations'] = []
+
+        if response_payload['successes']:
+            # Invalidate the default enterprise enrollment intentions and enterprise course enrollments cache
+            # as the previously redeemable enrollment intentions have been processed/enrolled.
+            self.invalidate_default_enrollment_intentions_cache()
+            self.invalidate_enrollments_cache()
+
+        for enrollment in response_payload['successes']:
+            course_run_key = enrollment.get('course_run_key')
+            self.context.data['default_enterprise_enrollment_realizations'].append({
+                'course_key': course_run_key,
+                'enrollment_status': 'enrolled',
+                'subscription_license_uuid': license_uuids_by_course_run_key.get(course_run_key),
+            })
+
+    def _request_default_enrollment_realizations(self, license_uuids_by_course_run_key):
+        """
+        Sends the request to bulk enroll into default enrollment intentions via the LMS
+        API client.
+        """
         bulk_enrollment_payload = []
         for course_run_key, license_uuid in license_uuids_by_course_run_key.items():
             bulk_enrollment_payload.append({
@@ -470,34 +499,21 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 user_message='There was an exception realizing default enrollments',
                 developer_message=f'Default realization enrollment exception: {exc}',
             )
+            response_payload = {}
 
-        if failures := response_payload.get('failures'):
-            self.add_error(
-                user_message='There were failures realizing default enrollments',
-                developer_message='Default realization enrollment failures: ' + json.dumps(failures),
-            )
+        return response_payload
 
-        if not self.context.data.get('default_enterprise_enrollment_realizations'):
-            self.context.data['default_enterprise_enrollment_realizations'] = []
+    def invalidate_default_enrollment_intentions_cache(self):
+        invalidate_default_enterprise_enrollment_intentions_learner_status_cache(
+            enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+            lms_user_id=self.context.lms_user_id,
+        )
 
-        for enrollment in response_payload['successes']:
-            course_run_key = enrollment.get('course_run_key')
-            self.context.data['default_enterprise_enrollment_realizations'].append({
-                'course_key': course_run_key,
-                'enrollment_status': 'enrolled',
-                'subscription_license_uuid': license_uuids_by_course_run_key.get(course_run_key),
-            })
-
-            # Invalidate the default enterprise enrollment intentions and enterprise course enrollments cache
-            #  as the previously redeemable enrollment intentions have been processed/enrolled.
-            invalidate_default_enterprise_enrollment_intentions_learner_status_cache(
-                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
-                lms_user_id=self.context.lms_user_id,
-            )
-            invalidate_enterprise_course_enrollments_cache(
-                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
-                lms_user_id=self.context.lms_user_id,
-            )
+    def invalidate_enrollments_cache(self):
+        invalidate_enterprise_course_enrollments_cache(
+            enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+            lms_user_id=self.context.lms_user_id,
+        )
 
 
 class DashboardHandler(BaseLearnerPortalHandler):
