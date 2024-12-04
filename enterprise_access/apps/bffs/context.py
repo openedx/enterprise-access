@@ -4,6 +4,7 @@ HandlerContext for bffs app.
 import logging
 
 from rest_framework import status
+from requests.exceptions import HTTPError
 
 from enterprise_access.apps.bffs import serializers
 from enterprise_access.apps.bffs.api import (
@@ -29,6 +30,14 @@ class HandlerContext:
         enterprise_customer_slug: The enterprise customer slug associated with this request.
         lms_user_id: The id associated with the authenticated user.
         enterprise_features: A dictionary to store enterprise features associated with the authenticated user.
+        enterprise_customer: The enterprise customer associated with the request.
+        active_enterprise_customer: The active enterprise customer associated with the request user.
+        all_linked_enterprise_customer_users: A list of all linked enterprise customer users
+          associated with the request user.
+        staff_enterprise_customer: The enterprise customer, if resolved as a staff request user.
+        is_request_user_linked_to_enterprise_customer: A boolean indicating if the request user is linked
+          to the resolved enterprise customer.
+        status_code: The HTTP status code to return in the response.
     """
 
     def __init__(self, request):
@@ -118,6 +127,12 @@ class HandlerContext:
     def staff_enterprise_customer(self):
         return self.data.get('staff_enterprise_customer')
 
+    def set_status_code(self, status_code):
+        """
+        Sets the status code for the response.
+        """
+        self._status_code = status_code
+
     def _initialize_common_context_data(self):
         """
         Initializes common context data, like enterprise customer UUID and user ID.
@@ -137,10 +152,40 @@ class HandlerContext:
         self._enterprise_customer_slug = enterprise_customer_slug
 
         # Initialize the enterprise customer users metatata derived from the LMS
-        self._initialize_enterprise_customer_users()
+        try:
+            self._initialize_enterprise_customer_users()
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception(
+                'Error initializing enterprise customer users for request user %s, '
+                'enterprise customer uuid %s and/or slug %s',
+                self.lms_user_id,
+                enterprise_customer_uuid,
+                enterprise_customer_slug,
+            )
+            self.add_error(
+                user_message='Error initializing enterprise customer users',
+                developer_message=f'Could not initialize enterprise customer users. Error: {exc}',
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+            return
 
         if not self.enterprise_customer:
             # If no enterprise customer is found, return early
+            logger.info(
+                'No enterprise customer found for request user %s, enterprise customer uuid %s, '
+                'and/or enterprise slug %s',
+                self.user.id,
+                enterprise_customer_uuid,
+                enterprise_customer_slug,
+            )
+            self.add_error(
+                user_message='No enterprise customer found',
+                developer_message=(
+                    f'No enterprise customer found for request user {self.user.id} and enterprise uuid '
+                    f'{enterprise_customer_uuid}, and/or enterprise slug {enterprise_customer_slug}'
+                ),
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
             return
 
         # Otherwise, update the enterprise customer UUID and slug if not already set
@@ -153,18 +198,10 @@ class HandlerContext:
         """
         Initializes the enterprise customer users for the request user.
         """
-        try:
-            enterprise_customer_users_data = get_and_cache_enterprise_customer_users(
-                self.request,
-                traverse_pagination=True
-            )
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.exception('Error retrieving linked enterprise customers')
-            self.add_error(
-                user_message='Error retrieving linked enterprise customers',
-                developer_message=f'Could not fetch enterprise customer users. Error: {exc}'
-            )
-            return
+        enterprise_customer_users_data = get_and_cache_enterprise_customer_users(
+            self.request,
+            traverse_pagination=True
+        )
 
         # Set enterprise features from the response
         self._enterprise_features = enterprise_customer_users_data.get('enterprise_features', {})
@@ -179,12 +216,21 @@ class HandlerContext:
                 enterprise_customer_uuid=self.enterprise_customer_uuid,
             )
         except Exception as exc:  # pylint: disable=broad-except
-            logger.exception('Error transforming enterprise customer users data')
+            logger.exception(
+                'Error transforming enterprise customer users metadata for request user %s, '
+                'enterprise customer uuid %s and/or slug %s',
+                self.lms_user_id,
+                self.enterprise_customer_uuid,
+                self.enterprise_customer_slug,
+            )
             self.add_error(
-                user_message='Error transforming enterprise customer users data',
-                developer_message=f'Could not transform enterprise customer users data. Error: {exc}'
+                user_message='Could not transform enterprise customer metadata',
+                developer_message=(
+                    f'Unable to transform enterprise customer users metadata. Error: {exc}'
+                ),
             )
 
+        # Update the context data with the transformed enterprise customer users data
         self.data.update({
             'enterprise_customer': transformed_data.get('enterprise_customer'),
             'active_enterprise_customer': transformed_data.get('active_enterprise_customer'),
@@ -192,19 +238,28 @@ class HandlerContext:
             'staff_enterprise_customer': transformed_data.get('staff_enterprise_customer'),
         })
 
-    def add_error(self, **kwargs):
+    def add_error(self, status_code=None, **kwargs):
         """
         Adds an error to the context.
-        Output fields determined by the ErrorSerializer
+
+        Args:
+            user_message (str): A user-friendly message describing the error.
+            developer_message (str): A message describing the error for developers.
+            [status_code] (int): The HTTP status code to return in the response.
         """
         serializer = serializers.ErrorSerializer(data=kwargs)
         serializer.is_valid(raise_exception=True)
         self.errors.append(serializer.data)
+        if status_code:
+            self.set_status_code(status_code)
 
     def add_warning(self, **kwargs):
         """
         Adds a warning to the context.
-        Output fields determined by the WarningSerializer
+
+        Args:
+            user_message (str): A user-friendly message describing the error.
+            developer_message (str): A message describing the error for developers.
         """
         serializer = serializers.WarningSerializer(data=kwargs)
         serializer.is_valid(raise_exception=True)

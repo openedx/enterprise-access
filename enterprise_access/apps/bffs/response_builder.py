@@ -134,7 +134,7 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
             return serialized_data, self.status_code
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception('Could not serialize the response data.')
-            self.context.add_error(
+            self.context.add_warning(
                 user_message='An error occurred while processing the response data.',
                 developer_message=f'Could not serialize the response data. Error: {exc}',
             )
