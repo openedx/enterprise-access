@@ -5,6 +5,7 @@ Tests for the BFF context
 from unittest import mock
 
 import ddt
+from rest_framework import status
 from rest_framework.exceptions import ValidationError
 
 from enterprise_access.apps.bffs.context import HandlerContext
@@ -72,6 +73,14 @@ class TestHandlerContext(TestHandlerContextMixin):
         )
         self.assertEqual(context.errors, expected_errors)
         self.assertEqual(context.warnings, [])
+
+        expected_status_code = (
+            status.HTTP_500_INTERNAL_SERVER_ERROR
+            if raises_exception
+            else status.HTTP_200_OK
+        )
+        self.assertEqual(context.status_code, expected_status_code)
+
         self.assertEqual(context.enterprise_customer_uuid, self.mock_enterprise_customer_uuid)
         expected_slug = None if raises_exception else self.mock_enterprise_customer_slug
         self.assertEqual(context.enterprise_customer_slug, expected_slug)
@@ -135,9 +144,16 @@ class TestHandlerContext(TestHandlerContextMixin):
                 }
             ] if raises_exception else []
         )
-
         self.assertEqual(context.errors, expected_errors)
         self.assertEqual(context.warnings, [])
+
+        expected_status_code = (
+            status.HTTP_404_NOT_FOUND
+            if raises_exception
+            else status.HTTP_200_OK
+        )
+        self.assertEqual(context.status_code, expected_status_code)
+
         self.assertEqual(context.enterprise_features, self.mock_enterprise_learner_response_data['enterprise_features'])
         self.assertEqual(context.enterprise_customer_uuid, self.mock_enterprise_customer_uuid)
         expected_slug = None if raises_exception else self.mock_enterprise_customer_slug
