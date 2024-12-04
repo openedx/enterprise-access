@@ -121,7 +121,9 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         for customer_record_key in ('enterprise_customer', 'active_enterprise_customer', 'staff_enterprise_customer'):
             if not (customer_record := getattr(self.context, customer_record_key, None)):
-                logger.warning(f"No {customer_record_key} found in the context for request user {self.context.lms_user_id}")
+                logger.warning(
+                    f"No {customer_record_key} found in the context for request user {self.context.lms_user_id}"
+                )
                 continue
             self.context.data[customer_record_key] = self.transform_enterprise_customer(customer_record)
 

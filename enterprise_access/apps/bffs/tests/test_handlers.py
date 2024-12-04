@@ -37,7 +37,6 @@ class TestBaseHandler(TestHandlerContextMixin):
         self.assertEqual(self.mock_error, base_handler.context.errors[0])
         self.assertEqual(status.HTTP_400_BAD_REQUEST, base_handler.context.status_code)
 
-
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     def test_base_handler_add_warning(self, mock_get_enterprise_customers_for_user):
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
