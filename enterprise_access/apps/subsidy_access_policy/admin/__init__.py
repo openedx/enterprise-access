@@ -26,7 +26,7 @@ from enterprise_access.apps.subsidy_access_policy.admin.views import (
     SubsidyAccessPolicySetLateRedemptionView
 )
 
-from .forms import ForcedPolicyRedemptionForm
+from .forms import ForcedPolicyRedemptionForm, SubsidyAccessPolicyForm
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +199,8 @@ class PerLearnerEnrollmentCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcc
     """
     Admin configuration for PerLearnerEnrollmentCreditAccessPolicy.
     """
+    form = SubsidyAccessPolicyForm
+
     list_display = BaseSubsidyAccessPolicyMixin.list_display + (
         'per_learner_enrollment_limit',
     )
@@ -250,6 +252,8 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
     """
     Admin configuration for PerLearnerSpendCreditAccessPolicy.
     """
+    form = SubsidyAccessPolicyForm
+
     list_display = BaseSubsidyAccessPolicyMixin.list_display + (
         'per_learner_spend_limit_dollars',
     )
@@ -313,6 +317,8 @@ class LearnerContentAssignmentAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAcces
     """
     Admin configuration for AssignedLearnerCreditAccessPolicy.
     """
+    form = SubsidyAccessPolicyForm
+
     search_fields = (
         'uuid',
         'display_name',
