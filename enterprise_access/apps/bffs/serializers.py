@@ -157,7 +157,7 @@ class BaseResponseSerializer(BaseBffSerializer):
     Serializer for base response.
     """
 
-    enterprise_customer = EnterpriseCustomerSerializer()
+    enterprise_customer = EnterpriseCustomerSerializer(required=False, allow_null=True)
     errors = ErrorSerializer(many=True, required=False, default=list)
     warnings = WarningSerializer(many=True, required=False, default=list)
     enterprise_features = serializers.DictField(required=False, default=dict)
@@ -240,7 +240,7 @@ class EnterpriseCustomerUserSubsidiesSerializer(BaseBffSerializer):
     Serializer for enterprise customer user subsidies.
     """
 
-    subscriptions = SubscriptionsSerializer()
+    subscriptions = SubscriptionsSerializer(required=False, default=dict)
 
 
 class BaseLearnerPortalResponseSerializer(BaseResponseSerializer):

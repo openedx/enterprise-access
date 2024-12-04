@@ -65,8 +65,8 @@ class TestHandlerContext(TestHandlerContextMixin):
         expected_errors = (
             [
                 {
-                    'developer_message': 'Could not fetch enterprise customer users. Error: Mock exception',
-                    'user_message': 'Error retrieving linked enterprise customers'
+                    'developer_message': 'Could not initialize enterprise customer users. Error: Mock exception',
+                    'user_message': 'Error initializing enterprise customer users'
                 }
             ] if raises_exception else []
         )
@@ -126,14 +126,16 @@ class TestHandlerContext(TestHandlerContextMixin):
         expected_errors = (
             [
                 {
-                    'user_message': 'Error transforming enterprise customer users data',
+                    'user_message': 'No enterprise customer found',
                     'developer_message': (
-                        'Could not transform enterprise customer users data. '
-                        'Error: Error retrieving enterprise customer data'
+                        f'No enterprise customer found for request user {context.lms_user_id} '
+                        f'and enterprise uuid {context.enterprise_customer_uuid}, '
+                        f'and/or enterprise slug {context.enterprise_customer_slug}'
                     ),
                 }
             ] if raises_exception else []
         )
+
         self.assertEqual(context.errors, expected_errors)
         self.assertEqual(context.warnings, [])
         self.assertEqual(context.enterprise_features, self.mock_enterprise_learner_response_data['enterprise_features'])

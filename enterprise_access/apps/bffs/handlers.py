@@ -457,6 +457,17 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         Load default enterprise course enrollments (stubbed)
         """
+        if not self.context.is_request_user_linked_to_enterprise_customer:
+            # Skip loading default enterprise enrollment intentions if the request
+            # user is not linked to specified enterprise customer (e.g., staff request user)
+            logger.info(
+                'Request user %s is not linked to enterprise customer %s. Skipping default '
+                'enterprise enrollment intentions.',
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
+            return
+
         try:
             default_enterprise_enrollment_intentions =\
                 get_and_cache_default_enterprise_enrollment_intentions_learner_status(
@@ -627,6 +638,15 @@ class DashboardHandler(BaseLearnerPortalHandler):
         Returns:
             list: A list of enterprise course enrollments.
         """
+        if not self.context.is_request_user_linked_to_enterprise_customer:
+            # Skip loading enterprise course enrollments if the request user is not linked to the enterprise customer
+            logger.info(
+                'Request user %s is not linked to enterprise customer %s. Skipping enterprise course enrollments.',
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
+            return
+
         try:
             enterprise_course_enrollments = get_and_cache_enterprise_course_enrollments(
                 request=self.context.request,

@@ -4,7 +4,6 @@ HandlerContext for bffs app.
 import logging
 
 from rest_framework import status
-from requests.exceptions import HTTPError
 
 from enterprise_access.apps.bffs import serializers
 from enterprise_access.apps.bffs.api import (
@@ -174,14 +173,14 @@ class HandlerContext:
             logger.info(
                 'No enterprise customer found for request user %s, enterprise customer uuid %s, '
                 'and/or enterprise slug %s',
-                self.user.id,
+                self.lms_user_id,
                 enterprise_customer_uuid,
                 enterprise_customer_slug,
             )
             self.add_error(
                 user_message='No enterprise customer found',
                 developer_message=(
-                    f'No enterprise customer found for request user {self.user.id} and enterprise uuid '
+                    f'No enterprise customer found for request user {self.lms_user_id} and enterprise uuid '
                     f'{enterprise_customer_uuid}, and/or enterprise slug {enterprise_customer_slug}'
                 ),
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -215,19 +214,13 @@ class HandlerContext:
                 enterprise_customer_slug=self.enterprise_customer_slug,
                 enterprise_customer_uuid=self.enterprise_customer_uuid,
             )
-        except Exception as exc:  # pylint: disable=broad-except
+        except Exception:  # pylint: disable=broad-except
             logger.exception(
                 'Error transforming enterprise customer users metadata for request user %s, '
                 'enterprise customer uuid %s and/or slug %s',
                 self.lms_user_id,
                 self.enterprise_customer_uuid,
                 self.enterprise_customer_slug,
-            )
-            self.add_error(
-                user_message='Could not transform enterprise customer metadata',
-                developer_message=(
-                    f'Unable to transform enterprise customer users metadata. Error: {exc}'
-                ),
             )
 
         # Update the context data with the transformed enterprise customer users data
