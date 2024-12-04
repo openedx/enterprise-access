@@ -33,24 +33,16 @@ class TestBaseHandler(TestHandlerContextMixin):
             **self.mock_error,
             "status_code": status.HTTP_400_BAD_REQUEST
         }
-        base_handler.add_error(
-            **arguments
-        )
+        base_handler.add_error(**arguments)
         self.assertEqual(self.mock_error, base_handler.context.errors[0])
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, base_handler.context.status_code)
 
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     def test_base_handler_add_warning(self, mock_get_enterprise_customers_for_user):
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
         context = HandlerContext(self.request)
         base_handler = BaseHandler(context)
-        # Define kwargs for add_warning
-        arguments = {
-            **self.mock_warning,
-            "status_code": 113  # Add an attribute that is not explicitly defined in the serializer to verify
-        }
-        base_handler.add_warning(
-            **arguments
-        )
+        base_handler.add_warning(**self.mock_warning)
         self.assertEqual(self.mock_warning, base_handler.context.warnings[0])
 
 
@@ -222,10 +214,7 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.bulk_enroll_enterprise_learners')
     def test_request_default_enrollment_realizations(self, mock_bulk_enroll, mock_get_customers):
-        mock_get_customers.return_value = {
-            **self.mock_enterprise_learner_response_data,
-            'results': [],
-        }
+        mock_get_customers.return_value = self.mock_enterprise_learner_response_data
         license_uuids_by_course_run_key = {
             'course-run-1': 'license-1',
             'course-run-2': 'license-2',
@@ -250,10 +239,7 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.bulk_enroll_enterprise_learners')
     def test_request_default_enrollment_realizations_exception(self, mock_bulk_enroll, mock_get_customers):
-        mock_get_customers.return_value = {
-            **self.mock_enterprise_learner_response_data,
-            'results': [],
-        }
+        mock_get_customers.return_value = self.mock_enterprise_learner_response_data
         license_uuids_by_course_run_key = {
             'course-run-1': 'license-1',
             'course-run-2': 'license-2',
@@ -286,10 +272,7 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
     def test_realize_default_enrollments(
         self, mock_get_intentions, mock_bulk_enroll, mock_get_customers
     ):
-        mock_get_customers.return_value = {
-            **self.mock_enterprise_learner_response_data,
-            'results': [],
-        }
+        mock_get_customers.return_value = self.mock_enterprise_learner_response_data
         mock_get_intentions.return_value = {
             "lms_user_id": self.mock_user.id,
             "user_email": self.mock_user.email,

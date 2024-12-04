@@ -42,19 +42,26 @@ class BaseHandler:
         """
         raise NotImplementedError("Subclasses must implement `load_and_process` method.")
 
-    def add_error(self, **kwargs):
+    def add_error(self, user_message, developer_message, status_code=None):
         """
         Adds an error to the context.
         Output fields determined by the ErrorSerializer
         """
-        self.context.add_error(**kwargs)
+        self.context.add_error(
+            user_message=user_message,
+            developer_message=developer_message,
+            status_code=status_code,
+        )
 
-    def add_warning(self, **kwargs):
+    def add_warning(self, user_message, developer_message):
         """
         Adds an error to the context.
         Output fields determined by the WarningSerializer
         """
-        self.context.add_warning(**kwargs)
+        self.context.add_warning(
+            user_message=user_message,
+            developer_message=developer_message,
+        )
 
 
 class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
@@ -84,10 +91,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         The method in this class simply calls common learner logic to ensure the context is set up.
         """
         if not self.context.enterprise_customer:
-            self.add_error(
-                user_message="An error occurred while loading the learner portal handler.",
-                developer_message="Enterprise customer not found in the context.",
-            )
+            logger.info('No enterprise customer found in the context for request user %s', self.context.lms_user_id)
             return
 
         try:
@@ -100,11 +104,15 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             # Retrieve default enterprise courses and enroll in the redeemable ones
             self.load_default_enterprise_enrollment_intentions()
             self.enroll_in_redeemable_default_enterprise_enrollment_intentions()
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.exception("Error loading learner portal handler")
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.exception(
+                "Error loading/processing learner portal handler for request user %s and enterprise customer %s",
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
             self.add_error(
-                user_message="An error occurred while loading and processing common learner logic.",
-                developer_message=f"Error: {e}",
+                user_message="Could not load and/or process common data",
+                developer_message=f"Unable to load and/or process common learner portal data: {exc}",
             )
 
     def transform_enterprise_customers(self):
@@ -113,6 +121,9 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         for customer_record_key in ('enterprise_customer', 'active_enterprise_customer', 'staff_enterprise_customer'):
             if not (customer_record := getattr(self.context, customer_record_key, None)):
+                logger.warning(
+                    f"No {customer_record_key} found in the context for request user {self.context.lms_user_id}"
+                )
                 continue
             self.context.data[customer_record_key] = self.transform_enterprise_customer(customer_record)
 
@@ -121,6 +132,10 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 self.transform_enterprise_customer_user(enterprise_customer_user)
                 for enterprise_customer_user in enterprise_customer_users
             ]
+        else:
+            logger.warning(
+                f"No linked enterprise customer users found in the context for request user {self.context.lms_user_id}"
+            )
 
     def load_and_process_subsidies(self):
         """
@@ -159,8 +174,13 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         Returns:
             The transformed enterprise customer data.
         """
-        if not enterprise_customer or not enterprise_customer.get('enable_learner_portal', False):
-            # If the enterprise customer does not exist or the learner portal is not enabled, return None
+        if not enterprise_customer:
+            # If the enterprise customer does not exist, return None.
+            return None
+
+        if not enterprise_customer.get('enable_learner_portal', False):
+            # If the enterprise customer's learner portal is not enabled, log an info message and return None.
+            logger.info(f"Learner portal is not enabled for enterprise customer {enterprise_customer.get('uuid')}")
             return None
 
         # Learner Portal is enabled, so transform the enterprise customer data.
@@ -192,30 +212,16 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             self.context.data['enterprise_customer_user_subsidies'].update({
                 'subscriptions': subscriptions_data,
             })
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.exception("Error loading subscription licenses")
-            self.add_error(
-                user_message="An error occurred while loading subscription licenses.",
-                developer_message=f"Error: {e}",
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.exception(
+                "Error loading subscription licenses for request user %s and enterprise customer %s",
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
             )
-
-    def transform_subscription_licenses(self, subscription_licenses):
-        """
-        Transform subscription licenses data if needed.
-        """
-        return [
-            {
-                'uuid': subscription_license.get('uuid'),
-                'status': subscription_license.get('status'),
-                'user_email': subscription_license.get('user_email'),
-                'activation_date': subscription_license.get('activation_date'),
-                'last_remind_date': subscription_license.get('last_remind_date'),
-                'revoked_date': subscription_license.get('revoked_date'),
-                'activation_key': subscription_license.get('activation_key'),
-                'subscription_plan': subscription_license.get('subscription_plan', {}),
-            }
-            for subscription_license in subscription_licenses
-        ]
+            self.add_error(
+                user_message="Unable to retrieve subscription licenses",
+                developer_message=f"Unable to fetch subscription licenses. Error: {exc}",
+            )
 
     def transform_subscriptions_result(self, subscriptions_result):
         """
@@ -223,10 +229,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         subscription_licenses = subscriptions_result.get('results', [])
         subscription_licenses_by_status = {}
-
-        transformed_licenses = self.transform_subscription_licenses(subscription_licenses)
-
-        for subscription_license in transformed_licenses:
+        for subscription_license in subscription_licenses:
             status = subscription_license.get('status')
             if status not in subscription_licenses_by_status:
                 subscription_licenses_by_status[status] = []
@@ -234,7 +237,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
 
         return {
             'customer_agreement': subscriptions_result.get('customer_agreement'),
-            'subscription_licenses': transformed_licenses,
+            'subscription_licenses': subscription_licenses,
             'subscription_licenses_by_status': subscription_licenses_by_status,
         }
 
@@ -290,10 +293,14 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         This method is called after `load_subscription_licenses` to handle further actions based
         on the loaded data.
         """
-        if not self.subscriptions or self.current_activated_license:
-            # Skip processing if:
-            # - there is no subscriptions data
-            # - user already has an activated license(s)
+        if not self.subscriptions:
+            # Skip process if there are no subscriptions data
+            logger.warning("No subscription data found for the request user %s", self.context.lms_user_id)
+            return
+
+        if self.current_activated_license:
+            # Skip processing if request user already has an activated license(s)
+            logger.info("User %s already has an activated license", self.context.lms_user_id)
             return
 
         # Check if there are 'assigned' licenses that need to be activated
@@ -332,23 +339,25 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                         enterprise_customer_uuid=self.context.enterprise_customer_uuid,
                         lms_user_id=self.context.lms_user_id,
                     )
-                except Exception as e:  # pylint: disable=broad-exception-caught
-                    logger.exception(f"Error activating license {subscription_license.get('uuid')}")
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    license_uuid = subscription_license.get('uuid')
+                    logger.exception(f"Error activating license {license_uuid}")
                     self.add_error(
-                        user_message="An error occurred while activating a subscription license.",
-                        developer_message=f"License UUID: {subscription_license.get('uuid')}, Error: {e}",
+                        user_message="Unable to activate subscription license",
+                        developer_message=f"Could not activate subscription license {license_uuid}, Error: {exc}",
                     )
                     return
 
                 # Update the subscription_license data with the activation status and date; the activated license is not
                 # returned from the API, so we need to manually update the license object we have available.
-                transformed_activated_subscription_licenses = self.transform_subscription_licenses([activated_license])
+                transformed_activated_subscription_licenses = [activated_license]
                 activated_licenses.append(transformed_activated_subscription_licenses[0])
             else:
-                logger.error(f"Activation key not found for license {subscription_license.get('uuid')}")
+                license_uuid = subscription_license.get('uuid')
+                logger.error(f"Activation key not found for license {license_uuid}")
                 self.add_error(
-                    user_message="An error occurred while activating a subscription license.",
-                    developer_message=f"Activation key not found for license {subscription_license.get('uuid')}",
+                    user_message="No subscription license activation key found",
+                    developer_message=f"Activation key not found for license {license_uuid}",
                 )
 
         # Update the subscription_licenses_by_status data with the activated licenses
@@ -424,24 +433,43 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 lms_user_id=self.context.lms_user_id,
             )
             # Update the context with the auto-applied license data
-            transformed_auto_applied_licenses = self.transform_subscription_licenses([auto_applied_license])
-            licenses = self.subscription_licenses + transformed_auto_applied_licenses
-            subscription_licenses_by_status['activated'] = transformed_auto_applied_licenses
+            licenses = self.subscription_licenses + [auto_applied_license]
+            subscription_licenses_by_status['activated'] = [auto_applied_license]
             self.context.data['enterprise_customer_user_subsidies']['subscriptions'].update({
                 'subscription_licenses': licenses,
                 'subscription_licenses_by_status': subscription_licenses_by_status,
             })
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.exception("Error auto-applying license")
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.exception(
+                "Error auto-applying subscription license for user %s and "
+                "enterprise customer %s and customer agreement %s",
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+                customer_agreement.get('uuid'),
+            )
             self.add_error(
-                user_message="An error occurred while auto-applying a license.",
-                developer_message=f"Customer agreement UUID: {customer_agreement.get('uuid')}, Error: {e}",
+                user_message="Unable to auto-apply a subscription license.",
+                developer_message=(
+                    f"Could not auto-apply a subscription license for "
+                    f"customer agreement {customer_agreement.get('uuid')}, Error: {exc}",
+                )
             )
 
     def load_default_enterprise_enrollment_intentions(self):
         """
         Load default enterprise course enrollments (stubbed)
         """
+        if not self.context.is_request_user_linked_to_enterprise_customer:
+            # Skip loading default enterprise enrollment intentions if the request
+            # user is not linked to specified enterprise customer (e.g., staff request user)
+            logger.info(
+                'Request user %s is not linked to enterprise customer %s. Skipping default '
+                'enterprise enrollment intentions.',
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
+            return
+
         try:
             default_enterprise_enrollment_intentions =\
                 get_and_cache_default_enterprise_enrollment_intentions_learner_status(
@@ -450,10 +478,14 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 )
             self.context.data['default_enterprise_enrollment_intentions'] = default_enterprise_enrollment_intentions
         except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.exception("Error loading default enterprise courses")
+            logger.exception(
+                "Error loading default enterprise enrollment intentions for user %s and enterprise customer %s",
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
             self.add_error(
-                user_message="An error occurred while loading default enterprise courses.",
-                developer_message=f"Error: {e}",
+                user_message="Could not load default enterprise enrollment intentions",
+                developer_message=f"Could not load default enterprise enrollment intentions. Error: {e}",
             )
 
     def enroll_in_redeemable_default_enterprise_enrollment_intentions(self):
@@ -464,7 +496,24 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         needs_enrollment = enrollment_statuses.get('needs_enrollment', {})
         needs_enrollment_enrollable = needs_enrollment.get('enrollable', [])
 
-        if not (needs_enrollment_enrollable and self.current_activated_license):
+        if not needs_enrollment_enrollable:
+            # Skip enrolling in default enterprise courses if there are no enrollable courses for which to enroll
+            logger.info(
+                "No default enterprise enrollment intentions courses for which to enroll "
+                "for request user %s and enterprise customer %s",
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
+            return
+
+        if not self.current_activated_license:
+            # Skip enrolling in default enterprise courses if there is no activated license
+            logger.info(
+                "No activated license found for request user %s and enterprise customer %s. "
+                "Skipping realization of default enterprise enrollment intentions.",
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
             return
 
         license_uuids_by_course_run_key = {}
@@ -481,21 +530,30 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         response_payload = self._request_default_enrollment_realizations(license_uuids_by_course_run_key)
 
         if failures := response_payload.get('failures'):
+            # Log and add error if there are failures realizing default enrollments
+            failures_str = json.dumps(failures)
+            logger.error(
+                'Default realization enrollment failures for request user %s and '
+                'enterprise customer %s: %s',
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+                failures_str,
+            )
             self.add_error(
                 user_message='There were failures realizing default enrollments',
-                developer_message='Default realization enrollment failures: ' + json.dumps(failures),
+                developer_message='Default realization enrollment failures: ' + failures_str,
             )
 
         if not self.context.data.get('default_enterprise_enrollment_realizations'):
             self.context.data['default_enterprise_enrollment_realizations'] = []
 
-        if response_payload['successes']:
+        if successful_enrollments := response_payload.get('successes', []):
             # Invalidate the default enterprise enrollment intentions and enterprise course enrollments cache
             # as the previously redeemable enrollment intentions have been processed/enrolled.
             self.invalidate_default_enrollment_intentions_cache()
             self.invalidate_enrollments_cache()
 
-        for enrollment in response_payload['successes']:
+        for enrollment in successful_enrollments:
             course_run_key = enrollment.get('course_run_key')
             self.context.data['default_enterprise_enrollment_realizations'].append({
                 'course_key': course_run_key,
@@ -523,7 +581,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 bulk_enrollment_payload,
             )
         except Exception as exc:  # pylint: disable=broad-exception-caught
-            logger.exception('Error actualizing default enrollments')
+            logger.exception('Error realizing default enterprise enrollment intentions')
             self.add_error(
                 user_message='There was an exception realizing default enrollments',
                 developer_message=f'Default realization enrollment exception: {exc}',
@@ -565,10 +623,14 @@ class DashboardHandler(BaseLearnerPortalHandler):
             # Load data specific to the dashboard route
             self.load_enterprise_course_enrollments()
         except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.exception("Error retrieving enterprise_course_enrollments")
+            logger.exception(
+                "Error loading and/or processing dashboard data for user %s and enterprise customer %s",
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
             self.add_error(
-                user_message="An error occurred while processing the learner dashboard.",
-                developer_message=f"Error: {e}",
+                user_message="Could not load and/or processing the learner dashboard.",
+                developer_message=f"Failed to load and/or processing the learner dashboard data: {e}",
             )
 
     def load_enterprise_course_enrollments(self):
@@ -578,6 +640,15 @@ class DashboardHandler(BaseLearnerPortalHandler):
         Returns:
             list: A list of enterprise course enrollments.
         """
+        if not self.context.is_request_user_linked_to_enterprise_customer:
+            # Skip loading enterprise course enrollments if the request user is not linked to the enterprise customer
+            logger.info(
+                'Request user %s is not linked to enterprise customer %s. Skipping enterprise course enrollments.',
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
+            return
+
         try:
             enterprise_course_enrollments = get_and_cache_enterprise_course_enrollments(
                 request=self.context.request,
@@ -585,9 +656,9 @@ class DashboardHandler(BaseLearnerPortalHandler):
                 is_active=True,
             )
             self.context.data['enterprise_course_enrollments'] = enterprise_course_enrollments
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception("Error retrieving enterprise course enrollments")
             self.add_error(
-                user_message="An error occurred while retrieving enterprise course enrollments.",
-                developer_message=f"Error: {e}",
+                user_message="Could not retrieve your enterprise course enrollments.",
+                developer_message=f"Failed to retrieve enterprise course enrollments: {exc}",
             )

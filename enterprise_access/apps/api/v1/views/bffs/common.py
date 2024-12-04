@@ -51,7 +51,7 @@ class BaseBFFViewSet(ViewSet):
             # Create the context based on the request
             context = HandlerContext(request=request)
         except Exception as exc:  # pylint: disable=broad-except
-            logger.exception("Could not create the handler context.")
+            logger.exception("Could not instantiate the handler context for the request.")
             error = {
                 'user_message': 'An error occurred while processing the request.',
                 'developer_message': f'Could not create the handler context. Error: {exc}',
@@ -62,14 +62,33 @@ class BaseBFFViewSet(ViewSet):
         try:
             # Create the route handler
             handler = handler_class(context)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception(
+                "Could not instantiate route handler (%s) for request user %s and enterprise customer %s.",
+                handler_class.__name__,
+                context.lms_user_id,
+                context.enterprise_customer_uuid,
+            )
+            context.add_error(
+                user_message='An error occurred while processing the request.',
+                developer_message=f'Could not instantiate route handler ({handler_class.__name__}). Error: {exc}',
+            )
 
+        try:
             # Load and process route data
             handler.load_and_process()
         except Exception as exc:  # pylint: disable=broad-except
-            logger.exception("Could not create route handler or load/process route data.")
+            logger.exception(
+                "Could not load/process route handler (%s) for request user %s and enterprise customer %s.",
+                handler_class.__name__,
+                context.lms_user_id,
+                context.enterprise_customer_uuid,
+            )
             context.add_error(
                 user_message='An error occurred while processing the request.',
-                developer_message=f'Could not create route handler or load/process route data. Error: {exc}',
+                developer_message=(
+                    f'Could not load/process data for route handler ({handler_class.__name__}). Error: {exc}',
+                ),
             )
 
         # Build the response data and status code
