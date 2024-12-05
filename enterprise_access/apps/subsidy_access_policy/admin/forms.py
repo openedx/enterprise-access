@@ -5,7 +5,7 @@ from django import forms
 from django.conf import settings
 from django.utils.translation import gettext as _
 
-from ..models import ForcedPolicyRedemption
+from ..models import ForcedPolicyRedemption, SubsidyAccessPolicy
 
 
 class LateRedemptionDaysFromNowChoices:
@@ -91,4 +91,16 @@ class ForcedPolicyRedemptionForm(forms.ModelForm):
 
     class Meta:
         model = ForcedPolicyRedemption
+        fields = '__all__'
+
+
+class SubsidyAccessPolicyForm(forms.ModelForm):
+    def clean_subsidy_uuid(self):
+        # 1. check if the subsidy_uuid actually exists
+        # 2. subsidy is assigned to the same enterprise customer as the budget
+        # if any of these checks fail, raise a ValidationError
+        return self.cleaned_data["subsidy_uuid"]
+
+    class Meta:
+        model = SubsidyAccessPolicy
         fields = '__all__'
