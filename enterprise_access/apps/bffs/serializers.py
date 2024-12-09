@@ -181,6 +181,7 @@ class CustomerAgreementSerializer(BaseBffSerializer):
     button_label_in_modal_v2 = serializers.CharField(required=False, allow_null=True)
     expired_subscription_modal_messaging_v2 = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     modal_header_text_v2 = serializers.CharField(required=False, allow_null=True)
+    url_for_button_in_modal_v2 = serializers.CharField(required=False, allow_null=True)
 
 
 class SubscriptionPlanSerializer(BaseBffSerializer):
