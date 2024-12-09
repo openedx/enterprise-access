@@ -15,7 +15,7 @@ asgiref==3.8.1
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   django
     #   django-cors-headers
-astroid==3.3.5
+astroid==3.3.6
     # via
     #   pylint
     #   pylint-celery
@@ -99,7 +99,7 @@ coreschema==0.0.4
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   coreapi
-coverage[toml]==7.6.8
+coverage[toml]==7.6.9
     # via
     #   -r requirements/test.in
     #   pytest-cov
@@ -217,7 +217,7 @@ edx-auth-backends==4.4.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
 edx-braze-client==0.2.5
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
-edx-ccx-keys==1.3.0
+edx-ccx-keys==2.0.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   openedx-events
@@ -225,7 +225,7 @@ edx-celeryutils==1.3.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
 edx-django-release-util==1.4.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
-edx-django-utils==7.0.1
+edx-django-utils==7.1.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   edx-drf-extensions
@@ -448,7 +448,7 @@ pyyaml==6.0.2
     #   drf-spectacular
     #   drf-yasg
     #   edx-django-release-util
-redis==5.2.0
+redis==5.2.1
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
 referencing==0.35.1
     # via
@@ -468,7 +468,7 @@ requests-oauthlib==2.0.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   social-auth-core
-rpds-py==0.21.0
+rpds-py==0.22.3
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   jsonschema
@@ -483,7 +483,7 @@ simplejson==3.19.3
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   django-rest-swagger
-six==1.16.0
+six==1.17.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt
     #   analytics-python
