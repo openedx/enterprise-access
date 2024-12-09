@@ -106,6 +106,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 'expired_subscription_modal_messaging_v2'
             ),
             'modal_header_text_v2': self.mock_customer_agreement.get('modal_header_text_v2'),
+            'url_for_button_in_modal_v2': self.mock_customer_agreement.get('url_for_button_in_modal_v2'),
         }
         self.expected_subscription_license = {
             'uuid': self.mock_subscription_license.get('uuid'),
