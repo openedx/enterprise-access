@@ -74,7 +74,7 @@ class MockLicenseManagerMetadataMixin(MockEnterpriseMetadata):
             "days_until_expiration_including_renewals": 50,
             "is_locked_for_renewal_processing": False,
             "should_auto_apply_licenses": False,
-            "created": _days_from_now(-60, DATE_FORMAT_ISO_8601)
+            "created": _days_from_now(-60, DATE_FORMAT_ISO_8601),
         }
         self.mock_customer_agreement = {
             "uuid": self.mock_customer_agreement_uuid,
@@ -92,7 +92,7 @@ class MockLicenseManagerMetadataMixin(MockEnterpriseMetadata):
             "modal_header_text_v2": None,
             "expired_subscription_modal_messaging_v2": None,
             "button_label_in_modal_v2": None,
-            "url_for_button_in_modal_v2": None
+            "url_for_button_in_modal_v2": None,
         }
         self.mock_subscription_license = {
             "uuid": self.mock_learner_license_activation_uuid,
@@ -103,7 +103,7 @@ class MockLicenseManagerMetadataMixin(MockEnterpriseMetadata):
             "subscription_plan_uuid": self.mock_subscription_plan_uuid,
             "revoked_date": None,
             "activation_key": self.mock_license_activation_key,
-            "subscription_plan": self.mock_subscription_plan
+            "subscription_plan": self.mock_subscription_plan,
         }
         self.mock_learner_license_auto_apply_response = {
             **self.mock_subscription_license,
