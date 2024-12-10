@@ -1,11 +1,15 @@
 """
 Forms to be used for subsidy_access_policy django admin.
 """
+import requests
 from django import forms
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext as _
 
-from ..models import ForcedPolicyRedemption
+from enterprise_access.apps.subsidy_access_policy.utils import get_versioned_subsidy_client
+
+from ..models import ForcedPolicyRedemption, SubsidyAccessPolicy
 
 
 class LateRedemptionDaysFromNowChoices:
@@ -91,4 +95,31 @@ class ForcedPolicyRedemptionForm(forms.ModelForm):
 
     class Meta:
         model = ForcedPolicyRedemption
+        fields = '__all__'
+
+
+class SubsidyAccessPolicyForm(forms.ModelForm):
+    """
+    Admin form for the SubsidyAccessPolicy model.
+    """
+    def clean_subsidy_uuid(self):
+        """
+        Validate that the subsidy exists and is assigned to the same enterprise customer as the budget.
+        """
+        # 1. check if the subsidy_uuid actually exists
+        # 2. subsidy is assigned to the same enterprise customer as the budget
+        # if any of these checks fail, raise a ValidationError
+        client = get_versioned_subsidy_client(version=1)
+        try:
+            subsidy = client.retrieve_subsidy(self.cleaned_data["subsidy_uuid"])
+        except requests.exceptions.HTTPError as exc:
+            raise ValidationError("Subsidy does not exist") from exc
+
+        if str(subsidy["enterprise_customer_uuid"]) != str(self.cleaned_data["enterprise_customer_uuid"]):
+            raise ValidationError("Subsidy is not assigned to the same enterprise customer as the budget")
+
+        return self.cleaned_data["subsidy_uuid"]
+
+    class Meta:
+        model = SubsidyAccessPolicy
         fields = '__all__'
