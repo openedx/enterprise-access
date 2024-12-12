@@ -350,6 +350,19 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
             }],
         )
 
+        # a simple validation here that a second consecutive call to
+        # load the default intentions means the handler doesn't read from the cache,
+        # because the first request included enrollable intentions.
+        # We make this assertion using the returned value from the mock call
+        # to fetch default intention status. In a production-like setting, this
+        # second call should contain data indicating that default enrollment
+        # intentions were actually realized.
+        handler.load_default_enterprise_enrollment_intentions()
+        self.assertEqual(
+            handler.context.data['default_enterprise_enrollment_intentions'],
+            mock_get_intentions.return_value,
+        )
+
 
 class TestDashboardHandler(TestHandlerContextMixin):
     """
