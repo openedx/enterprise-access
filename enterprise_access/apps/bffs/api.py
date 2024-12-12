@@ -125,6 +125,8 @@ def get_and_cache_default_enterprise_enrollment_intentions_learner_status(
 ):
     """
     Retrieves and caches default enterprise enrollment intentions for a learner.
+    This function does not cache this data if it includes any enrollable intentions,
+    because we don't want to re-attempt enrollment realization on the second of consecutive requests.
     """
     cache_key = default_enterprise_enrollment_intentions_learner_status_cache_key(
         enterprise_customer_uuid,
@@ -142,6 +144,13 @@ def get_and_cache_default_enterprise_enrollment_intentions_learner_status(
     response_payload = client.get_default_enterprise_enrollment_intentions_learner_status(
         enterprise_customer_uuid=enterprise_customer_uuid,
     )
+
+    # Don't set in the cache if there are enrollable intentions
+    if statuses := response_payload.get('enrollment_statuses', {}):
+        needs_enrollment = statuses.get('needs_enrollment', {})
+        if needs_enrollment.get('enrollable', []):
+            return response_payload
+
     TieredCache.set_all_tiers(cache_key, response_payload, timeout)
     return response_payload
 
