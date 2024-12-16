@@ -15,7 +15,7 @@ asgiref==3.8.1
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   django
     #   django-cors-headers
-astroid==3.3.5
+astroid==3.3.6
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   pylint
@@ -43,7 +43,7 @@ celery==5.4.0
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   django-celery-results
     #   edx-celeryutils
-certifi==2024.8.30
+certifi==2024.12.14
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   requests
@@ -87,7 +87,7 @@ click-repl==0.3.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   celery
-code-annotations==2.0.0
+code-annotations==2.1.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-lint
@@ -107,7 +107,7 @@ coreschema==0.0.4
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   coreapi
-coverage[toml]==7.6.8
+coverage[toml]==7.6.9
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   pytest-cov
@@ -132,7 +132,7 @@ distlib==0.3.9
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   virtualenv
-django==4.2.16
+django==4.2.17
     # via
     #   -c /home/runner/work/enterprise-access/enterprise-access/requirements/common_constraints.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -233,7 +233,7 @@ edx-auth-backends==4.4.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
 edx-braze-client==0.2.5
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-edx-ccx-keys==1.3.0
+edx-ccx-keys==2.0.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   openedx-events
@@ -241,7 +241,7 @@ edx-celeryutils==1.3.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
 edx-django-release-util==1.4.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-edx-django-utils==7.0.1
+edx-django-utils==7.1.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-drf-extensions
@@ -373,7 +373,7 @@ more-itertools==10.5.0
     #   jaraco-functools
 mysqlclient==2.2.6
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-newrelic==10.3.1
+newrelic==10.4.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-django-utils
@@ -404,7 +404,7 @@ pbr==6.1.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   stevedore
-pkginfo==1.11.2
+pkginfo==1.12.0
     # via twine
 platformdirs==4.3.6
     # via
@@ -521,7 +521,7 @@ pyyaml==6.0.2
     #   edx-django-release-util
 readme-renderer==44.0
     # via twine
-redis==5.2.0
+redis==5.2.1
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
 referencing==0.35.1
     # via
@@ -549,7 +549,7 @@ rfc3986==2.0.0
     # via twine
 rich==13.9.4
     # via twine
-rpds-py==0.21.0
+rpds-py==0.22.3
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   jsonschema
@@ -566,7 +566,7 @@ simplejson==3.19.3
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   django-rest-swagger
-six==1.16.0
+six==1.17.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   analytics-python
@@ -587,7 +587,7 @@ social-auth-core==4.5.4
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-auth-backends
     #   social-auth-app-django
-sqlparse==0.5.2
+sqlparse==0.5.3
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   django
