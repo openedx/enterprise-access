@@ -13,11 +13,6 @@ analytics-python==1.4.post1
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
     #   -r /edx/app/enterprise-access/requirements/test.txt
-anyio==4.8.0
-    # via
-    #   -r /edx/app/enterprise-access/requirements/quality.txt
-    #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   httpx
 asgiref==3.8.1
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
@@ -34,10 +29,14 @@ attrs==24.3.0
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
     #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   confluent-kafka
     #   jsonschema
     #   openedx-events
     #   referencing
+avro==1.12.0
+    # via
+    #   -r /edx/app/enterprise-access/requirements/quality.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
+    #   confluent-kafka
 backoff==1.10.0
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
@@ -52,7 +51,6 @@ cachetools==5.5.0
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
     #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   confluent-kafka
     #   tox
 celery==5.4.0
     # via
@@ -64,8 +62,6 @@ certifi==2024.12.14
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
     #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   httpcore
-    #   httpx
     #   requests
 cffi==1.17.1
     # via
@@ -126,7 +122,7 @@ colorama==0.4.6
     #   -r /edx/app/enterprise-access/requirements/quality.txt
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   tox
-confluent-kafka[schemaregistry]==2.7.0
+confluent-kafka[avro,schema-registry]==2.6.1
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
     #   -r /edx/app/enterprise-access/requirements/test.txt
@@ -386,6 +382,7 @@ fastavro==1.10.0
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
     #   -r /edx/app/enterprise-access/requirements/test.txt
+    #   confluent-kafka
     #   openedx-events
 filelock==3.16.1
     # via
@@ -397,27 +394,10 @@ freezegun==1.5.1
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
     #   -r /edx/app/enterprise-access/requirements/test.txt
-h11==0.14.0
-    # via
-    #   -r /edx/app/enterprise-access/requirements/quality.txt
-    #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   httpcore
-httpcore==1.0.7
-    # via
-    #   -r /edx/app/enterprise-access/requirements/quality.txt
-    #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   httpx
-httpx==0.27.2
-    # via
-    #   -r /edx/app/enterprise-access/requirements/quality.txt
-    #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   confluent-kafka
 idna==3.10
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
     #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   anyio
-    #   httpx
     #   requests
 inflection==0.5.1
     # via
@@ -603,7 +583,7 @@ pycparser==2.22
     #   cffi
 pydocstyle==6.3.0
     # via -r /edx/app/enterprise-access/requirements/quality.txt
-pygments==2.19.0
+pygments==2.19.1
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
     #   -r /edx/app/enterprise-access/requirements/test.txt
@@ -725,6 +705,7 @@ requests==2.32.3
     #   -r /edx/app/enterprise-access/requirements/quality.txt
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   analytics-python
+    #   confluent-kafka
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
@@ -784,12 +765,6 @@ six==1.17.0
     #   edx-lint
     #   edx-rbac
     #   python-dateutil
-sniffio==1.3.1
-    # via
-    #   -r /edx/app/enterprise-access/requirements/quality.txt
-    #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   anyio
-    #   httpx
 snowballstemmer==2.2.0
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
@@ -837,7 +812,6 @@ typing-extensions==4.12.2
     # via
     #   -r /edx/app/enterprise-access/requirements/quality.txt
     #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   anyio
     #   edx-opaque-keys
     #   faker
 tzdata==2024.2

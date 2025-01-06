@@ -3,7 +3,7 @@
 
 analytics-python
 celery
-confluent-kafka[schemaregistry]
+confluent-kafka[avro,schema-registry]
 Django>=2.2          # Web application framework
 djangoql
 django-cors-headers

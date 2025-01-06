@@ -10,10 +10,6 @@ amqp==5.3.1
     #   kombu
 analytics-python==1.4.post1
     # via -r /edx/app/enterprise-access/requirements/validation.txt
-anyio==4.8.0
-    # via
-    #   -r /edx/app/enterprise-access/requirements/validation.txt
-    #   httpx
 asgiref==3.8.1
     # via
     #   -r /edx/app/enterprise-access/requirements/validation.txt
@@ -27,10 +23,13 @@ astroid==3.3.8
 attrs==24.3.0
     # via
     #   -r /edx/app/enterprise-access/requirements/validation.txt
-    #   confluent-kafka
     #   jsonschema
     #   openedx-events
     #   referencing
+avro==1.12.0
+    # via
+    #   -r /edx/app/enterprise-access/requirements/validation.txt
+    #   confluent-kafka
 backoff==1.10.0
     # via
     #   -r /edx/app/enterprise-access/requirements/validation.txt
@@ -46,7 +45,6 @@ build==1.2.2.post1
 cachetools==5.5.0
     # via
     #   -r /edx/app/enterprise-access/requirements/validation.txt
-    #   confluent-kafka
     #   tox
 celery==5.4.0
     # via
@@ -56,8 +54,6 @@ celery==5.4.0
 certifi==2024.12.14
     # via
     #   -r /edx/app/enterprise-access/requirements/validation.txt
-    #   httpcore
-    #   httpx
     #   requests
 cffi==1.17.1
     # via
@@ -111,7 +107,7 @@ colorama==0.4.6
     # via
     #   -r /edx/app/enterprise-access/requirements/validation.txt
     #   tox
-confluent-kafka[schemaregistry]==2.7.0
+confluent-kafka[avro,schema-registry]==2.6.1
     # via -r /edx/app/enterprise-access/requirements/validation.txt
 coreapi==2.3.3
     # via
@@ -308,6 +304,7 @@ faker==33.3.0
 fastavro==1.10.0
     # via
     #   -r /edx/app/enterprise-access/requirements/validation.txt
+    #   confluent-kafka
     #   openedx-events
 filelock==3.16.1
     # via
@@ -316,23 +313,9 @@ filelock==3.16.1
     #   virtualenv
 freezegun==1.5.1
     # via -r /edx/app/enterprise-access/requirements/validation.txt
-h11==0.14.0
-    # via
-    #   -r /edx/app/enterprise-access/requirements/validation.txt
-    #   httpcore
-httpcore==1.0.7
-    # via
-    #   -r /edx/app/enterprise-access/requirements/validation.txt
-    #   httpx
-httpx==0.27.2
-    # via
-    #   -r /edx/app/enterprise-access/requirements/validation.txt
-    #   confluent-kafka
 idna==3.10
     # via
     #   -r /edx/app/enterprise-access/requirements/validation.txt
-    #   anyio
-    #   httpx
     #   requests
 inflection==0.5.1
     # via
@@ -506,7 +489,7 @@ pycparser==2.22
     #   cffi
 pydocstyle==6.3.0
     # via -r /edx/app/enterprise-access/requirements/validation.txt
-pygments==2.19.0
+pygments==2.19.1
     # via
     #   -r /edx/app/enterprise-access/requirements/validation.txt
     #   diff-cover
@@ -610,6 +593,7 @@ requests==2.32.3
     # via
     #   -r /edx/app/enterprise-access/requirements/validation.txt
     #   analytics-python
+    #   confluent-kafka
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
@@ -662,11 +646,6 @@ six==1.17.0
     #   edx-lint
     #   edx-rbac
     #   python-dateutil
-sniffio==1.3.1
-    # via
-    #   -r /edx/app/enterprise-access/requirements/validation.txt
-    #   anyio
-    #   httpx
 snowballstemmer==2.2.0
     # via
     #   -r /edx/app/enterprise-access/requirements/validation.txt
@@ -706,7 +685,6 @@ twine==6.0.1
 typing-extensions==4.12.2
     # via
     #   -r /edx/app/enterprise-access/requirements/validation.txt
-    #   anyio
     #   edx-opaque-keys
     #   faker
 tzdata==2024.2
