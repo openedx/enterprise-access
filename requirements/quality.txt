@@ -10,10 +10,6 @@ amqp==5.3.1
     #   kombu
 analytics-python==1.4.post1
     # via -r /edx/app/enterprise-access/requirements/test.txt
-anyio==4.8.0
-    # via
-    #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   httpx
 asgiref==3.8.1
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
@@ -27,10 +23,13 @@ astroid==3.3.8
 attrs==24.3.0
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   confluent-kafka
     #   jsonschema
     #   openedx-events
     #   referencing
+avro==1.12.0
+    # via
+    #   -r /edx/app/enterprise-access/requirements/test.txt
+    #   confluent-kafka
 backoff==1.10.0
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
@@ -42,7 +41,6 @@ billiard==4.2.1
 cachetools==5.5.0
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   confluent-kafka
     #   tox
 celery==5.4.0
     # via
@@ -52,8 +50,6 @@ celery==5.4.0
 certifi==2024.12.14
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   httpcore
-    #   httpx
     #   requests
 cffi==1.17.1
     # via
@@ -104,8 +100,10 @@ colorama==0.4.6
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   tox
-confluent-kafka[schemaregistry]==2.7.0
-    # via -r /edx/app/enterprise-access/requirements/test.txt
+confluent-kafka[avro,schema-registry]==2.6.1
+    # via
+    #   -c /edx/app/enterprise-access/requirements/constraints.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
 coreapi==2.3.3
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
@@ -294,6 +292,7 @@ faker==33.3.0
 fastavro==1.10.0
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
+    #   confluent-kafka
     #   openedx-events
 filelock==3.16.1
     # via
@@ -302,23 +301,9 @@ filelock==3.16.1
     #   virtualenv
 freezegun==1.5.1
     # via -r /edx/app/enterprise-access/requirements/test.txt
-h11==0.14.0
-    # via
-    #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   httpcore
-httpcore==1.0.7
-    # via
-    #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   httpx
-httpx==0.27.2
-    # via
-    #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   confluent-kafka
 idna==3.10
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   anyio
-    #   httpx
     #   requests
 inflection==0.5.1
     # via
@@ -459,7 +444,7 @@ pycparser==2.22
     #   cffi
 pydocstyle==6.3.0
     # via -r requirements/quality.in
-pygments==2.19.0
+pygments==2.19.1
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   readme-renderer
@@ -554,6 +539,7 @@ requests==2.32.3
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   analytics-python
+    #   confluent-kafka
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
@@ -598,11 +584,6 @@ six==1.17.0
     #   edx-lint
     #   edx-rbac
     #   python-dateutil
-sniffio==1.3.1
-    # via
-    #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   anyio
-    #   httpx
 snowballstemmer==2.2.0
     # via pydocstyle
 social-auth-app-django==5.4.2
@@ -639,7 +620,6 @@ twine==6.0.1
 typing-extensions==4.12.2
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
-    #   anyio
     #   edx-opaque-keys
     #   faker
 tzdata==2024.2
