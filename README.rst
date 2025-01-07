@@ -72,7 +72,7 @@ A note on creating SubsidyRequestCustomerConfiguration Objects locally
 
 In a devstack enviroment, login to the LMS and navigate to any
 MFE before creating SubsidyRequestCustomerConfiguration objects in the
-enterprise-access Django admin
+enterprise-access Django admin.
 
 *Why*
 
