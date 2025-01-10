@@ -74,6 +74,31 @@ services:
     volumes:
       - .:/edx/app/enterprise-access/
 
+  consume_enterprise_subsidies_transaction_lifecycle:
+    image: edxops/enterprise-access-dev
+    container_name: enterprise_access.consume_enterprise_subsidies_transaction_lifecycle
+    volumes:
+      - .:/edx/app/enterprise-access/
+      - ../src:/edx/src
+    command: bash -c 'while true; do python /edx/app/enterprise-access/manage.py consume_events -t enterprise-subsidies-transaction-lifecycle -g enterprise_access_dev; sleep 2; done'
+    ports:
+      - "18272:18272"
+    depends_on:
+      - mysql80
+      - memcache
+      - worker
+    networks:
+      - devstack_default
+    stdin_open: true
+    tty: true
+    environment:
+      CELERY_ALWAYS_EAGER: 'false'
+      CELERY_BROKER_TRANSPORT: redis
+      CELERY_BROKER_HOSTNAME: edx.devstack.redis:6379
+      CELERY_BROKER_VHOST: 0
+      CELERY_BROKER_PASSWORD: password
+      DJANGO_SETTINGS_MODULE: enterprise_access.settings.devstack
+
 networks:
   devstack_default:
     external: true
