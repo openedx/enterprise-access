@@ -79,7 +79,7 @@ class LearnerSubscriptionsDataMixin(EnterpriseCustomerUserSubsidiesDataMixin):
         return self.subscriptions.get('subscription_plan', {})
 
     @property
-    def show_expiration_notifications(self):
+    def show_subscription_expiration_notifications(self):
         """
         Get whether subscription expiration notifications should be shown from the context.
         """
