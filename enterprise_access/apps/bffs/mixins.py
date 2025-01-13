@@ -64,6 +64,27 @@ class LearnerSubscriptionsDataMixin(EnterpriseCustomerUserSubsidiesDataMixin):
         """
         return self.subscriptions.get('subscription_licenses_by_status', {})
 
+    @property
+    def subscription_license(self):
+        """
+        Get subscription license from the context.
+        """
+        return self.subscriptions.get('subscription_license', None)
+
+    @property
+    def subscription_plan(self):
+        """
+        Get subscription plan from the context.
+        """
+        return self.subscriptions.get('subscription_plan', {})
+
+    @property
+    def show_expiration_notifications(self):
+        """
+        Get whether subscription expiration notifications should be shown from the context.
+        """
+        return self.subscriptions.get('show_expiration_notifications', False)
+
 
 class LearnerSubsidiesDataMixin(LearnerSubscriptionsDataMixin):
     """

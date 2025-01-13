@@ -148,6 +148,9 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
             'customer_agreement': None,
             'subscription_licenses': [],
             'subscription_licenses_by_status': {},
+            'subscription_license': None,
+            'subscription_plan': None,
+            'show_expiration_notifications': False,
         }
         self.assertEqual(actual_subscriptions, expected_subscriptions)
 

@@ -208,10 +208,6 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 include_revoked=True,
                 current_plans_only=False,
             )
-            subscriptions_data = self.transform_subscriptions_result(subscriptions_result)
-            self.context.data['enterprise_customer_user_subsidies'].update({
-                'subscriptions': subscriptions_data,
-            })
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(
                 "Error loading subscription licenses for request user %s and enterprise customer %s",
@@ -222,23 +218,79 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 user_message="Unable to retrieve subscription licenses",
                 developer_message=f"Unable to fetch subscription licenses. Error: {exc}",
             )
+            return
 
+        try:
+            subscriptions_data = self.transform_subscriptions_result(subscriptions_result)
+            self.context.data['enterprise_customer_user_subsidies'].update({
+                'subscriptions': subscriptions_data,
+            })
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.exception(
+                "Error transforming subscription licenses for request user %s and enterprise customer %s",
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
+            self.add_error(
+                user_message="Unable to transform subscription licenses",
+                developer_message=f"Unable to transform subscription licenses. Error: {exc}",
+            )
+
+    def _extract_subscription_license(self, subscription_licenses_by_status):
+        """
+        Extract subscription licenses from the subscription licenses by status.
+        """
+        license_status_priority_order = ['activated', 'assigned', 'revoked']
+        subscription_license = next(
+            (
+                license
+                for status in license_status_priority_order
+                for license in subscription_licenses_by_status.get(status, [])
+            ),
+            None,
+        )
+        return subscription_license
+    
     def transform_subscriptions_result(self, subscriptions_result):
         """
         Transform subscription licenses data if needed.
         """
         subscription_licenses = subscriptions_result.get('results', [])
         subscription_licenses_by_status = {}
-        for subscription_license in subscription_licenses:
+
+        # Sort licenses by whether the associated subscription plans
+        # are current; current plans should be prioritized over non-current plans.
+        ordered_subscription_licenses = sorted(
+            subscription_licenses,
+            key=lambda license: not license.get('subscription_plan', {}).get('is_current'),
+        )
+
+        # Group licenses by status
+        for subscription_license in ordered_subscription_licenses:
             status = subscription_license.get('status')
             if status not in subscription_licenses_by_status:
                 subscription_licenses_by_status[status] = []
             subscription_licenses_by_status[status].append(subscription_license)
 
+        customer_agreement = subscriptions_result.get('customer_agreement')
+        subscription_license = self._extract_subscription_license(subscription_licenses_by_status)
+        subscription_plan = subscription_license.get('subscription_plan') if subscription_license else None
+
+        # Determine if expiration notifications should be shown
+        if not customer_agreement:
+            show_expiration_notifications = False
+        else:
+            disable_expiration_notifications = customer_agreement.get('disable_expiration_notifications', False)
+            custom_expiration_messaging = customer_agreement.get('has_custom_license_expiration_messaging_v2', False)
+            show_expiration_notifications = not (disable_expiration_notifications or custom_expiration_messaging)
+
         return {
-            'customer_agreement': subscriptions_result.get('customer_agreement'),
+            'customer_agreement': customer_agreement,
             'subscription_licenses': subscription_licenses,
             'subscription_licenses_by_status': subscription_licenses_by_status,
+            'subscription_license': subscription_license,
+            'subscription_plan': subscription_plan,
+            'show_expiration_notifications': show_expiration_notifications,
         }
 
     def _current_subscription_licenses_for_status(self, status):
@@ -389,11 +441,18 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                     updated_subscription_licenses.append(activated_license)
                     break
                 updated_subscription_licenses.append(subscription_license)
-
         if updated_subscription_licenses:
             self.context.data['enterprise_customer_user_subsidies']['subscriptions'].update({
                 'subscription_licenses': updated_subscription_licenses,
             })
+
+        # Update the subscription_license and subscription_plan data given the activated license
+        subscription_license = self._extract_subscription_license(subscription_licenses_by_status)
+        subscription_plan = subscription_license.get('subscription_plan') if subscription_license else None
+        self.context.data['enterprise_customer_user_subsidies']['subscriptions'].update({
+            'subscription_license': subscription_license,
+            'subscription_plan': subscription_plan,
+        })
 
     def check_and_auto_apply_license(self):
         """
@@ -438,6 +497,8 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             self.context.data['enterprise_customer_user_subsidies']['subscriptions'].update({
                 'subscription_licenses': licenses,
                 'subscription_licenses_by_status': subscription_licenses_by_status,
+                'subscription_license': auto_applied_license,
+                'subscription_plan': auto_applied_license.get('subscription_plan'),
             })
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(
