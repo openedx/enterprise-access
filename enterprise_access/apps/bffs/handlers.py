@@ -4,6 +4,7 @@ Handlers for bffs app.
 import json
 import logging
 
+from enterprise_access.apps.api_client.constants import LicenseStatuses
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerUserApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.bffs.api import (
@@ -240,7 +241,11 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         Extract subscription licenses from the subscription licenses by status.
         """
-        license_status_priority_order = ['activated', 'assigned', 'revoked']
+        license_status_priority_order = [
+            LicenseStatuses.ACTIVATED,
+            LicenseStatuses.ASSIGNED,
+            LicenseStatuses.REVOKED,
+        ]
         subscription_license = next(
             (
                 license
@@ -308,7 +313,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         Returns list of current, activated licenses, if any, for the user.
         """
-        activated_licenses = self._current_subscription_licenses_for_status('activated')
+        activated_licenses = self._current_subscription_licenses_for_status(LicenseStatuses.ACTIVATED)
         return activated_licenses
 
     @property
@@ -325,7 +330,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         Returns a revoked license for the user iff the related subscription plan is current,
         otherwise returns None.
         """
-        return self._current_subscription_licenses_for_status('revoked')
+        return self._current_subscription_licenses_for_status(LicenseStatuses.REVOKED)
 
     @property
     def current_assigned_licenses(self):
@@ -333,7 +338,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         Returns an assigned license for the user iff the related subscription plan is current,
         otherwise returns None.
         """
-        return self._current_subscription_licenses_for_status('assigned')
+        return self._current_subscription_licenses_for_status(LicenseStatuses.ASSIGNED)
 
     def process_subscription_licenses(self):
         """
@@ -416,7 +421,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         updated_activated_licenses = self.current_activated_licenses
         updated_activated_licenses.extend(activated_licenses)
         if updated_activated_licenses:
-            subscription_licenses_by_status['activated'] = updated_activated_licenses
+            subscription_licenses_by_status[LicenseStatuses.ACTIVATED] = updated_activated_licenses
 
         activated_license_uuids = {license['uuid'] for license in activated_licenses}
         remaining_assigned_licenses = [
@@ -425,9 +430,9 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             if subscription_license['uuid'] not in activated_license_uuids
         ]
         if remaining_assigned_licenses:
-            subscription_licenses_by_status['assigned'] = remaining_assigned_licenses
+            subscription_licenses_by_status[LicenseStatuses.ASSIGNED] = remaining_assigned_licenses
         else:
-            subscription_licenses_by_status.pop('assigned', None)
+            subscription_licenses_by_status.pop(LicenseStatuses.ASSIGNED, None)
 
         self.context.data['enterprise_customer_user_subsidies']['subscriptions'].update({
             'subscription_licenses_by_status': subscription_licenses_by_status,
