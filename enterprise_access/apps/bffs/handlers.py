@@ -250,7 +250,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             None,
         )
         return subscription_license
-    
+
     def transform_subscriptions_result(self, subscriptions_result):
         """
         Transform subscription licenses data if needed.
