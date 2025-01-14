@@ -54,7 +54,7 @@ code-annotations==2.1.0
     # via edx-toggles
 confluent-kafka[avro,schema-registry]==2.6.1
     # via
-    #   -c /edx/app/enterprise-access/requirements/constraints.txt
+    #   -c /home/runner/work/enterprise-access/enterprise-access/requirements/constraints.txt
     #   -r requirements/base.in
 coreapi==2.3.3
     # via
@@ -72,7 +72,7 @@ defusedxml==0.8.0rc2
     #   social-auth-core
 django==4.2.17
     # via
-    #   -c /edx/app/enterprise-access/requirements/common_constraints.txt
+    #   -c /home/runner/work/enterprise-access/enterprise-access/requirements/common_constraints.txt
     #   -r requirements/base.in
     #   django-celery-results
     #   django-cors-headers
@@ -226,7 +226,7 @@ markupsafe==3.0.2
     # via jinja2
 monotonic==1.6
     # via analytics-python
-mysqlclient==2.2.6
+mysqlclient==2.2.7
     # via -r requirements/base.in
 newrelic==10.4.0
     # via edx-django-utils
@@ -346,8 +346,10 @@ uritemplate==4.1.1
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.3.0
-    # via requests
+urllib3==2.2.3
+    # via
+    #   -c /home/runner/work/enterprise-access/enterprise-access/requirements/common_constraints.txt
+    #   requests
 vine==5.1.0
     # via
     #   amqp
