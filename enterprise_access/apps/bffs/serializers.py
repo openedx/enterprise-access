@@ -228,12 +228,15 @@ class SubscriptionLicenseStatusSerializer(BaseBffSerializer):
 
 class SubscriptionsSerializer(BaseBffSerializer):
     """
-    Serializer for enterprise customer user subsidies.
+    Serializer for subscriptions subsidies.
     """
 
     customer_agreement = CustomerAgreementSerializer(required=False, allow_null=True)
     subscription_licenses = SubscriptionLicenseSerializer(many=True, required=False, default=list)
     subscription_licenses_by_status = SubscriptionLicenseStatusSerializer(required=False)
+    subscription_license = SubscriptionLicenseSerializer(required=False, allow_null=True)
+    subscription_plan = SubscriptionPlanSerializer(required=False, allow_null=True)
+    show_expiration_notifications = serializers.BooleanField(required=False)
 
 
 class EnterpriseCustomerUserSubsidiesSerializer(BaseBffSerializer):

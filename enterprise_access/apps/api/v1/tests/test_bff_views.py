@@ -144,6 +144,9 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                         'assigned': [],
                         'revoked': [],
                     },
+                    'subscription_license': None,
+                    'subscription_plan': None,
+                    'show_expiration_notifications': False,
                 },
             },
             'errors': [],
@@ -279,6 +282,9 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                         'assigned': [],
                         'revoked': [],
                     },
+                    'subscription_license': self.expected_subscription_license,
+                    'subscription_plan': self.expected_subscription_license['subscription_plan'],
+                    'show_expiration_notifications': True,
                 },
             },
         })
@@ -347,6 +353,9 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                         'assigned': [],
                         'revoked': [],
                     },
+                    'subscription_license': expected_activated_subscription_license,
+                    'subscription_plan': expected_activated_subscription_license['subscription_plan'],
+                    'show_expiration_notifications': True,
                 },
             },
         })
@@ -620,6 +629,15 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             if has_existing_revoked_license
             else []
         )
+        expected_subscription_license = None
+        expected_subscription_plan = None
+        if should_auto_apply or has_existing_activated_license:
+            expected_subscription_license = expected_activated_subscription_license
+        elif has_existing_revoked_license:
+            expected_subscription_license = expected_revoked_subscription_license
+        if expected_subscription_license:
+            expected_subscription_plan = expected_subscription_license['subscription_plan']
+
         expected_licenses = []
         expected_licenses.extend(expected_activated_licenses)
         expected_licenses.extend(expected_revoked_licenses)
@@ -641,6 +659,9 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                         'assigned': [],
                         'revoked': expected_revoked_licenses,
                     },
+                    'subscription_license': expected_subscription_license,
+                    'subscription_plan': expected_subscription_plan,
+                    'show_expiration_notifications': True,
                 },
             },
         })
