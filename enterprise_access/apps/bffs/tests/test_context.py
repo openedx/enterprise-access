@@ -51,6 +51,7 @@ class TestHandlerContext(TestHandlerContextMixin):
                         'enterprise_customer': self.mock_enterprise_customer_2,
                     }
                 ],
+                'should_update_active_enterprise_customer_user': False,
             }
 
         self.assertEqual(context.data, expected_data)
@@ -125,11 +126,13 @@ class TestHandlerContext(TestHandlerContextMixin):
             'active_enterprise_customer': None,
             'staff_enterprise_customer': self.mock_enterprise_customer,
             'all_linked_enterprise_customer_users': [],
+            'should_update_active_enterprise_customer_user': False,
         }
         if raises_exception:
             expected_data.update({
                 'enterprise_customer': None,
                 'staff_enterprise_customer': None,
+                'should_update_active_enterprise_customer_user': False,
             })
         self.assertEqual(context.data, expected_data)
         expected_errors = (

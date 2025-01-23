@@ -103,8 +103,16 @@ class HandlerContext:
         return self.data.get('active_enterprise_customer')
 
     @property
+    def staff_enterprise_customer(self):
+        return self.data.get('staff_enterprise_customer')
+
+    @property
     def all_linked_enterprise_customer_users(self):
         return self.data.get('all_linked_enterprise_customer_users')
+
+    @property
+    def should_update_active_enterprise_customer_user(self):
+        return self.data.get('should_update_active_enterprise_customer_user')
 
     @property
     def is_request_user_linked_to_enterprise_customer(self):
@@ -121,10 +129,6 @@ class HandlerContext:
             enterprise_customer_user.get('enterprise_customer', {}).get('uuid') == enterprise_customer_uuid
             for enterprise_customer_user in self.all_linked_enterprise_customer_users
         )
-
-    @property
-    def staff_enterprise_customer(self):
-        return self.data.get('staff_enterprise_customer')
 
     def set_status_code(self, status_code):
         """
@@ -229,6 +233,9 @@ class HandlerContext:
             'active_enterprise_customer': transformed_data.get('active_enterprise_customer'),
             'all_linked_enterprise_customer_users': transformed_data.get('all_linked_enterprise_customer_users', []),
             'staff_enterprise_customer': transformed_data.get('staff_enterprise_customer'),
+            'should_update_active_enterprise_customer_user': transformed_data.get(
+                'should_update_active_enterprise_customer_user', False
+            )
         })
 
     def add_error(self, status_code=None, **kwargs):

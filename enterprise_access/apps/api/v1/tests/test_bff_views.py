@@ -137,6 +137,25 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         # Mock base response data
         self.mock_common_response_data = {
             'enterprise_customer': self.expected_enterprise_customer,
+            'all_linked_enterprise_customer_users': [
+                {
+                    'id': 1,
+                    'active': True,
+                    'enterprise_customer': self.expected_enterprise_customer,
+                },
+                {
+                    'id': 2,
+                    'active': False,
+                    'enterprise_customer': {
+                        **self.mock_enterprise_customer_2,
+                        'disable_search': False,
+                        'show_integration_warning': True,
+                    },
+                },
+            ],
+            'active_enterprise_customer': self.expected_enterprise_customer,
+            'staff_enterprise_customer': None,
+            'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
             'enterprise_customer_user_subsidies': {
                 'subscriptions': {
                     'customer_agreement': None,
@@ -242,7 +261,6 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             expected_response_data = {
                 'detail': f'Missing: {BFF_READ_PERMISSION}',
             }
-
         self.assertEqual(response.status_code, expected_status_code)
         self.assertEqual(response.json(), expected_response_data)
 
@@ -368,6 +386,104 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             },
         })
         self.assertEqual(response.json(), expected_response_data)
+
+    def _set_up_mock_dashboard_with_subscriptions_license_auto_apply_data(
+            self,
+            mock_get_default_enrollment_intentions_learner_status,
+            mock_get_subscription_licenses_for_learner,
+            mock_get_enterprise_customers_for_user,
+            mock_get_enterprise_course_enrollments,
+            mock_get_enterprise_customer_data,
+            mock_auto_apply_license,
+            identity_provider,
+            is_staff_request_user,
+            has_plan_for_auto_apply,
+            has_existing_activated_license,
+            has_existing_revoked_license,
+            auto_apply_with_universal_link,
+    ):
+        """
+        This function facilitate mocking of the dashboard_with_subscriptions_license_auto_apply
+        Additional mocks or business logic updates should be handled here due to pylint errors.
+        """
+        mock_identity_provider = 'mock_idp' if identity_provider else None
+        mock_identity_providers = (
+            [
+                {
+                    'provider_id': 'mock_idp',
+                    'default_provider': True,
+                },
+            ]
+            if identity_provider
+            else []
+        )
+        mock_enterprise_customer_with_auto_apply = {
+            **self.expected_enterprise_customer,
+            'identity_provider': mock_identity_provider,
+            'identity_providers': mock_identity_providers,
+            'show_integration_warning': bool(identity_provider)
+        }
+        staff_enterprise_customer = None
+        active_enterprise_customer = mock_enterprise_customer_with_auto_apply
+        if is_staff_request_user:
+            # Set the request user as a staff user and mock the enterprise customer response data.
+            self.user.is_staff = True
+            self.user.save()
+            mock_get_enterprise_customer_data.return_value = self.mock_enterprise_customer
+            staff_enterprise_customer = mock_enterprise_customer_with_auto_apply
+            active_enterprise_customer = None
+        mock_linked_enterprise_customer_users = (
+            []
+            if is_staff_request_user
+            else [{
+                'id': 1,
+                'active': True,
+                'enterprise_customer': mock_enterprise_customer_with_auto_apply,
+            }]
+        )
+        mock_enterprise_learner_response_data = {
+            **self.mock_enterprise_learner_response_data,
+            'results': mock_linked_enterprise_customer_users,
+        }
+        mock_get_enterprise_customers_for_user.return_value = mock_enterprise_learner_response_data
+        mock_auto_applied_subscription_license = {
+            **self.mock_subscription_license,
+            'status': 'activated',
+            'activation_date': '2024-01-01T00:00:00Z',
+        }
+        mock_subscription_licenses_data = {
+            **self.mock_subscription_licenses_data,
+            'customer_agreement': {
+                **self.mock_customer_agreement,
+                'enable_auto_applied_subscriptions_with_universal_link': auto_apply_with_universal_link,
+                'subscription_for_auto_applied_licenses': (
+                    self.mock_subscription_plan_uuid
+                    if has_plan_for_auto_apply else None
+                ),
+            },
+        }
+        if has_existing_activated_license:
+            mock_subscription_licenses_data['results'].append({
+                **self.mock_subscription_license,
+                'status': 'activated',
+                'activation_date': '2024-01-01T00:00:00Z',
+            })
+        if has_existing_revoked_license:
+            mock_subscription_licenses_data['results'].append({
+                **self.mock_subscription_license,
+                'status': 'revoked',
+            })
+        mock_get_subscription_licenses_for_learner.return_value = mock_subscription_licenses_data
+        mock_auto_apply_license.return_value = mock_auto_applied_subscription_license
+        mock_get_default_enrollment_intentions_learner_status.return_value = \
+            self.mock_default_enterprise_enrollment_intentions_learner_status_data
+        mock_get_enterprise_course_enrollments.return_value = self.mock_enterprise_course_enrollments
+        return (
+            mock_enterprise_customer_with_auto_apply,
+            mock_linked_enterprise_customer_users,
+            staff_enterprise_customer,
+            active_enterprise_customer,
+        )
 
     @ddt.data(
         # No existing licenses, identity provider, no universal link auto-apply, no plan for auto-apply,
@@ -533,75 +649,24 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
             'context': self.mock_enterprise_customer_uuid,
         }])
-
-        if is_staff_request_user:
-            # Set the request user as a staff user and mock the enterprise customer response data.
-            self.user.is_staff = True
-            self.user.save()
-            mock_get_enterprise_customer_data.return_value = self.mock_enterprise_customer
-
-        mock_identity_provider = 'mock_idp' if identity_provider else None
-        mock_identity_providers = (
-            [
-                {
-                    'provider_id': 'mock_idp',
-                    'default_provider': True,
-                },
-            ]
-            if identity_provider
-            else []
+        (mock_enterprise_customer_with_auto_apply,
+         mock_linked_enterprise_customer_users,
+         staff_enterprise_customer,
+         active_enterprise_customer,
+         ) = self._set_up_mock_dashboard_with_subscriptions_license_auto_apply_data(
+            mock_get_default_enrollment_intentions_learner_status=mock_get_default_enrollment_intentions_learner_status,
+            mock_get_subscription_licenses_for_learner=mock_get_subscription_licenses_for_learner,
+            mock_get_enterprise_customers_for_user=mock_get_enterprise_customers_for_user,
+            mock_get_enterprise_course_enrollments=mock_get_enterprise_course_enrollments,
+            mock_get_enterprise_customer_data=mock_get_enterprise_customer_data,
+            mock_auto_apply_license=mock_auto_apply_license,
+            identity_provider=identity_provider,
+            is_staff_request_user=is_staff_request_user,
+            has_plan_for_auto_apply=has_plan_for_auto_apply,
+            has_existing_activated_license=has_existing_activated_license,
+            has_existing_revoked_license=has_existing_revoked_license,
+            auto_apply_with_universal_link=auto_apply_with_universal_link,
         )
-        mock_enterprise_customer_with_auto_apply = {
-            **self.mock_enterprise_customer,
-            'identity_provider': mock_identity_provider,
-            'identity_providers': mock_identity_providers,
-        }
-        mock_linked_enterprise_customer_users = (
-            []
-            if is_staff_request_user
-            else [{
-                'active': True,
-                'enterprise_customer': mock_enterprise_customer_with_auto_apply,
-            }]
-        )
-        mock_enterprise_learner_response_data = {
-            **self.mock_enterprise_learner_response_data,
-            'results': mock_linked_enterprise_customer_users,
-        }
-        mock_get_enterprise_customers_for_user.return_value = mock_enterprise_learner_response_data
-        mock_auto_applied_subscription_license = {
-            **self.mock_subscription_license,
-            'status': 'activated',
-            'activation_date': '2024-01-01T00:00:00Z',
-        }
-        mock_subscription_licenses_data = {
-            **self.mock_subscription_licenses_data,
-            'customer_agreement': {
-                **self.mock_customer_agreement,
-                'enable_auto_applied_subscriptions_with_universal_link': auto_apply_with_universal_link,
-                'subscription_for_auto_applied_licenses': (
-                    self.mock_subscription_plan_uuid
-                    if has_plan_for_auto_apply else None
-                ),
-            },
-        }
-        if has_existing_activated_license:
-            mock_subscription_licenses_data['results'].append({
-                **self.mock_subscription_license,
-                'status': 'activated',
-                'activation_date': '2024-01-01T00:00:00Z',
-            })
-        if has_existing_revoked_license:
-            mock_subscription_licenses_data['results'].append({
-                **self.mock_subscription_license,
-                'status': 'revoked',
-            })
-        mock_get_subscription_licenses_for_learner.return_value = mock_subscription_licenses_data
-        mock_auto_apply_license.return_value = mock_auto_applied_subscription_license
-        mock_get_default_enrollment_intentions_learner_status.return_value =\
-            self.mock_default_enterprise_enrollment_intentions_learner_status_data
-        mock_get_enterprise_course_enrollments.return_value = self.mock_enterprise_course_enrollments
-
         query_params = {
             'enterprise_customer_slug': self.mock_enterprise_customer_slug,
         }
@@ -650,14 +715,12 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         expected_licenses.extend(expected_activated_licenses)
         expected_licenses.extend(expected_revoked_licenses)
         expected_response_data = self.mock_dashboard_route_response_data.copy()
-        expected_show_integration_warning = bool(identity_provider)
         expected_response_data.update({
-            'enterprise_customer': {
-                **self.expected_enterprise_customer,
-                'identity_provider': mock_identity_provider,
-                'identity_providers': mock_identity_providers,
-                'show_integration_warning': expected_show_integration_warning,
-            },
+            'enterprise_customer': mock_enterprise_customer_with_auto_apply,
+            'all_linked_enterprise_customer_users': mock_linked_enterprise_customer_users,
+            'staff_enterprise_customer': staff_enterprise_customer,
+            'active_enterprise_customer': active_enterprise_customer,
+            'should_update_active_enterprise_customer_user': False,
             'enterprise_customer_user_subsidies': {
                 'subscriptions': {
                     'customer_agreement': expected_customer_agreement,

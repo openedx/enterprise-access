@@ -8,7 +8,7 @@ from edx_django_utils.cache import TieredCache
 
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerUserApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient, LmsUserApiClient
-from enterprise_access.cache_utils import versioned_cache_key
+from enterprise_access.cache_utils import request_cache, versioned_cache_key
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +41,13 @@ def enterprise_course_enrollments_cache_key(enterprise_customer_uuid, lms_user_i
     return versioned_cache_key('get_enterprise_course_enrollments', enterprise_customer_uuid, lms_user_id)
 
 
-def get_and_cache_enterprise_customer_users(request, timeout=settings.ENTERPRISE_USER_RECORD_CACHE_TIMEOUT, **kwargs):
+def get_and_cache_enterprise_customer_users(request, **kwargs):
     """
     Retrieves and caches enterprise learner data.
     """
     username = request.user.username
     cache_key = enterprise_customer_users_cache_key(username)
-    cached_response = TieredCache.get_cached_response(cache_key)
+    cached_response = request_cache(namespace=REQUEST_CACHE_NAMESPACE).get_cached_response(cache_key)
     if cached_response.is_found:
         logger.info(
             f'enterprise_customer_users cache hit for username {username}'
@@ -59,7 +59,11 @@ def get_and_cache_enterprise_customer_users(request, timeout=settings.ENTERPRISE
         username=username,
         **kwargs,
     )
-    TieredCache.set_all_tiers(cache_key, response_payload, timeout)
+    logger.info(
+        'Fetched enterprise customer user for username %s',
+        username,
+    )
+    request_cache(namespace=REQUEST_CACHE_NAMESPACE).set(cache_key, response_payload)
     return response_payload
 
 
@@ -258,30 +262,33 @@ def _determine_enterprise_customer_for_display(
     Determine the enterprise customer user for display.
 
     Returns:
-        The enterprise customer user for display.
+        tuple(Dict, boolean): The enterprise customer user for display, and a boolean to determine
+        whether to update the active enterprise customer to the return value.
     """
+
     if not enterprise_customer_slug and not enterprise_customer_uuid:
         # No enterprise customer specified in the request, so return the active enterprise customer
-        return active_enterprise_customer
+        return active_enterprise_customer, False
 
     # If the requested enterprise does not match the active enterprise customer user's slug/uuid
     # and there is a linked enterprise customer user for the requested enterprise, return the
-    # linked enterprise customer.
+    # linked enterprise customer. By returning true, we are updating the current active enterprise
+    # customer to the requested_enterprise_customer
     request_matches_active_enterprise_customer = _request_matches_active_enterprise_customer(
         active_enterprise_customer=active_enterprise_customer,
         enterprise_customer_slug=enterprise_customer_slug,
         enterprise_customer_uuid=enterprise_customer_uuid,
     )
     if not request_matches_active_enterprise_customer and requested_enterprise_customer:
-        return requested_enterprise_customer
+        return requested_enterprise_customer, True
 
     # If the request user is staff and the requested enterprise does not match the active enterprise
     # customer user's slug/uuid, return the staff-enterprise customer.
     if staff_enterprise_customer:
-        return staff_enterprise_customer
+        return staff_enterprise_customer, False
 
     # Otherwise, return the active enterprise customer.
-    return active_enterprise_customer
+    return active_enterprise_customer, False
 
 
 def _request_matches_active_enterprise_customer(
@@ -360,7 +367,7 @@ def transform_enterprise_customer_users_data(data, request, enterprise_customer_
         enterprise_customer_user_for_requested_customer.get('enterprise_customer')
         if enterprise_customer_user_for_requested_customer else None
     )
-    enterprise_customer = _determine_enterprise_customer_for_display(
+    enterprise_customer, should_update_active_enterprise_customer_user = _determine_enterprise_customer_for_display(
         enterprise_customer_slug=enterprise_customer_slug,
         enterprise_customer_uuid=enterprise_customer_uuid,
         active_enterprise_customer=active_enterprise_customer,
@@ -373,4 +380,5 @@ def transform_enterprise_customer_users_data(data, request, enterprise_customer_
         'active_enterprise_customer': active_enterprise_customer,
         'all_linked_enterprise_customer_users': enterprise_customer_users,
         'staff_enterprise_customer': staff_enterprise_customer,
+        'should_update_active_enterprise_customer_user': should_update_active_enterprise_customer_user,
     }
