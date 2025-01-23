@@ -44,6 +44,10 @@ class BaseResponseBuilder:
             dict: A dictionary containing the response data.
         """
         self.response_data['enterprise_customer'] = self.context.enterprise_customer
+        self.response_data['all_linked_enterprise_customer_users'] = self.context.all_linked_enterprise_customer_users
+        self.response_data['should_update_active_enterprise_customer_user'] = (
+            self.context.should_update_active_enterprise_customer_user
+        )
         self.response_data['enterprise_features'] = self.context.enterprise_features
         return self.response_data, self.status_code
 
@@ -120,7 +124,6 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
         self.response_data.update({
             'enterprise_course_enrollments': self.enterprise_course_enrollments,
         })
-
         # Serialize and validate the response
         try:
             serializer = LearnerDashboardResponseSerializer(data=self.response_data)

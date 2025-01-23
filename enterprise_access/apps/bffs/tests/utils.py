@@ -7,8 +7,10 @@ from django.test import RequestFactory, TestCase
 from faker import Faker
 from rest_framework import status
 
+from enterprise_access.apps.api_client.tests.test_constants import DATE_FORMAT_ISO_8601, DATE_FORMAT_ISO_8601_MS
 from enterprise_access.apps.content_assignments.tests.test_utils import mock_course_run_1
 from enterprise_access.apps.core.tests.factories import UserFactory
+from enterprise_access.utils import _days_from_now
 
 
 class TestHandlerContextMixin(TestCase):
@@ -108,6 +110,13 @@ class TestHandlerContextMixin(TestCase):
             'reply_to': None,
             'sender_alias': None,
         }
+        self.mock_all_linked_enterprise_customer_users = [{
+            'id': 1,
+            'user_id': 3,
+            'enterprise_customer': self.mock_enterprise_customer,
+            'active': self.mock_enterprise_customer.get('active'),
+        }]
+        self.mock_should_update_active_enterprise_customer_user = False
         self.mock_enterprise_customer_2 = {
             **self.mock_enterprise_customer,
             'uuid': self.mock_enterprise_customer_uuid_2,
@@ -117,12 +126,16 @@ class TestHandlerContextMixin(TestCase):
         self.mock_enterprise_learner_response_data = {
             'results': [
                 {
+                    'id': 1,
                     'active': True,
                     'enterprise_customer': self.mock_enterprise_customer,
+                    'user_id': 3,
                 },
                 {
+                    'id': 2,
                     'active': False,
                     'enterprise_customer': self.mock_enterprise_customer_2,
+                    'user_id': 6,
                 },
             ],
             'enterprise_features': {'feature_flag': True}
@@ -162,6 +175,12 @@ class TestHandlerContextMixin(TestCase):
 
         # Define a dictionary of private attributes to property names
         mock_property_enterprise_customer = getattr(mock_handler_context, 'data').get('enterprise_customer')
+        mock_linked_enterprise_customer_users = getattr(mock_handler_context, 'data').get(
+            'all_linked_enterprise_customer_users'
+        )
+        mock_should_update_active_enterprise_customer_user = getattr(mock_handler_context, 'data').get(
+            'should_update_active_enterprise_customer_user'
+        )
         property_mocks = {
             'request': getattr(mock_handler_context, '_request'),
             'status_code': getattr(mock_handler_context, '_status_code'),
@@ -174,6 +193,8 @@ class TestHandlerContextMixin(TestCase):
             'staff_enterprise_customer': None,
             'lms_user_id': getattr(mock_handler_context, '_lms_user_id'),
             'enterprise_features': getattr(mock_handler_context, '_enterprise_features'),
+            'all_linked_enterprise_customer_users': mock_linked_enterprise_customer_users,
+            'should_update_active_enterprise_customer_user': mock_should_update_active_enterprise_customer_user,
         }
 
         # Override the property getters
