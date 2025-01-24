@@ -3,6 +3,8 @@
 import collections
 from uuid import uuid4
 
+from attrs import asdict, define, field, make_class, Factory
+from cattrs import structure, unstructure
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -14,6 +16,11 @@ from jsonfield.fields import JSONField
 from model_utils.models import SoftDeletableModel, TimeStampedModel
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_update_with_history
+
+
+@define
+class Empty:
+    pass
 
 
 class AbstractUnitOfWork(TimeStampedModel, SoftDeletableModel):
@@ -28,6 +35,9 @@ class AbstractUnitOfWork(TimeStampedModel, SoftDeletableModel):
 
     class Meta:
         abstract = True
+
+    input_class = Empty
+    output_class = Empty
 
     uuid = models.UUIDField(
         primary_key=True,
@@ -53,13 +63,22 @@ class AbstractUnitOfWork(TimeStampedModel, SoftDeletableModel):
         blank=True,
     )
 
+    @property
+    def input_object(self):
+        return self.input_class(**self.input_data)
+
+    @property
+    def output_object(self):
+        return self.output_class(**self.output_data)
+
     def process_input(self, **kwargs):
         raise NotImplementedError
 
     def execute(self, **kwargs):
+        breakpoint()
         try:
             result = self.process_input(**kwargs)
-            self.output_data = result
+            self.output_data = asdict(result)
             self.succeeded_at = timezone.now()
         except:
             self.failed_at = timezone.now()
@@ -76,23 +95,30 @@ class AbstractPipeline(AbstractUnitOfWork):
         abstract = True
 
     steps = []
+    input_class = Empty
+    output_class = Empty
 
-    def get_input_data_for_step_type(self, step_type):
-        raise NotImplementedError
+    @property
+    def input_object(self):
+        return structure(self.input_data, self.input_class)
+
+    def get_input_object_for_step_type(self, step_type):
+        return getattr(self.input_object, step_type.input_class.KEY, None)
 
     def process_input(self, **kwargs):
         if self.succeeded_at:
             return
 
-        accumulated_output = {}
+        accumulated_output = self.output_class()
 
         preceding_step_record = None
         for PipelineStep in self.steps:
-            input_data = self.get_input_data_for_step_type(PipelineStep)
+            breakpoint()
+            input_object = self.get_input_object_for_step_type(PipelineStep)
             kwargs = {
                 'pipeline_record': self,
                 'defaults': {
-                    'input_data': input_data,
+                    'input_data': asdict(input_object),
                 }
             }
             if preceding_step_record:
@@ -101,11 +127,19 @@ class AbstractPipeline(AbstractUnitOfWork):
             step_record, _ = PipelineStep.objects.get_or_create(**kwargs)
             preceding_step_record = step_record
             if step_record.succeeded_at:
-                accumulated_output.update(step_record.output_data)
+                setattr(
+                    accumulated_output,
+                    PipelineStep.output_class.KEY,
+                    step_record.output_object,
+                )
                 continue
 
-            step_output = step_record.execute(**accumulated_output)
-            accumulated_output.update(step_output)
+            step_output = step_record.execute()
+            setattr(
+                accumulated_output,
+                PipelineStep.output_class.KEY,
+                step_output,
+            )
 
         return accumulated_output
 
@@ -145,19 +179,54 @@ class PizzaPipelineStep(AbstractPipelineStep):
     )
 
 
+@define
+class StretchDoughInput:
+    KEY = 'stretch_dough_input'
+
+    crust_style: str
+
+
+@define
+class StretchDoughOutput:
+    KEY = 'stretch_dough_output'
+
+    is_saucy: bool = False
+
+
 class StretchDoughStep(PizzaPipelineStep):
+    input_class = StretchDoughInput
+    output_class = StretchDoughOutput
+
     def process_input(self, **kwargs):
         print('Stretching dough...')
-        crust_style = self.input_data.get('crust_style')
-        print(crust_style)
+        print(self.input_object)
 
-        result = {**self.input_data}
-        result.update(kwargs)
-        result['is_saucy'] = crust_style != 'thin'
-        return result
+        output_object = self.output_class(
+            is_saucy=(crust_style != 'thin'),
+        )
+        return asdict(output_object)
+
+
+@define
+class ToppingsInput:
+    KEY = 'toppings_input'
+
+    whole_pie: list[str] = Factory(list)
+    left_half_pie: list[str] = Factory(list)
+    right_half_pie: list[str] = Factory(list)
+
+
+@define
+class ToppingsOutput:
+    KEY = 'toppings_output'
+
+    is_awesome: bool = False
 
 
 class AddToppingsStep(PizzaPipelineStep):
+    input_class = ToppingsInput
+    output_class = ToppingsOutput
+
     preceding_step = models.ForeignKey(
         StretchDoughStep,
         on_delete=models.CASCADE,
@@ -167,21 +236,40 @@ class AddToppingsStep(PizzaPipelineStep):
         """
         Depends on output from prior step.
         """
+        breakpoint()
         print('Adding toppings to whole pizza...')
-        print(self.input_data.get('whole_pie'))
+        print(self.input_object.whole_pie)
 
-        print('Adding toppings to half pizza...')
-        print(self.input_data.get('half_pie'))
+        print('Adding toppings to left half of pizza...')
+        print(self.input_object.left_half_pie)
 
-        print('Sauciness:')
-        print(kwargs.get('is_saucy'))
+        print('Adding toppings to right half of pizza...')
+        print(self.input_object.right_half_pie)
 
-        result = {**self.input_data}
-        result.update(kwargs)
-        return result
+        output_object = self.output_class(
+            is_awesome=True,
+        )
+        return output_object
+
+
+@define
+class BakeInput:
+    KEY = 'bake_input'
+
+    doneness: str = 'regular'
+
+
+@define
+class BakeOutput:
+    KEY = 'bake_output'
+
+    structural_integrity: str = 'good'
 
 
 class BakePizzaStep(PizzaPipelineStep):
+    input_class = BakeInput
+    output_class = BakeInput
+
     preceding_step = models.ForeignKey(
         AddToppingsStep,
         on_delete=models.CASCADE,
@@ -192,12 +280,32 @@ class BakePizzaStep(PizzaPipelineStep):
         Depends on output from prior step.
         """
         print('Baking...')
-        doneness = self.input_data.get('doneness')
-        print(doneness)
+        print(self.input_object.doneness)
 
-        result = {**self.input_data}
-        result.update(kwargs)
-        return result
+        output_object = self.output_class(structural_integrity='excellent')
+        return output_object
+
+
+
+PizzaPipelineInput = make_class(
+    'PizzaPipelineInput',
+    {
+        StretchDoughInput.KEY: field(type=StretchDoughInput),
+        ToppingsInput.KEY: field(type=ToppingsInput),
+        BakeInput.KEY: field(type=BakeInput),
+    },
+)
+
+
+PizzaPipelineOutput = make_class(
+    'PizzaPipelineOutput',
+    {
+        StretchDoughOutput.KEY: field(type=StretchDoughOutput, default=None),
+        ToppingsOutput.KEY: field(type=ToppingsOutput, default=None),
+        BakeOutput.KEY: field(type=BakeOutput, default=None),
+    },
+)
+
 
 class PizzaPipeline(AbstractPipeline):
     """
@@ -208,26 +316,23 @@ class PizzaPipeline(AbstractPipeline):
         AddToppingsStep,
         BakePizzaStep,
     ]
-
-    def get_input_data_for_step_type(self, step_type):
-        if step_type == StretchDoughStep:
-            return self.input_data.get('stretch_dough')
-        elif step_type == AddToppingsStep:
-            return self.input_data.get('toppings')
-        elif step_type == BakePizzaStep:
-            return self.input_data.get('bake')
+    input_class = PizzaPipelineInput
+    output_class = PizzaPipelineOutput
 
     @classmethod
-    def test_input(cls):
-        return {
-            'stretch_dough': {
+    def run_test(cls):
+        test_input = {
+            StretchDoughInput.KEY: {
                 'crust_style': 'thin',
             },
-            'toppings': {
+            ToppingsInput.KEY: {
                 'whole_pie': ['bacon'],
-                'half_pie': ['pineapple'],
+                'left_half_pie': ['pineapple'],
             },
-            'bake': {
+            BakeInput.KEY: {
                 'doneness': 'well_done',
             }
         }
+        pipeline = cls.objects.create(input_data=test_input)
+        pipeline.execute()
+        return pipeline
