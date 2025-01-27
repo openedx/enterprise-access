@@ -52,7 +52,6 @@ class AbstractUnitOfWork(TimeStampedModel, SoftDeletableModel):
     output_data = JSONField(
         blank=True,
         null=True,
-        editable=False,
     )
     succeeded_at = models.DateTimeField(
         null=True,
@@ -71,13 +70,15 @@ class AbstractUnitOfWork(TimeStampedModel, SoftDeletableModel):
     def output_object(self):
         return self.output_class(**self.output_data)
 
-    def process_input(self, **kwargs):
+    def process_input(self, accumulated_output=None, **kwargs):
         raise NotImplementedError
 
-    def execute(self, **kwargs):
-        breakpoint()
+    def execute(self, accumulated_output=None, **kwargs):
         try:
-            result = self.process_input(**kwargs)
+            result = self.process_input(
+                accumulated_output=accumulated_output,
+                **kwargs,
+            )
             self.output_data = asdict(result)
             self.succeeded_at = timezone.now()
         except:
@@ -86,6 +87,9 @@ class AbstractUnitOfWork(TimeStampedModel, SoftDeletableModel):
 
         self.save()
         return result
+
+    def __str__(self):
+        return str(self.uuid) + str(self.input_class) + str(self.output_class)
 
 
 class AbstractPipeline(AbstractUnitOfWork):
@@ -113,18 +117,17 @@ class AbstractPipeline(AbstractUnitOfWork):
 
         preceding_step_record = None
         for PipelineStep in self.steps:
-            breakpoint()
             input_object = self.get_input_object_for_step_type(PipelineStep)
-            kwargs = {
+            step_record_kwargs = {
                 'pipeline_record': self,
                 'defaults': {
                     'input_data': asdict(input_object),
                 }
             }
             if preceding_step_record:
-                kwargs['preceding_step'] = preceding_step_record
+                step_record_kwargs['preceding_step'] = preceding_step_record
 
-            step_record, _ = PipelineStep.objects.get_or_create(**kwargs)
+            step_record, _ = PipelineStep.objects.get_or_create(**step_record_kwargs)
             preceding_step_record = step_record
             if step_record.succeeded_at:
                 setattr(
@@ -134,7 +137,7 @@ class AbstractPipeline(AbstractUnitOfWork):
                 )
                 continue
 
-            step_output = step_record.execute()
+            step_output = step_record.execute(accumulated_output=accumulated_output)
             setattr(
                 accumulated_output,
                 PipelineStep.output_class.KEY,
@@ -197,7 +200,7 @@ class StretchDoughStep(PizzaPipelineStep):
     input_class = StretchDoughInput
     output_class = StretchDoughOutput
 
-    def process_input(self, **kwargs):
+    def process_input(self, accumulated_output=None, **kwargs):
         print('Stretching dough...')
         print(self.input_object)
 
@@ -232,11 +235,9 @@ class AddToppingsStep(PizzaPipelineStep):
         on_delete=models.CASCADE,
     )
 
-    def process_input(self, **kwargs):
+    def process_input(self, accumulated_output=None, **kwargs):
         """
-        Depends on output from prior step.
         """
-        breakpoint()
         print('Adding toppings to whole pizza...')
         print(self.input_object.whole_pie)
 
@@ -268,19 +269,32 @@ class BakeOutput:
 
 class BakePizzaStep(PizzaPipelineStep):
     input_class = BakeInput
-    output_class = BakeInput
+    output_class = BakeOutput
 
     preceding_step = models.ForeignKey(
         AddToppingsStep,
         on_delete=models.CASCADE,
     )
 
-    def process_input(self, **kwargs):
+    def _are_toppings_awesome(self, accumulated_output):
+        if not accumulated_output:
+            return False
+
+        toppings_output = getattr(accumulated_output, ToppingsOutput.KEY, None)
+        if not toppings_output:
+            return False
+
+        return toppings_output.is_awesome
+
+    def process_input(self, accumulated_output=None, **kwargs):
         """
         Depends on output from prior step.
         """
         print('Baking...')
         print(self.input_object.doneness)
+
+        if self._are_toppings_awesome(accumulated_output):
+            print('Baking extra good because the toppings were awesome!')
 
         output_object = self.output_class(structural_integrity='excellent')
         return output_object
