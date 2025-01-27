@@ -25,7 +25,7 @@ astroid==3.3.8
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   pylint
     #   pylint-celery
-attrs==24.3.0
+attrs==25.1.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -47,7 +47,7 @@ billiard==4.2.1
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   celery
-cachetools==5.5.0
+cachetools==5.5.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -244,7 +244,7 @@ django-rest-swagger==2.2.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-django-simple-history==3.7.0
+django-simple-history==3.8.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -344,7 +344,7 @@ edx-event-bus-kafka==6.0.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-edx-lint==5.4.1
+edx-lint==5.6.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -373,7 +373,7 @@ factory-boy==3.3.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-faker==33.3.1
+faker==35.0.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -384,7 +384,7 @@ fastavro==1.10.0
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   confluent-kafka
     #   openedx-events
-filelock==3.16.1
+filelock==3.17.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -394,6 +394,10 @@ freezegun==1.5.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+id==1.5.0
+    # via
+    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
+    #   twine
 idna==3.10
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
@@ -542,10 +546,6 @@ pbr==6.1.0
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   stevedore
-pkginfo==1.12.0
-    # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
-    #   twine
 platformdirs==4.3.6
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
@@ -564,7 +564,7 @@ ply==3.11
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   djangoql
-prompt-toolkit==3.0.48
+prompt-toolkit==3.0.50
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -636,7 +636,7 @@ pynacl==1.5.0
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-django-utils
-pyproject-api==1.8.0
+pyproject-api==1.9.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -694,7 +694,7 @@ redis==5.2.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-referencing==0.36.1
+referencing==0.36.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -709,6 +709,7 @@ requests==2.32.3
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
+    #   id
     #   requests-oauthlib
     #   requests-toolbelt
     #   social-auth-core
@@ -802,11 +803,11 @@ tomlkit==0.13.2
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   pylint
-tox==4.23.2
+tox==4.24.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-twine==6.0.1
+twine==6.1.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
 typing-extensions==4.12.2
     # via
@@ -815,7 +816,7 @@ typing-extensions==4.12.2
     #   edx-opaque-keys
     #   faker
     #   referencing
-tzdata==2024.2
+tzdata==2025.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
