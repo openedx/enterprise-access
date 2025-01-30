@@ -376,26 +376,34 @@ class TestDashboardHandler(TestHandlerContextMixin):
         super().setUp()
 
         self.mock_enterprise_course_enrollment = {
-            "certificate_download_url": None,
-            "emails_enabled": False,
             "course_run_id": "course-v1:BabsonX+MIS01x+1T2019",
             "course_run_status": "in_progress",
             "created": "2023-09-29T14:24:45.409031+00:00",
             "start_date": "2019-03-19T10:00:00Z",
             "end_date": "2024-12-31T04:30:00Z",
-            "display_name": "AI for Leaders",
-            "course_run_url": "https://learning.edx.org/course/course-v1:BabsonX+MIS01x+1T2019/home",
-            "due_dates": [],
+            "title": "AI for Leaders",
+            "notifications": [],
             "pacing": "self",
             "org_name": "BabsonX",
             "is_revoked": False,
             "is_enrollment_active": True,
             "mode": "verified",
+            "link_to_course": "https://learning.edx.org/course/course-v1:BabsonX+MIS01x+1T2019/home",
+            "link_to_certificate": None,
             "resume_course_run_url": None,
             "course_key": "BabsonX+MIS01x",
             "course_type": "verified-audit",
             "product_source": "edx",
             "enroll_by": "2024-12-21T23:59:59Z",
+            'can_unenroll': True,
+            'has_emails_enabled': False,
+            'micromasters_title': None,
+            # Deprecated fields (to be removed in a future release)
+            'certificate_download_url': None,
+            "course_run_url": "https://learning.edx.org/course/course-v1:BabsonX+MIS01x+1T2019/home",
+            "display_name": "AI for Leaders",
+            'due_dates': [],
+            'emails_enabled': False,
         }
         self.mock_enterprise_course_enrollments = [self.mock_enterprise_course_enrollment]
 

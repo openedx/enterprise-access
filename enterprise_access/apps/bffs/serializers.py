@@ -270,29 +270,41 @@ class EnterpriseCourseEnrollmentSerializer(BaseBffSerializer):
     Serializer for enterprise course enrollment.
     """
 
+    can_unenroll = serializers.BooleanField()
     course_run_id = serializers.CharField()
+    course_run_status = serializers.CharField()
     course_key = serializers.CharField()
     course_type = serializers.CharField()
-    org_name = serializers.CharField()
-    course_run_status = serializers.CharField()
-    display_name = serializers.CharField()
-    emails_enabled = serializers.BooleanField(required=False, allow_null=True)
-    certificate_download_url = serializers.CharField(allow_null=True)
     created = serializers.DateTimeField()
-    start_date = serializers.DateTimeField(allow_null=True)
     end_date = serializers.DateTimeField(allow_null=True)
-    mode = serializers.CharField()
-    is_enrollment_active = serializers.BooleanField()
-    product_source = serializers.CharField()
     enroll_by = serializers.DateTimeField(allow_null=True)
-    pacing = serializers.CharField()
-    course_run_url = serializers.URLField()
-    resume_course_run_url = serializers.URLField(allow_null=True)
+    has_emails_enabled = serializers.BooleanField()
+    is_enrollment_active = serializers.BooleanField()
     is_revoked = serializers.BooleanField()
+    link_to_course = serializers.URLField()
+    link_to_certificate = serializers.URLField(allow_null=True)
+    micromasters_title = serializers.CharField(allow_null=True)
+    mode = serializers.CharField()
+    notifications = serializers.ListField(
+        child=EnrollmentDueDateSerializer(),
+        allow_empty=True,
+    )
+    org_name = serializers.CharField()
+    pacing = serializers.CharField()
+    product_source = serializers.CharField()
+    resume_course_run_url = serializers.URLField(allow_null=True)
+    start_date = serializers.DateTimeField(allow_null=True)
+    title = serializers.CharField()
+
+    # Deprecated (will be removed in a future release)
+    certificate_download_url = serializers.CharField(allow_null=True)
+    course_run_url = serializers.URLField()
+    display_name = serializers.CharField()
     due_dates = serializers.ListField(
         child=EnrollmentDueDateSerializer(),
         allow_empty=True,
     )
+    emails_enabled = serializers.BooleanField(required=False, allow_null=True)
 
 
 class BFFRequestSerializer(BaseBffSerializer):
@@ -316,9 +328,21 @@ class LearnerDashboardRequestSerializer(BFFRequestSerializer):
     """
 
 
+class LearnerEnrollmentsByStatusSerializer(BaseBffSerializer):
+    """
+    Serializer for subscription license status.
+    """
+
+    in_progress = EnterpriseCourseEnrollmentSerializer(many=True, required=False, default=list)
+    upcoming = EnterpriseCourseEnrollmentSerializer(many=True, required=False, default=list)
+    completed = EnterpriseCourseEnrollmentSerializer(many=True, required=False, default=list)
+    saved_for_later = EnterpriseCourseEnrollmentSerializer(many=True, required=False, default=list)
+
+
 class LearnerDashboardResponseSerializer(BaseLearnerPortalResponseSerializer):
     """
     Serializer for the learner dashboard response.
     """
 
     enterprise_course_enrollments = EnterpriseCourseEnrollmentSerializer(many=True)
+    all_enrollments_by_status = LearnerEnrollmentsByStatusSerializer()

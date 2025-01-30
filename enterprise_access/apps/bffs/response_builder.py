@@ -119,6 +119,7 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
         # Add specific fields related to the learner dashboard
         self.response_data.update({
             'enterprise_course_enrollments': self.enterprise_course_enrollments,
+            'all_enrollments_by_status': self.all_enrollments_by_status,
         })
 
         # Serialize and validate the response

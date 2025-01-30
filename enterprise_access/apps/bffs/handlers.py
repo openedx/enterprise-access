@@ -9,14 +9,13 @@ from enterprise_access.apps.api_client.license_manager_client import LicenseMana
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.bffs.api import (
     get_and_cache_default_enterprise_enrollment_intentions_learner_status,
-    get_and_cache_enterprise_course_enrollments,
     get_and_cache_subscription_licenses_for_learner,
     invalidate_default_enterprise_enrollment_intentions_learner_status_cache,
     invalidate_enterprise_course_enrollments_cache,
     invalidate_subscription_licenses_cache
 )
 from enterprise_access.apps.bffs.context import HandlerContext
-from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin
+from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin, LearnerDashboardDataMixin
 from enterprise_access.apps.bffs.serializers import EnterpriseCustomerUserSubsidiesSerializer
 
 logger = logging.getLogger(__name__)
@@ -669,7 +668,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         )
 
 
-class DashboardHandler(BaseLearnerPortalHandler):
+class DashboardHandler(LearnerDashboardDataMixin, BaseLearnerPortalHandler):
     """
     A handler class for processing the learner dashboard route.
 
@@ -697,34 +696,4 @@ class DashboardHandler(BaseLearnerPortalHandler):
             self.add_error(
                 user_message="Could not load and/or processing the learner dashboard.",
                 developer_message=f"Failed to load and/or processing the learner dashboard data: {e}",
-            )
-
-    def load_enterprise_course_enrollments(self):
-        """
-        Loads enterprise course enrollments data.
-
-        Returns:
-            list: A list of enterprise course enrollments.
-        """
-        if not self.context.is_request_user_linked_to_enterprise_customer:
-            # Skip loading enterprise course enrollments if the request user is not linked to the enterprise customer
-            logger.info(
-                'Request user %s is not linked to enterprise customer %s. Skipping enterprise course enrollments.',
-                self.context.lms_user_id,
-                self.context.enterprise_customer_uuid,
-            )
-            return
-
-        try:
-            enterprise_course_enrollments = get_and_cache_enterprise_course_enrollments(
-                request=self.context.request,
-                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
-                is_active=True,
-            )
-            self.context.data['enterprise_course_enrollments'] = enterprise_course_enrollments
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            logger.exception("Error retrieving enterprise course enrollments")
-            self.add_error(
-                user_message="Could not retrieve your enterprise course enrollments.",
-                developer_message=f"Failed to retrieve enterprise course enrollments: {exc}",
             )

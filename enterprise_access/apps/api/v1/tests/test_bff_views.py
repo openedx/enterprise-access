@@ -10,6 +10,7 @@ from rest_framework import status
 from rest_framework.reverse import reverse
 
 from enterprise_access.apps.api_client.tests.test_utils import MockLicenseManagerMetadataMixin
+from enterprise_access.apps.bffs.constants import COURSE_ENROLLMENT_STATUSES
 from enterprise_access.apps.bffs.tests.utils import TestHandlerContextMixin, mock_dashboard_dependencies
 from enterprise_access.apps.core.constants import (
     BFF_READ_PERMISSION,
@@ -77,6 +78,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             "course_type": "verified-audit",
             "product_source": "edx",
             "enroll_by": "2024-12-21T23:59:59Z",
+            "micromasters_title": None,
         }
         self.mock_enterprise_course_enrollments = []
 
@@ -156,6 +158,12 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         self.mock_dashboard_route_response_data = {
             **self.mock_common_response_data,
             'enterprise_course_enrollments': [],
+            'all_enrollments_by_status': {
+                COURSE_ENROLLMENT_STATUSES.IN_PROGRESS: [],
+                COURSE_ENROLLMENT_STATUSES.UPCOMING: [],
+                COURSE_ENROLLMENT_STATUSES.COMPLETED: [],
+                COURSE_ENROLLMENT_STATUSES.SAVED_FOR_LATER: [],
+            },
         }
 
     @ddt.data(
@@ -696,11 +704,48 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
 
         response = self.client.post(dashboard_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected_transformed_enrollment = {
+            'can_unenroll': True,
+            'has_emails_enabled': False,
+            'link_to_course': (
+                self.mock_enterprise_course_enrollment['course_run_url'] or
+                self.mock_enterprise_course_enrollment['resume_course_run_url']
+            ),
+            'link_to_certificate': self.mock_enterprise_course_enrollment['certificate_download_url'],
+            'micromasters_title': self.mock_enterprise_course_enrollment['micromasters_title'],
+            'course_run_id': self.mock_enterprise_course_enrollment['course_run_id'],
+            'course_run_status': self.mock_enterprise_course_enrollment['course_run_status'],
+            'created': self.mock_enterprise_course_enrollment['created'],
+            'start_date': self.mock_enterprise_course_enrollment['start_date'],
+            'end_date': self.mock_enterprise_course_enrollment['end_date'],
+            'title': self.mock_enterprise_course_enrollment['display_name'],
+            'notifications': self.mock_enterprise_course_enrollment['due_dates'],
+            'pacing': self.mock_enterprise_course_enrollment['pacing'],
+            'org_name': self.mock_enterprise_course_enrollment['org_name'],
+            'is_revoked': self.mock_enterprise_course_enrollment['is_revoked'],
+            'is_enrollment_active': self.mock_enterprise_course_enrollment['is_enrollment_active'],
+            'mode': self.mock_enterprise_course_enrollment['mode'],
+            'resume_course_run_url': self.mock_enterprise_course_enrollment['resume_course_run_url'],
+            'course_key': self.mock_enterprise_course_enrollment['course_key'],
+            'course_type': self.mock_enterprise_course_enrollment['course_type'],
+            'product_source': self.mock_enterprise_course_enrollment['product_source'],
+            'enroll_by': self.mock_enterprise_course_enrollment['enroll_by'],
+            # Deprecated fields (to be removed in the future)
+            'certificate_download_url': None,
+            'course_run_url': self.mock_enterprise_course_enrollment['course_run_url'],
+            'display_name': self.mock_enterprise_course_enrollment['display_name'],
+            'due_dates': self.mock_enterprise_course_enrollment['due_dates'],
+            'emails_enabled': False,
+        }
         expected_response_data = self.mock_dashboard_route_response_data.copy()
         expected_response_data.update({
-            'enterprise_course_enrollments': [
-                self.mock_enterprise_course_enrollment,
-            ],
+            'enterprise_course_enrollments': [expected_transformed_enrollment],
+            'all_enrollments_by_status': {
+                COURSE_ENROLLMENT_STATUSES.IN_PROGRESS: [expected_transformed_enrollment],
+                COURSE_ENROLLMENT_STATUSES.UPCOMING: [],
+                COURSE_ENROLLMENT_STATUSES.COMPLETED: [],
+                COURSE_ENROLLMENT_STATUSES.SAVED_FOR_LATER: [],
+            },
         })
         self.assertEqual(response.json(), expected_response_data)
 
