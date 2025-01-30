@@ -20,7 +20,7 @@ astroid==3.3.8
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   pylint
     #   pylint-celery
-attrs==24.3.0
+attrs==25.1.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   jsonschema
@@ -42,7 +42,7 @@ build==1.2.2.post1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/pip-tools.txt
     #   pip-tools
-cachetools==5.5.0
+cachetools==5.5.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   tox
@@ -205,7 +205,7 @@ django-object-actions==4.3.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
 django-rest-swagger==2.2.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
-django-simple-history==3.7.0
+django-simple-history==3.8.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
 django-waffle==4.2.0
     # via
@@ -277,7 +277,7 @@ edx-event-bus-kafka==6.0.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
 edx-i18n-tools==1.6.3
     # via -r requirements/dev.in
-edx-lint==5.4.1
+edx-lint==5.6.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
 edx-opaque-keys[django]==2.11.0
     # via
@@ -297,7 +297,7 @@ edx-toggles==5.2.0
     #   edx-event-bus-kafka
 factory-boy==3.3.1
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
-faker==33.3.1
+faker==35.0.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   factory-boy
@@ -306,13 +306,17 @@ fastavro==1.10.0
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   confluent-kafka
     #   openedx-events
-filelock==3.16.1
+filelock==3.17.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   tox
     #   virtualenv
 freezegun==1.5.1
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
+id==1.5.0
+    # via
+    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
+    #   twine
 idna==3.10
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
@@ -451,10 +455,6 @@ pbr==6.1.0
     #   stevedore
 pip-tools==7.4.1
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/pip-tools.txt
-pkginfo==1.12.0
-    # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
-    #   twine
 platformdirs==4.3.6
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
@@ -473,7 +473,7 @@ ply==3.11
     #   djangoql
 polib==1.2.0
     # via edx-i18n-tools
-prompt-toolkit==3.0.48
+prompt-toolkit==3.0.50
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   click-repl
@@ -533,7 +533,7 @@ pynacl==1.5.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   edx-django-utils
-pyproject-api==1.8.0
+pyproject-api==1.9.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   tox
@@ -584,7 +584,7 @@ readme-renderer==44.0
     #   twine
 redis==5.2.1
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
-referencing==0.36.1
+referencing==0.36.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   jsonschema
@@ -597,6 +597,7 @@ requests==2.32.3
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
+    #   id
     #   requests-oauthlib
     #   requests-toolbelt
     #   social-auth-core
@@ -678,9 +679,9 @@ tomlkit==0.13.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   pylint
-tox==4.23.2
+tox==4.24.1
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
-twine==6.0.1
+twine==6.1.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
 typing-extensions==4.12.2
     # via
@@ -688,7 +689,7 @@ typing-extensions==4.12.2
     #   edx-opaque-keys
     #   faker
     #   referencing
-tzdata==2024.2
+tzdata==2025.1
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/validation.txt
     #   celery

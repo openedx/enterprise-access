@@ -12,7 +12,7 @@ asgiref==3.8.1
     # via
     #   django
     #   django-cors-headers
-attrs==24.3.0
+attrs==25.1.0
     # via
     #   jsonschema
     #   openedx-events
@@ -124,7 +124,7 @@ django-object-actions==4.3.0
     # via -r requirements/base.in
 django-rest-swagger==2.2.0
     # via -r requirements/base.in
-django-simple-history==3.7.0
+django-simple-history==3.8.0
     # via -r requirements/base.in
 django-waffle==4.2.0
     # via
@@ -246,7 +246,7 @@ pbr==6.1.0
     # via stevedore
 ply==3.11
     # via djangoql
-prompt-toolkit==3.0.48
+prompt-toolkit==3.0.50
     # via click-repl
 psutil==6.1.1
     # via edx-django-utils
@@ -287,7 +287,7 @@ pyyaml==6.0.2
     #   edx-django-release-util
 redis==5.2.1
     # via -r requirements/base.in
-referencing==0.36.1
+referencing==0.36.2
     # via
     #   jsonschema
     #   jsonschema-specifications
@@ -339,7 +339,7 @@ typing-extensions==4.12.2
     # via
     #   edx-opaque-keys
     #   referencing
-tzdata==2024.2
+tzdata==2025.1
     # via
     #   celery
     #   kombu
