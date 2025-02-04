@@ -2,6 +2,13 @@
 Mixins for accessing `HandlerContext` data for bffs app
 """
 
+import logging
+
+from enterprise_access.apps.bffs.api import get_and_cache_enterprise_course_enrollments
+from enterprise_access.apps.bffs.constants import COURSE_ENROLLMENT_STATUSES, UNENROLLABLE_COURSE_STATUSES
+
+logger = logging.getLogger(__name__)
+
 
 class BFFContextDataMixin:
     """
@@ -105,9 +112,9 @@ class BaseLearnerDataMixin(LearnerSubsidiesDataMixin, BFFContextDataMixin):
         return self.context.data.get('default_enterprise_enrollment_intentions', {})
 
 
-class LearnerDashboardDataMixin(BaseLearnerDataMixin):
+class EnterpriseCourseEnrollmentsDataMixin(BaseLearnerDataMixin):
     """
-    Mixin to access learner dashboard data from the context.
+    Mixin to load and access enterprise course enrollments data from the context.
     """
 
     @property
@@ -116,3 +123,166 @@ class LearnerDashboardDataMixin(BaseLearnerDataMixin):
         Get enterprise course enrollments from the context.
         """
         return self.context.data.get('enterprise_course_enrollments', [])
+
+    @property
+    def all_enrollments_by_status(self):
+        """
+        Get all enrollments by status from the context.
+        """
+        return self.context.data.get('all_enrollments_by_status', {})
+
+    def load_enterprise_course_enrollments(self):
+        """
+        Loads enterprise course enrollments data.
+
+        Returns:
+            list: A list of enterprise course enrollments.
+        """
+        if not self.context.is_request_user_linked_to_enterprise_customer:
+            # Skip loading enterprise course enrollments if the request user is not linked to the enterprise customer
+            logger.info(
+                'Request user %s is not linked to enterprise customer %s. Skipping enterprise course enrollments.',
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
+            return
+
+        try:
+            enterprise_course_enrollments = get_and_cache_enterprise_course_enrollments(
+                request=self.context.request,
+                enterprise_customer_uuid=self.context.enterprise_customer_uuid,
+                is_active=True,
+            )
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.exception("Error retrieving enterprise course enrollments")
+            self.add_error(
+                user_message="Could not retrieve your enterprise course enrollments.",
+                developer_message=f"Failed to retrieve enterprise course enrollments: {exc}",
+            )
+
+        try:
+            course_enrollments_data = self._transform_enterprise_course_enrollments(enterprise_course_enrollments)
+            self.context.data['enterprise_course_enrollments'] = course_enrollments_data.get('enrollments', [])
+            self.context.data['all_enrollments_by_status'] = course_enrollments_data.get('enrollments_by_status', {})
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.exception("Error transforming enterprise course enrollments")
+            self.add_error(
+                user_message="Could not transform your enterprise course enrollments.",
+                developer_message=f"Failed to transform enterprise course enrollments: {exc}",
+            )
+
+    def _transform_enterprise_course_enrollments(self, enterprise_course_enrollments):
+        """
+        Transform the enterprise course enrollments data.
+
+        Args:
+            enterprise_course_enrollments: The enterprise course enrollments data.
+        Returns:
+            The transformed enterprise course enrollments data.
+        """
+        enrollments = [
+            self._transform_enterprise_course_enrollment(enterprise_course_enrollment)
+            for enterprise_course_enrollment in enterprise_course_enrollments
+        ]
+        enrollments_by_status = self._group_course_enrollments_by_status(enrollments)
+        return {
+            'enrollments': enrollments,
+            'enrollments_by_status': enrollments_by_status,
+        }
+
+    def _transform_enterprise_course_enrollment(self, enrollment):
+        """
+        Transform the enterprise course enrollment data.
+
+        Args:
+            enrollment: The enterprise course enrollment data.
+        Returns:
+            The transformed enterprise course enrollment data.
+        """
+
+        # Extract specific fields verbatim from the enrollment data
+        fields_to_pluck = [
+            'course_run_id',
+            'course_run_status',
+            'course_key',
+            'course_type',
+            'created',
+            'end_date',
+            'enroll_by',
+            'is_enrollment_active',
+            'is_revoked',
+            'micromasters_title',
+            'mode',
+            'org_name',
+            'pacing',
+            'product_source',
+            'resume_course_run_url',
+            'start_date',
+            # Deprecated fields (to be removed in a future release)
+            'certificate_download_url',
+            'course_run_url',
+            'display_name',
+            'due_dates',
+            'emails_enabled',
+        ]
+        transformed_data = {
+            field: enrollment.get(field)
+            for field in fields_to_pluck
+        }
+
+        # Update transformed enrollment data with additional derived fields
+        transformed_data.update({
+            'title': enrollment.get('display_name'),
+            # The link to course here gives precedence to the resume course link, which is
+            # present if the learner has made progress. If the learner has not made progress,
+            # we should link to the main course run URL. Similarly, if the resume course link
+            # is not set in the API response, we should fallback on the normal course link.
+            'link_to_course': (
+                enrollment.get('resume_course_run_url') or
+                enrollment.get('course_run_url')
+            ),
+            'link_to_certificate': enrollment.get('certificate_download_url'),
+            'has_emails_enabled': enrollment.get('emails_enabled', False),
+            'notifications': enrollment.get('due_dates'),
+            'can_unenroll': self._can_unenroll_course_enrollment(enrollment),
+        })
+
+        return transformed_data
+
+    def _group_course_enrollments_by_status(self, course_enrollments):
+        """
+        Groups course enrollments by their status.
+
+        Args:
+            enrollments (list): List of course enrollment dictionaries.
+
+        Returns:
+            dict: A dictionary where keys are status names and values are lists of enrollments with that status.
+        """
+        statuses = {
+            COURSE_ENROLLMENT_STATUSES.IN_PROGRESS: [],
+            COURSE_ENROLLMENT_STATUSES.UPCOMING: [],
+            COURSE_ENROLLMENT_STATUSES.COMPLETED: [],
+            COURSE_ENROLLMENT_STATUSES.SAVED_FOR_LATER: [],
+        }
+        for enrollment in course_enrollments:
+            status = enrollment.get('course_run_status')
+            if status in statuses:
+                statuses[status].append(enrollment)
+        return statuses
+
+    def _can_unenroll_course_enrollment(self, enrollment):
+        """
+        Determines whether a course enrollment may be unenrolled based on its enrollment
+        status (e.g., in progress, completed) and enrollment completion.
+        """
+        return (
+            enrollment.get('course_run_status') in UNENROLLABLE_COURSE_STATUSES and
+            not enrollment.get('certificate_download_url')
+        )
+
+
+class LearnerDashboardDataMixin(EnterpriseCourseEnrollmentsDataMixin, BaseLearnerDataMixin):
+    """
+    Mixin to access learner dashboard data from the context.
+    """
