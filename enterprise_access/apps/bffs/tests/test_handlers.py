@@ -375,37 +375,55 @@ class TestDashboardHandler(TestHandlerContextMixin):
     def setUp(self):
         super().setUp()
 
-        self.mock_enterprise_course_enrollment = {
+        self.mock_original_enterprise_course_enrollment = {
             "course_run_id": "course-v1:BabsonX+MIS01x+1T2019",
             "course_run_status": "in_progress",
             "created": "2023-09-29T14:24:45.409031+00:00",
             "start_date": "2019-03-19T10:00:00Z",
             "end_date": "2024-12-31T04:30:00Z",
-            "title": "AI for Leaders",
-            "notifications": [],
+            "display_name": "AI for Leaders",
+            "due_dates": [],
             "pacing": "self",
             "org_name": "BabsonX",
             "is_revoked": False,
             "is_enrollment_active": True,
             "mode": "verified",
-            "link_to_course": "https://learning.edx.org/course/course-v1:BabsonX+MIS01x+1T2019/home",
-            "link_to_certificate": None,
+            "course_run_url": "https://learning.edx.org/course/course-v1:BabsonX+MIS01x+1T2019/home",
+            "certificate_download_url": None,
             "resume_course_run_url": None,
             "course_key": "BabsonX+MIS01x",
             "course_type": "verified-audit",
             "product_source": "edx",
             "enroll_by": "2024-12-21T23:59:59Z",
-            'can_unenroll': True,
-            'has_emails_enabled': False,
-            'micromasters_title': None,
-            # Deprecated fields (to be removed in a future release)
-            'certificate_download_url': None,
-            "course_run_url": "https://learning.edx.org/course/course-v1:BabsonX+MIS01x+1T2019/home",
-            "display_name": "AI for Leaders",
-            'due_dates': [],
-            'emails_enabled': False,
+            "emails_enabled": False,
+            "micromasters_title": None,
         }
-        self.mock_enterprise_course_enrollments = [self.mock_enterprise_course_enrollment]
+        self.mock_transformed_enterprise_course_enrollment = {
+            "course_run_id": self.mock_original_enterprise_course_enrollment['course_run_id'],
+            "course_run_status": self.mock_original_enterprise_course_enrollment['course_run_status'],
+            "created": self.mock_original_enterprise_course_enrollment['created'],
+            "start_date": self.mock_original_enterprise_course_enrollment['start_date'],
+            "end_date": self.mock_original_enterprise_course_enrollment['end_date'],
+            "title": self.mock_original_enterprise_course_enrollment['display_name'],
+            "notifications": self.mock_original_enterprise_course_enrollment['due_dates'],
+            "pacing": self.mock_original_enterprise_course_enrollment['pacing'],
+            "org_name": self.mock_original_enterprise_course_enrollment['org_name'],
+            "is_revoked": self.mock_original_enterprise_course_enrollment['is_revoked'],
+            "is_enrollment_active": self.mock_original_enterprise_course_enrollment['is_enrollment_active'],
+            "mode": self.mock_original_enterprise_course_enrollment['mode'],
+            "link_to_course": self.mock_original_enterprise_course_enrollment['course_run_url'],
+            "link_to_certificate": None,
+            "resume_course_run_url": None,
+            "course_key": self.mock_original_enterprise_course_enrollment['course_key'],
+            "course_type": self.mock_original_enterprise_course_enrollment['course_type'],
+            "product_source": self.mock_original_enterprise_course_enrollment['product_source'],
+            "enroll_by": self.mock_original_enterprise_course_enrollment['enroll_by'],
+            "can_unenroll": True,
+            "has_emails_enabled": self.mock_original_enterprise_course_enrollment['emails_enabled'],
+            "micromasters_title": self.mock_original_enterprise_course_enrollment['micromasters_title'],
+        }
+        self.mock_original_enterprise_course_enrollments = [self.mock_original_enterprise_course_enrollment]
+        self.mock_transformed_enterprise_course_enrollments = [self.mock_transformed_enterprise_course_enrollment]
 
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_course_enrollments')
@@ -415,7 +433,7 @@ class TestDashboardHandler(TestHandlerContextMixin):
         mock_get_enterprise_customers_for_user,
     ):
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
-        mock_get_enterprise_course_enrollments.return_value = self.mock_enterprise_course_enrollments
+        mock_get_enterprise_course_enrollments.return_value = self.mock_original_enterprise_course_enrollments
 
         context = HandlerContext(self.request)
         dashboard_handler = DashboardHandler(context)
@@ -424,5 +442,5 @@ class TestDashboardHandler(TestHandlerContextMixin):
 
         self.assertEqual(
             dashboard_handler.context.data.get('enterprise_course_enrollments'),
-            self.mock_enterprise_course_enrollments,
+            self.mock_transformed_enterprise_course_enrollments,
         )

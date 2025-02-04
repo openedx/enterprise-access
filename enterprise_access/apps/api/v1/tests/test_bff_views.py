@@ -730,12 +730,6 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'course_type': self.mock_enterprise_course_enrollment['course_type'],
             'product_source': self.mock_enterprise_course_enrollment['product_source'],
             'enroll_by': self.mock_enterprise_course_enrollment['enroll_by'],
-            # Deprecated fields (to be removed in the future)
-            'certificate_download_url': None,
-            'course_run_url': self.mock_enterprise_course_enrollment['course_run_url'],
-            'display_name': self.mock_enterprise_course_enrollment['display_name'],
-            'due_dates': self.mock_enterprise_course_enrollment['due_dates'],
-            'emails_enabled': False,
         }
         expected_response_data = self.mock_dashboard_route_response_data.copy()
         expected_response_data.update({

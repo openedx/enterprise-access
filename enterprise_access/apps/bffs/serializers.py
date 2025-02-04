@@ -296,16 +296,6 @@ class EnterpriseCourseEnrollmentSerializer(BaseBffSerializer):
     start_date = serializers.DateTimeField(allow_null=True)
     title = serializers.CharField()
 
-    # Deprecated (will be removed in a future release)
-    certificate_download_url = serializers.CharField(allow_null=True)
-    course_run_url = serializers.URLField()
-    display_name = serializers.CharField()
-    due_dates = serializers.ListField(
-        child=EnrollmentDueDateSerializer(),
-        allow_empty=True,
-    )
-    emails_enabled = serializers.BooleanField(required=False, allow_null=True)
-
 
 class BFFRequestSerializer(BaseBffSerializer):
     """
