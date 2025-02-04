@@ -218,12 +218,6 @@ class EnterpriseCourseEnrollmentsDataMixin(BaseLearnerDataMixin):
             'product_source',
             'resume_course_run_url',
             'start_date',
-            # Deprecated fields (to be removed in a future release)
-            'certificate_download_url',
-            'course_run_url',
-            'display_name',
-            'due_dates',
-            'emails_enabled',
         ]
         transformed_data = {
             field: enrollment.get(field)
