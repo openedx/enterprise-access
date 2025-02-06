@@ -218,7 +218,11 @@ class BrazeCampaignSender:
         start_date = self.normalized_metadata.get('start_date')
         end_date = self.normalized_metadata.get('end_date')
         course_metadata = self.course_metadata
-
+        logger.info(
+            f"[get_start_date] Assignment UUID: {self.assignment.uuid} - start_date: {start_date}, "
+            f"end_date: {end_date}, "
+            f"course_metadata: {course_metadata}"
+        )
         return get_human_readable_date(
             get_self_paced_normalized_start_date(start_date, end_date, course_metadata)
         )
