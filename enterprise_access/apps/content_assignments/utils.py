@@ -1,6 +1,7 @@
 """
 Utils for content_assignments
 """
+import logging
 from datetime import datetime, timedelta
 
 from dateutil import parser
@@ -11,6 +12,8 @@ from enterprise_access.apps.content_assignments.constants import (
     START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
 )
 
+
+logger = logging.getLogger(__name__)
 
 def is_within_minimum_start_date_threshold(curr_date, start_date):
     """
@@ -47,10 +50,18 @@ def get_self_paced_normalized_start_date(start_date, end_date, course_metadata):
     curr_date = datetime.now()
     pacing_type = course_metadata.get('pacing_type', {}) or None
     weeks_to_complete = course_metadata.get('weeks_to_complete', {}) or None
+    logger.info(f"Start Date: {start_date}, End Date: {end_date}, Course Metadata: {course_metadata}")
     if not (start_date and end_date and pacing_type and weeks_to_complete):
+        logger.info(f"[Case-1] Missing required data: returning: curr_date:{curr_date}")
         return curr_date.strftime(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT)
     if pacing_type == "self_paced":
         if has_time_to_complete(curr_date, end_date, weeks_to_complete) or \
                 is_within_minimum_start_date_threshold(curr_date, start_date):
+            logger.info(
+                "[Case-2] Self-paced course with sufficient time to complete. "
+                f"curr_date: {curr_date}, end_date: {end_date}, weeks_to_complete: {weeks_to_complete}, "
+                f"start_date: {start_date}"
+            )
             return curr_date.strftime(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT)
+    logger.info(f"[Case-3] Returning original start_date {start_date}.")
     return start_date

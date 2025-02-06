@@ -218,7 +218,11 @@ class BrazeCampaignSender:
         start_date = self.normalized_metadata.get('start_date')
         end_date = self.normalized_metadata.get('end_date')
         course_metadata = self.course_metadata
-
+        logger.info(
+            f"[get_start_date] - start_date: {start_date}, "
+            f"end_date: {end_date}, "
+            f"course_metadata: {course_metadata}"
+        )
         return get_human_readable_date(
             get_self_paced_normalized_start_date(start_date, end_date, course_metadata)
         )
@@ -228,7 +232,7 @@ class BrazeCampaignSender:
         Returns the minimum of this assignment's auto-expiration date,
         the content's enrollment deadline, and the related policy's expiration timestamp.
         """
-        action_required_by_timestamp = get_automatic_expiration_date_and_reason(self.assignment, self.course_metadata)
+        action_required_by_timestamp = get_automatic_expiration_date_and_reason(self.assignment, self.course_metadata) 
         if not action_required_by_timestamp:
             return None
         return format_datetime_obj(
@@ -495,7 +499,7 @@ def send_email_for_new_assignment(new_assignment_uuid):
     Args:
         new_assignment_uuid: (string) the new assignment uuid
     """
-    assignment = _get_assignment_or_raise(new_assignment_uuid)
+    assignment = _get_assignment_or_raise(new_assignment_uuid) 
 
     campaign_sender = BrazeCampaignSender(assignment)
     braze_trigger_properties = campaign_sender.get_properties(
@@ -509,6 +513,9 @@ def send_email_for_new_assignment(new_assignment_uuid):
         'learner_portal_link',
         'action_required_by_timestamp'
     )
+
+    logger.info(f'Braze properties for assignment {assignment.uuid}: {braze_trigger_properties}')
+
     campaign_uuid = settings.BRAZE_ASSIGNMENT_NOTIFICATION_CAMPAIGN
     campaign_sender.send_campaign_message(
         braze_trigger_properties,
