@@ -8,6 +8,7 @@ from rest_framework import status
 from enterprise_access.apps.bffs import serializers
 from enterprise_access.apps.bffs.api import (
     get_and_cache_enterprise_customer_users,
+    invalidate_enterprise_customer_users,
     transform_enterprise_customer_users_data
 )
 
@@ -105,6 +106,10 @@ class HandlerContext:
     @property
     def all_linked_enterprise_customer_users(self):
         return self.data.get('all_linked_enterprise_customer_users')
+
+    @property
+    def should_update_active_enterprise_customer_user(self):
+        return self.data.get('should_update_active_enterprise_customer_user')
 
     @property
     def is_request_user_linked_to_enterprise_customer(self):
@@ -222,13 +227,43 @@ class HandlerContext:
                 self.enterprise_customer_uuid,
                 self.enterprise_customer_slug,
             )
-
+        # Sets the active enterprise customer metadata in the LMS
+        if should_update_active_enterprise_customer_user := transformed_data.get(
+                'should_update_active_enterprise_customer_user',
+        ):
+            enterprise_customer = transformed_data.get('enterprise_customer')
+            enterprise_customer_uuid = enterprise_customer.get('uuid')
+            try:
+                invalidate_enterprise_customer_users(username=self.request.user.username)
+                transformed_data.update({
+                    'active_enterprise_customer': enterprise_customer,
+                    'all_linked_enterprise_customer_users': [
+                        {
+                            **enterprise_customer_user,
+                            "active": (
+                                enterprise_customer_user["enterprise_customer"]["uuid"] == enterprise_customer_uuid
+                            )
+                        }
+                        for enterprise_customer_user in transformed_data.get('all_linked_enterprise_customer_users', [])
+                    ]
+                })
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.exception(
+                    f"Failed to update active active enterprise user "
+                    f"{enterprise_customer_uuid} and learner {self.lms_user_id}: {exc} "
+                )
+                self.add_error(
+                    developer_message=f"Unable to update the active enterprise customer user to "
+                                      f"{self.enterprise_customer_uuid}",
+                    user_message="Unable to update your active enterprise"
+                )
         # Update the context data with the transformed enterprise customer users data
         self.data.update({
             'enterprise_customer': transformed_data.get('enterprise_customer'),
             'active_enterprise_customer': transformed_data.get('active_enterprise_customer'),
             'all_linked_enterprise_customer_users': transformed_data.get('all_linked_enterprise_customer_users', []),
             'staff_enterprise_customer': transformed_data.get('staff_enterprise_customer'),
+            'should_update_active_enterprise_customer_user': should_update_active_enterprise_customer_user
         })
 
     def add_error(self, status_code=None, **kwargs):

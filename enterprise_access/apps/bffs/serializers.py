@@ -152,12 +152,27 @@ class EnterpriseCustomerSerializer(BaseBffSerializer):
     show_integration_warning = serializers.BooleanField()
 
 
+class EnterpriseCustomerUsersSerializer(BaseBffSerializer):
+    """
+    Serializer for all linked enterprise customer users
+    """
+    id = serializers.IntegerField()
+    user_id = serializers.IntegerField()
+    enterprise_customer = EnterpriseCustomerSerializer()
+    active = serializers.BooleanField()
+
+
 class BaseResponseSerializer(BaseBffSerializer):
     """
     Serializer for base response.
     """
 
     enterprise_customer = EnterpriseCustomerSerializer(required=False, allow_null=True)
+    all_linked_enterprise_customer_users = serializers.ListField(
+        child=EnterpriseCustomerUsersSerializer(),
+        allow_empty=True,
+    )
+    should_update_active_enterprise_customer_user = serializers.BooleanField()
     errors = ErrorSerializer(many=True, required=False, default=list)
     warnings = WarningSerializer(many=True, required=False, default=list)
     enterprise_features = serializers.DictField(required=False, default=dict)
