@@ -216,9 +216,9 @@ class BrazeCampaignSender:
         Checks if the start_date is matches the criteria set by `get_self_paced_normalized_start_date`
         for old start_dates, if so, return today's date, otherwise, return the start_date
         """
+        start_date = self.normalized_metadata.get('start_date')
+        end_date = self.normalized_metadata.get('end_date')
         course_run_metadata = get_course_run_metadata_for_assignment(self.assignment, self.course_metadata)
-        start_date = course_run_metadata.get('start_date')
-        end_date = course_run_metadata.get('end_date')
         logger.info(
             f"[get_start_date] Assignment UUID: {self.assignment.uuid} - start_date: {start_date}, "
             f"end_date: {end_date}, "

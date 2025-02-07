@@ -232,14 +232,14 @@ class TestBrazeEmailTasks(APITestWithMocks):
         }
         cls.mock_content_metadata = {
             'key': TEST_COURSE_KEY,
-            'course_runs':[
+            'course_runs': [
                 {
                     'key': TEST_COURSE_RUN_KEY,
                     'start': '2020-01-01T12:00:00Z',
-                    'end': '2024-03-22T23:59:59Z',
+                    'end': '2022-01-01 12:00:00Z',
                     'enrollment_start': None,
                     'enrollment_end': '2023-09-11T19:00:00Z',
-                    'pacing_type': 'instructor_paced',
+                    'pacing_type': 'self_paced',
                     'weeks_to_complete': 8,
                 }
             ],
@@ -286,6 +286,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
             parent_content_key=TEST_COURSE_KEY,
             is_assigned_course_run=True,
             learner_email='learner@example.com',
+            preferred_course_run_key=TEST_COURSE_RUN_KEY,
             lms_user_id=TEST_LMS_USER_ID_2,
             assignment_configuration=self.assignment_configuration,
         )
@@ -414,7 +415,18 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 {'name': 'Good People', 'logo_image_url': 'http://pictures.nice'},
                 {'name': 'Fast Learners', 'logo_image_url': 'http://pictures.totally'},
             ],
-            'card_image_url': 'https://itsanimage.com'
+            'card_image_url': 'https://itsanimage.com',
+            'course_runs': [
+                {
+                    'key': TEST_COURSE_RUN_KEY,
+                    'start': '2020-01-01 12:00:00Z',
+                    'end': '2022-01-01 12:00:00Z',
+                    'enrollment_start': None,
+                    'enrollment_end': '2023-09-11T19:00:00Z',
+                    'pacing_type': 'self_paced',
+                    'weeks_to_complete': 8,
+                }
+            ],
         }
         mock_catalog_client.return_value.catalog_content_metadata.return_value = {
             'count': 1,
