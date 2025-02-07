@@ -20,6 +20,7 @@ from enterprise_access.apps.content_assignments.content_metadata_api import (
 from enterprise_access.tasks import LoggedTaskWithRetry
 from enterprise_access.utils import (
     get_automatic_expiration_date_and_reason,
+    get_course_run_metadata_for_assignment,
     get_normalized_metadata_for_assignment,
     localized_utcnow
 )
@@ -215,16 +216,16 @@ class BrazeCampaignSender:
         Checks if the start_date is matches the criteria set by `get_self_paced_normalized_start_date`
         for old start_dates, if so, return today's date, otherwise, return the start_date
         """
-        start_date = self.normalized_metadata.get('start_date')
-        end_date = self.normalized_metadata.get('end_date')
-        course_metadata = self.course_metadata
+        course_run_metadata = get_course_run_metadata_for_assignment(self.assignment, self.course_metadata)
+        start_date = course_run_metadata.get('start_date')
+        end_date = course_run_metadata.get('end_date')
         logger.info(
             f"[get_start_date] Assignment UUID: {self.assignment.uuid} - start_date: {start_date}, "
             f"end_date: {end_date}, "
-            f"course_metadata: {course_metadata}"
+            f"course_run_metadata: {course_run_metadata}"
         )
         return get_human_readable_date(
-            get_self_paced_normalized_start_date(start_date, end_date, course_metadata)
+            get_self_paced_normalized_start_date(start_date, end_date, course_run_metadata)
         )
 
     def get_action_required_by_timestamp(self):

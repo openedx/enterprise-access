@@ -245,3 +245,27 @@ def _days_from_now(days_from_now=0, date_format=None):
     if not date_format:
         return date
     return date.strftime(date_format)
+
+
+def get_course_run_metadata_for_assignment(assignment, content_metadata):
+    """
+    Retrieves metadata for a specific course run associated with an assignment. If the assignment has
+    a preferred course run, returns the metadata for that run. If the preferred run metadata is not 
+    found, returns normalized_metadata.
+
+    Args:
+        assignment (dict): The assignment object.
+        content_metadata (dict): The content metadata object.
+
+    Returns:
+        dict: Course run metadata if available, otherwise normalized_metadata.
+    """
+    if preferred_course_run_key := assignment.preferred_course_run_key:
+        course_runs = content_metadata.get('course_runs', [])
+        for course_run in course_runs:
+            if course_run.get('key') == preferred_course_run_key:
+                # manually applying existing key value mappings for consistent return structure
+                course_run['start_date'] = course_run.get('start')
+                course_run['end_date'] = course_run.get('end')
+                return course_run
+    return content_metadata.get('normalized_metadata', {})
