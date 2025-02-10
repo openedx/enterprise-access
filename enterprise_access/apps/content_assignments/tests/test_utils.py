@@ -2,6 +2,8 @@
 Tests for Enterprise Access content_assignments utils.
 """
 
+import uuid
+
 import ddt
 from django.test import TestCase
 
@@ -13,7 +15,12 @@ from enterprise_access.apps.content_assignments.utils import (
     has_time_to_complete,
     is_within_minimum_start_date_threshold
 )
-from enterprise_access.utils import _curr_date, _days_from_now, get_normalized_metadata_for_assignment
+from enterprise_access.utils import (
+    _curr_date,
+    _days_from_now,
+    get_course_run_metadata_for_assignment,
+    get_normalized_metadata_for_assignment
+)
 
 mock_course_run_1 = {
     'start_date': _days_from_now(-370, DATE_FORMAT_ISO_8601),
@@ -38,6 +45,9 @@ mock_advertised_course_run = {
     'enroll_start_date': _days_from_now(-20, DATE_FORMAT_ISO_8601),
     'content_price': 100,
 }
+
+assignment_uuid = uuid.uuid4()
+advertised_course_run_uuid = uuid.uuid4()
 
 
 @ddt.ddt
@@ -273,3 +283,66 @@ class UtilsTests(TestCase):
             content_metadata=self.mock_content_metadata
         )
         self.assertEqual(normalized_metadata, expected_output)
+
+    @ddt.data(
+        # Test case for preferred course run that exists
+        {
+            'assignment': {
+                'preferred_course_run_key': 'course-v1:edX+DemoX+1T60',
+                'uuid': assignment_uuid
+            },
+            'content_metadata': {
+                'course_runs': [
+                    {'key': 'course-v1:edX+DemoX+1T60', 'data': 'test1'},
+                    {'key': 'course-v1:edX+DemoX+1T360', 'data': 'test2'}
+                ],
+                'advertised_course_run_uuid': advertised_course_run_uuid,
+                'key': 'test-content-key'
+            },
+            'expected_output': {'key': 'course-v1:edX+DemoX+1T60', 'data': 'test1'}
+        },
+        # Test case for preferred course run that doesn't exist - should fall back to advertised run
+        {
+            'assignment': {
+                'preferred_course_run_key': 'non-existent-key',
+                'uuid': assignment_uuid
+            },
+            'content_metadata': {
+                'course_runs': [
+                    {'key': 'course-v1:edX+DemoX+1T60', 'uuid': advertised_course_run_uuid, 'data': 'test1'},
+                    {'key': 'course-v1:edX+DemoX+1T360', 'data': 'test2'}
+                ],
+                'advertised_course_run_uuid': advertised_course_run_uuid,
+                'key': 'test-content-key'
+            },
+            'expected_output': {'key': 'course-v1:edX+DemoX+1T60', 'uuid': advertised_course_run_uuid, 'data': 'test1'}
+        },
+        # Test case for no preferred course run - should return advertised run
+        {
+            'assignment': {
+                'preferred_course_run_key': None,
+                'uuid': assignment_uuid
+            },
+            'content_metadata': {
+                'course_runs': [
+                    {'key': 'course-v1:edX+DemoX+1T60', 'uuid': advertised_course_run_uuid, 'data': 'test1'},
+                    {'key': 'course-v1:edX+DemoX+1T360', 'data': 'test2'}
+                ],
+                'advertised_course_run_uuid': advertised_course_run_uuid,
+                'key': 'test-content-key'
+            },
+            'expected_output': {'key': 'course-v1:edX+DemoX+1T60', 'uuid': advertised_course_run_uuid, 'data': 'test1'}
+        }
+    )
+    @ddt.unpack
+    def test_get_course_run_metadata_for_assignment(self, assignment, content_metadata, expected_output):
+        """
+        Test get_course_run_metadata_for_assignment returns the correct course run metadata
+        based on assignment and content metadata.
+        """
+        assignment_obj = LearnerContentAssignmentFactory(**assignment)
+        course_run_metadata = get_course_run_metadata_for_assignment(
+            assignment=assignment_obj,
+            content_metadata=content_metadata
+        )
+        self.assertEqual(course_run_metadata, expected_output)
