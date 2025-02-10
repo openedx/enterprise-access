@@ -12,6 +12,7 @@ asgiref==3.8.1
     # via
     #   django
     #   django-cors-headers
+    #   django-countries
 attrs==25.1.0
     # via
     #   jsonschema
@@ -28,7 +29,7 @@ celery==5.4.0
     #   -r requirements/base.in
     #   django-celery-results
     #   edx-celeryutils
-certifi==2024.12.14
+certifi==2025.1.31
     # via requests
 cffi==1.17.1
     # via
@@ -54,7 +55,7 @@ code-annotations==2.2.0
     # via edx-toggles
 confluent-kafka[avro,schema-registry]==2.6.1
     # via
-    #   -c /home/runner/work/enterprise-access/enterprise-access/requirements/constraints.txt
+    #   -c /edx/app/enterprise-access/requirements/constraints.txt
     #   -r requirements/base.in
 coreapi==2.3.3
     # via
@@ -70,9 +71,9 @@ defusedxml==0.8.0rc2
     # via
     #   python3-openid
     #   social-auth-core
-django==4.2.18
+django==4.2.19
     # via
-    #   -c /home/runner/work/enterprise-access/enterprise-access/requirements/common_constraints.txt
+    #   -c /edx/app/enterprise-access/requirements/common_constraints.txt
     #   -r requirements/base.in
     #   django-celery-results
     #   django-cors-headers
@@ -102,7 +103,9 @@ django==4.2.18
     #   social-auth-app-django
 django-celery-results==2.5.1
     # via -r requirements/base.in
-django-cors-headers==4.6.0
+django-cors-headers==4.7.0
+    # via -r requirements/base.in
+django-countries==7.6.1
     # via -r requirements/base.in
 django-crum==0.7.9
     # via
@@ -228,7 +231,7 @@ monotonic==1.6
     # via analytics-python
 mysqlclient==2.2.7
     # via -r requirements/base.in
-newrelic==10.4.0
+newrelic==10.6.0
     # via edx-django-utils
 oauthlib==3.2.2
     # via
@@ -236,13 +239,13 @@ oauthlib==3.2.2
     #   social-auth-core
 openapi-codec==1.3.2
     # via django-rest-swagger
-openedx-events==9.15.2
+openedx-events==9.17.0
     # via
     #   -r requirements/base.in
     #   edx-event-bus-kafka
 packaging==24.2
     # via drf-yasg
-pbr==6.1.0
+pbr==6.1.1
     # via stevedore
 ply==3.11
     # via djangoql
@@ -263,7 +266,7 @@ pyjwt[crypto]==2.10.1
     #   social-auth-core
 pymemcache==4.0.0
     # via -r requirements/base.in
-pymongo==4.10.1
+pymongo==4.11.1
     # via edx-opaque-keys
 pynacl==1.5.0
     # via edx-django-utils
@@ -275,7 +278,7 @@ python-slugify==8.0.4
     # via code-annotations
 python3-openid==3.2.0
     # via social-auth-core
-pytz==2024.2
+pytz==2025.1
     # via
     #   -r requirements/base.in
     #   drf-yasg
@@ -337,6 +340,7 @@ text-unidecode==1.3
     # via python-slugify
 typing-extensions==4.12.2
     # via
+    #   django-countries
     #   edx-opaque-keys
     #   referencing
 tzdata==2025.1
@@ -350,7 +354,7 @@ uritemplate==4.1.1
     #   drf-yasg
 urllib3==2.2.3
     # via
-    #   -c /home/runner/work/enterprise-access/enterprise-access/requirements/common_constraints.txt
+    #   -c /edx/app/enterprise-access/requirements/common_constraints.txt
     #   requests
 vine==5.1.0
     # via

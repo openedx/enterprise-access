@@ -10,73 +10,74 @@ alabaster==1.0.0
     # via sphinx
 amqp==5.3.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   kombu
 analytics-python==1.4.post1
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 asgiref==3.8.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   django
     #   django-cors-headers
+    #   django-countries
 astroid==3.3.8
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pylint
     #   pylint-celery
 attrs==25.1.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   jsonschema
     #   openedx-events
     #   referencing
 avro==1.12.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   confluent-kafka
-babel==2.16.0
+babel==2.17.0
     # via
     #   pydata-sphinx-theme
     #   sphinx
 backoff==1.10.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   analytics-python
-beautifulsoup4==4.12.3
+beautifulsoup4==4.13.3
     # via pydata-sphinx-theme
 billiard==4.2.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   celery
 cachetools==5.5.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   tox
 celery==5.4.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   django-celery-results
     #   edx-celeryutils
-certifi==2024.12.14
+certifi==2025.1.31
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   requests
 cffi==1.17.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   cryptography
     #   pynacl
 chardet==5.2.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   tox
 charset-normalizer==3.4.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   requests
 click==8.1.8
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   celery
     #   click-didyoumean
     #   click-log
@@ -87,70 +88,70 @@ click==8.1.8
     #   edx-lint
 click-didyoumean==0.3.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   celery
 click-log==0.4.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-lint
 click-plugins==1.1.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   celery
 click-repl==0.3.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   celery
 code-annotations==2.2.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-lint
     #   edx-toggles
 colorama==0.4.6
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   tox
 confluent-kafka[avro,schema-registry]==2.6.1
     # via
-    #   -c /home/runner/work/enterprise-access/enterprise-access/requirements/constraints.txt
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -c /edx/app/enterprise-access/requirements/constraints.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
 coreapi==2.3.3
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   django-rest-swagger
     #   openapi-codec
 coreschema==0.0.4
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   coreapi
-coverage[toml]==7.6.10
+coverage[toml]==7.6.11
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pytest-cov
 cryptography==44.0.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pyjwt
     #   social-auth-core
 ddt==1.7.2
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 defusedxml==0.8.0rc2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   python3-openid
     #   social-auth-core
 dill==0.3.9
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pylint
 distlib==0.3.9
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   virtualenv
-django==4.2.18
+django==4.2.19
     # via
-    #   -c /home/runner/work/enterprise-access/enterprise-access/requirements/common_constraints.txt
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -c /edx/app/enterprise-access/requirements/common_constraints.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   django-celery-results
     #   django-cors-headers
     #   django-crum
@@ -178,45 +179,47 @@ django==4.2.18
     #   openedx-events
     #   social-auth-app-django
 django-celery-results==2.5.1
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-django-cors-headers==4.6.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
+django-cors-headers==4.7.0
+    # via -r /edx/app/enterprise-access/requirements/test.txt
+django-countries==7.6.1
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 django-crum==0.7.9
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-django-utils
     #   edx-rbac
     #   edx-toggles
 django-dynamic-fixture==4.0.1
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 django-extensions==3.2.3
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 django-filter==24.3
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 django-log-request-id==2.1.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 django-model-utils==5.0.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-celeryutils
     #   edx-rbac
 django-object-actions==4.3.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 django-rest-swagger==2.2.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 django-simple-history==3.8.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 django-waffle==4.2.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-django-utils
     #   edx-drf-extensions
     #   edx-toggles
 djangoql==0.18.1
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 djangorestframework==3.15.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   django-rest-swagger
     #   djangorestframework-csv
     #   drf-jwt
@@ -225,10 +228,10 @@ djangorestframework==3.15.2
     #   edx-api-doc-tools
     #   edx-drf-extensions
 djangorestframework-csv==3.0.2
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 dnspython==2.7.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pymongo
 doc8==1.1.2
     # via -r requirements/doc.in
@@ -241,31 +244,31 @@ docutils==0.21.2
     #   sphinx
 drf-jwt==1.19.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-drf-extensions
 drf-spectacular==0.28.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 drf-yasg==1.21.8
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-api-doc-tools
 edx-api-doc-tools==2.0.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 edx-auth-backends==4.4.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 edx-braze-client==0.2.5
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 edx-ccx-keys==2.0.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   openedx-events
 edx-celeryutils==1.3.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 edx-django-release-util==1.4.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 edx-django-utils==7.1.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-drf-extensions
     #   edx-event-bus-kafka
     #   edx-rest-api-client
@@ -273,172 +276,172 @@ edx-django-utils==7.1.0
     #   openedx-events
 edx-drf-extensions==10.5.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-rbac
 edx-enterprise-subsidy-client==0.4.4
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 edx-event-bus-kafka==6.0.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 edx-lint==5.6.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 edx-opaque-keys[django]==2.11.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-ccx-keys
     #   edx-drf-extensions
     #   openedx-events
 edx-rbac==1.10.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 edx-rest-api-client==6.0.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-enterprise-subsidy-client
 edx-toggles==5.2.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-event-bus-kafka
-factory-boy==3.3.1
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-faker==35.0.0
+factory-boy==3.3.3
+    # via -r /edx/app/enterprise-access/requirements/test.txt
+faker==36.1.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   factory-boy
 fastavro==1.10.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   confluent-kafka
     #   openedx-events
 filelock==3.17.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   tox
     #   virtualenv
 freezegun==1.5.1
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 idna==3.10
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   requests
 imagesize==1.4.1
     # via sphinx
 inflection==0.5.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   drf-spectacular
     #   drf-yasg
 iniconfig==2.0.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pytest
-isort==5.13.2
+isort==6.0.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pylint
 itypes==1.2.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   coreapi
 jinja2==3.1.5
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   code-annotations
     #   coreschema
     #   sphinx
 jsonfield==3.1.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-celeryutils
 jsonfield2==4.0.0.post0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 jsonschema==4.23.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   drf-spectacular
 jsonschema-specifications==2024.10.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   jsonschema
 kombu==5.4.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   celery
 markupsafe==3.0.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   jinja2
 mccabe==0.7.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pylint
 monotonic==1.6
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   analytics-python
 mysqlclient==2.2.7
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-newrelic==10.4.0
+    # via -r /edx/app/enterprise-access/requirements/test.txt
+newrelic==10.6.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-django-utils
 nh3==0.2.20
     # via readme-renderer
 oauthlib==3.2.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   requests-oauthlib
     #   social-auth-core
 openapi-codec==1.3.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   django-rest-swagger
-openedx-events==9.15.2
+openedx-events==9.17.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-event-bus-kafka
 packaging==24.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   drf-yasg
     #   pyproject-api
     #   pytest
     #   sphinx
     #   tox
-pbr==6.1.0
+pbr==6.1.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   stevedore
 platformdirs==4.3.6
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pylint
     #   tox
     #   virtualenv
 pluggy==1.5.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pytest
     #   tox
 ply==3.11
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   djangoql
 prompt-toolkit==3.0.50
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   click-repl
 psutil==6.1.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-django-utils
 pycparser==2.22
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   cffi
 pydata-sphinx-theme==0.16.1
     # via sphinx-book-theme
 pygments==2.19.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   accessible-pygments
     #   doc8
     #   pydata-sphinx-theme
@@ -446,77 +449,76 @@ pygments==2.19.1
     #   sphinx
 pyjwt[crypto]==2.10.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   drf-jwt
     #   edx-auth-backends
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==3.3.3
+pylint==3.3.4
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-lint
     #   pylint-celery
     #   pylint-django
     #   pylint-plugin-utils
 pylint-celery==0.3
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-lint
 pylint-django==2.6.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-lint
 pylint-plugin-utils==0.8.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pylint-celery
     #   pylint-django
 pymemcache==4.0.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-pymongo==4.10.1
+    # via -r /edx/app/enterprise-access/requirements/test.txt
+pymongo==4.11.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-opaque-keys
 pynacl==1.5.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-django-utils
 pyproject-api==1.9.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   tox
 pytest==8.3.4
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pytest-cov
     #   pytest-django
 pytest-cov==6.0.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-pytest-django==4.9.0
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
+pytest-django==4.10.0
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 python-dateutil==2.9.0.post0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   analytics-python
     #   celery
-    #   faker
     #   freezegun
 python-slugify==8.0.4
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   code-annotations
 python3-openid==3.2.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   social-auth-core
-pytz==2024.2
+pytz==2025.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   drf-yasg
 pyyaml==6.0.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   code-annotations
     #   drf-spectacular
     #   drf-yasg
@@ -524,15 +526,15 @@ pyyaml==6.0.2
 readme-renderer==44.0
     # via -r requirements/doc.in
 redis==5.2.1
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 referencing==0.36.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   jsonschema
     #   jsonschema-specifications
 requests==2.32.3
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   analytics-python
     #   confluent-kafka
     #   coreapi
@@ -543,28 +545,28 @@ requests==2.32.3
     #   sphinx
 requests-oauthlib==2.0.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   social-auth-core
 restructuredtext-lint==1.4.0
     # via doc8
 rpds-py==0.22.3
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   jsonschema
     #   referencing
 rules==3.5
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 semantic-version==2.10.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-drf-extensions
 simplejson==3.19.3
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   django-rest-swagger
 six==1.17.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   analytics-python
     #   edx-auth-backends
     #   edx-ccx-keys
@@ -576,11 +578,11 @@ snowballstemmer==2.2.0
     # via sphinx
 social-auth-app-django==5.4.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-auth-backends
 social-auth-core==4.5.4
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-auth-backends
     #   social-auth-app-django
 soupsieve==2.6
@@ -606,61 +608,63 @@ sphinxcontrib-serializinghtml==2.0.0
     # via sphinx
 sqlparse==0.5.3
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   django
 stevedore==5.4.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   code-annotations
     #   doc8
     #   edx-django-utils
     #   edx-opaque-keys
 text-unidecode==1.3
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   python-slugify
 tomlkit==0.13.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pylint
 tox==4.24.1
-    # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 typing-extensions==4.12.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
+    #   beautifulsoup4
+    #   django-countries
     #   edx-opaque-keys
-    #   faker
     #   pydata-sphinx-theme
     #   referencing
 tzdata==2025.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   celery
+    #   faker
     #   kombu
 uritemplate==4.1.1
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
 urllib3==2.2.3
     # via
-    #   -c /home/runner/work/enterprise-access/enterprise-access/requirements/common_constraints.txt
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -c /edx/app/enterprise-access/requirements/common_constraints.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   requests
 vine==5.1.0
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.29.1
+virtualenv==20.29.2
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   tox
 wcwidth==0.2.13
     # via
-    #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
+    #   -r /edx/app/enterprise-access/requirements/test.txt
     #   prompt-toolkit
 
 # The following packages are considered to be unsafe in a requirements file:
