@@ -247,6 +247,12 @@ def _days_from_now(days_from_now=0, date_format=None):
     return date.strftime(date_format)
 
 
+def get_advertised_course_run_metadata(content_metadata):
+    course_runs = content_metadata.get('course_runs', [])
+    advertised_course_run_uuid = content_metadata.get('advertised_course_run_uuid')
+    return next((run for run in course_runs if run.get('uuid') == advertised_course_run_uuid), None)
+
+
 def get_course_run_metadata_for_assignment(assignment, content_metadata):
     """
     Retrieves metadata for a specific course run associated with an assignment. If the assignment has
@@ -258,9 +264,12 @@ def get_course_run_metadata_for_assignment(assignment, content_metadata):
         content_metadata (dict): The content metadata object.
 
     Returns:
-        dict: Course run metadata if available, otherwise normalized_metadata.
+        dict: Course run metadata if available, otherwise advertised_course_run.
     """
     course_runs = content_metadata.get('course_runs', [])
+
+    # For run-based assignments, return metadata for the preferred course run if
+    # available. If not, fallback to advertised run.
     if preferred_course_run_key := assignment.preferred_course_run_key:
         course_run = next((run for run in course_runs if run.get('key') == preferred_course_run_key), None)
         if not course_run:
@@ -270,6 +279,9 @@ def get_course_run_metadata_for_assignment(assignment, content_metadata):
                 content_metadata.get('key'),
                 assignment.uuid
             )
+            # Fallback to advertised course run if preferred course run metadata is missing
+            return get_advertised_course_run_metadata(content_metadata)
         return course_run
-    advertised_course_run_uuid = content_metadata.get('advertised_course_run_uuid')
-    return next((run for run in course_runs if run.get("uuid") == advertised_course_run_uuid), None)
+
+    # For course-based assignments, return metadata for the advertised course run
+    return get_advertised_course_run_metadata(content_metadata)
