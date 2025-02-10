@@ -50,6 +50,7 @@ class LmsApiClient(BaseOAuthClient):
     enterprise_customer_endpoint = enterprise_api_base_url + 'enterprise-customer/'
     pending_enterprise_learner_endpoint = enterprise_api_base_url + 'pending-enterprise-learner/'
     enterprise_group_membership_endpoint = enterprise_api_base_url + 'enterprise-group/'
+    pending_enterprise_admin_endpoint = enterprise_api_base_url + 'pending-enterprise-admin/'
 
     def enterprise_customer_url(self, enterprise_customer_uuid):
         return os.path.join(
@@ -193,6 +194,40 @@ class LmsApiClient(BaseOAuthClient):
             raise exc
 
         return results
+
+    def create_enterprise_admin_user(self, enterprise_customer_uuid, user_email):
+        """
+        Creates a new enterprise pending admin record.
+
+        Arguments:
+            enterprise_customer_uuid (UUID): UUID of the enterprise customer.
+            user_email (string): The email address of the admin.
+        Returns:
+            dictionary describing the created pending admin record.
+        """
+        payload = {
+            'enterprise_customer': enterprise_customer_uuid,
+            'user_email': user_email,
+        }
+        try:
+            response = self.client.post(
+                self.pending_enterprise_admin_endpoint,
+                json=payload,
+                timeout=settings.LMS_CLIENT_TIMEOUT,
+            )
+            response.raise_for_status()
+            logger.info(
+                'Successfully created pending admin record for customer %s, email %s',
+                enterprise_customer_uuid, user_email,
+            )
+            payload = response.json()
+            return payload
+        except requests.exceptions.HTTPError:
+            logger.exception(
+                'Failed to create pending admin record for customer %s, email %s',
+                enterprise_customer_uuid, user_email,
+            )
+            raise
 
     def unlink_users_from_enterprise(self, enterprise_customer_uuid, user_emails, is_relinkable=True):
         """
