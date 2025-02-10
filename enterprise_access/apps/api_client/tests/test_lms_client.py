@@ -174,6 +174,81 @@ class TestLmsApiClient(TestCase):
             timeout=settings.LMS_CLIENT_TIMEOUT,
         )
 
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_create_enterprise_customer_data(self, mock_oauth_client, mock_json):
+        """
+        Test that we can use the LmsApiClient to create a new customer record.
+        """
+        customer_input = {
+            'name': 'New Customer',
+            'slug': 'new-customer',
+            'country': 'US',
+            'other_field': True,
+        }
+
+        mock_created_customer_payload = {
+            'name': 'New Customer',
+            'slug': 'new-customer',
+            'country': 'US',
+            'other_field': True,
+        }
+        mock_json.return_value = mock_created_customer_payload
+
+        mock_post = mock_oauth_client.return_value.post
+
+        mock_post.return_value = requests.Response()
+        mock_post.return_value.status_code = 201
+
+        client = LmsApiClient()
+        response_payload = client.create_enterprise_customer(**customer_input)
+
+        self.assertEqual(response_payload, mock_created_customer_payload)
+        expected_url = 'http://edx-platform.example.com/enterprise/api/v1/enterprise-customer/'
+        expected_input = {
+            'site': {'domain': settings.DEFAULT_CUSTOMER_SITE},
+            **customer_input,
+        }
+        mock_post.assert_called_once_with(
+            expected_url,
+            json=expected_input,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_create_enterprise_customer_error(self, mock_oauth_client):
+        """
+        Tests that we raise an exception appropriately when creating a
+        new customer record with the LmsApiClient().
+        """
+        customer_input = {
+            'name': 'New Customer',
+            'slug': 'new-customer',
+            'country': 'US',
+            'other_field': True,
+        }
+
+        mock_post = mock_oauth_client.return_value.post
+
+        mock_post.side_effect = requests.exceptions.HTTPError('oh no')
+        mock_post.return_value.status_code = 400
+
+        client = LmsApiClient()
+
+        with self.assertRaises(requests.exceptions.HTTPError):
+            client.create_enterprise_customer(**customer_input)
+
+        expected_url = 'http://edx-platform.example.com/enterprise/api/v1/enterprise-customer/'
+        expected_input = {
+            'site': {'domain': settings.DEFAULT_CUSTOMER_SITE},
+            **customer_input,
+        }
+        mock_post.assert_called_once_with(
+            expected_url,
+            json=expected_input,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
     def test_unlink_users_from_enterprise(self, mock_oauth_client):
         """

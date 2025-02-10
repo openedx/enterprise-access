@@ -105,6 +105,47 @@ class LmsApiClient(BaseOAuthClient):
             logger.exception(exc)
             raise
 
+    def create_enterprise_customer(self, *, name, slug, country, **kwargs):
+        """
+        Creates a new enterprise customer record.
+
+        Arguments:
+            name (string): The name of the customer.
+            slug (string): Slug of the enterprise customer.
+            country (string): The country code of the customer.
+            kwargs (dict): Any other fields to specify for the newly-created customer.
+        Returns:
+            dictionary containing enterprise customer metadata
+        """
+        payload = {
+            'name': name,
+            'slug': slug,
+            'country': country,
+            'site': {
+                'domain': settings.DEFAULT_CUSTOMER_SITE,
+            },
+            **kwargs,
+        }
+        response = self.client.post(
+            self.enterprise_customer_endpoint,
+            json=payload,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+        try:
+            response.raise_for_status()
+            payload = response.json()
+            logger.info(
+                'Successfully created customer %s with data %s',
+                name, payload,
+            )
+            return payload
+        except requests.exceptions.HTTPError:
+            logger.exception(
+                'Failed to create enterprise customer with name %s, response content %s',
+                name, response.content.decode(),
+            )
+            raise
+
     def get_enterprise_admin_users(self, enterprise_customer_uuid):
         """
         Gets a list of admin users for a given enterprise customer.
