@@ -45,12 +45,13 @@ class LmsApiClient(BaseOAuthClient):
     """
     API client for calls to the LMS service.
     """
-    enterprise_api_base_url = settings.LMS_URL + '/enterprise/api/v1/'
-    enterprise_learner_endpoint = enterprise_api_base_url + 'enterprise-learner/'
-    enterprise_customer_endpoint = enterprise_api_base_url + 'enterprise-customer/'
-    pending_enterprise_learner_endpoint = enterprise_api_base_url + 'pending-enterprise-learner/'
-    enterprise_group_membership_endpoint = enterprise_api_base_url + 'enterprise-group/'
-    pending_enterprise_admin_endpoint = enterprise_api_base_url + 'pending-enterprise-admin/'
+    enterprise_base_url = settings.LMS_URL + '/enterprise/'
+    enterprise_api_v1_base_url = enterprise_base_url + 'api/v1/'
+    enterprise_learner_endpoint = enterprise_api_v1_base_url + 'enterprise-learner/'
+    enterprise_customer_endpoint = enterprise_api_v1_base_url + 'enterprise-customer/'
+    pending_enterprise_learner_endpoint = enterprise_api_v1_base_url + 'pending-enterprise-learner/'
+    enterprise_group_membership_endpoint = enterprise_api_v1_base_url + 'enterprise-group/'
+    pending_enterprise_admin_endpoint = enterprise_api_v1_base_url + 'pending-enterprise-admin/'
 
     def enterprise_customer_url(self, enterprise_customer_uuid):
         return os.path.join(
@@ -60,7 +61,7 @@ class LmsApiClient(BaseOAuthClient):
 
     def enterprise_group_endpoint(self, group_uuid):
         return os.path.join(
-            self.enterprise_api_base_url + 'enterprise-group/',
+            self.enterprise_api_v1_base_url + 'enterprise-group/',
             f"{group_uuid}/",
         )
 
@@ -553,12 +554,12 @@ class LmsUserApiClient(BaseUserApiClient):
     """
     API client for user-specific calls to the LMS service.
     """
-    enterprise_api_base_url = f"{settings.LMS_URL}/enterprise/api/v1/"
+    enterprise_base_url = settings.LMS_URL + "/enterprise/"
+    enterprise_api_v1_base_url = enterprise_base_url + "api/v1/"
     enterprise_learner_portal_api_base_url = f"{settings.LMS_URL}/enterprise_learner_portal/api/v1/"
-
-    enterprise_learner_endpoint = f"{enterprise_api_base_url}enterprise-learner/"
+    enterprise_learner_endpoint = f"{enterprise_api_v1_base_url}enterprise-learner/"
     default_enterprise_enrollment_intentions_learner_status_endpoint = (
-        f'{enterprise_api_base_url}default-enterprise-enrollment-intentions/learner-status/'
+        f'{enterprise_api_v1_base_url}default-enterprise-enrollment-intentions/learner-status/'
     )
     enterprise_course_enrollments_endpoint = (
         f'{enterprise_learner_portal_api_base_url}enterprise_course_enrollments/'

@@ -1,4 +1,5 @@
 from unittest import mock
+from unittest.mock import MagicMock
 
 import ddt
 from rest_framework import status
@@ -22,6 +23,8 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
     def test_base_build_error(self, mock_handler_context):
         mock_context_data = {
             'enterprise_customer': self.mock_enterprise_customer,
+            'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
+            'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
         }
         mock_handler_context.return_value = self.get_mock_handler_context(
             data=mock_context_data,
@@ -32,6 +35,8 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
         expected_response_data = {
             'enterprise_customer': self.mock_enterprise_customer,
             'enterprise_features': {'feature_flag': True},
+            'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
+            'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
         }
         self.assertEqual(response_data, expected_response_data)
         self.assertEqual(status_code, status.HTTP_200_OK)
@@ -59,6 +64,8 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
     def test_add_errors_warnings_to_response(self, mock_handler_context, errors, warnings):
         mock_context_data = {
             'enterprise_customer': self.mock_enterprise_customer,
+            'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
+            'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
         }
         mock_handler_context.return_value = self.get_mock_handler_context(
             data=mock_context_data,
@@ -68,6 +75,8 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
         expected_output = {
             'enterprise_customer': self.mock_enterprise_customer,
             'enterprise_features': {'feature_flag': True},
+            'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
+            'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
             'errors': [],
             'warnings': [],
         }
@@ -129,6 +138,8 @@ class TestBaseLearnerResponseBuilder(TestBaseResponseBuilder, MockLicenseManager
     def test_build(self, mock_handler_context, has_subscriptions_data):
         mock_context_data = {
             'enterprise_customer': self.mock_enterprise_customer,
+            'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
+            'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
         }
         mock_handler_context.return_value = self.get_mock_handler_context(
             data=mock_context_data,
@@ -165,6 +176,8 @@ class TestBaseLearnerResponseBuilder(TestBaseResponseBuilder, MockLicenseManager
             'enterprise_customer_user_subsidies': {
                 'subscriptions': mock_subscriptions_data,
             },
+            'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
+            'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
             'errors': [],
             'warnings': [],
         }

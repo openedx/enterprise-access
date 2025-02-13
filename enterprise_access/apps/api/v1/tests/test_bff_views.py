@@ -137,6 +137,25 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         # Mock base response data
         self.mock_common_response_data = {
             'enterprise_customer': self.expected_enterprise_customer,
+            'all_linked_enterprise_customer_users': [
+                {
+                    'id': 1,
+                    'active': True,
+                    'enterprise_customer': self.expected_enterprise_customer,
+                    'user_id': 3,
+                },
+                {
+                    'id': 2,
+                    'active': False,
+                    'enterprise_customer': {
+                        **self.mock_enterprise_customer_2,
+                        'disable_search': False,
+                        'show_integration_warning': True,
+                    },
+                    'user_id': 6,
+                },
+            ],
+            'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
             'enterprise_customer_user_subsidies': {
                 'subscriptions': {
                     'customer_agreement': None,
@@ -242,7 +261,6 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             expected_response_data = {
                 'detail': f'Missing: {BFF_READ_PERMISSION}',
             }
-
         self.assertEqual(response.status_code, expected_status_code)
         self.assertEqual(response.json(), expected_response_data)
 
@@ -552,16 +570,19 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             else []
         )
         mock_enterprise_customer_with_auto_apply = {
-            **self.mock_enterprise_customer,
+            **self.expected_enterprise_customer,
             'identity_provider': mock_identity_provider,
             'identity_providers': mock_identity_providers,
+            'show_integration_warning': bool(identity_provider)
         }
         mock_linked_enterprise_customer_users = (
             []
             if is_staff_request_user
             else [{
+                'id': 1,
                 'active': True,
                 'enterprise_customer': mock_enterprise_customer_with_auto_apply,
+                'user_id': 3,
             }]
         )
         mock_enterprise_learner_response_data = {
@@ -658,6 +679,8 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 'identity_providers': mock_identity_providers,
                 'show_integration_warning': expected_show_integration_warning,
             },
+            'all_linked_enterprise_customer_users': mock_linked_enterprise_customer_users,
+            'should_update_active_enterprise_customer_user': False,
             'enterprise_customer_user_subsidies': {
                 'subscriptions': {
                     'customer_agreement': expected_customer_agreement,
