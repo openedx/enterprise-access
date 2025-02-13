@@ -8,7 +8,7 @@ import ddt
 from django.test import TestCase
 
 from enterprise_access.apps.api_client.tests.test_constants import DATE_FORMAT_ISO_8601
-from enterprise_access.apps.content_assignments.constants import BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT
+from enterprise_access.apps.content_assignments.constants import BRAZE_TIMESTAMP_FORMAT
 from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
 from enterprise_access.apps.content_assignments.utils import (
     get_self_paced_normalized_start_date,
@@ -189,7 +189,7 @@ class UtilsTests(TestCase):
     @ddt.unpack
     def test_get_self_paced_normalized_start_date_empty_data(self, start_date, end_date, course_metadata):
         assert get_self_paced_normalized_start_date(start_date, end_date, course_metadata) == \
-               _curr_date(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT)
+               _curr_date(BRAZE_TIMESTAMP_FORMAT)
 
     @ddt.data(
         # self-paced, has time to complete
@@ -241,7 +241,7 @@ class UtilsTests(TestCase):
 
         if pacing_type == 'self_paced' and (can_complete_in_time or within_start_date_threshold):
             assert get_self_paced_normalized_start_date(start_date, end_date, course_metadata) == \
-                   _curr_date(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT)
+                   _curr_date(BRAZE_TIMESTAMP_FORMAT)
         else:
             assert get_self_paced_normalized_start_date(start_date, end_date, course_metadata) == \
                    start_date
