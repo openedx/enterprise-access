@@ -533,8 +533,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'organization': self.enterprise_customer_name,
                 'course_title': assignment.content_title,
                 'enrollment_deadline': 'Jan 01, 2021',
-                'start_date':
-                    datetime.datetime.now().strftime(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT),
+                'start_date': datetime.datetime.now().strftime(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT),
                 'course_partner': 'Smart Folks and Good People',
                 'course_card_image': self.mock_content_metadata['card_image_url'],
                 'learner_portal_link': '{}/{}'.format(
@@ -542,7 +541,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                     self.mock_enterprise_customer_data['slug']
                 ),
                 'action_required_by_timestamp': '2021-01-01T12:00:00Z'
-            },
+            }
         )
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1
 

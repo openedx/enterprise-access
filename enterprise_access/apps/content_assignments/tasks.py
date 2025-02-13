@@ -226,8 +226,8 @@ class BrazeCampaignSender:
         )
         return get_human_readable_date(
             get_self_paced_normalized_start_date(
-                start_date, 
-                end_date, 
+                start_date,
+                end_date,
                 course_run_metadata
             ),
             BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT

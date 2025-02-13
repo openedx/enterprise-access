@@ -531,3 +531,6 @@ BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_85_CAMPAIGN = ''
 # https://github.com/openedx/enterprise-subsidy/blob/70e1a13f9f9b1be6a09a2c2f1a02e7a46315eaa6/enterprise_subsidy/apps/subsidy/models.py#L67
 SALES_CONTRACT_REFERENCE_PROVIDER_NAME = 'Salesforce OpportunityLineItem'
 SALES_CONTRACT_REFERENCE_PROVIDER_SLUG = 'salesforce_opportunity_line_item'
+
+# Settings for creation of enterprise customers
+DEFAULT_CUSTOMER_SITE = 'example.com'
