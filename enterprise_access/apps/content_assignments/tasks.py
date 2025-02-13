@@ -225,7 +225,12 @@ class BrazeCampaignSender:
             f"course_run_metadata: {course_run_metadata}"
         )
         return get_human_readable_date(
-            get_self_paced_normalized_start_date(start_date, end_date, course_run_metadata)
+            get_self_paced_normalized_start_date(
+                start_date, 
+                end_date, 
+                course_run_metadata
+            ),
+            BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT
         )
 
     def get_action_required_by_timestamp(self):

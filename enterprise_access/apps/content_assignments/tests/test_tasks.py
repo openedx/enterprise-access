@@ -468,7 +468,8 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'organization': self.enterprise_customer_name,
                 'course_title': assignment.content_title,
                 'enrollment_deadline': 'Jan 01, 2021',
-                'start_date': self.mock_formatted_todays_date,
+                'start_date':
+                    datetime.datetime.now().strftime(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT),
                 'course_partner': 'Smart Folks, Good People, and Fast Learners',
                 'course_card_image': 'https://itsanimage.com',
                 'learner_portal_link': 'http://enterprise-learner-portal.example.com/test-slug',
@@ -532,7 +533,8 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'organization': self.enterprise_customer_name,
                 'course_title': assignment.content_title,
                 'enrollment_deadline': 'Jan 01, 2021',
-                'start_date': self.mock_formatted_todays_date,
+                'start_date':
+                    datetime.datetime.now().strftime(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT),
                 'course_partner': 'Smart Folks and Good People',
                 'course_card_image': self.mock_content_metadata['card_image_url'],
                 'learner_portal_link': '{}/{}'.format(
