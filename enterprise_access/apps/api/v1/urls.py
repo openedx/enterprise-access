@@ -37,6 +37,11 @@ urlpatterns = [
         views.SubsidyAccessPolicyGroupViewset.as_view({'get': 'get_group_member_data_with_aggregates'}),
         name='aggregated-subsidy-enrollments'
     ),
+    path(
+        'provisioning',
+        views.ProvisioningCreateView.as_view(),
+        name='provisioning-create',
+    ),
 ]
 
 urlpatterns += router.urls

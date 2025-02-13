@@ -278,6 +278,22 @@ def has_explicit_access_to_bff_operator(user, enterprise_customer_uuid):
     return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.BFF_OPERATOR_ROLE)
 
 
+@rules.predicate
+def has_implicit_access_to_provisioning_admin(_, *args, **kwargs):
+    """
+    Check if request user has implicit access to the provisioning admin role.
+    Note, there is no enterprise customer context against which access to this
+    role is checked.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return request_user_has_implicit_access_via_jwt(
+        get_decoded_jwt(crum.get_current_request()),
+        constants.PROVISIONING_ADMIN_ROLE,
+        context=None,
+    )
+
 ######################################################
 # Consolidate implicit and explicit rule predicates. #
 ######################################################
@@ -433,4 +449,9 @@ rules.add_perm(
         has_bff_admin_access |
         has_bff_operator_access
     ),
+)
+
+rules.add_perm(
+    constants.PROVISIONING_CREATE_PERMISSION,
+    has_implicit_access_to_provisioning_admin,
 )

@@ -7,6 +7,7 @@ REQUESTS_LEARNER_ROLE = 'enterprise_access_requests_learner'
 SYSTEM_ENTERPRISE_ADMIN_ROLE = 'enterprise_admin'
 SYSTEM_ENTERPRISE_LEARNER_ROLE = 'enterprise_learner'
 SYSTEM_ENTERPRISE_OPERATOR_ROLE = 'enterprise_openedx_operator'
+SYSTEM_ENTERPRISE_PROVISIONING_ADMIN_ROLE = 'enterprise_provisioning_admin'
 
 REQUESTS_ADMIN_ACCESS_PERMISSION = 'requests.has_admin_access'
 REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION = 'requests.has_learner_or_admin_access'
@@ -32,6 +33,9 @@ BFF_LEARNER_ROLE = 'enterprise_access_bff_learner'
 BFF_ADMIN_ROLE = 'enterprise_access_bff_admin'
 BFF_OPERATOR_ROLE = 'enterprise_access_bff_operator'
 BFF_READ_PERMISSION = 'bff.has_read_access'
+
+PROVISIONING_ADMIN_ROLE = 'provisioning_admin'
+PROVISIONING_CREATE_PERMISSION = 'provisioning.can_create'
 
 ALL_ACCESS_CONTEXT = '*'
 

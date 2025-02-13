@@ -10,13 +10,15 @@ from enterprise_access.apps.core.constants import (
     CONTENT_ASSIGNMENTS_ADMIN_ROLE,
     CONTENT_ASSIGNMENTS_LEARNER_ROLE,
     CONTENT_ASSIGNMENTS_OPERATOR_ROLE,
+    PROVISIONING_ADMIN_ROLE,
     REQUESTS_ADMIN_ROLE,
     REQUESTS_LEARNER_ROLE,
     SUBSIDY_ACCESS_POLICY_LEARNER_ROLE,
     SUBSIDY_ACCESS_POLICY_OPERATOR_ROLE,
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
-    SYSTEM_ENTERPRISE_OPERATOR_ROLE
+    SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+    SYSTEM_ENTERPRISE_PROVISIONING_ADMIN_ROLE,
 )
 from enterprise_access.settings.utils import get_logger_config
 
@@ -58,6 +60,7 @@ THIRD_PARTY_APPS = (
     'csrf.apps.CsrfAppConfig',  # Enables frontend apps to retrieve CSRF tokens,
     'djangoql',
     'django_celery_results',
+    'django_countries',
     'django_filters',
     'django_object_actions',
     'rest_framework',
@@ -343,6 +346,9 @@ SYSTEM_TO_FEATURE_ROLE_MAPPING = {
         CONTENT_ASSIGNMENTS_LEARNER_ROLE,
         REQUESTS_LEARNER_ROLE,
         BFF_LEARNER_ROLE,
+    ],
+    SYSTEM_ENTERPRISE_PROVISIONING_ADMIN_ROLE: [
+        PROVISIONING_ADMIN_ROLE,
     ],
 }
 

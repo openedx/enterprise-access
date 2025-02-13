@@ -8,6 +8,7 @@ Django>=2.2          # Web application framework
 djangoql
 django-cors-headers
 django-celery-results
+django-countries
 django-crum
 django-extensions
 django-filter
