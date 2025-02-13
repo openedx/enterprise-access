@@ -7,7 +7,7 @@ from dateutil import parser
 from pytz import UTC
 
 from enterprise_access.apps.content_assignments.constants import (
-    BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT,
+    BRAZE_TIMESTAMP_FORMAT,
     START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
 )
 
@@ -48,9 +48,9 @@ def get_self_paced_normalized_start_date(start_date, end_date, course_metadata):
     pacing_type = course_metadata.get('pacing_type', {}) or None
     weeks_to_complete = course_metadata.get('weeks_to_complete', {}) or None
     if not (start_date and end_date and pacing_type and weeks_to_complete):
-        return curr_date.strftime(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT)
+        return curr_date.strftime(BRAZE_TIMESTAMP_FORMAT)
     if pacing_type == "self_paced":
         if has_time_to_complete(curr_date, end_date, weeks_to_complete) or \
                 is_within_minimum_start_date_threshold(curr_date, start_date):
-            return curr_date.strftime(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT)
+            return curr_date.strftime(BRAZE_TIMESTAMP_FORMAT)
     return start_date

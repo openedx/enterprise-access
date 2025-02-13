@@ -25,7 +25,7 @@ from enterprise_access.utils import (
     localized_utcnow
 )
 
-from .constants import BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT, LearnerContentAssignmentStateChoices
+from .constants import BRAZE_TIMESTAMP_FORMAT, LearnerContentAssignmentStateChoices
 from .utils import get_self_paced_normalized_start_date
 
 logger = logging.getLogger(__name__)
@@ -230,7 +230,7 @@ class BrazeCampaignSender:
                 end_date,
                 course_run_metadata
             ),
-            BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT
+            BRAZE_TIMESTAMP_FORMAT
         )
 
     def get_action_required_by_timestamp(self):
@@ -243,7 +243,7 @@ class BrazeCampaignSender:
             return None
         return format_datetime_obj(
             action_required_by_timestamp['date'],
-            output_pattern=BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT
+            output_pattern=BRAZE_TIMESTAMP_FORMAT
         )
 
     def get_course_partner(self):

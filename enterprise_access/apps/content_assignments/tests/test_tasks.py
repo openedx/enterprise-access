@@ -16,7 +16,7 @@ from rest_framework import status
 from enterprise_access.apps.api_client.braze_client import ENTERPRISE_BRAZE_ALIAS_LABEL
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
 from enterprise_access.apps.content_assignments.constants import (
-    BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT,
+    BRAZE_TIMESTAMP_FORMAT,
     AssignmentActionErrors,
     AssignmentActions,
     LearnerContentAssignmentStateChoices
@@ -264,7 +264,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
             'card_image_url': 'https://itsanimage.com',
         }
         cls.mock_formatted_todays_date = get_human_readable_date(datetime.datetime.now().strftime(
-            BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT
+            BRAZE_TIMESTAMP_FORMAT
         ))
 
     def setUp(self):
@@ -469,7 +469,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'course_title': assignment.content_title,
                 'enrollment_deadline': 'Jan 01, 2021',
                 'start_date':
-                    datetime.datetime.now().strftime(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT),
+                    datetime.datetime.now().strftime(BRAZE_TIMESTAMP_FORMAT),
                 'course_partner': 'Smart Folks, Good People, and Fast Learners',
                 'course_card_image': 'https://itsanimage.com',
                 'learner_portal_link': 'http://enterprise-learner-portal.example.com/test-slug',
@@ -533,7 +533,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'organization': self.enterprise_customer_name,
                 'course_title': assignment.content_title,
                 'enrollment_deadline': 'Jan 01, 2021',
-                'start_date': datetime.datetime.now().strftime(BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT),
+                'start_date': datetime.datetime.now().strftime(BRAZE_TIMESTAMP_FORMAT),
                 'course_partner': 'Smart Folks and Good People',
                 'course_card_image': self.mock_content_metadata['card_image_url'],
                 'learner_portal_link': '{}/{}'.format(
@@ -698,7 +698,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
 
         sender = BrazeCampaignSender(assignment)
         action_required_by = sender.get_action_required_by_timestamp()
-        expected_result = format_datetime_obj(yesterday, output_pattern=BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT)
+        expected_result = format_datetime_obj(yesterday, output_pattern=BRAZE_TIMESTAMP_FORMAT)
         self.assertEqual(expected_result, action_required_by)
 
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
@@ -757,7 +757,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
 
         sender = BrazeCampaignSender(assignment)
         action_required_by = sender.get_action_required_by_timestamp()
-        expected_result = format_datetime_obj(yesterday, output_pattern=BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT)
+        expected_result = format_datetime_obj(yesterday, output_pattern=BRAZE_TIMESTAMP_FORMAT)
         self.assertEqual(expected_result, action_required_by)
 
     @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
@@ -818,6 +818,6 @@ class TestBrazeEmailTasks(APITestWithMocks):
 
         expected_result = format_datetime_obj(
             get_automatic_expiration_date_and_reason(assignment)['date'],
-            output_pattern=BRAZE_ACTION_REQUIRED_BY_TIMESTAMP_FORMAT
+            output_pattern=BRAZE_TIMESTAMP_FORMAT
         )
         self.assertEqual(expected_result, action_required_by)
