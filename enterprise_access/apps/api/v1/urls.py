@@ -1,5 +1,6 @@
 """ API v1 URLs. """
 
+from django.conf import settings
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
@@ -26,6 +27,8 @@ router.register(
     views.LearnerContentAssignmentViewSet,
     'assignments',
 )
+if settings.ENABLE_CUSTOMER_BILLING_API:
+    router.register("customer-billing", views.CustomerBillingViewSet, 'customer-billing')
 
 # BFFs
 router.register('bffs/learner', views.LearnerPortalBFFViewSet, 'learner-portal-bff')
@@ -38,5 +41,14 @@ urlpatterns = [
         name='aggregated-subsidy-enrollments'
     ),
 ]
+
+if settings.ENABLE_CUSTOMER_BILLING_API:
+    urlpatterns += [
+        path(
+            'customer-billing/stripe-webhook',
+            views.CustomerBillingStripeWebHookView.as_view({'post': 'stripe_webhook'}),
+            name='stripe-webhook'
+        ),
+    ]
 
 urlpatterns += router.urls

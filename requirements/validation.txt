@@ -786,6 +786,10 @@ sqlparse==0.5.3
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   django
+stripe==11.5.0
+    # via
+    #   -r /Users/tsankey/tmp/edx/enterprise-access/requirements/quality.txt
+    #   -r /Users/tsankey/tmp/edx/enterprise-access/requirements/test.txt
 stevedore==5.4.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/quality.txt
