@@ -1,5 +1,6 @@
 """ API v1 URLs. """
 
+from django.conf import settings
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
@@ -26,6 +27,8 @@ router.register(
     views.LearnerContentAssignmentViewSet,
     'assignments',
 )
+if settings.ENABLE_CUSTOMER_BILLING_API:
+    router.register("customer-billing", views.CustomerBillingViewSet, 'customer-billing')
 
 # BFFs
 router.register('bffs/learner', views.LearnerPortalBFFViewSet, 'learner-portal-bff')
