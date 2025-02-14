@@ -34,6 +34,11 @@ BFF_ADMIN_ROLE = 'enterprise_access_bff_admin'
 BFF_OPERATOR_ROLE = 'enterprise_access_bff_operator'
 BFF_READ_PERMISSION = 'bff.has_read_access'
 
+CUSTOMER_BILLING_OPERATOR_ROLE = 'enterprise_access_customer_billing_operator'
+CUSTOMER_BILLING_ADMIN_ROLE = 'enterprise_access_customer_billing_admin'
+CUSTOMER_BILLING_CREATE_PLAN_PERMISSION = 'customer_billing.create_plan'
+CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION = 'customer_billing.create_portal_session'
+
 PROVISIONING_ADMIN_ROLE = 'provisioning_admin'
 PROVISIONING_CREATE_PERMISSION = 'provisioning.can_create'
 

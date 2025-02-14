@@ -804,6 +804,10 @@ sqlparse==0.5.3
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django
+stripe==12.1.0
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
 stevedore==5.4.1
     # via
     #   -r requirements/quality.txt
