@@ -333,6 +333,8 @@ stevedore==5.4.0
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
+stripe==11.5.0
+    # via -r requirements/base.in
 text-unidecode==1.3
     # via python-slugify
 typing-extensions==4.12.2
