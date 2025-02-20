@@ -75,11 +75,27 @@ class EnterpriseCustomerResponseSerializer(BaseSerializer):
     slug = serializers.SlugField(required=True, allow_blank=False)
 
 
-class PendingCustomerAdminResponseSerializer(BaseSerializer):
+class CreatedCustomerAdminResponseSerializer(BaseSerializer):
     """
     Pending admin serializer for provisioning responses.
     """
     user_email = serializers.EmailField()
+
+
+class ExistingCustomerAdminResponseSerializer(BaseSerializer):
+    """
+    Existing admin serializer for provisioning responses.
+    """
+    user_email = serializers.EmailField()
+
+
+class AdminObjectResponseSerializer(BaseSerializer):
+    """
+    Container serializer to describe created and existing
+    admin emails in a provisioning response.
+    """
+    created_admins = CreatedCustomerAdminResponseSerializer(many=True)
+    existing_admins = ExistingCustomerAdminResponseSerializer(many=True)
 
 
 class ProvisioningResponseSerializer(BaseSerializer):
@@ -87,4 +103,4 @@ class ProvisioningResponseSerializer(BaseSerializer):
     Response serializer for provisioning create view.
     """
     enterprise_customer = EnterpriseCustomerResponseSerializer()
-    pending_admins = PendingCustomerAdminResponseSerializer(many=True)
+    customer_admins = AdminObjectResponseSerializer()

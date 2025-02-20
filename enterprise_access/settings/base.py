@@ -332,6 +332,7 @@ SYSTEM_TO_FEATURE_ROLE_MAPPING = {
         CONTENT_ASSIGNMENTS_OPERATOR_ROLE,
         REQUESTS_ADMIN_ROLE,
         BFF_OPERATOR_ROLE,
+        PROVISIONING_ADMIN_ROLE,
     ],
     SYSTEM_ENTERPRISE_ADMIN_ROLE: [
         # enterprise admins only need learner-level access to Subsidy Access Policy APIs since they aren't responsible
