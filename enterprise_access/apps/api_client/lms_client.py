@@ -196,6 +196,33 @@ class LmsApiClient(BaseOAuthClient):
 
         return results
 
+    def get_enterprise_pending_admin_users(self, enterprise_customer_uuid):
+        """
+        Gets all pending enterprise admin records for the given customer uuid.
+
+        Arguments:
+            enterprise_customer_uuid (UUID): UUID of the enterprise customer.
+        Returns:
+            List of dictionaries of pending admin users.
+        """
+        response = self.client.get(
+            self.pending_enterprise_admin_endpoint + f'?enterprise_customer={enterprise_customer_uuid}',
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+        try:
+            response.raise_for_status()
+            logger.info(
+                'Fetched pending admin records for customer %s', enterprise_customer_uuid,
+            )
+            payload = response.json()
+            return payload.get('results', [])
+        except requests.exceptions.HTTPError:
+            logger.exception(
+                'Failed to fetch pending admin record for customer %s: %s',
+                enterprise_customer_uuid, response.content.decode()
+            )
+            raise
+
     def create_enterprise_admin_user(self, enterprise_customer_uuid, user_email):
         """
         Creates a new enterprise pending admin record.
@@ -210,12 +237,12 @@ class LmsApiClient(BaseOAuthClient):
             'enterprise_customer': enterprise_customer_uuid,
             'user_email': user_email,
         }
+        response = self.client.post(
+            self.pending_enterprise_admin_endpoint,
+            json=payload,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
         try:
-            response = self.client.post(
-                self.pending_enterprise_admin_endpoint,
-                json=payload,
-                timeout=settings.LMS_CLIENT_TIMEOUT,
-            )
             response.raise_for_status()
             logger.info(
                 'Successfully created pending admin record for customer %s, email %s',
@@ -225,8 +252,8 @@ class LmsApiClient(BaseOAuthClient):
             return payload
         except requests.exceptions.HTTPError:
             logger.exception(
-                'Failed to create pending admin record for customer %s, email %s',
-                enterprise_customer_uuid, user_email,
+                'Failed to create pending admin record for customer %s, email %s: %s',
+                enterprise_customer_uuid, user_email, response.content.decode()
             )
             raise
 
