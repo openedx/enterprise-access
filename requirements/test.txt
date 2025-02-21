@@ -520,6 +520,8 @@ stevedore==5.4.0
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
+stripe==11.5.0
+    # via -r /Users/tsankey/tmp/edx/enterprise-access/requirements/base.txt
 text-unidecode==1.3
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/base.txt

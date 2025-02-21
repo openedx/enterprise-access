@@ -534,3 +534,7 @@ SALES_CONTRACT_REFERENCE_PROVIDER_SLUG = 'salesforce_opportunity_line_item'
 
 # Settings for creation of enterprise customers
 DEFAULT_CUSTOMER_SITE = 'example.com'
+
+# Enable the customer billing API endpoints under /api/v1/customer-billing/*
+ENABLE_CUSTOMER_BILLING_API = True
+STRIPE_API_KEY = None

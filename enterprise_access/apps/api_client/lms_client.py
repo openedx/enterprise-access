@@ -100,8 +100,10 @@ class LmsApiClient(BaseOAuthClient):
             response = self.client.get(endpoint, timeout=settings.LMS_CLIENT_TIMEOUT)
             response.raise_for_status()
             payload = response.json()
-            if results := payload.get('results'):
-                return results[0]
+            if 'results' in payload:
+                if len(payload['results']) == 0:
+                    raise requests.exceptions.HTTPError()
+                return payload['results'][0]
             return payload
         except requests.exceptions.HTTPError as exc:
             logger.exception(exc)

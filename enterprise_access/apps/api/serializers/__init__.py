@@ -16,6 +16,7 @@ from .content_assignments.assignment_configuration import (
     AssignmentConfigurationResponseSerializer,
     AssignmentConfigurationUpdateRequestSerializer
 )
+from .customer_billing import CustomerBillingCreatePlanRequestSerializer
 from .subsidy_access_policy import (
     GroupMemberWithAggregatesRequestSerializer,
     GroupMemberWithAggregatesResponseSerializer,
