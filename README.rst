@@ -33,7 +33,7 @@ Running migrations
 
 Setting up openedx-events
 ^^^^^^^^^^^^^^^^^^^^^^^^^
-Ensure you've installed the ``edx_event_bus_kafka`` and ``openedx_events`` requirements. Entering
+Ensure you have installed the ``edx_event_bus_kafka`` and ``openedx_events`` requirements. Entering
 a shell with ``make app-shell`` and then running ``make requirements`` should install these for you.
 
 From your host, run ``make dev.up.with-events``, which will start a local kafka container for you.
