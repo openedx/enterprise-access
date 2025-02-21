@@ -218,6 +218,43 @@ class TestLmsApiClient(TestCase):
 
     @mock.patch('requests.Response.json')
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_enterprise_pending_admin_users(self, mock_oauth_client, mock_json):
+        """
+        Test that we can use the LmsApiClient to fetch existing pending admin records.
+        """
+        customer_uuid = str(uuid4())
+
+        mock_response_payload_results = [{
+            'id': 1,
+            'enterprise_customer': customer_uuid,
+            'user_email': 'test-existing-admin@example.com',
+        }]
+        mock_response_payload = {
+            'count': 1,
+            'results': mock_response_payload_results,
+        }
+        mock_json.return_value = mock_response_payload
+
+        mock_get = mock_oauth_client.return_value.get
+
+        mock_get.return_value = requests.Response()
+        mock_get.return_value.status_code = 200
+
+        client = LmsApiClient()
+        response_payload = client.get_enterprise_pending_admin_users(customer_uuid)
+
+        self.assertEqual(response_payload, mock_response_payload_results)
+        expected_url = (
+            'http://edx-platform.example.com/enterprise/api/v1/pending-enterprise-admin/'
+            f'?enterprise_customer={customer_uuid}'
+        )
+        mock_get.assert_called_once_with(
+            expected_url,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
     def test_create_enterprise_admin_user(self, mock_oauth_client, mock_json):
         """
         Test that we can use the LmsApiClient to create a new customer admin.
@@ -313,6 +350,31 @@ class TestLmsApiClient(TestCase):
         mock_post.assert_called_once_with(
             expected_url,
             json=expected_input,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_enterprise_pending_admin_error(self, mock_oauth_client):
+        """
+        Tests that we raise an exception appropriately when listing pending
+        admin records with the LmsApiClient().
+        """
+        customer_uuid = str(uuid4())
+        mock_get = mock_oauth_client.return_value.get
+
+        mock_get.side_effect = requests.exceptions.HTTPError('whoopsie')
+        mock_get.return_value.status_code = 400
+
+        client = LmsApiClient()
+        with self.assertRaises(requests.exceptions.HTTPError):
+            client.get_enterprise_pending_admin_users(customer_uuid)
+
+        expected_url = (
+            'http://edx-platform.example.com/enterprise/api/v1/pending-enterprise-admin/'
+            f'?enterprise_customer={customer_uuid}'
+        )
+        mock_get.assert_called_once_with(
+            expected_url,
             timeout=settings.LMS_CLIENT_TIMEOUT,
         )
 
