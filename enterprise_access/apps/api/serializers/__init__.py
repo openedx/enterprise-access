@@ -16,6 +16,7 @@ from .content_assignments.assignment_configuration import (
     AssignmentConfigurationResponseSerializer,
     AssignmentConfigurationUpdateRequestSerializer
 )
+from .provisioning import ProvisioningRequestSerializer, ProvisioningResponseSerializer
 from .subsidy_access_policy import (
     GroupMemberWithAggregatesRequestSerializer,
     GroupMemberWithAggregatesResponseSerializer,
