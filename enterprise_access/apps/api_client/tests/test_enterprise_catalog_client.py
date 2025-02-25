@@ -5,11 +5,15 @@ Tests for Discovery client.
 from unittest import mock
 from uuid import uuid4
 
+import ddt
 from django.test import TestCase
 from requests import Response
 from requests.exceptions import HTTPError
 
-from enterprise_access.apps.api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
+from enterprise_access.apps.api_client.enterprise_catalog_client import (
+    EnterpriseCatalogApiClient,
+    EnterpriseCatalogApiV1Client
+)
 
 
 class TestEnterpriseCatalogApiClient(TestCase):
@@ -110,4 +114,57 @@ class TestEnterpriseCatalogApiClient(TestCase):
         self.assertEqual(fetched_metadata, mock_response_json['count'])
         mock_oauth_client.return_value.get.assert_called_with(
             f'http://enterprise-catalog.example.com/api/v2/enterprise-catalogs/{catalog_uuid}/get_content_metadata/',
+        )
+
+
+@ddt.ddt
+class TestEnterpriseCatalogApiV1Client(TestCase):
+    """
+    Test EnterpriseCatalogApiV1Client.
+    """
+
+    @ddt.data(
+        {'coerce_to_parent_course': False},
+        {'coerce_to_parent_course': True},
+    )
+    @ddt.unpack
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_content_metadata(self, mock_oauth_client, coerce_to_parent_course):
+        content_key = 'course+A'
+        mock_response_json = {
+            'key': content_key,
+            'other_metadata': 'foo',
+        }
+
+        request_response = Response()
+        request_response.status_code = 200
+        mock_oauth_client.return_value.get.return_value.json.return_value = mock_response_json
+
+        client = EnterpriseCatalogApiV1Client()
+        fetched_metadata = client.content_metadata(content_key, coerce_to_parent_course=coerce_to_parent_course)
+
+        self.assertEqual(fetched_metadata, mock_response_json)
+        expected_query_params_kwarg = {}
+        if coerce_to_parent_course:
+            expected_query_params_kwarg |= {'params': {'coerce_to_parent_course': True}}
+        mock_oauth_client.return_value.get.assert_called_with(
+            f'http://enterprise-catalog.example.com/api/v1/content-metadata/{content_key}',
+            **expected_query_params_kwarg,
+        )
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_content_metadata_raises_http_error(self, mock_oauth_client):
+        content_key = 'course+A'
+        request_response = Response()
+        request_response.status_code = 400
+
+        mock_oauth_client.return_value.get.return_value = request_response
+
+        client = EnterpriseCatalogApiV1Client()
+
+        with self.assertRaises(HTTPError):
+            client.content_metadata(content_key)
+
+        mock_oauth_client.return_value.get.assert_called_with(
+            f'http://enterprise-catalog.example.com/api/v1/content-metadata/{content_key}',
         )

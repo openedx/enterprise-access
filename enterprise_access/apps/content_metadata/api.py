@@ -7,11 +7,11 @@ import logging
 
 from django.conf import settings
 from django.core.cache import cache
-from requests.exceptions import HTTPError
+from edx_django_utils.cache import TieredCache
 
 from enterprise_access.cache_utils import versioned_cache_key
 
-from ..api_client.enterprise_catalog_client import EnterpriseCatalogApiClient
+from ..api_client.enterprise_catalog_client import EnterpriseCatalogApiClient, EnterpriseCatalogApiV1Client
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ def get_and_cache_catalog_content_metadata(
     # Here's the list of results fetched from the catalog service
     fetched_metadata = []
     if keys_to_fetch:
-        fetched_metadata = _fetch_metadata_with_client(enterprise_catalog_uuid, keys_to_fetch)
+        fetched_metadata = _fetch_catalog_content_metadata_with_client(enterprise_catalog_uuid, keys_to_fetch)
 
     # Do a bulk set into the cache of everything we just had to fetch from the catalog service
     content_metadata_to_cache = {}
@@ -91,22 +91,57 @@ def get_and_cache_catalog_content_metadata(
     return metadata_results_list
 
 
-def _fetch_metadata_with_client(enterprise_catalog_uuid, content_keys):
+def _fetch_catalog_content_metadata_with_client(enterprise_catalog_uuid, content_keys):
     """
     Helper to isolate the task of fetching content metadata via our client.
     """
     client = EnterpriseCatalogApiClient()
-    try:
-        response_payload = client.catalog_content_metadata(
-            enterprise_catalog_uuid,
-            list(content_keys),
+    response_payload = client.catalog_content_metadata(
+        enterprise_catalog_uuid,
+        list(content_keys),
+    )
+    results = response_payload['results']
+    logger.info(
+        'Fetched content metadata in catalog %s for the following content keys: %s',
+        enterprise_catalog_uuid,
+        [record.get('key') for record in results],
+    )
+    return results
+
+
+def get_and_cache_content_metadata(
+    content_identifier,
+    coerce_to_parent_course=False,
+    timeout=settings.CONTENT_METADATA_CACHE_TIMEOUT,
+):
+    """
+    Fetch & cache content metadata from the enterprise-catalog catalog-/customer-agnostic endoint.
+
+    Returns:
+        dict: Serialized content metadata from the enterprise-catalog API.
+
+    Raises:
+        HTTPError: If there's a problem calling the enterprise-catalog API.
+    """
+    cache_key = versioned_cache_key(
+        'get_and_cache_content_metadata',
+        content_identifier,
+        f'coerce_to_parent_course={coerce_to_parent_course}',
+    )
+    cached_response = TieredCache.get_cached_response(cache_key)
+    if cached_response.is_found:
+        return cached_response.value
+
+    content_metadata = EnterpriseCatalogApiV1Client().content_metadata(
+        content_identifier,
+        coerce_to_parent_course=coerce_to_parent_course,
+    )
+    if content_metadata:
+        TieredCache.set_all_tiers(
+            cache_key,
+            content_metadata,
+            django_cache_timeout=timeout,
         )
-        results = response_payload['results']
-        logger.info(
-            'Fetched content metadata in catalog %s for the following content keys: %s',
-            enterprise_catalog_uuid,
-            [record.get('key') for record in results],
-        )
-        return results
-    except HTTPError as exc:
-        raise exc
+    else:
+        logger.warning('Could not fetch metadata for content %s', content_identifier)
+    return content_metadata
