@@ -92,7 +92,7 @@ MIDDLEWARE = (
     'edx_django_utils.cache.middleware.RequestCacheMiddleware',
     'edx_django_utils.monitoring.DeploymentMonitoringMiddleware',
     # Enables monitoring utility for writing custom metrics.
-    'edx_django_utils.monitoring.middleware.MonitoringCustomMetricsMiddleware',
+    'edx_django_utils.monitoring.CachedCustomMonitoringMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
