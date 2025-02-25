@@ -140,9 +140,11 @@ class TestLmsApiClient(TestCase):
             'uuid': 'some-uuid',
             'slug': 'some-test-slug',
         }
-        mock_json.return_value = mock_enterprise_customer
-        if not enterprise_uuid and enterprise_slug:
-            mock_json.return_value = {'results': [mock_enterprise_customer]}
+        if enterprise_uuid:
+            mock_json.return_value = mock_enterprise_customer
+        else:
+            mock_json.return_value = {'results': [mock_enterprise_customer], 'count': 1}
+
         mock_oauth_client.return_value.get.return_value = requests.Response()
         mock_oauth_client.return_value.get.return_value.status_code = 200
 
@@ -169,6 +171,39 @@ class TestLmsApiClient(TestCase):
                 f'?slug={enterprise_slug}'
             )
 
+        mock_oauth_client.return_value.get.assert_called_with(
+            expected_url,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_enterprise_customer_data_no_hits(
+        self,
+        mock_oauth_client,
+        mock_json,
+    ):
+        """
+        Verify client returns empty dict if no results when filtering by slug.
+        """
+        mock_json.return_value = {'results': [], 'count': 0}
+
+        mock_oauth_client.return_value.get.return_value = requests.Response()
+        mock_oauth_client.return_value.get.return_value.status_code = 200
+
+        client = LmsApiClient()
+        customer_data = client.get_enterprise_customer_data(
+            enterprise_customer_slug='nuthin',
+        )
+
+        self.assertEqual(customer_data, {})
+
+        expected_url = (
+            'http://edx-platform.example.com/'
+            'enterprise/api/v1/'
+            'enterprise-customer/'
+            '?slug=nuthin'
+        )
         mock_oauth_client.return_value.get.assert_called_with(
             expected_url,
             timeout=settings.LMS_CLIENT_TIMEOUT,
