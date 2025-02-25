@@ -134,7 +134,7 @@ def get_redemptions_by_content_and_policy_for_learner(policies, lms_user_id):
     """
     policies_by_subsidy_uuid = defaultdict(set)
     for policy in policies:
-        policies_by_subsidy_uuid[policy.subsidy_uuid].add(str(policy.uuid))
+        policies_by_subsidy_uuid[policy.subsidy_uuid].add(policy)
 
     result = defaultdict(lambda: defaultdict(list))
 
@@ -146,8 +146,15 @@ def get_redemptions_by_content_and_policy_for_learner(policies, lms_user_id):
             content_key = redemption['content_key']
             subsidy_access_policy_uuid = redemption['subsidy_access_policy_uuid']
 
-            if subsidy_access_policy_uuid in policies_with_subsidy:
-                result[content_key][subsidy_access_policy_uuid].append(redemption)
+            matching_policies = [
+                policy for policy in policies_with_subsidy
+                if str(policy.uuid) == subsidy_access_policy_uuid
+            ]
+            # We can assume there's at most one matching policy because the ``policies`` arg passed into this function
+            # should not contain duplicates.
+            matching_policy = matching_policies[0] if matching_policies else None
+            if matching_policy:
+                result[content_key][matching_policy].append(redemption)
             else:
                 logger.warning(
                     f"Transaction {transaction_uuid} has unmatched policy uuid for subsidy {subsidy_uuid}: "
