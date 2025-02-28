@@ -111,21 +111,25 @@ def get_list_price_for_content(enterprise_customer_uuid, content_key, content_me
             raise ContentPriceNullException(f'Could not determine list price for {content_key}') from exc
 
     # Note that the "content_price" key is guaranteed to exist, but the value may be None.
-    return list_price_dict_from_usd_cents(content_metadata['content_price'])
+    return make_list_price_dict(integer_cents=content_metadata['content_price'])
 
 
-def list_price_dict_from_usd_cents(list_price_integer_cents):
+def make_list_price_dict(decimal_dollars=None, integer_cents=None):
     """
     Helper to compute a list price dictionary given the non-negative price of the content in USD cents.
     """
-    list_price_decimal_dollars = None
-    if list_price_integer_cents is not None:
-        list_price_decimal_dollars = Decimal(list_price_integer_cents) / 100
-
-    return {
-        "usd": list_price_decimal_dollars,
-        "usd_cents": list_price_integer_cents,
-    }
+    if decimal_dollars is None and integer_cents is not None:
+        return {
+            "usd": Decimal(integer_cents) / 100,
+            "usd_cents": integer_cents,
+        }
+    elif decimal_dollars is not None and integer_cents is None:
+        return {
+            "usd": decimal_dollars,
+            "usd_cents": int(Decimal(decimal_dollars) * 100),
+        }
+    else:
+        raise ValueError("Only one of `decimal_dollars` or `integer_cents` can be passed.")
 
 
 def enroll_by_datetime(content_metadata):
