@@ -130,6 +130,8 @@ def make_list_price_dict(decimal_dollars=None, integer_cents=None):
         ValueError if neither OR both arguments were specified.
     """
     if decimal_dollars is None and integer_cents is not None:
+        if not isinstance(integer_cents, int):
+            raise ValueError("`integer_cents` must be an integer.")
         return {
             "usd": Decimal(integer_cents) / 100,
             "usd_cents": integer_cents,
