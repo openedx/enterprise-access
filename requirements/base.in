@@ -2,6 +2,7 @@
 -c constraints.txt
 
 analytics-python
+cattrs
 celery
 confluent-kafka[avro,schema-registry]
 Django>=2.2          # Web application framework

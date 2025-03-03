@@ -3,6 +3,10 @@ import tempfile
 
 from enterprise_access.settings.base import *
 
+INSTALLED_APPS += (
+    'enterprise_access.apps.workflow.tests',
+)
+
 # IN-MEMORY TEST DATABASE
 DATABASES = {
     'default': {
