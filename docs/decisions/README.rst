@@ -228,3 +228,18 @@ Accepted June 2024, this ADR describes a new constraint on the
 ``SubsidyAccessPolicy`` model's ``spend_limit`` field on the model's
 ``clean()`` function. It prevents admins from increasing the policy's
 ``spend_limit`` above the subsidy's ``total_deposits``.
+
+`<0024-provisioning-api.rst>`_
+******************************
+*Feature: Self-service Provisioning*
+
+Proposed February 2025, this ADR describes a singular endpoint that will
+make downstream calls across multiple services to provision net-new core
+enterprise business records.
+
+`<0025-abstract-workflow-pattern.rst>`_
+***************************************
+*Feature: Self-service Provisioning*
+
+Proposed March 2025, this ADR describes an abstract workflow pattern
+that will be wrapped around our provisioning implementation.
