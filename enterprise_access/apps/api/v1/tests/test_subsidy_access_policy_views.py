@@ -1784,6 +1784,13 @@ class BaseCanRedeemTestMixin:
         lms_client_instance = lms_client.return_value
         lms_client_instance.get_enterprise_user.return_value = TEST_USER_RECORD
 
+        catalog_get_and_cache_content_metadata_patcher = mock.patch(
+            'enterprise_access.apps.api.v1.views.subsidy_access_policy.get_and_cache_content_metadata',
+        )
+        self.mock_catalog_get_and_cache_content_metadata = catalog_get_and_cache_content_metadata_patcher.start()
+        self.mock_catalog_get_and_cache_content_metadata.return_value = {}
+
+        self.addCleanup(catalog_get_and_cache_content_metadata_patcher.stop)
         self.addCleanup(lms_client_patcher.stop)
         self.addCleanup(subsidy_client_patcher.stop)
         self.addCleanup(contains_key_patcher.stop)
@@ -1956,6 +1963,12 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
             'unit': 'usd_cents',
             'all_transactions': [],
         }
+        self.mock_catalog_get_and_cache_content_metadata.return_value = {
+            'normalized_metadata': {
+                'content_price': 50,  # normalized_metadata always serializes USD.
+            },
+            'normalized_metadata_by_run': {},
+        }
         test_content_key_1 = "course-v1:edX+Privacy101+3T2020"
         test_content_key_2 = "course-v1:edX+Privacy101+3T2020_2"
         test_content_key_1_metadata_price = 29900
@@ -1996,9 +2009,9 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
 
         # Check the response for the first content_key given.
         assert response_list[0]["content_key"] == test_content_key_1
-        # We should not assume that a list price is fetchable if the
-        # content cant' be redeemed - the content may not be in any catalog for any policy.
-        assert response_list[0]["list_price"] is None
+        # When there's no redeemable policy, the price returned is the current
+        # fixed price fetched directly from catalog.
+        assert response_list[0]["list_price"] == {'usd': 50.0, 'usd_cents': 5000}
         assert len(response_list[0]["redemptions"]) == 0
         assert response_list[0]["has_successful_redemption"] is False
         assert response_list[0]["redeemable_subsidy_access_policy"] is None
@@ -2031,7 +2044,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
 
         # Check the response for the second content_key given.
         assert response_list[1]["content_key"] == test_content_key_2
-        assert response_list[1]["list_price"] is None
+        assert response_list[1]["list_price"] == {'usd': 50.0, 'usd_cents': 5000}
 
         assert len(response_list[1]["redemptions"]) == 0
         assert response_list[1]["has_successful_redemption"] is False
@@ -2263,6 +2276,12 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
             "content_price": 1234,
             "enroll_by_date": '2001-01-01T00:00:00Z',
         }
+        self.mock_catalog_get_and_cache_content_metadata.return_value = {
+            'normalized_metadata': {
+                'content_price': 12.34,  # normalized_metadata always serializes USD.
+            },
+            'normalized_metadata_by_run': {},
+        }
 
         with mock.patch(
             'enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata',
@@ -2368,6 +2387,13 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
             'content_price': 19900,
         }
         self.mock_get_content_metadata.return_value = mock_subsidy_content_data
+        self.mock_catalog_get_and_cache_content_metadata.return_value = {
+            'normalized_metadata': {
+                'content_price': 199.00,  # normalized_metadata always serializes USD.
+            },
+            'normalized_metadata_by_run': {},
+        }
+
         query_params = {'content_key': test_content_key}
         if lms_user_id_override:
             query_params['lms_user_id'] = lms_user_id_override
@@ -2793,6 +2819,12 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
             "content_price": content_key_for_redemption_metadata_price,
         }
         self.mock_get_content_metadata.return_value = mock_get_subsidy_content_data
+        self.mock_catalog_get_and_cache_content_metadata.return_value = {
+            'normalized_metadata': {
+                'content_price': content_key_for_redemption_metadata_price / 100,
+            },
+            'normalized_metadata_by_run': {},
+        }
 
         # It's an unredeemable response, so mock out some admin users to return
         mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
@@ -2816,7 +2848,10 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
 
         # Check the response for the first content_key given.
         assert response_list[0]["content_key"] == content_key_for_redemption
-        assert response_list[0]["list_price"] is None
+        assert response_list[0]["list_price"] == {
+            'usd': content_key_for_redemption_metadata_price / 100.0,
+            'usd_cents': content_key_for_redemption_metadata_price,
+        }
         assert response_list[0]["redemptions"] == []
         assert response_list[0]["has_successful_redemption"] is False
         assert response_list[0]["redeemable_subsidy_access_policy"] is None

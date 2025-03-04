@@ -27,6 +27,7 @@ from enterprise_access.apps.api import filters, serializers, utils
 from enterprise_access.apps.api.mixins import UserDetailsFromJwtMixin
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments.api import AllocationException
+from enterprise_access.apps.content_metadata.api import get_and_cache_content_metadata
 from enterprise_access.apps.core.constants import (
     SUBSIDY_ACCESS_POLICY_ALLOCATION_PERMISSION,
     SUBSIDY_ACCESS_POLICY_READ_PERMISSION,
@@ -53,6 +54,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     MissingSubsidyAccessReasonUserMessages,
     TransactionStateChoices
 )
+from enterprise_access.apps.subsidy_access_policy.content_metadata_api import make_list_price_dict
 from enterprise_access.apps.subsidy_access_policy.exceptions import (
     ContentPriceNullException,
     MissingAssignment,
@@ -744,13 +746,18 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             redeemable_policies = []
             non_redeemable_policies = []
             resolved_policy = None
-            list_price = None
+            list_price_dict = None
 
-            redemptions_by_policy_uuid = redemptions_by_content_and_policy[content_key]
+            redemptions_by_policy = redemptions_by_content_and_policy[content_key]
+            policy_by_redemption_uuid = {
+                redemption['uuid']: policy
+                for policy, redemptions in redemptions_by_policy.items()
+                for redemption in redemptions
+            }
             # Flatten dict of lists because the response doesn't need to be bucketed by policy_uuid.
             redemptions = [
                 redemption
-                for redemptions in redemptions_by_policy_uuid.values()
+                for redemptions in redemptions_by_policy.values()
                 for redemption in redemptions
             ]
 
@@ -787,19 +794,32 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
             try:
                 if resolved_policy:
-                    list_price = resolved_policy.get_list_price(lms_user_id, content_key)
+                    list_price_dict = resolved_policy.get_list_price(lms_user_id, content_key)
                 elif successful_redemptions:
-                    # Get the policy record used at time of successful redemption.
-                    # [2023-12-05] TODO: consider cleaning this up.
-                    # This is kind of silly, b/c we only need this policy to compute the
-                    # list price, and it's really only *necessary* to fetch that price
-                    # from within the context of a *policy record* for cases where that successful
-                    # policy was assignment-based (because the list price for assignments might
-                    # slightly different from the current list price in the canonical content metadata).
-                    successfully_redeemed_policy = self.get_queryset().filter(
-                        uuid=successful_redemptions[0]['subsidy_access_policy_uuid'],
-                    ).first()
-                    list_price = successfully_redeemed_policy.get_list_price(lms_user_id, content_key)
+                    # Get the policy used for redemption and use that to compute the price. If the redemption was the
+                    # result of assignment, the historical assignment price might differ from the canonical price. We
+                    # prefer to display the redeemed price to avoid confusion.
+                    successfully_redeemed_policy = policy_by_redemption_uuid[successful_redemptions[0]['uuid']]
+                    list_price_dict = successfully_redeemed_policy.get_list_price(lms_user_id, content_key)
+                else:
+                    # In the case where the learner cannot redeem and has never redeemed this content, bypass the
+                    # subsidy metadata endpoint and go straight to the source (enterprise-catalog) to find normalized
+                    # price data. In this case, the list price returned rarely actually drives the display price in the
+                    # learner portal frontend, but we still need to maintain a non-null list price for a few reasons:
+                    # * Enterprise customers that leverage the API directly always expect a non-null price.
+                    # * On rare occasion, this price actually does drive the price display in learner-portal.  We think
+                    #   this can happen when courses are searchable and there is an assignment-based policy, but nothing
+                    #   has been assigned.
+                    # * Long-term, we will use can_redeem for all subsidy types, at which point we will also rely on
+                    #   this list_price for price display 100% of the time.
+                    course_metadata = get_and_cache_content_metadata(content_key, coerce_to_parent_course=True)
+                    decimal_dollars = (
+                        course_metadata['normalized_metadata_by_run'].get(content_key, {}).get('content_price') or
+                        course_metadata['normalized_metadata'].get('content_price')
+                    )
+                    if decimal_dollars is None:
+                        raise ContentPriceNullException('Failed to obtain content price from enterprise-catalog.')
+                    list_price_dict = make_list_price_dict(decimal_dollars=decimal_dollars)
             except ContentPriceNullException as exc:
                 raise RedemptionRequestException(
                     detail=f'Could not determine list price for content_key: {content_key}',
@@ -807,7 +827,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
             element_response = {
                 "content_key": content_key,
-                "list_price": list_price,
+                "list_price": list_price_dict,
                 "redemptions": redemptions,
                 "has_successful_redemption": bool(successful_redemptions),
                 "redeemable_subsidy_access_policy": resolved_policy,
