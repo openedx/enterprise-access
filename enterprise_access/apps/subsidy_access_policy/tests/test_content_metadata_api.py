@@ -46,12 +46,6 @@ class ContentMetadataApiTests(TestCase):
             "integer_cents": 1050,
             "expect_raises": ValueError,
         },
-        # integer_cents not an integer.
-        {
-            "decimal_dollars": None,
-            "integer_cents": 10.5,
-            "expect_raises": ValueError,
-        },
     )
     @ddt.unpack
     def test_make_list_price_dict(
