@@ -52,7 +52,7 @@ from .content_metadata_api import (
     get_and_cache_catalog_contains_content,
     get_and_cache_content_metadata,
     get_list_price_for_content,
-    make_list_price_dict
+    list_price_dict_from_usd_cents
 )
 from .customer_api import get_and_cache_enterprise_learner_record
 from .exceptions import (
@@ -1391,7 +1391,7 @@ class AssignedLearnerCreditAccessPolicy(AssignedCreditPolicyMixin, SubsidyAccess
             return super().get_list_price(lms_user_id, content_key)
         # an assignment's content_quantity is always <= 0 to express the fact
         # that value has been consumed from a subsidy (though not necessarily fulfilled)
-        return make_list_price_dict(integer_cents=found_assignment.content_quantity * -1)
+        return list_price_dict_from_usd_cents(found_assignment.content_quantity * -1)
 
     def can_redeem(
         self, lms_user_id, content_key,
