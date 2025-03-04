@@ -1,8 +1,6 @@
 """
 API client for enterprise-catalog service.
 """
-from urllib.parse import urljoin
-
 import backoff
 from django.conf import settings
 
@@ -12,14 +10,10 @@ from enterprise_access.apps.api_client.constants import autoretry_for_exceptions
 
 class EnterpriseCatalogApiClient(BaseOAuthClient):
     """
-    V2 API client for calls to the enterprise catalog service.
+    API client for calls to the enterprise catalog service.
     """
-    api_version = 'v2'
-
-    def __init__(self):
-        self.api_base_url = urljoin(settings.ENTERPRISE_CATALOG_URL, f'api/{self.api_version}/')
-        self.enterprise_catalog_endpoint = urljoin(self.api_base_url, 'enterprise-catalogs/')
-        super().__init__()
+    api_base_url = settings.ENTERPRISE_CATALOG_URL + '/api/v2/'
+    enterprise_catalog_endpoint = api_base_url + 'enterprise-catalogs/'
 
     @backoff.on_exception(wait_gen=backoff.expo, exception=autoretry_for_exceptions)
     def contains_content_items(self, catalog_uuid, content_ids):
@@ -90,37 +84,3 @@ class EnterpriseCatalogApiClient(BaseOAuthClient):
         response = self.client.get(endpoint)
         response.raise_for_status()
         return response.json()['count']
-
-    def content_metadata(self, content_id):
-        raise NotImplementedError('There is currently no v2 API implementation for this endpoint.')
-
-
-class EnterpriseCatalogApiV1Client(EnterpriseCatalogApiClient):
-    """
-    V1 API client for calls to the enterprise catalog service.
-    """
-    api_version = 'v1'
-
-    def __init__(self):
-        super().__init__()
-        self.content_metadata_endpoint = urljoin(self.api_base_url, 'content-metadata/')
-
-    @backoff.on_exception(wait_gen=backoff.expo, exception=autoretry_for_exceptions)
-    def content_metadata(self, content_id, coerce_to_parent_course=False):
-        """
-        Fetch catalog-/customer-agnostic content metadata.
-
-        Arguments:
-            content_id (str): ID of content to fetch.
-
-        Returns:
-            dict: serialized content metadata, or None if not found.
-        """
-        query_params = {}
-        if coerce_to_parent_course:
-            query_params |= {'coerce_to_parent_course': True}
-        kwargs = {'params': query_params} if query_params else {}
-        endpoint = self.content_metadata_endpoint + content_id
-        response = self.client.get(endpoint, **kwargs)
-        response.raise_for_status()
-        return response.json()

@@ -145,9 +145,9 @@ class TransactionsForLearnerTests(TestCase):
 
         self.assertEqual(
             {
-                'content-1': {cherry_policy: [mock_pie_transactions[0]]},
-                'content-2': {apple_policy: [mock_pie_transactions[1]]},
-                'content-3': {german_chocolate_policy: [mock_cake_transactions[0]]},
+                'content-1': {str(cherry_policy.uuid): [mock_pie_transactions[0]]},
+                'content-2': {str(apple_policy.uuid): [mock_pie_transactions[1]]},
+                'content-3': {str(german_chocolate_policy.uuid): [mock_cake_transactions[0]]},
             },
             result,
         )
