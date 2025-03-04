@@ -24,6 +24,7 @@ astroid==3.3.8
 attrs==25.1.0
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
+    #   cattrs
     #   jsonschema
     #   openedx-events
     #   referencing
@@ -43,6 +44,8 @@ cachetools==5.5.2
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   tox
+cattrs==24.1.2
+    # via -r /edx/app/enterprise-access/requirements/test.txt
 celery==5.4.0
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
@@ -118,7 +121,7 @@ coverage[toml]==7.6.12
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pytest-cov
-cryptography==44.0.1
+cryptography==44.0.2
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pyjwt
@@ -232,7 +235,7 @@ drf-jwt==1.19.2
     #   edx-drf-extensions
 drf-spectacular==0.28.0
     # via -r /edx/app/enterprise-access/requirements/test.txt
-drf-yasg==1.21.8
+drf-yasg==1.21.9
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-api-doc-tools
@@ -250,7 +253,7 @@ edx-celeryutils==1.3.0
     # via -r /edx/app/enterprise-access/requirements/test.txt
 edx-django-release-util==1.4.0
     # via -r /edx/app/enterprise-access/requirements/test.txt
-edx-django-utils==7.1.0
+edx-django-utils==7.2.0
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-drf-extensions
@@ -319,7 +322,7 @@ iniconfig==2.0.0
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pytest
-isort==6.0.0
+isort==6.0.1
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   -r requirements/quality.in
@@ -334,7 +337,7 @@ jaraco-context==6.0.1
     # via keyring
 jaraco-functools==4.1.0
     # via keyring
-jeepney==0.8.0
+jeepney==0.9.0
     # via
     #   keyring
     #   secretstorage
@@ -389,7 +392,7 @@ newrelic==10.6.0
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   edx-django-utils
-nh3==0.2.20
+nh3==0.2.21
     # via readme-renderer
 oauthlib==3.2.2
     # via
@@ -494,7 +497,7 @@ pyproject-api==1.9.0
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   tox
-pytest==8.3.4
+pytest==8.3.5
     # via
     #   -r /edx/app/enterprise-access/requirements/test.txt
     #   pytest-cov
