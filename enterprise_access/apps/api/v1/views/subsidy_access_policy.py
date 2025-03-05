@@ -16,6 +16,7 @@ from edx_enterprise_subsidy_client import EnterpriseSubsidyAPIClient
 from edx_rbac.decorators import permission_required
 from edx_rbac.mixins import PermissionRequiredMixin
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
+from requests.exceptions import HTTPError
 from rest_framework import authentication, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import APIException, NotFound
@@ -812,7 +813,12 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                     #   has been assigned.
                     # * Long-term, we will use can_redeem for all subsidy types, at which point we will also rely on
                     #   this list_price for price display 100% of the time.
-                    course_metadata = get_and_cache_content_metadata(content_key, coerce_to_parent_course=True)
+                    try:
+                        course_metadata = get_and_cache_content_metadata(content_key, coerce_to_parent_course=True)
+                    except HTTPError as exc:
+                        raise ContentPriceNullException(
+                            'Failed to obtain content metadata from enterprise-catalog.'
+                        ) from exc
                     decimal_dollars = (
                         course_metadata['normalized_metadata_by_run'].get(content_key, {}).get('content_price') or
                         course_metadata['normalized_metadata'].get('content_price')
