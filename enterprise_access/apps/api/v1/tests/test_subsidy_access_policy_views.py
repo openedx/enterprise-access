@@ -2785,7 +2785,7 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
         # Only an errored assignment exists.
         {'has_cancelled_assignment': False, 'has_failed_assignment': True},
         # No assignment exists for the learner/content pair to check.
-        {'has_cancelled_assignment': False, 'has_failed_assignment': True},
+        {'has_cancelled_assignment': False, 'has_failed_assignment': False},
     )
     @ddt.unpack
     def test_can_redeem_no_assignment_for_content(
@@ -2877,3 +2877,52 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
             },
         ]
         assert response_list[0]["reasons"] == expected_reasons
+
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
+    def test_can_redeem_content_not_in_catalog_service_422_unprocessable(
+        self, mock_transactions_cache_for_learner, mock_lms_client,
+    ):
+        """
+        Test that the can_redeem endpoint returns 422 Unprocessable if the content key is totally fake/typoed.
+        """
+        mock_transactions_cache_for_learner.return_value = {
+            'transactions': [],
+            'aggregates': {
+                'total_quantity': 0,
+            },
+        }
+        content_key_for_redemption = "course-v1:Unredeemable+Content+3T2020"
+
+        self.mock_contains_key.return_value = False
+        self.mock_get_content_metadata.return_value = None
+        self.mock_get_content_metadata.side_effect = HTTPError(
+            'Content not found',
+            response=MockResponse('Content not found', status.HTTP_404_NOT_FOUND),
+        )
+        self.mock_catalog_get_and_cache_content_metadata.return_value = None
+        self.mock_catalog_get_and_cache_content_metadata.side_effect = HTTPError(
+            'No ContentMetadata matches the given query.',
+            response=MockResponse(
+                {'detail': 'No ContentMetadata matches the given query.'},
+                status.HTTP_404_NOT_FOUND,
+            ),
+        )
+
+        # It's an unredeemable response, so mock out some admin users to return
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
+            'slug': 'sluggy',
+            'admin_users': [{'email': 'edx@example.org'}],
+        }
+
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
+            side_effect=HTTPError(
+                'Content not found',
+                response=MockResponse('Content not found', status.HTTP_404_NOT_FOUND),
+            ),
+        ):
+            query_params = {'content_key': [content_key_for_redemption]}
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
