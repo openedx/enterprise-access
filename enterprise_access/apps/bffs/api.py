@@ -265,7 +265,6 @@ def _determine_enterprise_customer_for_display(
         tuple(Dict, boolean): The enterprise customer user for display, and a boolean to determine
         whether to update the active enterprise customer to the return value.
     """
-
     if not enterprise_customer_slug and not enterprise_customer_uuid:
         # No enterprise customer specified in the request, so return the active enterprise customer
         return active_enterprise_customer, False

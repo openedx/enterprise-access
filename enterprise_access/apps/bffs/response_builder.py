@@ -127,6 +127,7 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
             'enterprise_course_enrollments': self.enterprise_course_enrollments,
             'all_enrollments_by_status': self.all_enrollments_by_status,
         })
+
         # Serialize and validate the response
         try:
             serializer = LearnerDashboardResponseSerializer(data=self.response_data)
