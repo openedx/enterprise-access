@@ -15,10 +15,6 @@ from enterprise_access.apps.bffs.api import (
     invalidate_subscription_licenses_cache
 )
 from enterprise_access.apps.bffs.context import HandlerContext
-from enterprise_access.apps.bffs.exceptions import (
-    EnterpriseCustomerNotFoundError,
-    LearnerPortalNotEnabledError,
-)
 from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin, LearnerDashboardDataMixin
 from enterprise_access.apps.bffs.serializers import EnterpriseCustomerUserSubsidiesSerializer
 
@@ -94,11 +90,10 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
 
         The method in this class simply calls common learner logic to ensure the context is set up.
         """
-        if not self.context.enterprise_customer:
-            logger.info('No enterprise customer found in the context for request user %s', self.context.lms_user_id)
-            return
-
         try:
+            # Verify enterprise customer attrs have learner portal enabled
+            self.ensure_learner_portal_enabled()
+
             # Transform enterprise customer data
             self.transform_enterprise_customers()
 
@@ -119,6 +114,35 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 developer_message=f"Unable to load and/or process common learner portal data: {exc}",
             )
 
+    def ensure_learner_portal_enabled(self):
+        """
+        Ensure the learner portal is enabled for the enterprise
+        customer attributes in the context. If not, remove the enterprise
+        customer data from the context and add a warning.
+        """
+        for customer_record_key in ('enterprise_customer', 'active_enterprise_customer', 'staff_enterprise_customer'):
+            if not (customer_record := getattr(self.context, customer_record_key, None)):
+                logger.warning(
+                    f"No {customer_record_key} found in the context for request user {self.context.lms_user_id}"
+                )
+                continue
+
+            if not customer_record.get('enable_learner_portal', False):
+                logger.warning(
+                    f"Learner portal is not enabled for enterprise customer {customer_record.get('uuid')}"
+                )
+                # Remove the enterprise customer data from the context
+                self.context.data.pop(customer_record_key, None)
+
+                # Add a warning to the context
+                self.add_warning(
+                    user_message="Learner portal not enabled for enterprise customer",
+                    developer_message=(
+                        f"[{customer_record_key}] Learner portal not enabled for enterprise "
+                        f"customer {customer_record.get('uuid')} for request user {self.context.lms_user_id}"
+                    ),
+                )
+
     def transform_enterprise_customers(self):
         """
         Transform enterprise customer metadata retrieved by self.context.
@@ -129,29 +153,7 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                     f"No {customer_record_key} found in the context for request user {self.context.lms_user_id}"
                 )
                 continue
-
-            try:
-                self.context.data[customer_record_key] = self.transform_enterprise_customer(customer_record)
-            except EnterpriseCustomerNotFoundError as exc:
-                logger.error(
-                    f"[{customer_record_key}] Enterprise customer not found for request "
-                    f"user {self.context.lms_user_id}"
-                )
-                self.add_error(
-                    user_message="Enterprise customer not found",
-                    developer_message=f"[{customer_record_key}] Enterprise customer not found: {exc}",
-                )
-            except LearnerPortalNotEnabledError as exc:
-                logger.warning(
-                    f"Learner portal not enabled for enterprise customer {customer_record.get('uuid')}"
-                )
-                self.add_warning(
-                    user_message="Learner portal not enabled for enterprise customer",
-                    developer_message=(
-                        f"[{customer_record_key}] Learner portal not enabled for enterprise "
-                        f"customer {customer_record.get('uuid')}: {exc}"
-                    ),
-                )
+            self.context.data[customer_record_key] = self.transform_enterprise_customer(customer_record)
 
         if enterprise_customer_users := self.context.all_linked_enterprise_customer_users:
             self.context.data['all_linked_enterprise_customer_users'] = [
@@ -202,18 +204,6 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         Returns:
             The transformed enterprise customer data.
         """
-        if not enterprise_customer:
-            raise EnterpriseCustomerNotFoundError(
-                f"Enterprise customer not found for request user {self.context.lms_user_id}"
-            )
-
-        if not enterprise_customer.get('enable_learner_portal', False):
-            # If the enterprise customer's learner portal is not enabled, log an info message and return None.
-            logger.info(f"Learner portal is not enabled for enterprise customer {enterprise_customer.get('uuid')}")
-            raise LearnerPortalNotEnabledError(
-                f"Learner portal is not enabled for enterprise customer {enterprise_customer.get('uuid')}"
-            )
-
         # Learner Portal is enabled, so transform the enterprise customer data.
         identity_provider = enterprise_customer.get("identity_provider")
         disable_search = bool(

@@ -172,12 +172,22 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
         Test load_and_process method without learner portal enabled. No enterprise
         customer metadata should be returned.
         """
+        mock_customer_without_learner_portal = {
+            **self.mock_enterprise_customer,
+            'enable_learner_portal': False,
+        }
         mock_get_enterprise_customers_for_user.return_value = {
             **self.mock_enterprise_learner_response_data,
-            'results': [{
-                **self.mock_enterprise_customer,
-                'enable_learner_portal': False,
-            }],
+            'results': [
+                {
+                    'active': True,
+                    'enterprise_customer': mock_customer_without_learner_portal,
+                },
+                {
+                    'active': False,
+                    'enterprise_customer': self.mock_enterprise_customer_2,
+                },
+            ],
         }
         context = HandlerContext(self.request)
         handler = BaseLearnerPortalHandler(context)
@@ -185,8 +195,37 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
         handler.load_and_process()
 
         actual_enterprise_customer = handler.context.data.get('enterprise_customer')
-        expected_enterprise_customer = None
-        self.assertEqual(actual_enterprise_customer, expected_enterprise_customer)
+        actual_active_enterprise_customer = handler.context.data.get('active_enterprise_customer')
+        actual_linked_ecus = handler.context.data.get('all_linked_enterprise_customer_users')
+
+        # Assert enterprise_customer and active_enterprise_customer are None
+        self.assertEqual(actual_enterprise_customer, None)
+        self.assertEqual(actual_active_enterprise_customer, None)
+
+        # Assert only the enterprise customer with learner portal enabled is returned
+        self.assertEqual(len(actual_linked_ecus), 1)
+        self.assertEqual(actual_linked_ecus[0]['enterprise_customer'], self.expected_enterprise_customer_2)
+
+        # Assert warnings added for enterprise customers without learner portal enabled
+        self.assertEqual(len(handler.context.warnings), 2)
+        expected_warning_user_message = 'Learner portal not enabled for enterprise customer'
+
+        def _expected_warning_developer_message(customer_record_key):
+            return (
+                f"[{customer_record_key}] Learner portal not enabled for enterprise customer "
+                f"{mock_customer_without_learner_portal.get('uuid')} for request user {self.mock_user.lms_user_id}"
+            )
+
+        self.assertEqual(handler.context.warnings[0]['user_message'], expected_warning_user_message)
+        self.assertEqual(
+            handler.context.warnings[0]['developer_message'],
+            _expected_warning_developer_message(customer_record_key='enterprise_customer')
+        )
+        self.assertEqual(handler.context.warnings[1]['user_message'], expected_warning_user_message)
+        self.assertEqual(
+            handler.context.warnings[1]['developer_message'],
+            _expected_warning_developer_message(customer_record_key='active_enterprise_customer')
+        )
 
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.get_enterprise_customer_data')
