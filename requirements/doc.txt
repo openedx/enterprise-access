@@ -20,7 +20,7 @@ asgiref==3.8.1
     #   django
     #   django-cors-headers
     #   django-countries
-astroid==3.3.8
+astroid==3.3.9
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   pylint
@@ -148,7 +148,7 @@ distlib==0.3.9
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   virtualenv
-django==4.2.19
+django==4.2.20
     # via
     #   -c /home/runner/work/enterprise-access/enterprise-access/requirements/common_constraints.txt
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
@@ -302,7 +302,7 @@ edx-toggles==5.3.0
     #   edx-event-bus-kafka
 factory-boy==3.3.3
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-faker==36.1.1
+faker==37.0.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   factory-boy
@@ -341,7 +341,7 @@ itypes==1.2.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   coreapi
-jinja2==3.1.5
+jinja2==3.1.6
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   code-annotations
@@ -379,7 +379,7 @@ monotonic==1.6
     #   analytics-python
 mysqlclient==2.2.7
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-newrelic==10.6.0
+newrelic==10.7.0
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-django-utils
@@ -456,7 +456,7 @@ pyjwt[crypto]==2.10.1
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==3.3.4
+pylint==3.3.5
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-lint
@@ -478,7 +478,7 @@ pylint-plugin-utils==0.8.2
     #   pylint-django
 pymemcache==4.0.0
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
-pymongo==4.11.1
+pymongo==4.11.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   edx-opaque-keys
@@ -628,7 +628,7 @@ tomlkit==0.13.2
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   pylint
-tox==4.24.1
+tox==4.24.2
     # via -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
 typing-extensions==4.12.2
     # via
@@ -661,7 +661,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.29.2
+virtualenv==20.29.3
     # via
     #   -r /home/runner/work/enterprise-access/enterprise-access/requirements/test.txt
     #   tox
