@@ -16,3 +16,8 @@ backports.zoneinfo; python_version<'3.9'
 
 # confluent-kafka 2.7.0 increased CPU usage
 confluent-kafka<2.6.2
+
+# pinning braze-client below version 1, which will likely introduce a breaking-change
+# as the package is converted to an openedx plugin.
+# https://github.com/edx/braze-client/pull/30
+edx-braze-client<1
