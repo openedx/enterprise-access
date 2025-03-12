@@ -15,6 +15,7 @@ asgiref==3.8.1
     #   django-countries
 attrs==25.1.0
     # via
+    #   cattrs
     #   jsonschema
     #   openedx-events
     #   referencing
@@ -24,6 +25,8 @@ backoff==1.10.0
     # via analytics-python
 billiard==4.2.1
     # via celery
+cattrs==24.1.2
+    # via -r requirements/base.in
 celery==5.4.0
     # via
     #   -r requirements/base.in

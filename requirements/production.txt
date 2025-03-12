@@ -19,6 +19,7 @@ asgiref==3.8.1
 attrs==25.1.0
     # via
     #   -r requirements/base.txt
+    #   cattrs
     #   jsonschema
     #   openedx-events
     #   referencing
@@ -34,6 +35,8 @@ billiard==4.2.1
     # via
     #   -r requirements/base.txt
     #   celery
+cattrs==24.1.2
+    # via -r /edx/app/enterprise-access/requirements/base.txt
 celery==5.4.0
     # via
     #   -r requirements/base.txt
