@@ -21,7 +21,7 @@ astroid==3.3.9
     #   -r requirements/validation.txt
     #   pylint
     #   pylint-celery
-attrs==25.1.0
+attrs==25.3.0
     # via
     #   -r requirements/validation.txt
     #   jsonschema
@@ -119,7 +119,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/validation.txt
     #   coreapi
-coverage[toml]==7.6.12
+coverage[toml]==7.7.0
     # via
     #   -r requirements/validation.txt
     #   pytest-cov
@@ -309,7 +309,7 @@ fastavro==1.10.0
     #   -r requirements/validation.txt
     #   confluent-kafka
     #   openedx-events
-filelock==3.17.0
+filelock==3.18.0
     # via
     #   -r requirements/validation.txt
     #   tox
@@ -382,7 +382,7 @@ keyring==25.6.0
     # via
     #   -r requirements/validation.txt
     #   twine
-kombu==5.4.2
+kombu==5.5.0
     # via
     #   -r requirements/validation.txt
     #   celery

@@ -20,7 +20,7 @@ astroid==3.3.9
     # via
     #   pylint
     #   pylint-celery
-attrs==25.1.0
+attrs==25.3.0
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -106,7 +106,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/base.txt
     #   coreapi
-coverage[toml]==7.6.12
+coverage[toml]==7.7.0
     # via
     #   -r requirements/test.in
     #   pytest-cov
@@ -225,7 +225,9 @@ edx-api-doc-tools==2.0.0
 edx-auth-backends==4.4.0
     # via -r requirements/base.txt
 edx-braze-client==0.2.5
-    # via -r requirements/base.txt
+    # via
+    #   -c requirements/constraints.txt
+    #   -r requirements/base.txt
 edx-ccx-keys==2.0.2
     # via
     #   -r requirements/base.txt
@@ -277,7 +279,7 @@ fastavro==1.10.0
     #   -r requirements/base.txt
     #   confluent-kafka
     #   openedx-events
-filelock==3.17.0
+filelock==3.18.0
     # via
     #   tox
     #   virtualenv
@@ -319,7 +321,7 @@ jsonschema-specifications==2024.10.1
     # via
     #   -r requirements/base.txt
     #   jsonschema
-kombu==5.4.2
+kombu==5.5.0
     # via
     #   -r requirements/base.txt
     #   celery
