@@ -14,6 +14,7 @@ from model_utils.models import SoftDeletableModel, TimeStampedModel
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_update_with_history
 
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
     SubsidyRequestStates,
@@ -306,3 +307,84 @@ def update_course_info_for_subsidy_request(sender, **kwargs):  # pylint: disable
         subsidy_type,
         str(subsidy_request.uuid),
     )
+
+
+class LearnerCreditRequestConfiguration(TimeStampedModel):
+    """
+    Stores configuration for learner credit requests.
+
+    .. no_pii: This model has no PII.
+    """
+
+    uuid = models.UUIDField(
+        primary_key=True,
+        default=uuid4,
+        editable=False,
+        unique=True,
+    )
+
+    active = models.BooleanField(
+        db_index=True,
+        default=False,
+        help_text='Whether this configuration is active. Defaults to True.',
+    )
+
+    history = HistoricalRecords()
+
+
+class LearnerCreditRequest(SubsidyRequest):
+    """
+    Stores information related to a learner credit request.
+
+    .. no_pii: This model has no PII
+    """
+
+    assignment = models.OneToOneField(
+        'content_assignments.LearnerContentAssignment',  # pylint: disable=all
+        related_name="credit_request",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="The content assignment associated with this request."
+    )
+
+    learner_credit_request_config = models.ForeignKey(
+        LearnerCreditRequestConfiguration,
+        related_name="learner_credit_requests",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="The learner credit request configuration associated with this request.",
+    )
+
+    history = HistoricalRecords()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'enterprise_customer_uuid', 'course_id'],
+                name='unique_learner_course_request',
+                condition=models.Q(state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.PENDING]),
+            )
+        ]
+
+    def __str__(self):
+        """
+        Return human-readable string representation.
+        """
+        if self.course_id:
+            return f'<LearnerCreditRequest for user {self.user} and course {self.course_id}>'
+        return f'<LearnerCreditRequest for user {self.user}>'
+
+    def approve(self, reviewer):
+        self.reviewer = reviewer
+        self.state = SubsidyRequestStates.APPROVED
+        self.reviewed_at = localized_utcnow()
+        self.save()
+
+    def decline(self, reviewer, reason=None):
+        self.reviewer = reviewer
+        self.state = SubsidyRequestStates.DECLINED
+        self.decline_reason = reason
+        self.reviewed_at = localized_utcnow()
+        self.save()
