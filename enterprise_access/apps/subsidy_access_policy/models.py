@@ -158,6 +158,12 @@ class SubsidyAccessPolicy(TimeStampedModel):
             'it disappear from all frontends, effectively soft-deleting it. Default is False (deactivated).'
         ),
     )
+    browse_and_request = models.BooleanField(
+        default=False,
+        help_text=(
+            'If selected, it means browse and request is active on this policy.'
+        ),
+    )
     retired = models.BooleanField(
         default=False,
         help_text=(
