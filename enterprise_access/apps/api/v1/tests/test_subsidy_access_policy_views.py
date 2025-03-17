@@ -49,6 +49,7 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PolicyGroupAssociationFactory
 )
 from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequestConfiguration
 from test_utils import TEST_ENTERPRISE_GROUP_UUID, TEST_USER_RECORD, APITestWithMocks
 
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:subsidy-access-policies-list')
@@ -1576,6 +1577,10 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             assignment_configuration=assignment_configuration,
             spend_limit=1000000,
         )
+        # Create LearnerCreditRequestConfiguration and associate it with SubsidyAccessPolicy
+        learner_credit_config = LearnerCreditRequestConfiguration.objects.create()
+        assigned_learner_policy.learner_credit_request_config = learner_credit_config
+        assigned_learner_policy.save()
         assignment1 = LearnerContentAssignmentFactory.create(
             assignment_configuration=assignment_configuration,
             learner_email='alice@foo.com',
@@ -1715,7 +1720,8 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'late_redemption_allowed_until': None,
             'per_learner_enrollment_limit': None,
             'per_learner_spend_limit': None,
-            'assignment_configuration': str(assignment_configuration.uuid)
+            'assignment_configuration': str(assignment_configuration.uuid),
+            'learner_credit_request_config': str(learner_credit_config.uuid),
         }
         self.assertEqual(response_json[0]['learner_content_assignments'][0], expected_learner_content_assignment)
         self.assertEqual(response_json[0], expected_response)
