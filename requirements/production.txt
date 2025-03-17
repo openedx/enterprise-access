@@ -16,7 +16,7 @@ asgiref==3.8.1
     #   django
     #   django-cors-headers
     #   django-countries
-attrs==25.1.0
+attrs==25.3.0
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -279,7 +279,7 @@ jsonschema-specifications==2024.10.1
     # via
     #   -r requirements/base.txt
     #   jsonschema
-kombu==5.4.2
+kombu==5.5.0
     # via
     #   -r requirements/base.txt
     #   celery
