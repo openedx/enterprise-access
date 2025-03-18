@@ -18,6 +18,7 @@ class LicenseManagerApiClient(BaseOAuthClient):
     """
     api_base_url = settings.LICENSE_MANAGER_URL + '/api/v1/'
     subscriptions_endpoint = api_base_url + 'subscriptions/'
+    admin_license_view_endpoint = f"{api_base_url}admin-license-view/"
 
     def get_subscription_overview(self, subscription_uuid):
         """
@@ -40,6 +41,45 @@ class LicenseManagerApiClient(BaseOAuthClient):
             return response.json()
         except requests.exceptions.HTTPError as exc:
             logger.exception(exc)
+            raise
+
+    def get_learner_subscription_licenses_for_admin(
+        self,
+        enterprise_customer_uuid,
+        user_email,
+        traverse_pagination=False
+    ):
+        """
+        Get licenses for a learner with the provided learner's email address and enterprise customer uuid.
+
+        Arguments:
+            user_email (string): The email address for a learner within an enterprise
+            enterprise_customer_uuid (string): the uuid of an enterprise customer
+        Returns:
+            dict: Dictionary representation of json returned from API
+        """
+        query_params = {
+            'enterprise_customer_uuid': enterprise_customer_uuid,
+            'user_email': user_email
+        }
+        results = []
+        current_response = None
+        next_url = self.admin_license_view_endpoint
+        try:
+            while next_url:
+                current_response = self.client.get(
+                    next_url,
+                    params=query_params,
+                    timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT
+                )
+                current_response.raise_for_status()
+                data = current_response.json()
+                results.extend(data.get('results', []))
+
+                next_url = data.get('next') if traverse_pagination else None
+            return results
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(f"Failed to get learner subscription licenses for admin : {exc}")
             raise
 
     def assign_licenses(self, user_emails, subscription_uuid):

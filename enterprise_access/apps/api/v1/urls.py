@@ -26,6 +26,11 @@ router.register(
     views.LearnerContentAssignmentViewSet,
     'assignments',
 )
+router.register(
+    'admin-view',
+    views.AdminLearnerProfileViewSet,
+    'admin-view',
+)
 
 # BFFs
 router.register('bffs/learner', views.LearnerPortalBFFViewSet, 'learner-portal-bff')
