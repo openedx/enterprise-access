@@ -819,10 +819,13 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                         raise ContentPriceNullException(
                             'Failed to obtain content metadata from enterprise-catalog.'
                         ) from exc
-                    decimal_dollars = (
-                        course_metadata['normalized_metadata_by_run'].get(content_key, {}).get('content_price') or
-                        course_metadata['normalized_metadata'].get('content_price')
-                    )
+                    content_price_1 = course_metadata['normalized_metadata_by_run'].get(
+                        content_key, {}).get('content_price')
+                    content_price_2 = course_metadata['normalized_metadata'].get('content_price')
+                    if content_price_1 is not None:
+                        decimal_dollars = content_price_1
+                    else:
+                        decimal_dollars = content_price_2
                     if decimal_dollars is None:
                         raise ContentPriceNullException('Failed to obtain content price from enterprise-catalog.')
                     list_price_dict = make_list_price_dict(decimal_dollars=decimal_dollars)
