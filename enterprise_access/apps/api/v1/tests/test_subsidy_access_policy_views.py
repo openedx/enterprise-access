@@ -1920,6 +1920,79 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient', return_value=mock.MagicMock())
     @ddt.data(
+        {"test_price": 123.0, "test_price_2": None, "final_price": 123.0},
+        {"test_price": 0.0, "test_price_2": None, "final_price": 0.0},
+        {"test_price": None, "test_price_2": 0.0, "final_price": 0.0},
+    )
+    @ddt.unpack
+    def test_can_redeem_policy_content_price(
+        self, mock_lms_client, mock_transactions_cache_for_learner, test_price, test_price_2, final_price,
+    ):
+        """
+        Test that the can_redeem endpoint returns reasons for why each non-redeemable policy failed.
+        """
+        slug = 'sluggy'
+        test_content_key_1 = "course-v1:edX+Privacy101+3T2020"
+        mock_lms_client().get_enterprise_customer_data.return_value = {
+            'slug': slug,
+            'admin_users': [{
+                "email": 'alicent@example.org',
+                "lms_user_id": 12
+            }],
+            'contact_email': None,
+        }
+
+        mock_transactions_cache_for_learner.return_value = {
+            'transactions': [],
+            'aggregates': {
+                'total_quantity': 0,
+            },
+        }
+        self.redeemable_policy.subsidy_client.can_redeem.return_value = {
+            'can_redeem': False,
+            'active': True,
+            'content_price': 5000,  # value is ignored.
+            'unit': 'usd_cents',
+            'all_transactions': [],
+        }
+        self.mock_catalog_get_and_cache_content_metadata.return_value = {
+            'normalized_metadata': {
+                'content_price': test_price,
+            },
+            'normalized_metadata_by_run': {
+                test_content_key_1: {
+                    'content_price': test_price_2,
+                },
+            },
+        }
+
+        def mock_get_subsidy_content_data(*args, **kwargs):
+            if test_content_key_1 in args:
+                return {
+                    "content_uuid": str(uuid4()),
+                    "content_key": test_content_key_1,
+                    "source": "edX",
+                }
+            else:
+                return {}
+
+        self.mock_get_content_metadata.side_effect = mock_get_subsidy_content_data
+
+        with mock.patch(
+            'enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata',
+            side_effect=mock_get_subsidy_content_data,
+        ):
+            query_params = {'content_key': [test_content_key_1]}
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
+        assert response.status_code == status.HTTP_200_OK
+        response_list = response.json()
+
+        assert response_list[0]["list_price"]["usd"] == final_price
+
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient', return_value=mock.MagicMock())
+    @ddt.data(
         {"has_admin_users": True,
          "contact_email": 'edx@example.org',
          "admin_users": [{

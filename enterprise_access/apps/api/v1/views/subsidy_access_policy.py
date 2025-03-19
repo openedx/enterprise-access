@@ -817,18 +817,23 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                         course_metadata = get_and_cache_content_metadata(content_key, coerce_to_parent_course=True)
                     except HTTPError as exc:
                         raise ContentPriceNullException(
-                            'Failed to obtain content metadata from enterprise-catalog.'
+                            f'Failed to obtain content metadata from enterprise-catalog'
+                            f' with enterprise customer {enterprise_customer_uuid}.'
                         ) from exc
-                    decimal_dollars = (
-                        course_metadata['normalized_metadata_by_run'].get(content_key, {}).get('content_price') or
-                        course_metadata['normalized_metadata'].get('content_price')
-                    )
-                    if decimal_dollars is None:
-                        raise ContentPriceNullException('Failed to obtain content price from enterprise-catalog.')
+                    if (decimal_dollars := course_metadata['normalized_metadata_by_run'].get(
+                            content_key, {}).get('content_price')) is None:
+                        decimal_dollars = course_metadata['normalized_metadata'].get('content_price')
+                    if (decimal_dollars is None):
+                        raise ContentPriceNullException(
+                            f'Failed to obtain content price from enterprise-catalog'
+                            f' with enterprise customer {enterprise_customer_uuid}.'
+                        )
                     list_price_dict = make_list_price_dict(decimal_dollars=decimal_dollars)
             except ContentPriceNullException as exc:
                 raise RedemptionRequestException(
-                    detail=f'Could not determine list price for content_key: {content_key}',
+                    detail=(
+                        f'Could not determine list price for content_key {content_key}'
+                        f' with enterprise customer {enterprise_customer_uuid}')
                 ) from exc
 
             element_response = {
