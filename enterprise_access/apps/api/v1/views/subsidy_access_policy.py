@@ -703,7 +703,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         url_path='enterprise-customer/(?P<enterprise_customer_uuid>[^/.]+)/can-redeem',
         pagination_class=None,
     )
-    def can_redeem(self, request, enterprise_customer_uuid):
+    def can_redeem(self, request, enterprise_customer_uuid):  # pylint: disable=too-many-statements
         """
         Within a specified enterprise customer, retrieves a single, redeemable access policy (or null)
         for each ``content_key`` in a provided list of content keys.
@@ -817,7 +817,8 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                         course_metadata = get_and_cache_content_metadata(content_key, coerce_to_parent_course=True)
                     except HTTPError as exc:
                         raise ContentPriceNullException(
-                            'Failed to obtain content metadata from enterprise-catalog.'
+                            f'Failed to obtain content metadata from enterprise-catalog'
+                            f' with customer {enterprise_customer_uuid}.'
                         ) from exc
                     content_price_1 = course_metadata['normalized_metadata_by_run'].get(
                         content_key, {}).get('content_price')
@@ -827,11 +828,16 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                     else:
                         decimal_dollars = content_price_2
                     if decimal_dollars is None:
-                        raise ContentPriceNullException('Failed to obtain content price from enterprise-catalog.')
+                        raise ContentPriceNullException(
+                            f'Failed to obtain content price from enterprise-catalog'
+                            f' with customer {enterprise_customer_uuid}.'
+                        )
                     list_price_dict = make_list_price_dict(decimal_dollars=decimal_dollars)
             except ContentPriceNullException as exc:
                 raise RedemptionRequestException(
-                    detail=f'Could not determine list price for content_key: {content_key}',
+                    detail=(
+                        f'Could not determine list price for content_key {content_key}'
+                        f' in customer {enterprise_customer_uuid}')
                 ) from exc
 
             element_response = {
