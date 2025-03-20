@@ -1706,6 +1706,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'display_name': 'An assigned learner credit policy, for the test customer.',
             'description': 'A generic description',
             'active': True,
+            'browse_and_request': False,
             'retired': False,
             'retired_at': None,
             'catalog_uuid': str(assigned_learner_policy.catalog_uuid),
