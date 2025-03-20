@@ -80,6 +80,135 @@ class TestLmsApiClient(TestCase):
             ]
         }
 
+        self.flex_group_memberships_response = {
+            'next': None,
+            'previous': None,
+            'num_pages': 1,
+            'current_page': 1,
+            'results': [
+                {
+                    'lms_user_id': 3,
+                    'pending_enterprise_customer_user_id': None,
+                    'enterprise_group_membership_uuid': 'uuid-1',
+                    'member_details': {
+                        'user_email': 'test@example.com',
+                        'user_name': 'Test User'
+                    },
+                    'recent_action': 'Accepted: March 17, 2025',
+                    'status': 'accepted',
+                    'activated_at': '2025-03-17T22:07:48Z',
+                    'enrollments': 0,
+                    'group_name': 'Groups - 1'
+                },
+                {
+                    'lms_user_id': 3,
+                    'pending_enterprise_customer_user_id': None,
+                    'enterprise_group_membership_uuid': 'uuid-2',
+                    'member_details': {
+                        'user_email': 'test@example.com',
+                        'user_name': 'Test User'
+                    },
+                    'recent_action': 'Accepted: March 17, 2025',
+                    'status': 'accepted',
+                    'activated_at': '2025-03-17T22:07:48Z',
+                    'enrollments': 0,
+                    'group_name': 'Groups - 2'
+                },
+                {
+                    'lms_user_id': 3,
+                    'pending_enterprise_customer_user_id': None,
+                    'enterprise_group_membership_uuid': 'uuid-4',
+                    'member_details': {
+                        'user_email': 'test@example.com',
+                        'user_name': 'Test User'
+                    },
+                    'recent_action': 'Accepted: March 17, 2025',
+                    'status': 'accepted',
+                    'activated_at': '2025-03-17T22:07:48Z',
+                    'enrollments': 0,
+                    'group_name': 'Groups - 3'
+                },
+            ]
+        }
+
+        self.course_enrollments_response = {
+            'next': None,
+            'previous': None,
+            'num_pages': 3,
+            'current_page': 1,
+            'results': {
+                'in_progress': [
+                    {
+                        "id": 1,
+                        "created": "2025-03-04T23:22:49.200659+00:00",
+                        "modified": "2025-03-04T23:22:49.200659Z",
+                        "course_id": "course-id-1",
+                        "saved_for_later": False,
+                        "unenrolled": None,
+                        "unenrolled_at": None,
+                        "enterprise_customer_user": 22,
+                        "source": 5,
+                        "course_run_id": "course-id-15",
+                        "course_run_status": "in_progress",
+                        "start_date": "2025-03-04T08:00:00Z",
+                        "end_date": "2029-10-16T07:00:00Z",
+                        "display_name": "many testing 1",
+                        "org_name": "edX",
+                        "pacing": "instructor",
+                        "is_revoked": False,
+                        "is_enrollment_active": True,
+                        "mode": "verified"
+                    },
+                ],
+                'upcoming': [
+                    {
+                        "id": 2,
+                        "created": "2025-03-04T23:22:49.200659+00:00",
+                        "modified": "2025-03-04T23:22:49.200659Z",
+                        "course_id": "course v2",
+                        "saved_for_later": False,
+                        "unenrolled": None,
+                        "unenrolled_at": None,
+                        "enterprise_customer_user": 22,
+                        "source": 5,
+                        "course_run_id": "course v2",
+                        "course_run_status": "upcoming",
+                        "start_date": "2025-03-04T08:00:00Z",
+                        "end_date": "2029-10-16T07:00:00Z",
+                        "display_name": "course test 2",
+                        "org_name": "edX",
+                        "pacing": "instructor",
+                        "is_revoked": False,
+                        "is_enrollment_active": True,
+                        "mode": "verified"
+                    },
+                ],
+                'completed': [
+                    {
+                        "id": 3,
+                        "created": "2025-03-04T23:22:49.200659+00:00",
+                        "modified": "2025-03-04T23:22:49.200659Z",
+                        "course_id": "course v2",
+                        "saved_for_later": False,
+                        "unenrolled": None,
+                        "unenrolled_at": None,
+                        "enterprise_customer_user": 22,
+                        "source": 5,
+                        "course_run_id": "course v3",
+                        "course_run_status": "completed",
+                        "start_date": "2025-02-04T08:00:00Z",
+                        "end_date": "2025-03-04T08:00:00Z",
+                        "display_name": "course test 3",
+                        "org_name": "edX",
+                        "pacing": "instructor",
+                        "is_revoked": False,
+                        "is_enrollment_active": False,
+                        "mode": "verified"
+                    },
+                ],
+            }
+        }
+
     @mock.patch('requests.Response.json')
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
     def test_get_enterprise_admin_users(self, mock_oauth_client, mock_json):
@@ -106,6 +235,135 @@ class TestLmsApiClient(TestCase):
         )
         mock_oauth_client.return_value.get.assert_called_with(
             expected_url,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_course_enrollments_for_learner_profile(self, mock_oauth_client, mock_json):
+        """
+        Verify client hits the right URL for a learner's course enrollments data.
+        """
+        mock_json.return_value = self.course_enrollments_response
+        mock_oauth_client.return_value.get.return_value = requests.Response()
+        mock_oauth_client.return_value.get.return_value.status_code = 200
+
+        client = LmsApiClient()
+        course_enrollments_data = client.get_course_enrollments_for_learner_profile('some-uuid', 3)
+
+        assert course_enrollments_data.get('in_progress') == [
+            {
+                "id": 1,
+                "created": "2025-03-04T23:22:49.200659+00:00",
+                "modified": "2025-03-04T23:22:49.200659Z",
+                "course_id": "course-id-1",
+                "saved_for_later": False,
+                "unenrolled": None,
+                "unenrolled_at": None,
+                "enterprise_customer_user": 22,
+                "source": 5,
+                "course_run_id": "course-id-15",
+                "course_run_status": "in_progress",
+                "start_date": "2025-03-04T08:00:00Z",
+                "end_date": "2029-10-16T07:00:00Z",
+                "display_name": "many testing 1",
+                "org_name": "edX",
+                "pacing": "instructor",
+                "is_revoked": False,
+                "is_enrollment_active": True,
+                "mode": "verified"
+            },
+        ]
+        assert course_enrollments_data.get('upcoming') == [
+            {
+                "id": 2,
+                "created": "2025-03-04T23:22:49.200659+00:00",
+                "modified": "2025-03-04T23:22:49.200659Z",
+                "course_id": "course v2",
+                "saved_for_later": False,
+                "unenrolled": None,
+                "unenrolled_at": None,
+                "enterprise_customer_user": 22,
+                "source": 5,
+                "course_run_id": "course v2",
+                "course_run_status": "upcoming",
+                "start_date": "2025-03-04T08:00:00Z",
+                "end_date": "2029-10-16T07:00:00Z",
+                "display_name": "course test 2",
+                "org_name": "edX",
+                "pacing": "instructor",
+                "is_revoked": False,
+                "is_enrollment_active": True,
+                "mode": "verified"
+            },
+        ]
+        assert course_enrollments_data.get('completed') == [
+            {
+                "id": 3,
+                "created": "2025-03-04T23:22:49.200659+00:00",
+                "modified": "2025-03-04T23:22:49.200659Z",
+                "course_id": "course v2",
+                "saved_for_later": False,
+                "unenrolled": None,
+                "unenrolled_at": None,
+                "enterprise_customer_user": 22,
+                "source": 5,
+                "course_run_id": "course v3",
+                "course_run_status": "completed",
+                "start_date": "2025-02-04T08:00:00Z",
+                "end_date": "2025-03-04T08:00:00Z",
+                "display_name": "course test 3",
+                "org_name": "edX",
+                "pacing": "instructor",
+                "is_revoked": False,
+                "is_enrollment_active": False,
+                "mode": "verified"
+            },
+        ]
+        expected_url = (
+            'http://edx-platform.example.com/'
+            'enterprise/api/v1/'
+            'enterprise-course-enrollment-admin/'
+        )
+        mock_oauth_client.return_value.get.assert_called_with(
+            expected_url,
+            params={'enterprise_uuid': 'some-uuid', 'lms_user_id': 3},
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_enterprise_group_memberships_for_learner(self, mock_oauth_client, mock_json):
+        """
+        Verify client hits the right URL for enterprise flex group membership data.
+        """
+        mock_json.return_value = self.flex_group_memberships_response
+        mock_oauth_client.return_value.get.return_value = requests.Response()
+        mock_oauth_client.return_value.get.return_value.status_code = 200
+
+        client = LmsApiClient()
+        flex_group_memberships = client.get_enterprise_group_memberships_for_learner('some-uuid', 3)
+
+        assert len(flex_group_memberships) == 3
+        assert flex_group_memberships[0]['lms_user_id'] == 3
+        assert flex_group_memberships[0]['member_details'] == {
+            'user_email': 'test@example.com',
+            'user_name': 'Test User',
+        }
+
+        assert flex_group_memberships[0]['recent_action'] == 'Accepted: March 17, 2025'
+        assert flex_group_memberships[0]['status'] == 'accepted'
+        assert flex_group_memberships[0]['activated_at'] == '2025-03-17T22:07:48Z'
+        assert flex_group_memberships[0]['enrollments'] == 0
+        assert flex_group_memberships[0]['group_name'] == 'Groups - 1'
+        expected_url = (
+            'http://edx-platform.example.com/'
+            'enterprise/api/v1/'
+            'enterprise-group-membership/'
+        )
+        mock_oauth_client.return_value.get.assert_called_with(
+            expected_url,
+            params={'enterprise_uuid': 'some-uuid', 'lms_user_id': 3},
             timeout=settings.LMS_CLIENT_TIMEOUT,
         )
 

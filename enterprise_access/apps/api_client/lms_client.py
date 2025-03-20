@@ -52,6 +52,78 @@ class LmsApiClient(BaseOAuthClient):
     pending_enterprise_learner_endpoint = enterprise_api_v1_base_url + 'pending-enterprise-learner/'
     enterprise_group_membership_endpoint = enterprise_api_v1_base_url + 'enterprise-group/'
     pending_enterprise_admin_endpoint = enterprise_api_v1_base_url + 'pending-enterprise-admin/'
+    enterprise_flex_membership_endpoint = enterprise_api_v1_base_url + 'enterprise-group-membership/'
+    enterprise_course_enrollment_admin_endpoint = enterprise_api_v1_base_url + 'enterprise-course-enrollment-admin/'
+
+    def get_course_enrollments_for_learner_profile(self, enterprise_uuid, lms_user_id):
+        """
+        Retrieves all course enrollments for a learner to be viewed by admin.
+
+        Arguments:
+            enterprise_uuid (UUID): the UUID of the enterprise customer
+            lms_user_id (int): the lms user id of the user
+
+        Returns:
+            dict: Dictionary representation of the JSON response from the API
+        """
+        query_params = {
+            'enterprise_uuid': enterprise_uuid,
+            'lms_user_id': lms_user_id,
+        }
+
+        try:
+            current_response = self.client.get(
+                self.enterprise_course_enrollment_admin_endpoint,
+                params=query_params,
+                timeout=settings.LMS_CLIENT_TIMEOUT
+            )
+            current_response.raise_for_status()
+            results = current_response.json().get('results', {})
+            return results
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                f"Failed to fetch course enrollments for {lms_user_id}: {exc}"
+            )
+            raise
+
+    def get_enterprise_group_memberships_for_learner(self, enterprise_uuid, lms_user_id, traverse_pagination=False):
+        """
+        Retrieves all flex group memberships for a learner.
+
+        Arguments:
+            enterprise_uuid (UUID): the UUID of the enterprise customer
+            lms_user_id (int): the lms user id of the user
+
+        Returns:
+            dict: Dictionary representation of the JSON response from the API
+        """
+        query_params = {
+            'enterprise_uuid': enterprise_uuid,
+            'lms_user_id': lms_user_id,
+        }
+
+        results = []
+        current_response = None
+        next_url = self.enterprise_flex_membership_endpoint
+        try:
+            while next_url:
+                current_response = self.client.get(
+                    next_url,
+                    params=query_params,
+                    timeout=settings.LMS_CLIENT_TIMEOUT
+                )
+                current_response.raise_for_status()
+                data = current_response.json()
+                results.extend(data.get('results', []))
+
+                next_url = data.get('next') if traverse_pagination else None
+            return results
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                f"Failed to fetch enterprise flex group memberships for learner {lms_user_id}: {exc} "
+                f"Response content: {current_response.content if current_response else None}"
+            )
+            raise
 
     def enterprise_customer_url(self, enterprise_customer_uuid):
         return os.path.join(
