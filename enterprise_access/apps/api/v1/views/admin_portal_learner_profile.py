@@ -24,7 +24,7 @@ class AdminLearnerProfileViewSet(ViewSet):
 
     Expected params:
     - user_email (string): The email address for a learner within an enterprise.
-    - lms_user_id (string): The UUID of the LMS user.
+    - lms_user_id (string): The unique id of the LMS user.
     - enterprise_customer_uuid (string): The UUID of an enterprise customer.
     """
 

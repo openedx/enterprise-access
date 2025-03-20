@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 # pylint: disable=abstract-method
 class AdminLearnerProfileRequestSerializer(serializers.Serializer):
     """Serializer for validating admin learner profile query parameters."""
-    user_email = serializers.EmailField(required=False, help_text="The email address of the learner.")
-    lms_user_id = serializers.IntegerField(required=False, help_text="The ID of the LMS user.")
+    user_email = serializers.EmailField(required=True, help_text="The email address of the learner.")
+    lms_user_id = serializers.IntegerField(required=True, help_text="The ID of the LMS user.")
     enterprise_customer_uuid = serializers.UUIDField(required=True, help_text="The UUID of the enterprise customer.")
 
     def validate(self, attrs):
