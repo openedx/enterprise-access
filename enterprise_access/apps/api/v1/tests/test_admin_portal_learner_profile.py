@@ -91,7 +91,7 @@ class TestAdminPortalLearnerProfileView(TestCase):
         response = self.view(request)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('non_field_errors', response.data)
+        self.assertIn('lms_user_id', response.data)
 
     def test_missing_user_email(self):
         """Test when neither user_email nor lms_user_id is provided."""
@@ -102,7 +102,7 @@ class TestAdminPortalLearnerProfileView(TestCase):
         response = self.view(request)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('non_field_errors', response.data)
+        self.assertIn('user_email', response.data)
 
     @patch('enterprise_access.apps.admin_portal_learner_profile.api.get_learner_subscriptions')
     @patch('enterprise_access.apps.admin_portal_learner_profile.api.get_group_memberships')
