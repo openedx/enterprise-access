@@ -206,11 +206,12 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         """
         # Learner Portal is enabled, so transform the enterprise customer data.
         identity_provider = enterprise_customer.get("identity_provider")
+        active_integrations = enterprise_customer.get("active_integrations")
         disable_search = bool(
             not enterprise_customer.get("enable_integrated_customer_learner_portal_search", False) and
             identity_provider
         )
-        show_integration_warning = bool(not disable_search and identity_provider)
+        show_integration_warning = bool(not disable_search and active_integrations)
 
         return {
             **enterprise_customer,
