@@ -42,7 +42,7 @@ class AdminLearnerProfileViewSet(ViewSet):
     def learner_profile(self, request):
         """
         Retrieves all licenses, subscriptions, and enrollments associated with
-        a learner's email address and enterprise.
+        a learner's email address, LMS user ID, and enterprise.
         """
         serializer = serializers.AdminLearnerProfileRequestSerializer(data=request.query_params)
         if not serializer.is_valid():
@@ -53,17 +53,17 @@ class AdminLearnerProfileViewSet(ViewSet):
         user_email = validated_data.get('user_email')
         lms_user_id = validated_data.get('lms_user_id')
 
-        response_data = {}
-
-        if user_email:
-            response_data['subscriptions'] = admin_portal_learner_profile_api.get_learner_subscriptions(
-                enterprise_customer_uuid, user_email)
-
-        if lms_user_id:
-            response_data['group_memberships'] = admin_portal_learner_profile_api.get_group_memberships(
-                enterprise_customer_uuid, lms_user_id)
-            response_data['enrollments'] = admin_portal_learner_profile_api.get_enrollments(
-                enterprise_customer_uuid, lms_user_id)
+        response_data = {
+            'subscriptions': admin_portal_learner_profile_api.get_learner_subscriptions(
+                enterprise_customer_uuid, user_email
+            ),
+            'group_memberships': admin_portal_learner_profile_api.get_group_memberships(
+                enterprise_customer_uuid, lms_user_id
+            ),
+            'enrollments': admin_portal_learner_profile_api.get_enrollments(
+                enterprise_customer_uuid, lms_user_id
+            )
+        }
 
         return Response(
             serializers.AdminLearnerProfileResponseSerializer(response_data).data,

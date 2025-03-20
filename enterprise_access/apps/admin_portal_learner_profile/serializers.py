@@ -16,9 +16,11 @@ class AdminLearnerProfileRequestSerializer(serializers.Serializer):
     enterprise_customer_uuid = serializers.UUIDField(required=True, help_text="The UUID of the enterprise customer.")
 
     def validate(self, attrs):
-        """Ensure at least one identifier (user_email or lms_user_id) is provided."""
-        if not attrs.get('user_email') and not attrs.get('lms_user_id'):
-            raise serializers.ValidationError("Either user_email or lms_user_id must be provided.")
+        """Ensure all required fields are provided."""
+        if not attrs.get('enterprise_customer_uuid'):
+            raise serializers.ValidationError("enterprise_customer_uuid is required.")
+        if not attrs.get('user_email') or not attrs.get('lms_user_id'):
+            raise serializers.ValidationError("Both user_email and lms_user_id are required.")
         return attrs
 
 

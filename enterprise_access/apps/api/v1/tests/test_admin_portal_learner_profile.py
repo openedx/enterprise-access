@@ -82,64 +82,27 @@ class TestAdminPortalLearnerProfileView(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('enterprise_customer_uuid', response.data)
 
-    def test_missing_user_email_and_lms_user_id(self):
+    def test_missing_lms_user_id(self):
         """Test when neither user_email nor lms_user_id is provided."""
-        request = self.authenticate_request({'enterprise_customer_uuid': '123e4567-e89b-12d3-a456-426614174000'})
+        request = self.authenticate_request({
+            'enterprise_customer_uuid': '123e4567-e89b-12d3-a456-426614174000',
+            'user_email': 'test@example.com',
+        })
         response = self.view(request)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('non_field_errors', response.data)
 
-    @patch('enterprise_access.apps.admin_portal_learner_profile.api.get_learner_subscriptions')
-    @patch('enterprise_access.apps.admin_portal_learner_profile.api.get_group_memberships')
-    @patch('enterprise_access.apps.admin_portal_learner_profile.api.get_enrollments')
-    def test_successful_response_with_email(
-        self, mock_get_enrollments, mock_get_group_memberships, mock_get_learner_subscriptions
-    ):
-        """Test successful response with user_email parameter only."""
-        mock_get_learner_subscriptions.return_value = [self.mock_subscriptions]
-        mock_get_group_memberships.return_value = []
-        mock_get_enrollments.return_value = {}
-
+    def test_missing_user_email(self):
+        """Test when neither user_email nor lms_user_id is provided."""
         request = self.authenticate_request({
-            'user_email': 'test@example.com',
-            'enterprise_customer_uuid': '123e4567-e89b-12d3-a456-426614174000'
-        })
-
-        response = self.view(request)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('subscriptions', response.data)
-        self.assertEqual(len(response.data['subscriptions']), 1)
-        self.assertEqual(response.data['subscriptions'][0]['uuid'], "1b66a3c0-b001-48c9-a22e-c91d7a77b724")
-        self.assertEqual(response.data['subscriptions'][0]['user_email'], "edx@example.com")
-        self.assertEqual(response.data['subscriptions'][0]['subscription_plan']['title'], "subscription plan")
-
-    @patch('enterprise_access.apps.admin_portal_learner_profile.api.get_learner_subscriptions')
-    @patch('enterprise_access.apps.admin_portal_learner_profile.api.get_group_memberships')
-    @patch('enterprise_access.apps.admin_portal_learner_profile.api.get_enrollments')
-    def test_successful_response_with_lms_user_id(
-        self, mock_get_enrollments, mock_get_group_memberships, mock_get_learner_subscriptions
-    ):
-        """Test successful response with lms_user_id parameter only."""
-        mock_get_learner_subscriptions.return_value = []
-        mock_get_group_memberships.return_value = [self.mock_get_group_memberships]
-        mock_get_enrollments.return_value = {'in_progress': [{'course_id': 'course-v1:test+T1+2025'}]}
-
-        request = self.authenticate_request({
+            'enterprise_customer_uuid': '123e4567-e89b-12d3-a456-426614174000',
             'lms_user_id': '456',
-            'enterprise_customer_uuid': '123e4567-e89b-12d3-a456-426614174000'
         })
-
         response = self.view(request)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('group_memberships', response.data)
-        self.assertEqual(len(response.data['group_memberships']), 1)
-        self.assertEqual(response.data['group_memberships'][0]['group_name'], 'Groups - 1')
-        self.assertIn('enrollments', response.data)
-        self.assertEqual(len(response.data['enrollments']), 1)
-        self.assertEqual(response.data['enrollments'].get('in_progress')[0]['course_id'], 'course-v1:test+T1+2025')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('non_field_errors', response.data)
 
     @patch('enterprise_access.apps.admin_portal_learner_profile.api.get_learner_subscriptions')
     @patch('enterprise_access.apps.admin_portal_learner_profile.api.get_group_memberships')

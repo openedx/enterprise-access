@@ -61,7 +61,7 @@ class LmsApiClient(BaseOAuthClient):
 
         Arguments:
             enterprise_uuid (UUID): the UUID of the enterprise customer
-            lms_user_ids (list of str): lms user ids of the users to unlink
+            lms_user_id (int): the lms user id of the user
 
         Returns:
             dict: Dictionary representation of the JSON response from the API
@@ -92,7 +92,7 @@ class LmsApiClient(BaseOAuthClient):
 
         Arguments:
             enterprise_uuid (UUID): the UUID of the enterprise customer
-            lms_user_ids (list of str): lms user ids of the users to unlink
+            lms_user_id (int): the lms user id of the user
 
         Returns:
             dict: Dictionary representation of the JSON response from the API
