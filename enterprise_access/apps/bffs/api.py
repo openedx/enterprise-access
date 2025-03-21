@@ -6,6 +6,7 @@ import logging
 from django.conf import settings
 from edx_django_utils.cache import TieredCache
 
+from enterprise_access.apps.api_client import EnterpriseCatalogApiV1Client
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerUserApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient, LmsUserApiClient
 from enterprise_access.cache_utils import request_cache, versioned_cache_key
@@ -24,6 +25,8 @@ def enterprise_customer_users_cache_key(username):
 def enterprise_customer_cache_key(enterprise_customer_slug, enterprise_customer_uuid):
     return versioned_cache_key('enterprise_customer', enterprise_customer_slug, enterprise_customer_uuid)
 
+def secured_algolia_api_key_cache_key(enterprise_customer_uuid, lms_user_id):
+    return versioned_cache_key('secured_algolia_api_key', enterprise_customer_uuid, lms_user_id)
 
 def subscription_licenses_cache_key(enterprise_customer_uuid, lms_user_id):
     return versioned_cache_key('get_subscription_licenses_for_learner', enterprise_customer_uuid, lms_user_id)
@@ -92,6 +95,40 @@ def get_and_cache_enterprise_customer(
         enterprise_customer_uuid=enterprise_customer_uuid,
         enterprise_customer_slug=enterprise_customer_slug,
     )
+    TieredCache.set_all_tiers(cache_key, response_payload, timeout)
+    return response_payload
+
+def get_and_cache_secured_algolia_search_keys(
+    request,
+    enterprise_customer_uuid,
+    timeout=settings.DEFAULT_CACHE_TIMEOUT,
+):
+    """
+    Retrieves and caches default enterprise enrollment intentions for a learner.
+    This function does not cache this data if it includes any enrollable intentions,
+    because we don't want to re-attempt enrollment realization on the second of consecutive requests.
+    """
+    cache_key = secured_algolia_api_key_cache_key(
+        enterprise_customer_uuid,
+        request.user.id,
+    )
+    cached_response = TieredCache.get_cached_response(cache_key)
+    if cached_response.is_found:
+        logger.info(
+            f'secured_algolia_api_key cache hit '
+            f'for enterprise_customer_uuid {enterprise_customer_uuid}'
+            f'and user id {request.user.id}'
+        )
+        return cached_response.value
+
+    client = EnterpriseCatalogApiV1Client()
+    response_payload = client.get_secured_algolia_api_key(
+        enterprise_customer_uuid=enterprise_customer_uuid,
+    )
+
+    # Calculate timeout based on response_payload's valid_until field
+    print('hamzah', response_payload)
+
     TieredCache.set_all_tiers(cache_key, response_payload, timeout)
     return response_payload
 

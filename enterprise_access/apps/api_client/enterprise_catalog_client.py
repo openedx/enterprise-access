@@ -105,6 +105,10 @@ class EnterpriseCatalogApiV1Client(EnterpriseCatalogApiClient):
         super().__init__()
         self.content_metadata_endpoint = urljoin(self.api_base_url, 'content-metadata/')
 
+    def secured_algolia_api_key_endpoint(self, enterprise_customer_uuid):
+        secured_algolia_api_key_path = f'enterprise-customer/{enterprise_customer_uuid}/secured_algolia_api_key'
+        return urljoin(self.api_base_url, secured_algolia_api_key_path)
+
     @backoff.on_exception(wait_gen=backoff.expo, exception=autoretry_for_exceptions)
     def content_metadata(self, content_id, coerce_to_parent_course=False):
         """
@@ -124,3 +128,30 @@ class EnterpriseCatalogApiV1Client(EnterpriseCatalogApiClient):
         response = self.client.get(endpoint, **kwargs)
         response.raise_for_status()
         return response.json()
+
+    @backoff.on_exception(wait_gen=backoff.expo, exception=autoretry_for_exceptions)
+    def get_secured_algolia_api_key(self, enterprise_customer_uuid):
+        """
+        Fetch secured algolia API keys
+
+        Arguments:
+            enterprise_customer_uuid (uuid): UUID of the enterprise customer
+
+        Returns:
+            200:
+                'algolia': {
+                    'secured_api_key' (str): The secured api key for algolia to consume in the client
+                    'valid_until' (Datetime): The date until the secured api key is valid until in the client
+                }
+                'catalog_uuids_to_catalog_query_uuids': A dictionary of catalog uuids mapped to their corresponding
+                    catalog query uuids.
+            400:
+                'user_message' (str): Message of corresponding error indicating a user oriented message
+                'developer_message' (str): Message of corresponding error indicating an actionable developer message
+        """
+        secured_algolia_search_keys_endpoint = self.secured_algolia_api_key_endpoint(enterprise_customer_uuid)
+        response = self.client.get(secured_algolia_search_keys_endpoint)
+        response.raise_for_status()
+        return response.json()
+
+

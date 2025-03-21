@@ -51,6 +51,7 @@ class BaseResponseBuilder:
             self.context.should_update_active_enterprise_customer_user
         )
         self.response_data['enterprise_features'] = self.context.enterprise_features
+        self.response_data['secured_algolia_api_key'] = self.context.secured_algolia_api_key
         return self.response_data, self.status_code
 
     def add_errors_warnings_to_response(self):

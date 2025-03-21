@@ -8,7 +8,7 @@ from rest_framework import status
 from enterprise_access.apps.bffs import serializers
 from enterprise_access.apps.bffs.api import (
     get_and_cache_enterprise_customer_users,
-    transform_enterprise_customer_users_data
+    transform_enterprise_customer_users_data, get_and_cache_secured_algolia_search_keys
 )
 
 logger = logging.getLogger(__name__)
@@ -115,6 +115,10 @@ class HandlerContext:
         return self.data.get('should_update_active_enterprise_customer_user')
 
     @property
+    def secured_algolia_api_key(self):
+        return self.data.get('secured_algolia_api_key')
+
+    @property
     def is_request_user_linked_to_enterprise_customer(self):
         """
         Returns True if the request user is linked to the resolved enterprise customer, False otherwise.
@@ -154,7 +158,7 @@ class HandlerContext:
         enterprise_customer_slug = enterprise_slug_query_param or enterprise_slug_post_param
         self._enterprise_customer_slug = enterprise_customer_slug
 
-        # Initialize the enterprise customer users metatata derived from the LMS
+        # Initialize the enterprise customer users metadata derived from the LMS
         try:
             self._initialize_enterprise_customer_users()
         except Exception as exc:  # pylint: disable=broad-except
@@ -197,6 +201,15 @@ class HandlerContext:
         if not self.enterprise_customer_uuid:
             self._enterprise_customer_uuid = self.enterprise_customer.get('uuid')
 
+        # Initialize the secured algolia api keys metadata derived from enterprise catalog
+        try:
+            self._initialize_secured_algolia_api_keys()
+        except Exception as exc:
+            logger.exception(
+                'Error initializing the secured algolia api keys for request user %s, '
+                'enterprise customer uuid %s'
+            )
+
     def _initialize_enterprise_customer_users(self):
         """
         Initializes the enterprise customer users for the request user.
@@ -237,6 +250,12 @@ class HandlerContext:
                 'should_update_active_enterprise_customer_user', False
             )
         })
+
+    def _initialize_secured_algolia_api_keys(self):
+        secured_algolia_api_key_data = get_and_cache_secured_algolia_search_keys(
+            self.request
+        )
+        print(secured_algolia_api_key_data)
 
     def add_error(self, status_code=None, **kwargs):
         """
