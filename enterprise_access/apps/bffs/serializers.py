@@ -160,6 +160,23 @@ class EnterpriseCustomerUserSerializer(BaseBffSerializer):
     enterprise_customer = EnterpriseCustomerSerializer()
     active = serializers.BooleanField()
 
+class SecuredAlgoliaAPIKeySerializer(BaseBffSerializer):
+    """
+    Serializer for the secured Algolia API key and expiration.
+    """
+    secured_api_key = serializers.CharField()
+    valid_until = serializers.DateTimeField()
+
+class SecuredAlgoliaAPIKeyResponseSerializer(BaseBffSerializer):
+    """
+    Serializer for the response of the secured Algolia API key endpoint for the BFF.
+    """
+    algolia = SecuredAlgoliaAPIKeySerializer(help_text='Secured Algolia API key and expiration.')
+    catalog_uuids_to_catalog_query_uuids = serializers.DictField(
+        child=serializers.UUIDField(),
+        help_text='Mapping of catalog UUIDs to catalog query UUIDs.',
+    )
+
 
 class BaseResponseSerializer(BaseBffSerializer):
     """
@@ -171,6 +188,7 @@ class BaseResponseSerializer(BaseBffSerializer):
     active_enterprise_customer = EnterpriseCustomerSerializer(required=False, allow_null=True)
     staff_enterprise_customer = EnterpriseCustomerSerializer(required=False, allow_null=True)
     should_update_active_enterprise_customer_user = serializers.BooleanField()
+    secured_algolia_api_key = SecuredAlgoliaAPIKeyResponseSerializer(required=False, allow_null=True)
     errors = ErrorSerializer(many=True, required=False, default=list)
     warnings = WarningSerializer(many=True, required=False, default=list)
     enterprise_features = serializers.DictField(required=False, default=dict)
