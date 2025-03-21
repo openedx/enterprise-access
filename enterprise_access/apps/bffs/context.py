@@ -2,13 +2,16 @@
 HandlerContext for bffs app.
 """
 import logging
+from urllib.error import HTTPError
 
 from rest_framework import status
 
 from enterprise_access.apps.bffs import serializers
 from enterprise_access.apps.bffs.api import (
     get_and_cache_enterprise_customer_users,
-    transform_enterprise_customer_users_data
+    get_and_cache_secured_algolia_search_keys,
+    transform_enterprise_customer_users_data,
+    transform_secured_algolia_api_key_response
 )
 
 logger = logging.getLogger(__name__)
@@ -115,6 +118,14 @@ class HandlerContext:
         return self.data.get('should_update_active_enterprise_customer_user')
 
     @property
+    def secured_algolia_api_key(self):
+        return self.data.get('secured_algolia_api_key')
+
+    @property
+    def catalog_uuids_to_catalog_query_uuids(self):
+        return self.data.get('catalog_uuids_to_catalog_query_uuids')
+
+    @property
     def is_request_user_linked_to_enterprise_customer(self):
         """
         Returns True if the request user is linked to the resolved enterprise customer, False otherwise.
@@ -154,7 +165,7 @@ class HandlerContext:
         enterprise_customer_slug = enterprise_slug_query_param or enterprise_slug_post_param
         self._enterprise_customer_slug = enterprise_customer_slug
 
-        # Initialize the enterprise customer users metatata derived from the LMS
+        # Initialize the enterprise customer users metadata derived from the LMS
         try:
             self._initialize_enterprise_customer_users()
         except Exception as exc:  # pylint: disable=broad-except
@@ -197,6 +208,54 @@ class HandlerContext:
         if not self.enterprise_customer_uuid:
             self._enterprise_customer_uuid = self.enterprise_customer.get('uuid')
 
+        # Initialize the secured algolia api keys metadata derived from enterprise catalog
+        try:
+            self._initialize_secured_algolia_api_keys()
+        except HTTPError as exc:
+            exception_response = exc.response.json()
+            exception_response_user_message = exception_response.get('user_message')
+            exception_response_developer_message = exception_response.get('developer_message')
+            logger.exception(
+                'HTTP Error initializing the secured algolia api keys for request user %s, '
+                'enterprise customer uuid %s',
+                self.lms_user_id,
+                enterprise_customer_uuid,
+            )
+            self.add_error(
+                user_message=exception_response_user_message or 'HTTP Error initializing the secured algolia api keys',
+                developer_message=exception_response_developer_message or
+                f'Could not initialize the secured algolia api keys. Error: {exc}',
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception(
+                'Error initializing the secured algolia api keys for request user %s, '
+                'enterprise customer uuid %s',
+                self.lms_user_id,
+                enterprise_customer_uuid,
+            )
+            self.add_error(
+                user_message='Error initializing the secured algolia api keys',
+                developer_message=f'Could not initialize the secured algolia api keys. Error: {exc}',
+            )
+
+        if not (self.secured_algolia_api_key and self.catalog_uuids_to_catalog_query_uuids):
+            logger.info(
+                'No secured algolia key found for request user %s, enterprise customer uuid %s, '
+                'and/or enterprise slug %s',
+                self.lms_user_id,
+                enterprise_customer_uuid,
+                enterprise_customer_slug,
+            )
+            self.add_error(
+                user_message='No secured algolia api key or catalog query mapping found',
+                developer_message=(
+                    f'No secured algolia api key or catalog query mapping found for request '
+                    f'user {self.lms_user_id} and enterprise uuid '
+                    f'{enterprise_customer_uuid}, and/or enterprise slug {enterprise_customer_slug}'
+                ),
+            )
+            return
+
     def _initialize_enterprise_customer_users(self):
         """
         Initializes the enterprise customer users for the request user.
@@ -234,8 +293,37 @@ class HandlerContext:
             'all_linked_enterprise_customer_users': transformed_data.get('all_linked_enterprise_customer_users', []),
             'staff_enterprise_customer': transformed_data.get('staff_enterprise_customer'),
             'should_update_active_enterprise_customer_user': transformed_data.get(
-                'should_update_active_enterprise_customer_user', False
+                'should_update_active_enterprise_customer_user',
+                False
             )
+        })
+
+    def _initialize_secured_algolia_api_keys(self):
+        """
+        Initializes the secured algolia api key for the request user.
+        """
+        secured_algolia_api_key_data = get_and_cache_secured_algolia_search_keys(
+            self.request,
+            self._enterprise_customer_uuid,
+        )
+
+        secured_algolia_api_key = None
+        catalog_uuids_to_catalog_query_uuids = {}
+        try:
+            secured_algolia_api_key, catalog_uuids_to_catalog_query_uuids = transform_secured_algolia_api_key_response(
+                secured_algolia_api_key_data
+            )
+        except Exception:  # pylint: disable=broad-except
+            logger.exception(
+                'Error transforming secured algolia api key for request user %s,'
+                'enterprise customer uuid %s and/or slug %s',
+                self.lms_user_id,
+                self.enterprise_customer_uuid,
+                self.enterprise_customer_slug,
+            )
+        self.data.update({
+            'secured_algolia_api_key': secured_algolia_api_key,
+            'catalog_uuids_to_catalog_query_uuids': catalog_uuids_to_catalog_query_uuids
         })
 
     def add_error(self, status_code=None, **kwargs):

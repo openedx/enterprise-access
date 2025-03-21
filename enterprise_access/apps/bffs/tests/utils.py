@@ -7,7 +7,9 @@ from django.test import RequestFactory, TestCase
 from faker import Faker
 from rest_framework import status
 
+from enterprise_access.apps.api_client.tests.test_constants import DATE_FORMAT_ISO_8601
 from enterprise_access.apps.core.tests.factories import UserFactory
+from enterprise_access.utils import _days_from_now
 
 
 class TestHandlerContextMixin(TestCase):
@@ -149,6 +151,19 @@ class TestHandlerContextMixin(TestCase):
             ],
             'enterprise_features': {'feature_flag': True}
         }
+        self.mock_secured_algolia_api_key = 'Th15I54Fak341gOlI4K3y'
+        self.mock_catalog_uuid = self.faker.uuid4()
+        self.mock_catalog_query_uuid = self.faker.uuid4()
+        self.mock_catalog_uuids_to_catalog_query_uuids = {
+            self.mock_catalog_uuid: self.mock_catalog_query_uuid,
+        }
+        self.mock_secured_algolia_api_key_response = {
+            'algolia': {
+                'secured_api_key': self.mock_secured_algolia_api_key,
+                'valid_until': _days_from_now(1, DATE_FORMAT_ISO_8601)
+            },
+            'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids
+        }
         self.mock_error = {
             "developer_message": "No enterprise uuid associated to the user mock-uuid",
             "user_message": "You may not be associated with the enterprise.",
@@ -196,6 +211,12 @@ class TestHandlerContextMixin(TestCase):
         mock_should_update_active_enterprise_customer_user = getattr(mock_handler_context, 'data').get(
             'should_update_active_enterprise_customer_user'
         )
+        mock_secured_algolia_api_key = getattr(mock_handler_context, 'data').get(
+            'secured_algolia_api_key'
+        )
+        mock_catalog_uuids_to_catalog_query_uuids = getattr(mock_handler_context, 'data').get(
+            'catalog_uuids_to_catalog_query_uuids'
+        )
         property_mocks = {
             'request': getattr(mock_handler_context, '_request'),
             'status_code': getattr(mock_handler_context, '_status_code'),
@@ -206,6 +227,8 @@ class TestHandlerContextMixin(TestCase):
             'enterprise_customer': mock_property_enterprise_customer,
             'active_enterprise_customer': mock_active_enterprise_customer,
             'staff_enterprise_customer': mock_staff_enterprise_customer,
+            'secured_algolia_api_key': mock_secured_algolia_api_key,
+            'catalog_uuids_to_catalog_query_uuids': mock_catalog_uuids_to_catalog_query_uuids,
             'lms_user_id': getattr(mock_handler_context, '_lms_user_id'),
             'enterprise_features': getattr(mock_handler_context, '_enterprise_features'),
             'all_linked_enterprise_customer_users': mock_linked_enterprise_customer_users,
@@ -233,6 +256,19 @@ def mock_enterprise_learner_dependency(func):
     return wrapper
 
 
+def mock_secured_algolia_api_key_dependency(func):
+    """
+    Mock the secured algolia api key related service dependencies.
+    """
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client'
+        '.EnterpriseCatalogUserV1ApiClient.get_secured_algolia_api_key'
+    )
+    def wrapper(self, *args, **kwargs):
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
 def mock_subsidy_dependencies(func):
     """
     Mock the service dependencies for the subsidies.
@@ -255,6 +291,7 @@ def mock_common_dependencies(func):
     Mock the common service dependencies.
     """
     @mock_enterprise_learner_dependency
+    @mock_secured_algolia_api_key_dependency
     @mock_subsidy_dependencies
     def wrapper(self, *args, **kwargs):
         return func(self, *args, **kwargs)

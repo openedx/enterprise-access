@@ -22,13 +22,22 @@ class TestHandlerContext(TestHandlerContextMixin):
         {'raises_exception': False},
         {'raises_exception': True},
     )
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client'
+        '.EnterpriseCatalogUserV1ApiClient.get_secured_algolia_api_key'
+    )
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     @ddt.unpack
-    def test_handler_context_init(self, mock_get_enterprise_customers_for_user, raises_exception):
+    def test_handler_context_init(
+            self,
+            mock_get_enterprise_customers_for_user,
+            mock_get_secured_algolia_api_key_for_user,
+            raises_exception):
         if raises_exception:
             mock_get_enterprise_customers_for_user.side_effect = Exception('Mock exception')
         else:
             mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+            mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
 
         context = HandlerContext(self.request)
 
@@ -41,6 +50,8 @@ class TestHandlerContext(TestHandlerContextMixin):
                 'enterprise_customer': self.mock_enterprise_customer,
                 'active_enterprise_customer': self.mock_enterprise_customer,
                 'staff_enterprise_customer': None,
+                'secured_algolia_api_key': self.mock_secured_algolia_api_key,
+                'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
                 'all_linked_enterprise_customer_users': [
                     {
                         **self.mock_enterprise_learner_response_data['results'][0],
@@ -95,6 +106,10 @@ class TestHandlerContext(TestHandlerContextMixin):
         {'raises_exception': False},
         {'raises_exception': True},
     )
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client'
+        '.EnterpriseCatalogUserV1ApiClient.get_secured_algolia_api_key'
+    )
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.get_enterprise_customer_data')
     @ddt.unpack
@@ -102,6 +117,7 @@ class TestHandlerContext(TestHandlerContextMixin):
         self,
         mock_get_enterprise_customer_data,
         mock_get_enterprise_customers_for_user,
+        mock_get_secured_algolia_api_key_for_user,
         raises_exception,
     ):
         mock_get_enterprise_customers_for_user.return_value = {
@@ -111,13 +127,14 @@ class TestHandlerContext(TestHandlerContextMixin):
 
         if raises_exception:
             mock_get_enterprise_customer_data.side_effect = Exception('Mock exception')
+            mock_get_secured_algolia_api_key_for_user.side_effect = Exception('Mock exception')
         else:
             mock_get_enterprise_customer_data.return_value = self.mock_enterprise_customer
+            mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
 
         request = self.request
         request.user = self.mock_staff_user
         context = HandlerContext(request)
-
         self.assertEqual(context.request, request)
         self.assertEqual(context.user, self.mock_staff_user)
 
@@ -125,15 +142,19 @@ class TestHandlerContext(TestHandlerContextMixin):
             'enterprise_customer': self.mock_enterprise_customer,
             'active_enterprise_customer': None,
             'staff_enterprise_customer': self.mock_enterprise_customer,
+            'secured_algolia_api_key': self.mock_secured_algolia_api_key,
+            'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
             'all_linked_enterprise_customer_users': [],
             'should_update_active_enterprise_customer_user': False,
         }
         if raises_exception:
-            expected_data.update({
+            expected_data = {
                 'enterprise_customer': None,
+                'active_enterprise_customer': None,
                 'staff_enterprise_customer': None,
                 'should_update_active_enterprise_customer_user': False,
-            })
+                'all_linked_enterprise_customer_users': [],
+            }
         self.assertEqual(context.data, expected_data)
         expected_errors = (
             [
@@ -291,7 +312,7 @@ class TestHandlerContext(TestHandlerContextMixin):
         context.add_error(
             **arguments
         )
-        self.assertEqual(expected_output, context.errors[0])
+        self.assertEqual(expected_output, context.errors[-1])
 
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     def test_handler_context_add_error_serializer_is_valid(self, mock_get_enterprise_customers_for_user):
