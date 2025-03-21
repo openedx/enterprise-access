@@ -10,7 +10,7 @@ Context
 
 We intend to utilize Stripe to manage subscription and payment lifecycles for the Enterprise Self-Service Purchasing
 feature. We will need a robust way to ingest events from Stripe, handle those events, and forward them to SalesForce.
-For example, when stripe emits an ``invoice.paid`` event, that needs to be communicated to SalesForce in order to
+For example, when Stripe emits an ``invoice.paid`` event, that needs to be communicated to SalesForce in order to
 trigger the creation/update of Customers, Opportunities, etc. Furthermore, that same event needs to be communicated to
 our edX Enterprise backend so that we can immediately followup with the customer to confirm that we have begun to
 provision their product.
@@ -23,7 +23,15 @@ At minimum, "robust" means:
 Decision
 ========
 
-The selected solution can be described as having three decoupled parts:
+The selected approach is to configure Stripe to POST two separate WebHook endpoints for every event:
+
+#. POST to a new django view in the edX backend (tentatively enterprise-access).
+#. POST to a custom SalesForce endpoint.
+
+.. image:: ../images/0025-stripe-event-consumption-delivery.png
+
+Architecture of the edX backend WebHook endpoint
+------------------------------------------------
 
 #. **Ingest:** Implement a new webhook endpoint in the edX Enterprise backend.
 
@@ -41,31 +49,40 @@ The selected solution can be described as having three decoupled parts:
 
    * Architecturally, this is an infinite loop via management command running in a dedicated container/pod.
 
-     * Alternatively, this might work as a Celery "beat" scheduled for every 10 seconds.  This could reduce
-       code/infrastructure requirements.
-
    * Ingested events which have not been handled will cause ``handle_stripe_event`` tasks to be queued.
-
-   * Ingested events which have not been forwarded will cause ``forward_stripe_event`` tasks to be queued.
 
    * In order to give celery time to handle the event without sacrificing loop frequency, throttle queue requests for a
      given event ID by checking the TaskResult table just like `how we throttle tasks in enterprise-catalog
      <https://github.com/openedx/enterprise-catalog/blob/01f5367309ee25093e414b0fd3498a48ec575073/enterprise_catalog/apps/api/tasks.py#L134>`_.
+     A recent TaskResult record for a given event is like a lock that prevents the same event from re-queuing.
 
-   * A suggestion on scheduling order: In case multiple events for the same customer are pending, we should make a best
-     effort to chain the task requests for a given customer (Celery tasks can be natively chained). Handling or
-     forwarding events out of order for a given customer would probably expose weird corner cases.
+   * Scheduling order: In case multiple events for the same customer are pending, we should make a best effort to chain
+     the task requests for a given customer (Celery tasks can be natively chained). Handling events out of order for a
+     given customer could expose weird corner cases.
 
-#. **Handle:** Implement two celery tasks: one to handle an event and another to forward an event to SalesForce.
+#. **Handle:** Implement a celery task to "handle" an event.
 
-   * "Handling" and "forwarding" an event is bifurcated into separate celery tasks in order to have tighter control over
-     retry and different sensitivities to duplicate invocations.
+   * The handler task should mark the event has handled by setting the ``handled`` boolean on the event record to ``true``.
 
-     * Handling an event: This is primarily for one-time communications. This should happen only once, and not trigger a retry.
+   * Behavior will differ based on the event type received.
 
-     * Forwarding an event: The receiver should be designed to handle duplicates, so we can eagerly retry.
+Architecture of the SalesForce WebHook endpoint
+-----------------------------------------------
 
-.. image:: ../images/0025-stripe-event-consumption-delivery.png
+This endpoint will be provided by the `Stripe Connector App
+<https://docs.stripe.com/plugins/stripe-connector-for-salesforce/installation-guide>`_ to directly ingest Stripe events
+within SalesForce.
+
+SalesForce Engineers will then need to trigger custom APEX code (or other automation) to handle `invoice.paid` and other
+events. As a SOQL query, recent `invoice.paid` events can be fetched like this::
+
+  select CreatedDate,
+         stripeGC__Request_Body__c
+  from stripeGC__Stripe_Event__c
+  where stripeGC__Event_Name__c = 'invoice.paid'
+    and stripeGC__Is_Live_Mode__c = true
+  order by CreatedDate desc
+  limit 10
 
 Alternatives Considered
 =======================
@@ -77,32 +94,40 @@ Rejected
 
   * This is too sensitive to errors during ingestion, which could result in dropped events.
 
-* Use a k8s ``cronjob`` to schedule the picker component.
+* Use a k8s ``cronjob`` to perform the "Pick" role (infinite loop).
 
   * This was okay, but cronjobs have a minimum frequency of minutely, which could add an uncomfortable amount of delay.
 
-In Consideration
-================
+* Use a Celery "beat" to perform the "Pick" role (infinite loop) using a 1-second period.
 
-* Utilize the `Stripe Connector App
-  <https://docs.stripe.com/plugins/stripe-connector-for-salesforce/installation-guide>`_ to directly send stripe events
-  to SalesForce.
+  * The beats scheduler is configured by default to wake up every 5 seconds, resulting in a minimum scheduling period of
+    5 seconds.  We do really need 1 second. Theoretically we could reconfigure it to wake up every second.
 
-  * Pros:
+  * It's unclear from documentation what happens if beats start taking longer than the configured period.
 
-    * Don't have to write SalesForce APEX code to validate/de-duplicate events.
+  * I thought maybe this could save us time setting up infrastructure when compared with a dedicated picker, but it
+    turns out celery beats don't just magically run inside an existing worker. They actually need to run inside their
+    own dedicated container.
 
-    * Less sensitive to downtime in our event pipeline.
+* We considered making the edX backend an intermediary for Stripe events bound for SalesForce.
 
-  * Cons:
+  * This was ultimately rejected on the basis of the Stripe Connector App giving us just enough features to tip the
+    cost/benefit balance.
 
-    * More set-up inside the SalesForce WebUI.
+  * By acting as intermediary, we would need to implement all of the following additional features in-house:
 
-    * Slightly worse observability of delivered events (for DD alerting purposes).
+    * Provision SalesForce endpoints to act as WebHook listeners.
 
-    * Costs money?  I'm not sure what's meant by "$1/company/one-time payment".
+    * Write APEX handlers to validate stripe event signatures, de-duplicate events sent multiple times on accident, and
+      write events to a table.
+
+    * Write a "forwarding" handler task within the edX Enterprise backend to reliably POST and retry POSTing events to
+      SalesForce.
 
 Consequences
 ============
 
-TODO
+I haven't quite figured out how to easily monitor event deliveries via the SalesForce Connector App in a way that can be
+alerted via DataDog. **Open Question**: If we integrated DataDog into SalesForce, could we monitor any of these `event types
+<https://developer.salesforce.com/docs/atlas.en-us.object_reference.meta/object_reference/sforce_api_objects_eventlogfile_supportedeventtypes.htm>`_
+to count APEX executions?
