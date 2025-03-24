@@ -20,7 +20,7 @@ astroid==3.3.9
     # via
     #   pylint
     #   pylint-celery
-attrs==25.1.0
+attrs==25.3.0
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -106,7 +106,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/base.txt
     #   coreapi
-coverage[toml]==7.6.12
+coverage[toml]==7.7.1
     # via
     #   -r requirements/test.in
     #   pytest-cov
@@ -225,7 +225,9 @@ edx-api-doc-tools==2.0.0
 edx-auth-backends==4.4.0
     # via -r requirements/base.txt
 edx-braze-client==0.2.5
-    # via -r requirements/base.txt
+    # via
+    #   -c requirements/constraints.txt
+    #   -r requirements/base.txt
 edx-ccx-keys==2.0.2
     # via
     #   -r requirements/base.txt
@@ -252,7 +254,7 @@ edx-event-bus-kafka==6.0.0
     # via -r requirements/base.txt
 edx-lint==5.6.0
     # via -r requirements/test.in
-edx-opaque-keys[django]==2.11.0
+edx-opaque-keys[django]==2.12.0
     # via
     #   -r requirements/base.txt
     #   edx-ccx-keys
@@ -270,14 +272,14 @@ edx-toggles==5.3.0
     #   edx-event-bus-kafka
 factory-boy==3.3.3
     # via -r requirements/test.in
-faker==37.0.0
+faker==37.0.2
     # via factory-boy
 fastavro==1.10.0
     # via
     #   -r requirements/base.txt
     #   confluent-kafka
     #   openedx-events
-filelock==3.17.0
+filelock==3.18.0
     # via
     #   tox
     #   virtualenv
@@ -292,7 +294,7 @@ inflection==0.5.1
     #   -r requirements/base.txt
     #   drf-spectacular
     #   drf-yasg
-iniconfig==2.0.0
+iniconfig==2.1.0
     # via pytest
 isort==6.0.1
     # via pylint
@@ -319,7 +321,7 @@ jsonschema-specifications==2024.10.1
     # via
     #   -r requirements/base.txt
     #   jsonschema
-kombu==5.4.2
+kombu==5.5.0
     # via
     #   -r requirements/base.txt
     #   celery
@@ -348,7 +350,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
-openedx-events==9.18.2
+openedx-events==9.20.0
     # via
     #   -r requirements/base.txt
     #   edx-event-bus-kafka
@@ -363,7 +365,7 @@ pbr==6.1.1
     # via
     #   -r requirements/base.txt
     #   stevedore
-platformdirs==4.3.6
+platformdirs==4.3.7
     # via
     #   pylint
     #   tox
@@ -398,7 +400,7 @@ pyjwt[crypto]==2.10.1
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==3.3.5
+pylint==3.3.6
     # via
     #   edx-lint
     #   pylint-celery
@@ -414,7 +416,7 @@ pylint-plugin-utils==0.8.2
     #   pylint-django
 pymemcache==4.0.0
     # via -r requirements/base.txt
-pymongo==4.11.2
+pymongo==4.11.3
     # via
     #   -r requirements/base.txt
     #   edx-opaque-keys
