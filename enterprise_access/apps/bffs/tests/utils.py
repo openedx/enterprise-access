@@ -265,3 +265,32 @@ def mock_dashboard_dependencies(func):
     def wrapper(self, *args, **kwargs):
         return func(self, *args, **kwargs)
     return wrapper
+
+
+def mock_search_dependencies(func):
+    """
+    Mock the service dependencies for the search route.
+    """
+    @mock_common_dependencies
+    def wrapper(self, *args, **kwargs):
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
+def mock_academy_dependencies(func):
+    """
+    Mock the service dependencies for the academy route.
+    """
+    @mock_common_dependencies
+    def wrapper(self, *args, **kwargs):
+        return func(self, *args, **kwargs)
+    return wrapper
+
+def mock_skills_quiz_dependencies(func):
+    """
+    Mock the service dependencies for the academy route.
+    """
+    @mock_common_dependencies
+    def wrapper(self, *args, **kwargs):
+        return func(self, *args, **kwargs)
+    return wrapper

@@ -249,7 +249,7 @@ class SubscriptionsSerializer(BaseBffSerializer):
     subscription_licenses_by_status = SubscriptionLicenseStatusSerializer(required=False)
     subscription_license = SubscriptionLicenseSerializer(required=False, allow_null=True)
     subscription_plan = SubscriptionPlanSerializer(required=False, allow_null=True)
-    show_expiration_notifications = serializers.BooleanField(required=False)
+    show_expiration_notifications = serializers.BooleanField(required=False, default=False)
 
 
 class EnterpriseCustomerUserSubsidiesSerializer(BaseBffSerializer):
@@ -331,6 +331,24 @@ class LearnerDashboardRequestSerializer(BFFRequestSerializer):
     """
 
 
+class LearnerSearchRequestSerializer(BFFRequestSerializer):
+    """
+    Serializer for the learner search request.
+    """
+
+
+class LearnerAcademyRequestSerializer(BFFRequestSerializer):
+    """
+    Serializer for the learner academy detail request.
+    """
+
+
+class LearnerSkillsQuizRequestSerializer(BFFRequestSerializer):
+    """
+    Serializer for the learner skills quiz request.
+    """
+
+
 class LearnerEnrollmentsByStatusSerializer(BaseBffSerializer):
     """
     Serializer for subscription license status.
@@ -349,3 +367,21 @@ class LearnerDashboardResponseSerializer(BaseLearnerPortalResponseSerializer):
 
     enterprise_course_enrollments = EnterpriseCourseEnrollmentSerializer(many=True)
     all_enrollments_by_status = LearnerEnrollmentsByStatusSerializer()
+
+
+class LearnerSearchResponseSerializer(BaseLearnerPortalResponseSerializer):
+    """
+    Serializer for the learner search response.
+    """
+
+
+class LearnerAcademyResponseSerializer(BaseLearnerPortalResponseSerializer):
+    """
+    Serializer for the learner academy detail response.
+    """
+
+
+class LearnerSkillsQuizResponseSerializer(BaseLearnerPortalResponseSerializer):
+    """
+    Serializer for the learner skills quiz response.
+    """

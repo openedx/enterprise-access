@@ -4,8 +4,16 @@ Response Builder Module for bffs app
 
 import logging
 
+from typing import Type
+from rest_framework.serializers import Serializer
+
 from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin, LearnerDashboardDataMixin
-from enterprise_access.apps.bffs.serializers import LearnerDashboardResponseSerializer
+from enterprise_access.apps.bffs.serializers import (
+    LearnerDashboardResponseSerializer,
+    LearnerSearchResponseSerializer,
+    LearnerAcademyResponseSerializer,
+    LearnerSkillsQuizResponseSerializer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +26,7 @@ class BaseResponseBuilder:
     response builders like `LearnerDashboardResponseBuilder` or `CourseResponseBuilder`.
     """
 
-    @property
-    def status_code(self):
-        """
-        Returns the HTTP status code for the response from HandlerContext.
-        """
-        return self.context.status_code
+    serializer_class: Type[Serializer]  # Subclasses must define a serializer_class
 
     def __init__(self, context):
         """
@@ -34,6 +37,13 @@ class BaseResponseBuilder:
         """
         self.context = context
         self.response_data = {}
+
+    @property
+    def status_code(self):
+        """
+        Returns the HTTP status code for the response from HandlerContext.
+        """
+        return self.context.status_code
 
     def build(self):
         """
@@ -51,7 +61,6 @@ class BaseResponseBuilder:
             self.context.should_update_active_enterprise_customer_user
         )
         self.response_data['enterprise_features'] = self.context.enterprise_features
-        return self.response_data, self.status_code
 
     def add_errors_warnings_to_response(self):
         """
@@ -59,6 +68,31 @@ class BaseResponseBuilder:
         """
         self.response_data['errors'] = self.context.errors
         self.response_data['warnings'] = self.context.warnings
+
+    def serialize(self):
+        """
+        Serializes the response data. If serialization fails, it logs the serialization error
+        as a warning in the BFF response.
+
+        Returning a partially invalid serialized response is better than returning an error here to
+        return any data that was successfully serialized to support as much of the corresponding
+        frontend page route as possible.
+        """
+        if not hasattr(self, 'serializer_class') or self.serializer_class is None:
+            raise NotImplementedError("Subclasses must define a serializer_class.")
+
+        try:
+            serializer = self.serializer_class(data=self.response_data)
+            serializer.is_valid(raise_exception=True)
+            return serializer.validated_data, self.status_code
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception('Could not serialize the response data.')
+            self.context.add_warning(
+                user_message='An error occurred while processing the response data.',
+                developer_message=f'Could not serialize the response data. Error: {exc}',
+            )
+            self.add_errors_warnings_to_response()
+            return self.serializer_class(self.response_data).data, self.status_code
 
 
 class BaseLearnerResponseBuilder(BaseResponseBuilder, BaseLearnerDataMixin):
@@ -110,6 +144,8 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
     relevant to the learner dashboard page.
     """
 
+    serializer_class = LearnerDashboardResponseSerializer
+
     def build(self):
         """
         Builds the response data for the learner dashboard route.
@@ -128,21 +164,35 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
             'all_enrollments_by_status': self.all_enrollments_by_status,
         })
 
-        # Serialize and validate the response
-        try:
-            serializer = LearnerDashboardResponseSerializer(data=self.response_data)
-            serializer.is_valid(raise_exception=True)
-            serialized_data = serializer.validated_data
+        return self.serialize()
 
-            # Return the response data and status code
-            return serialized_data, self.status_code
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.exception('Could not serialize the response data.')
-            self.context.add_warning(
-                user_message='An error occurred while processing the response data.',
-                developer_message=f'Could not serialize the response data. Error: {exc}',
-            )
-            self.add_errors_warnings_to_response()
-            serializer = LearnerDashboardResponseSerializer(self.response_data)
-            serialized_data = serializer.data
-            return serialized_data, self.status_code
+
+class LearnerSearchResponseBuilder(BaseLearnerResponseBuilder):
+    """
+    A response builder for the learner search route.
+
+    Extends `BaseLearnerResponseBuilder` to extract and format data
+    relevant to the learner search page.
+    """
+
+    serializer_class = LearnerSearchResponseSerializer
+
+class LearnerAcademyResponseBuilder(BaseLearnerResponseBuilder):
+    """
+    A response builder for the learner academy route.
+
+    Extends `BaseLearnerResponseBuilder` to extract and format data
+    relevant to the learner academy detail page.
+    """
+
+    serializer_class = LearnerAcademyResponseSerializer
+
+class LearnerSkillsQuizResponseBuilder(BaseLearnerResponseBuilder):
+    """
+    A response builder for the learner academy route.
+
+    Extends `BaseLearnerResponseBuilder` to extract and format data
+    relevant to the learner skills quiz page.
+    """
+
+    serializer_class = LearnerSkillsQuizResponseSerializer

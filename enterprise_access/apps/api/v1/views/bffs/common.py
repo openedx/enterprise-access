@@ -93,7 +93,9 @@ class BaseBFFViewSet(ViewSet):
 
         # Build the response data and status code
         response_builder = response_builder_class(context)
-        response_data, status_code = response_builder.build()
+
+        response_builder.build()
+        response_data, status_code = response_builder.serialize()
 
         ordered_representation = OrderedDict(response_data)
 
