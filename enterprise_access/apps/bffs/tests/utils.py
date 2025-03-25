@@ -286,6 +286,7 @@ def mock_academy_dependencies(func):
         return func(self, *args, **kwargs)
     return wrapper
 
+
 def mock_skills_quiz_dependencies(func):
     """
     Mock the service dependencies for the academy route.

@@ -16,7 +16,7 @@ from enterprise_access.apps.bffs.tests.utils import (
     mock_academy_dependencies,
     mock_dashboard_dependencies,
     mock_search_dependencies,
-    mock_skills_quiz_dependencies,
+    mock_skills_quiz_dependencies
 )
 from enterprise_access.apps.core.constants import (
     BFF_READ_PERMISSION,

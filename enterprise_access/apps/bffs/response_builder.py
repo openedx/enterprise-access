@@ -3,16 +3,16 @@ Response Builder Module for bffs app
 """
 
 import logging
-
 from typing import Type
+
 from rest_framework.serializers import Serializer
 
 from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin, LearnerDashboardDataMixin
 from enterprise_access.apps.bffs.serializers import (
+    LearnerAcademyResponseSerializer,
     LearnerDashboardResponseSerializer,
     LearnerSearchResponseSerializer,
-    LearnerAcademyResponseSerializer,
-    LearnerSkillsQuizResponseSerializer,
+    LearnerSkillsQuizResponseSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -164,8 +164,6 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
             'all_enrollments_by_status': self.all_enrollments_by_status,
         })
 
-        return self.serialize()
-
 
 class LearnerSearchResponseBuilder(BaseLearnerResponseBuilder):
     """
@@ -177,6 +175,7 @@ class LearnerSearchResponseBuilder(BaseLearnerResponseBuilder):
 
     serializer_class = LearnerSearchResponseSerializer
 
+
 class LearnerAcademyResponseBuilder(BaseLearnerResponseBuilder):
     """
     A response builder for the learner academy route.
@@ -186,6 +185,7 @@ class LearnerAcademyResponseBuilder(BaseLearnerResponseBuilder):
     """
 
     serializer_class = LearnerAcademyResponseSerializer
+
 
 class LearnerSkillsQuizResponseBuilder(BaseLearnerResponseBuilder):
     """
