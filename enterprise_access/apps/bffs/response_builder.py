@@ -84,7 +84,7 @@ class BaseResponseBuilder:
         try:
             serializer = self.serializer_class(data=self.response_data)
             serializer.is_valid(raise_exception=True)
-            return serializer.validated_data, self.status_code
+            return serializer.data, self.status_code
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception('Could not serialize the response data.')
             self.context.add_warning(

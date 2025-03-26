@@ -216,7 +216,7 @@ edx-drf-extensions==10.5.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.0
+edx-enterprise-subsidy-client==2.0.1
     # via -r requirements/base.txt
 edx-event-bus-kafka==6.0.0
     # via -r requirements/base.txt
@@ -279,7 +279,7 @@ jsonschema-specifications==2024.10.1
     # via
     #   -r requirements/base.txt
     #   jsonschema
-kombu==5.5.0
+kombu==5.5.1
     # via
     #   -r requirements/base.txt
     #   celery
@@ -372,7 +372,7 @@ python3-openid==3.2.0
     # via
     #   -r requirements/base.txt
     #   social-auth-core
-pytz==2025.1
+pytz==2025.2
     # via
     #   -r requirements/base.txt
     #   drf-yasg
@@ -405,7 +405,7 @@ requests-oauthlib==2.0.0
     # via
     #   -r requirements/base.txt
     #   social-auth-core
-rpds-py==0.23.1
+rpds-py==0.24.0
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -452,7 +452,7 @@ text-unidecode==1.3
     # via
     #   -r requirements/base.txt
     #   python-slugify
-typing-extensions==4.12.2
+typing-extensions==4.13.0
     # via
     #   -r requirements/base.txt
     #   django-countries

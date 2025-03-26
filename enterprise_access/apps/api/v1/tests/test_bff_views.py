@@ -8,6 +8,7 @@ import ddt
 from django.core.cache import cache as django_cache
 from rest_framework import status
 from rest_framework.reverse import reverse
+from pytest_dictsdiff import check_objects
 
 from enterprise_access.apps.api_client.tests.test_utils import MockLicenseManagerMetadataMixin
 from enterprise_access.apps.bffs.constants import COURSE_ENROLLMENT_STATUSES
@@ -277,7 +278,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 'detail': f'Missing: {BFF_READ_PERMISSION}',
             }
         self.assertEqual(response.status_code, expected_status_code)
-        self.assertEqual(response.json(), expected_response_data)
+        assert check_objects(response.json(), expected_response_data)
 
     @mock_dashboard_dependencies
     def test_dashboard_with_subscriptions(
@@ -329,7 +330,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 },
             },
         })
-        self.assertEqual(response.json(), expected_response_data)
+        assert check_objects(response.json(), expected_response_data)
 
     @mock_dashboard_dependencies
     @mock.patch('enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient.activate_license')
@@ -400,7 +401,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 },
             },
         })
-        self.assertEqual(response.json(), expected_response_data)
+        assert check_objects(response.json(), expected_response_data)
 
     def _set_up_mock_dashboard_with_subscriptions_license_auto_apply_data(
         self,
@@ -751,7 +752,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 },
             },
         })
-        self.assertEqual(response.json(), expected_response_data)
+        assert check_objects(response.json(), expected_response_data)
 
     @mock_dashboard_dependencies
     def test_dashboard_with_enrollments(
@@ -819,7 +820,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 COURSE_ENROLLMENT_STATUSES.SAVED_FOR_LATER: [],
             },
         })
-        self.assertEqual(response.json(), expected_response_data)
+        assert check_objects(response.json(), expected_response_data)
 
     @mock_dashboard_dependencies
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.bulk_enroll_enterprise_learners')
@@ -922,7 +923,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         expected_status_code = status.HTTP_200_OK
 
         self.assertEqual(response.status_code, expected_status_code)
-        self.assertEqual(response.json(), self.mock_search_route_response_data)
+        assert check_objects(response.json(), self.mock_search_route_response_data)
 
     @mock_academy_dependencies
     def test_academy_base_response(
@@ -953,7 +954,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         expected_status_code = status.HTTP_200_OK
 
         self.assertEqual(response.status_code, expected_status_code)
-        self.assertEqual(response.json(), self.mock_academy_route_response_data)
+        assert check_objects(response.json(), self.mock_academy_route_response_data)
 
     @mock_skills_quiz_dependencies
     def test_skills_quiz_base_response(
@@ -984,4 +985,4 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         expected_status_code = status.HTTP_200_OK
 
         self.assertEqual(response.status_code, expected_status_code)
-        self.assertEqual(response.json(), self.mock_skills_quiz_route_response_data)
+        assert check_objects(response.json(), self.mock_skills_quiz_route_response_data)

@@ -7,10 +7,7 @@ from django.test import RequestFactory, TestCase
 from faker import Faker
 from rest_framework import status
 
-from enterprise_access.apps.api_client.tests.test_constants import DATE_FORMAT_ISO_8601, DATE_FORMAT_ISO_8601_MS
-from enterprise_access.apps.content_assignments.tests.test_utils import mock_course_run_1
 from enterprise_access.apps.core.tests.factories import UserFactory
-from enterprise_access.utils import _days_from_now
 
 
 class TestHandlerContextMixin(TestCase):
@@ -109,13 +106,14 @@ class TestHandlerContextMixin(TestCase):
             'enterprise_notification_banner': None,
             'reply_to': None,
             'sender_alias': None,
+            'disable_search': False,
+            'show_integration_warning': False,
         }
         self.mock_active_enterprise_customer = {
             **self.mock_enterprise_customer
         }
         self.mock_all_linked_enterprise_customer_users = [{
             'id': 1,
-            'user_id': 3,
             'enterprise_customer': self.mock_enterprise_customer,
             'active': self.mock_enterprise_customer.get('active'),
         }]
