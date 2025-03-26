@@ -20,6 +20,7 @@ class MockResponseBuilder(BaseResponseBuilder):
 
     serializer_class = BaseResponseSerializer
 
+
 @ddt.ddt
 class TestBaseResponseBuilder(TestHandlerContextMixin):
     """
