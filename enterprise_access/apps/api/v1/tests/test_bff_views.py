@@ -6,9 +6,9 @@ from urllib.parse import urlencode
 
 import ddt
 from django.core.cache import cache as django_cache
+from pytest_dictsdiff import check_objects
 from rest_framework import status
 from rest_framework.reverse import reverse
-from pytest_dictsdiff import check_objects
 
 from enterprise_access.apps.api_client.tests.test_utils import MockLicenseManagerMetadataMixin
 from enterprise_access.apps.bffs.constants import COURSE_ENROLLMENT_STATUSES

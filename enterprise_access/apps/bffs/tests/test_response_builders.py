@@ -2,14 +2,12 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 import ddt
-from rest_framework import status
 from pytest_dictsdiff import check_objects
+from rest_framework import status
 
 from enterprise_access.apps.api_client.tests.test_license_manager_client import MockLicenseManagerMetadataMixin
 from enterprise_access.apps.bffs.response_builder import BaseLearnerResponseBuilder, BaseResponseBuilder
-from enterprise_access.apps.bffs.serializers import (
-    BaseResponseSerializer,
-)
+from enterprise_access.apps.bffs.serializers import BaseResponseSerializer
 from enterprise_access.apps.bffs.tests.utils import TestHandlerContextMixin
 
 
