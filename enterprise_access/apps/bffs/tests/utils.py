@@ -96,7 +96,13 @@ class TestHandlerContextMixin(TestCase):
                 'email': 'admin@example.com',
                 'lms_user_id': 12,
             }],
-            'active_integrations': [],
+            'active_integrations': [{
+                'channel_code': self.faker.lexify(text='????').upper(),
+                'created': f"{self.faker.date_time_this_year().isoformat()}Z",
+                'modified': f"{self.faker.date_time_this_month().isoformat()}Z",
+                'display_name': f'{self.faker.company()} Integration',
+                'active': self.faker.boolean(chance_of_getting_true=90)
+            }],
             'enterprise_customer_catalogs': [],
             'identity_provider': 'mock_idp',
             'identity_providers': [{
@@ -128,6 +134,7 @@ class TestHandlerContextMixin(TestCase):
             'uuid': self.mock_enterprise_customer_uuid_2,
             'slug': self.mock_enterprise_customer_slug_2,
             'name': 'Mock Enterprise Customer 2',
+            'active_integrations': [],
         }
         self.mock_enterprise_learner_response_data = {
             'results': [

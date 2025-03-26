@@ -149,7 +149,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     'enterprise_customer': {
                         **self.mock_enterprise_customer_2,
                         'disable_search': False,
-                        'show_integration_warning': True,
+                        'show_integration_warning': False,
                     },
                 },
             ],
@@ -421,7 +421,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             **self.expected_enterprise_customer,
             'identity_provider': mock_identity_provider,
             'identity_providers': mock_identity_providers,
-            'show_integration_warning': bool(identity_provider)
+            'active_integrations': self.mock_enterprise_customer['active_integrations'],
         }
         staff_enterprise_customer = None
         active_enterprise_customer = mock_enterprise_customer_with_auto_apply
