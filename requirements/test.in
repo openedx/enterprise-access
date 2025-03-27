@@ -12,4 +12,5 @@ factory-boy
 freezegun
 pytest-cov
 pytest-django
+pytest_dictsdiff
 tox

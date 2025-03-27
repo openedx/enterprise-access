@@ -134,6 +134,10 @@ defusedxml==0.7.1
     #   -r requirements/test.txt
     #   python3-openid
     #   social-auth-core
+dictdiffer==0.9.0
+    # via
+    #   -r requirements/test.txt
+    #   pytest-dictsdiff
 dill==0.3.9
     # via
     #   -r requirements/test.txt
@@ -267,7 +271,7 @@ edx-drf-extensions==10.5.0
     # via
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.0
+edx-enterprise-subsidy-client==2.0.1
     # via -r requirements/test.txt
 edx-event-bus-kafka==6.0.0
     # via -r requirements/test.txt
@@ -293,7 +297,7 @@ edx-toggles==5.3.0
     #   edx-event-bus-kafka
 factory-boy==3.3.3
     # via -r requirements/test.txt
-faker==37.0.2
+faker==37.1.0
     # via
     #   -r requirements/test.txt
     #   factory-boy
@@ -364,7 +368,7 @@ jsonschema-specifications==2024.10.1
     #   jsonschema
 keyring==25.6.0
     # via twine
-kombu==5.5.0
+kombu==5.5.1
     # via
     #   -r requirements/test.txt
     #   celery
@@ -506,6 +510,8 @@ pytest==8.3.5
     #   pytest-django
 pytest-cov==6.0.0
     # via -r requirements/test.txt
+pytest-dictsdiff==0.5.8
+    # via -r requirements/test.txt
 pytest-django==4.10.0
     # via -r requirements/test.txt
 python-dateutil==2.9.0.post0
@@ -522,7 +528,7 @@ python3-openid==3.2.0
     # via
     #   -r requirements/test.txt
     #   social-auth-core
-pytz==2025.1
+pytz==2025.2
     # via
     #   -r requirements/test.txt
     #   drf-yasg
@@ -565,7 +571,7 @@ rfc3986==2.0.0
     # via twine
 rich==13.9.4
     # via twine
-rpds-py==0.23.1
+rpds-py==0.24.0
     # via
     #   -r requirements/test.txt
     #   jsonschema
@@ -625,7 +631,7 @@ tox==4.24.2
     # via -r requirements/test.txt
 twine==6.1.0
     # via -r requirements/quality.in
-typing-extensions==4.12.2
+typing-extensions==4.13.0
     # via
     #   -r requirements/test.txt
     #   django-countries

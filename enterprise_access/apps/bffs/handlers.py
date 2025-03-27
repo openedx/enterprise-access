@@ -718,3 +718,30 @@ class DashboardHandler(LearnerDashboardDataMixin, BaseLearnerPortalHandler):
                 user_message="Could not load and/or processing the learner dashboard.",
                 developer_message=f"Failed to load and/or processing the learner dashboard data: {e}",
             )
+
+
+class SearchHandler(BaseLearnerPortalHandler):
+    """
+    A handler class for processing the learner search route.
+
+    Extends `BaseLearnerPortalHandler` to handle the loading and processing
+    of data specific to the learner search.
+    """
+
+
+class AcademyHandler(BaseLearnerPortalHandler):
+    """
+    A handler class for processing the learner academy detail route.
+
+    Extends `BaseLearnerPortalHandler` to handle the loading and processing
+    of data specific to the learner academy detail route.
+    """
+
+
+class SkillsQuizHandler(BaseLearnerPortalHandler):
+    """
+    A handler class for processing the learner skills quiz route.
+
+    Extends `BaseLearnerPortalHandler` to handle the loading and processing
+    of data specific to the learner skills quiz route.
+    """

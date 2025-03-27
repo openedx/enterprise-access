@@ -6,12 +6,19 @@ from urllib.parse import urlencode
 
 import ddt
 from django.core.cache import cache as django_cache
+from pytest_dictsdiff import check_objects
 from rest_framework import status
 from rest_framework.reverse import reverse
 
 from enterprise_access.apps.api_client.tests.test_utils import MockLicenseManagerMetadataMixin
 from enterprise_access.apps.bffs.constants import COURSE_ENROLLMENT_STATUSES
-from enterprise_access.apps.bffs.tests.utils import TestHandlerContextMixin, mock_dashboard_dependencies
+from enterprise_access.apps.bffs.tests.utils import (
+    TestHandlerContextMixin,
+    mock_academy_dependencies,
+    mock_dashboard_dependencies,
+    mock_search_dependencies,
+    mock_skills_quiz_dependencies
+)
 from enterprise_access.apps.core.constants import (
     BFF_READ_PERMISSION,
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -184,6 +191,15 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 COURSE_ENROLLMENT_STATUSES.SAVED_FOR_LATER: [],
             },
         }
+        self.mock_search_route_response_data = {
+            **self.mock_common_response_data,
+        }
+        self.mock_academy_route_response_data = {
+            **self.mock_common_response_data,
+        }
+        self.mock_skills_quiz_route_response_data = {
+            **self.mock_common_response_data,
+        }
 
     @ddt.data(
         {
@@ -262,7 +278,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 'detail': f'Missing: {BFF_READ_PERMISSION}',
             }
         self.assertEqual(response.status_code, expected_status_code)
-        self.assertEqual(response.json(), expected_response_data)
+        assert check_objects(response.json(), expected_response_data)
 
     @mock_dashboard_dependencies
     def test_dashboard_with_subscriptions(
@@ -314,7 +330,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 },
             },
         })
-        self.assertEqual(response.json(), expected_response_data)
+        assert check_objects(response.json(), expected_response_data)
 
     @mock_dashboard_dependencies
     @mock.patch('enterprise_access.apps.api_client.license_manager_client.LicenseManagerUserApiClient.activate_license')
@@ -385,22 +401,22 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 },
             },
         })
-        self.assertEqual(response.json(), expected_response_data)
+        assert check_objects(response.json(), expected_response_data)
 
     def _set_up_mock_dashboard_with_subscriptions_license_auto_apply_data(
-            self,
-            mock_get_default_enrollment_intentions_learner_status,
-            mock_get_subscription_licenses_for_learner,
-            mock_get_enterprise_customers_for_user,
-            mock_get_enterprise_course_enrollments,
-            mock_get_enterprise_customer_data,
-            mock_auto_apply_license,
-            identity_provider,
-            is_staff_request_user,
-            has_plan_for_auto_apply,
-            has_existing_activated_license,
-            has_existing_revoked_license,
-            auto_apply_with_universal_link,
+        self,
+        mock_get_default_enrollment_intentions_learner_status,
+        mock_get_subscription_licenses_for_learner,
+        mock_get_enterprise_customers_for_user,
+        mock_get_enterprise_course_enrollments,
+        mock_get_enterprise_customer_data,
+        mock_auto_apply_license,
+        identity_provider,
+        is_staff_request_user,
+        has_plan_for_auto_apply,
+        has_existing_activated_license,
+        has_existing_revoked_license,
+        auto_apply_with_universal_link,
     ):
         """
         This function facilitate mocking of the dashboard_with_subscriptions_license_auto_apply
@@ -736,7 +752,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 },
             },
         })
-        self.assertEqual(response.json(), expected_response_data)
+        assert check_objects(response.json(), expected_response_data)
 
     @mock_dashboard_dependencies
     def test_dashboard_with_enrollments(
@@ -804,7 +820,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                 COURSE_ENROLLMENT_STATUSES.SAVED_FOR_LATER: [],
             },
         })
-        self.assertEqual(response.json(), expected_response_data)
+        assert check_objects(response.json(), expected_response_data)
 
     @mock_dashboard_dependencies
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.bulk_enroll_enterprise_learners')
@@ -877,3 +893,96 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
              'license_uuid': mock_activated_subscription_license['uuid'], 'is_default_auto_enrollment': True},
         ]
         self.assertEqual(expected_payload, actual_payload_arg)
+
+    @mock_search_dependencies
+    def test_search_base_response(
+        self,
+        mock_get_enterprise_customers_for_user,
+        mock_get_default_enrollment_intentions_learner_status,
+        mock_get_subscription_licenses_for_learner,
+    ):
+        """
+        Test the search route.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': self.mock_enterprise_customer_uuid,
+        }])
+        mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+        mock_get_subscription_licenses_for_learner.return_value = self.mock_subscription_licenses_data
+        mock_get_default_enrollment_intentions_learner_status.return_value =\
+            self.mock_default_enterprise_enrollment_intentions_learner_status_data
+
+        query_params = {
+            'enterprise_customer_slug': self.mock_enterprise_customer_slug,
+        }
+        url = reverse('api:v1:learner-portal-bff-search')
+        url += f"?{urlencode(query_params)}"
+
+        response = self.client.post(url)
+        expected_status_code = status.HTTP_200_OK
+
+        self.assertEqual(response.status_code, expected_status_code)
+        assert check_objects(response.json(), self.mock_search_route_response_data)
+
+    @mock_academy_dependencies
+    def test_academy_base_response(
+        self,
+        mock_get_enterprise_customers_for_user,
+        mock_get_default_enrollment_intentions_learner_status,
+        mock_get_subscription_licenses_for_learner,
+    ):
+        """
+        Test the academy route.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': self.mock_enterprise_customer_uuid,
+        }])
+        mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+        mock_get_subscription_licenses_for_learner.return_value = self.mock_subscription_licenses_data
+        mock_get_default_enrollment_intentions_learner_status.return_value =\
+            self.mock_default_enterprise_enrollment_intentions_learner_status_data
+
+        query_params = {
+            'enterprise_customer_slug': self.mock_enterprise_customer_slug,
+        }
+        url = reverse('api:v1:learner-portal-bff-academy')
+        url += f"?{urlencode(query_params)}"
+
+        response = self.client.post(url)
+        expected_status_code = status.HTTP_200_OK
+
+        self.assertEqual(response.status_code, expected_status_code)
+        assert check_objects(response.json(), self.mock_academy_route_response_data)
+
+    @mock_skills_quiz_dependencies
+    def test_skills_quiz_base_response(
+        self,
+        mock_get_enterprise_customers_for_user,
+        mock_get_default_enrollment_intentions_learner_status,
+        mock_get_subscription_licenses_for_learner,
+    ):
+        """
+        Test the skills quiz route.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': self.mock_enterprise_customer_uuid,
+        }])
+        mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+        mock_get_subscription_licenses_for_learner.return_value = self.mock_subscription_licenses_data
+        mock_get_default_enrollment_intentions_learner_status.return_value =\
+            self.mock_default_enterprise_enrollment_intentions_learner_status_data
+
+        query_params = {
+            'enterprise_customer_slug': self.mock_enterprise_customer_slug,
+        }
+        url = reverse('api:v1:learner-portal-bff-skills-quiz')
+        url += f"?{urlencode(query_params)}"
+
+        response = self.client.post(url)
+        expected_status_code = status.HTTP_200_OK
+
+        self.assertEqual(response.status_code, expected_status_code)
+        assert check_objects(response.json(), self.mock_skills_quiz_route_response_data)

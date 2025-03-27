@@ -2,15 +2,21 @@ from unittest import mock
 from unittest.mock import MagicMock
 
 import ddt
+from pytest_dictsdiff import check_objects
 from rest_framework import status
 
 from enterprise_access.apps.api_client.tests.test_license_manager_client import MockLicenseManagerMetadataMixin
 from enterprise_access.apps.bffs.response_builder import BaseLearnerResponseBuilder, BaseResponseBuilder
-from enterprise_access.apps.bffs.serializers import (
-    EnterpriseCustomerUserSubsidiesSerializer,
-    SubscriptionLicenseStatusSerializer
-)
+from enterprise_access.apps.bffs.serializers import BaseResponseSerializer
 from enterprise_access.apps.bffs.tests.utils import TestHandlerContextMixin
+
+
+class MockResponseBuilder(BaseResponseBuilder):
+    """
+    A mock response builder class that extends BaseResponseBuilder.
+    """
+
+    serializer_class = BaseResponseSerializer
 
 
 @ddt.ddt
@@ -32,8 +38,9 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
             data=mock_context_data,
         )
         mock_handler_context_instance = mock_handler_context.return_value
-        base_response_builder = BaseResponseBuilder(mock_handler_context_instance)
-        response_data, status_code = base_response_builder.build()
+        base_response_builder = MockResponseBuilder(mock_handler_context_instance)
+        base_response_builder.build()
+        response_data, status_code = base_response_builder.serialize()
         expected_response_data = {
             'enterprise_customer': self.mock_enterprise_customer,
             'enterprise_features': {'feature_flag': True},
@@ -41,9 +48,11 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
             'staff_enterprise_customer': self.mock_staff_enterprise_customer,
             'active_enterprise_customer': self.mock_active_enterprise_customer,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
+            'errors': [],
+            'warnings': [],
         }
-        self.assertEqual(response_data, expected_response_data)
         self.assertEqual(status_code, status.HTTP_200_OK)
+        assert check_objects(response_data, expected_response_data)
 
     @ddt.data(
         {
@@ -77,7 +86,7 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
             data=mock_context_data,
         )
         mock_handler_context_instance = mock_handler_context.return_value
-        base_response_builder = BaseResponseBuilder(mock_handler_context_instance)
+        base_response_builder = MockResponseBuilder(mock_handler_context_instance)
         expected_output = {
             'enterprise_customer': self.mock_enterprise_customer,
             'enterprise_features': {'feature_flag': True},
@@ -96,8 +105,10 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
             mock_handler_context_instance.warnings.append(self.mock_warning)
             expected_output['warnings'] = [self.mock_warning]
         base_response_builder.add_errors_warnings_to_response()
-        response_data, _ = base_response_builder.build()
-        self.assertEqual(response_data, expected_output)
+        base_response_builder.build()
+        response_data, _ = base_response_builder.serialize()
+
+        assert check_objects(response_data, expected_output)
 
     # TODO Revisit this function in ENT-9633 to determine if 200 is ok for a nested errored response
     @ddt.data(
@@ -118,7 +129,7 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
         else:
             mock_handler_context.return_value = self.mock_handler_context
         mock_handler_context_instance = mock_handler_context.return_value
-        base_response_builder = BaseResponseBuilder(mock_handler_context_instance)
+        base_response_builder = MockResponseBuilder(mock_handler_context_instance)
         expected_output = status_code if status_code else status.HTTP_200_OK
         response_status_code = base_response_builder.status_code
         self.assertEqual(response_status_code, expected_output)
@@ -126,6 +137,9 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
 
 @ddt.ddt
 class TestBaseLearnerResponseBuilder(TestBaseResponseBuilder, MockLicenseManagerMetadataMixin):
+    """
+    Test suite for BaseLearnerResponseBuilder.
+    """
     def setUp(self):
         super().setUp()
         self.mock_enterprise_catalog_uuid_1 = self.faker.uuid4()

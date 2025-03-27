@@ -125,6 +125,8 @@ defusedxml==0.7.1
     #   -r requirements/base.txt
     #   python3-openid
     #   social-auth-core
+dictdiffer==0.9.0
+    # via pytest-dictsdiff
 dill==0.3.9
     # via pylint
 distlib==0.3.9
@@ -251,7 +253,7 @@ edx-drf-extensions==10.5.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.0
+edx-enterprise-subsidy-client==2.0.1
     # via -r requirements/base.txt
 edx-event-bus-kafka==6.0.0
     # via -r requirements/base.txt
@@ -275,7 +277,7 @@ edx-toggles==5.3.0
     #   edx-event-bus-kafka
 factory-boy==3.3.3
     # via -r requirements/test.in
-faker==37.0.2
+faker==37.1.0
     # via factory-boy
 fastavro==1.10.0
     # via
@@ -324,7 +326,7 @@ jsonschema-specifications==2024.10.1
     # via
     #   -r requirements/base.txt
     #   jsonschema
-kombu==5.5.0
+kombu==5.5.1
     # via
     #   -r requirements/base.txt
     #   celery
@@ -435,6 +437,8 @@ pytest==8.3.5
     #   pytest-django
 pytest-cov==6.0.0
     # via -r requirements/test.in
+pytest-dictsdiff==0.5.8
+    # via -r requirements/test.in
 pytest-django==4.10.0
     # via -r requirements/test.in
 python-dateutil==2.9.0.post0
@@ -451,7 +455,7 @@ python3-openid==3.2.0
     # via
     #   -r requirements/base.txt
     #   social-auth-core
-pytz==2025.1
+pytz==2025.2
     # via
     #   -r requirements/base.txt
     #   drf-yasg
@@ -483,7 +487,7 @@ requests-oauthlib==2.0.0
     # via
     #   -r requirements/base.txt
     #   social-auth-core
-rpds-py==0.23.1
+rpds-py==0.24.0
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -535,7 +539,7 @@ tomlkit==0.13.2
     # via pylint
 tox==4.24.2
     # via -r requirements/test.in
-typing-extensions==4.12.2
+typing-extensions==4.13.0
     # via
     #   -r requirements/base.txt
     #   django-countries
