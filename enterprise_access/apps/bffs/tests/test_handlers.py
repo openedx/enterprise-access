@@ -61,7 +61,7 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
         self.expected_enterprise_customer_2 = {
             **self.mock_enterprise_customer_2,
             'disable_search': False,
-            'show_integration_warning': True,
+            'show_integration_warning': False,
         }
         self.mock_subscription_licenses_data = {
             'customer_agreement': None,
