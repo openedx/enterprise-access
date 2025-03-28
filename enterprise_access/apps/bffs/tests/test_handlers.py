@@ -34,7 +34,7 @@ class TestBaseHandler(TestHandlerContextMixin):
             "status_code": status.HTTP_400_BAD_REQUEST
         }
         base_handler.add_error(**arguments)
-        self.assertEqual(self.mock_error, base_handler.context.errors[0])
+        self.assertEqual(self.mock_error, base_handler.context.errors[-1])
         self.assertEqual(status.HTTP_400_BAD_REQUEST, base_handler.context.status_code)
 
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
@@ -253,10 +253,20 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
         expected_staff_enterprise_customer = self.expected_enterprise_customer
         self.assertEqual(actual_staff_enterprise_customer, expected_staff_enterprise_customer)
 
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client'
+        '.EnterpriseCatalogUserV1ApiClient.get_secured_algolia_api_key'
+    )
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.bulk_enroll_enterprise_learners')
-    def test_request_default_enrollment_realizations(self, mock_bulk_enroll, mock_get_customers):
+    def test_request_default_enrollment_realizations(
+        self,
+        mock_bulk_enroll,
+        mock_get_customers,
+        mock_get_secured_algolia_api_key_for_user,
+    ):
         mock_get_customers.return_value = self.mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
         license_uuids_by_course_run_key = {
             'course-run-1': 'license-1',
             'course-run-2': 'license-2',
@@ -278,10 +288,20 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
         self.assertCountEqual(expected_payload, actual_payload_arg)
         self.assertEqual(context.errors, [])
 
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client'
+        '.EnterpriseCatalogUserV1ApiClient.get_secured_algolia_api_key'
+    )
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsUserApiClient.get_enterprise_customers_for_user')
     @mock.patch('enterprise_access.apps.api_client.lms_client.LmsApiClient.bulk_enroll_enterprise_learners')
-    def test_request_default_enrollment_realizations_exception(self, mock_bulk_enroll, mock_get_customers):
+    def test_request_default_enrollment_realizations_exception(
+        self,
+        mock_bulk_enroll,
+        mock_get_customers,
+        mock_get_secured_algolia_api_key_for_user
+    ):
         mock_get_customers.return_value = self.mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
         license_uuids_by_course_run_key = {
             'course-run-1': 'license-1',
             'course-run-2': 'license-2',
@@ -302,6 +322,10 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
         )
 
     @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client'
+        '.EnterpriseCatalogUserV1ApiClient.get_secured_algolia_api_key'
+    )
+    @mock.patch(
         'enterprise_access.apps.api_client.lms_client.LmsUserApiClient'
         '.get_enterprise_customers_for_user')
     @mock.patch(
@@ -312,9 +336,10 @@ class TestBaseLearnerPortalHandler(TestHandlerContextMixin):
         '.get_default_enterprise_enrollment_intentions_learner_status'
     )
     def test_realize_default_enrollments(
-        self, mock_get_intentions, mock_bulk_enroll, mock_get_customers
+        self, mock_get_intentions, mock_bulk_enroll, mock_get_customers, mock_get_secured_algolia_api_key_for_user
     ):
         mock_get_customers.return_value = self.mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
         mock_get_intentions.return_value = {
             "lms_user_id": self.mock_user.id,
             "user_email": self.mock_user.email,

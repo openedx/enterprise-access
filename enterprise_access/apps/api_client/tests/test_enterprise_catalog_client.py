@@ -3,17 +3,24 @@ Tests for Discovery client.
 """
 
 from unittest import mock
+from urllib.parse import urlparse
 from uuid import uuid4
 
 import ddt
-from django.test import TestCase
+from django.conf import settings
+from django.test import RequestFactory, TestCase
+from faker import Faker
 from requests import Response
 from requests.exceptions import HTTPError
 
 from enterprise_access.apps.api_client.enterprise_catalog_client import (
     EnterpriseCatalogApiClient,
-    EnterpriseCatalogApiV1Client
+    EnterpriseCatalogApiV1Client,
+    EnterpriseCatalogUserV1ApiClient
 )
+from enterprise_access.apps.api_client.tests.test_constants import DATE_FORMAT_ISO_8601
+from enterprise_access.apps.core.tests.factories import UserFactory
+from enterprise_access.utils import _days_from_now
 
 
 class TestEnterpriseCatalogApiClient(TestCase):
@@ -168,3 +175,102 @@ class TestEnterpriseCatalogApiV1Client(TestCase):
         mock_oauth_client.return_value.get.assert_called_with(
             f'http://enterprise-catalog.example.com/api/v1/content-metadata/{content_key}',
         )
+
+
+@ddt.ddt
+class TestEnterpriseCatalogUserV1ApiClient(TestCase):
+    """
+    Test EnterpriseCatalogUserV1ApiClient
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+        self.faker = Faker()
+        self.request_id_key = settings.REQUEST_ID_RESPONSE_HEADER
+
+        self.user = UserFactory()
+        self.mock_enterprise_customer_uuid = self.faker.uuid4()
+        self.mock_catalog_uuid = self.faker.uuid4()
+        self.mock_catalog_query_uuid = self.faker.uuid4()
+
+    @ddt.data(
+        {'enterprise_customer_uuid': 'test_uuid'},
+        {'enterprise_customer_uuid': None},
+    )
+    @ddt.unpack
+    def test_secured_algolia_api_key_endpoint(self, enterprise_customer_uuid):
+        expected_url = (
+            f'http://enterprise-catalog.example.com/api/v1'
+            f'/enterprise-customer/{enterprise_customer_uuid}/secured-algolia-api-key/'
+        )
+        request = self.factory.get(expected_url)
+        request.headers = {
+            "Authorization": 'test-auth',
+            self.request_id_key: 'test-request-id'
+        }
+        request.user = self.user
+        context = {
+            "request": request
+        }
+        client = EnterpriseCatalogUserV1ApiClient(context['request'])
+        if enterprise_customer_uuid is None:
+            with self.assertRaises(ValueError):
+                client.secured_algolia_api_key_endpoint(
+                    enterprise_customer_uuid=enterprise_customer_uuid
+                )
+        else:
+            secured_algolia_api_key_url = client.secured_algolia_api_key_endpoint(
+                enterprise_customer_uuid=enterprise_customer_uuid
+            )
+            self.assertEqual(secured_algolia_api_key_url, expected_url)
+
+    @mock.patch('requests.Session.send')
+    @mock.patch('crum.get_current_request')
+    def test_secured_algolia_api_key(self, mock_crum_get_current_request, mock_send):
+        expected_url = (
+            f'http://enterprise-catalog.example.com/api/v1'
+            f'/enterprise-customer/{self.mock_enterprise_customer_uuid}/secured-algolia-api-key/'
+        )
+        request = self.factory.get(expected_url)
+        request.headers = {
+            "Authorization": 'test-auth',
+            self.request_id_key: 'test-request-id'
+        }
+        request.user = self.user
+        context = {
+            "request": request
+        }
+
+        mock_crum_get_current_request.return_value = request
+
+        expected_result = {
+            "algolia": {
+                "secured_api_key": "Th15I54Fak341gOlI4K3y",
+                "valid_until": _days_from_now(1, DATE_FORMAT_ISO_8601),
+            },
+            'catalog_uuids_to_catalog_query_uuids': {
+                self.mock_catalog_uuid: self.mock_catalog_query_uuid,
+            }
+        }
+        mock_response = mock.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = expected_result
+
+        mock_send.return_value = mock_response
+
+        client = EnterpriseCatalogUserV1ApiClient(context['request'])
+        result = client.get_secured_algolia_api_key(enterprise_customer_uuid=self.mock_enterprise_customer_uuid)
+        prepared_request = mock_send.call_args[0][0]
+
+        # Assert base request URL/method is correct
+        parsed_url = urlparse(prepared_request.url)
+        self.assertEqual(f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}", expected_url)
+        self.assertEqual(prepared_request.method, 'GET')
+
+        # Assert headers are correctly set
+        self.assertEqual(prepared_request.headers['Authorization'], 'test-auth')
+        self.assertEqual(prepared_request.headers[self.request_id_key], 'test-request-id')
+
+        # Assert the response is as expected
+        self.assertEqual(result, expected_result)

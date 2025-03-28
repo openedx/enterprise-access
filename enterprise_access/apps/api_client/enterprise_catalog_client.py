@@ -7,6 +7,7 @@ import backoff
 from django.conf import settings
 
 from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
+from enterprise_access.apps.api_client.base_user import BaseUserApiClient
 from enterprise_access.apps.api_client.constants import autoretry_for_exceptions
 
 
@@ -122,5 +123,57 @@ class EnterpriseCatalogApiV1Client(EnterpriseCatalogApiClient):
         kwargs = {'params': query_params} if query_params else {}
         endpoint = self.content_metadata_endpoint + content_id
         response = self.client.get(endpoint, **kwargs)
+        response.raise_for_status()
+        return response.json()
+
+
+class EnterpriseCatalogUserV1ApiClient(BaseUserApiClient):
+    """
+    API client for user-specific calls to the enterprise catalog V1 service
+    """
+
+    api_version = 'v1'
+    api_base_url = urljoin(settings.ENTERPRISE_CATALOG_URL, f'api/{api_version}/')
+
+    def secured_algolia_api_key_endpoint(self, enterprise_customer_uuid: str) -> str:
+        """
+         Constructs the API endpoint URL for fetching the secured Algolia API key
+         for a specific enterprise customer.
+
+         Args:
+             enterprise_customer_uuid (str): The UUID of the enterprise customer. Must not be empty.
+
+         Returns:
+             str: Fully-qualified URL for the secured Algolia API key endpoint.
+
+         Raises:
+             ValueError: If `enterprise_customer_uuid` is not provided or is an empty string.
+         """
+        if not enterprise_customer_uuid:
+            raise ValueError(f'Invalid enterprise_customer_uuid: {enterprise_customer_uuid!r}')
+
+        secured_algolia_api_key_path: str = f'enterprise-customer/{enterprise_customer_uuid}/secured-algolia-api-key/'
+        return urljoin(self.api_base_url, secured_algolia_api_key_path)
+
+    def get_secured_algolia_api_key(self, enterprise_customer_uuid):
+        """
+        Fetch secured algolia API keys
+
+        Arguments:
+            enterprise_customer_uuid (uuid): UUID of the enterprise customer
+
+        Returns:
+            200:
+                'algolia': {
+                    'secured_api_key' (str): The secured api key for algolia to consume in the client
+                    'valid_until' (Datetime): The date until the secured api key is valid until in the client
+                }
+                'catalog_uuids_to_catalog_query_uuids': A dictionary of catalog uuids mapped to their corresponding
+                    catalog query uuids.
+            400:
+                'user_message' (str): Message of corresponding error indicating a user oriented message
+                'developer_message' (str): Message of corresponding error indicating an actionable developer message
+        """
+        response = self.get(self.secured_algolia_api_key_endpoint(enterprise_customer_uuid))
         response.raise_for_status()
         return response.json()

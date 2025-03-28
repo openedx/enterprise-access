@@ -160,6 +160,8 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     },
                 },
             ],
+            'secured_algolia_api_key': self.mock_secured_algolia_api_key,
+            'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
             'active_enterprise_customer': self.expected_enterprise_customer,
             'staff_enterprise_customer': None,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
@@ -232,6 +234,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
     def test_dashboard_empty_state_with_permissions(
         self,
         mock_get_enterprise_customers_for_user,
+        mock_get_secured_algolia_api_key_for_user,
         mock_get_subscription_licenses_for_learner,
         mock_get_default_enrollment_intentions_learner_status,
         mock_get_enterprise_course_enrollments,
@@ -256,6 +259,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'context': role_context,
         }])
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
         mock_get_subscription_licenses_for_learner.return_value = self.mock_subscription_licenses_data
         mock_get_default_enrollment_intentions_learner_status.return_value =\
             self.mock_default_enterprise_enrollment_intentions_learner_status_data
@@ -284,6 +288,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
     def test_dashboard_with_subscriptions(
         self,
         mock_get_enterprise_customers_for_user,
+        mock_get_secured_algolia_api_key_for_user,
         mock_get_default_enrollment_intentions_learner_status,
         mock_get_subscription_licenses_for_learner,
         mock_get_enterprise_course_enrollments,
@@ -296,6 +301,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'context': self.mock_enterprise_customer_uuid,
         }])
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
         mock_subscription_licenses_data = {
             'customer_agreement': self.mock_customer_agreement,
             'results': [self.mock_subscription_license],
@@ -337,6 +343,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
     def test_dashboard_with_subscriptions_license_activation(
         self,
         mock_get_enterprise_customers_for_user,
+        mock_get_secured_algolia_api_key_for_user,
         mock_get_default_enrollment_intentions_learner_status,
         mock_get_subscription_licenses_for_learner,
         mock_get_enterprise_course_enrollments,
@@ -351,6 +358,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'context': self.mock_enterprise_customer_uuid,
         }])
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
         mock_assigned_subscription_license = {
             **self.mock_subscription_license,
             'status': 'assigned',
@@ -408,6 +416,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         mock_get_default_enrollment_intentions_learner_status,
         mock_get_subscription_licenses_for_learner,
         mock_get_enterprise_customers_for_user,
+        mock_get_secured_algolia_api_key_for_user,
         mock_get_enterprise_course_enrollments,
         mock_get_enterprise_customer_data,
         mock_auto_apply_license,
@@ -462,6 +471,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'results': mock_linked_enterprise_customer_users,
         }
         mock_get_enterprise_customers_for_user.return_value = mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
         mock_auto_applied_subscription_license = {
             **self.mock_subscription_license,
             'status': 'activated',
@@ -644,6 +654,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
     def test_dashboard_with_subscriptions_license_auto_apply(
         self,
         mock_get_enterprise_customers_for_user,
+        mock_get_secured_algolia_api_key_for_user,
         mock_get_default_enrollment_intentions_learner_status,
         mock_get_subscription_licenses_for_learner,
         mock_get_enterprise_course_enrollments,
@@ -673,6 +684,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             mock_get_default_enrollment_intentions_learner_status=mock_get_default_enrollment_intentions_learner_status,
             mock_get_subscription_licenses_for_learner=mock_get_subscription_licenses_for_learner,
             mock_get_enterprise_customers_for_user=mock_get_enterprise_customers_for_user,
+            mock_get_secured_algolia_api_key_for_user=mock_get_secured_algolia_api_key_for_user,
             mock_get_enterprise_course_enrollments=mock_get_enterprise_course_enrollments,
             mock_get_enterprise_customer_data=mock_get_enterprise_customer_data,
             mock_auto_apply_license=mock_auto_apply_license,
@@ -758,6 +770,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
     def test_dashboard_with_enrollments(
         self,
         mock_get_enterprise_customers_for_user,
+        mock_get_secured_algolia_api_key_for_user,
         mock_get_subscription_licenses_for_learner,
         mock_get_default_enrollment_intentions_learner_status,
         mock_get_enterprise_course_enrollments,
@@ -770,6 +783,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'context': self.mock_enterprise_customer_uuid,
         }])
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
         mock_get_subscription_licenses_for_learner.return_value = self.mock_subscription_licenses_data
         mock_get_default_enrollment_intentions_learner_status.return_value =\
             self.mock_default_enterprise_enrollment_intentions_learner_status_data
@@ -827,6 +841,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
     def test_dashboard_with_default_enrollment_realizations(
         self,
         mock_get_enterprise_customers_for_user,
+        mock_get_secured_algolia_api_key_for_user,
         mock_get_default_enrollment_intentions_learner_status,
         mock_get_subscription_licenses_for_learner,
         mock_get_enterprise_course_enrollments,
@@ -840,6 +855,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'context': self.mock_enterprise_customer_uuid,
         }])
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
 
         mock_activated_subscription_license = {
             **self.mock_subscription_license,
@@ -898,6 +914,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
     def test_search_base_response(
         self,
         mock_get_enterprise_customers_for_user,
+        mock_get_secured_algolia_api_key_for_user,
         mock_get_default_enrollment_intentions_learner_status,
         mock_get_subscription_licenses_for_learner,
     ):
@@ -909,6 +926,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'context': self.mock_enterprise_customer_uuid,
         }])
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
         mock_get_subscription_licenses_for_learner.return_value = self.mock_subscription_licenses_data
         mock_get_default_enrollment_intentions_learner_status.return_value =\
             self.mock_default_enterprise_enrollment_intentions_learner_status_data
@@ -929,6 +947,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
     def test_academy_base_response(
         self,
         mock_get_enterprise_customers_for_user,
+        mock_get_secured_algolia_api_key_for_user,
         mock_get_default_enrollment_intentions_learner_status,
         mock_get_subscription_licenses_for_learner,
     ):
@@ -940,6 +959,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'context': self.mock_enterprise_customer_uuid,
         }])
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
         mock_get_subscription_licenses_for_learner.return_value = self.mock_subscription_licenses_data
         mock_get_default_enrollment_intentions_learner_status.return_value =\
             self.mock_default_enterprise_enrollment_intentions_learner_status_data
@@ -960,6 +980,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
     def test_skills_quiz_base_response(
         self,
         mock_get_enterprise_customers_for_user,
+        mock_get_secured_algolia_api_key_for_user,
         mock_get_default_enrollment_intentions_learner_status,
         mock_get_subscription_licenses_for_learner,
     ):
@@ -971,6 +992,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
             'context': self.mock_enterprise_customer_uuid,
         }])
         mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
         mock_get_subscription_licenses_for_learner.return_value = self.mock_subscription_licenses_data
         mock_get_default_enrollment_intentions_learner_status.return_value =\
             self.mock_default_enterprise_enrollment_intentions_learner_status_data

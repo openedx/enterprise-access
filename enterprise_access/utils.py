@@ -4,8 +4,10 @@ Utils for any app in the enterprise-access project.
 import logging
 import traceback
 from datetime import datetime, timedelta
+from typing import Optional
 
 from django.apps import apps
+from django.utils import dateparse, timezone
 from pytz import UTC
 
 from enterprise_access.apps.content_assignments.constants import AssignmentAutomaticExpiredReason
@@ -285,3 +287,24 @@ def get_course_run_metadata_for_assignment(assignment, content_metadata):
 
     # For course-based assignments, return metadata for the advertised course run
     return get_advertised_course_run_metadata(content_metadata)
+
+
+def determine_timeout_offset(
+        date_str: str,
+        epsilon_seconds: int = 10,
+) -> int:
+    """
+    Returns the number of seconds until the given datetime string,
+    minus an optional epsilon buffer.
+
+    Args:
+        date_str (str): The target datetime in ISO 8601 format.
+        epsilon_seconds (int): Number of seconds to subtract from the offset (default: 10).
+
+    Returns:
+        int: Number of seconds until the target time, minus epsilon. Returns 0 if already passed.
+    """
+    parsed_time: Optional[datetime] = dateparse.parse_datetime(date_str)
+    if not parsed_time:
+        raise ValueError(f"Invalid date string: {date_str}")
+    return max(0, int((parsed_time - timezone.now()).total_seconds() - epsilon_seconds))

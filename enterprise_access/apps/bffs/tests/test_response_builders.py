@@ -32,6 +32,8 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
             'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
             'staff_enterprise_customer': self.mock_staff_enterprise_customer,
             'active_enterprise_customer': self.mock_active_enterprise_customer,
+            'secured_algolia_api_key': self.mock_secured_algolia_api_key,
+            'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
         }
         mock_handler_context.return_value = self.get_mock_handler_context(
@@ -47,6 +49,8 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
             'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
             'staff_enterprise_customer': self.mock_staff_enterprise_customer,
             'active_enterprise_customer': self.mock_active_enterprise_customer,
+            'secured_algolia_api_key': self.mock_secured_algolia_api_key,
+            'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
             'errors': [],
             'warnings': [],
@@ -80,6 +84,8 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
             'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
             'staff_enterprise_customer': self.mock_staff_enterprise_customer,
             'active_enterprise_customer': self.mock_active_enterprise_customer,
+            'secured_algolia_api_key': self.mock_secured_algolia_api_key,
+            'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
         }
         mock_handler_context.return_value = self.get_mock_handler_context(
@@ -93,6 +99,8 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
             'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
             'staff_enterprise_customer': self.mock_staff_enterprise_customer,
             'active_enterprise_customer': self.mock_active_enterprise_customer,
+            'secured_algolia_api_key': self.mock_secured_algolia_api_key,
+            'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
             'errors': [],
             'warnings': [],
@@ -163,6 +171,8 @@ class TestBaseLearnerResponseBuilder(TestBaseResponseBuilder, MockLicenseManager
             'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
             'staff_enterprise_customer': self.mock_staff_enterprise_customer,
             'active_enterprise_customer': self.mock_active_enterprise_customer,
+            'secured_algolia_api_key': self.mock_secured_algolia_api_key,
+            'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
         }
         mock_handler_context.return_value = self.get_mock_handler_context(
@@ -203,6 +213,8 @@ class TestBaseLearnerResponseBuilder(TestBaseResponseBuilder, MockLicenseManager
             'staff_enterprise_customer': self.mock_staff_enterprise_customer,
             'active_enterprise_customer': self.mock_active_enterprise_customer,
             'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
+            'secured_algolia_api_key': self.mock_secured_algolia_api_key,
+            'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
             'errors': [],
             'warnings': [],
