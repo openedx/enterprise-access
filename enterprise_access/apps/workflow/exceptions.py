@@ -7,3 +7,4 @@ class UnitOfWorkException(Exception):
     """
     Base exception class for Units of Work.
     """
+    code = ''

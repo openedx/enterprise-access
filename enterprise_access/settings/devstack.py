@@ -108,6 +108,7 @@ SHELL_PLUS_IMPORTS = [
     'from enterprise_access.apps.content_assignments import api as assignments_api',
     'from pprint import pprint',
     'from enterprise_access.apps.content_assignments import tasks as assignments_tasks',
+    'from enterprise_access.apps.provisioning.models import *',
 ]
 
 
