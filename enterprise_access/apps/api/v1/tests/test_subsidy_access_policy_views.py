@@ -31,6 +31,7 @@ from enterprise_access.apps.core.constants import (
 )
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_BEYOND_ENROLLMENT_DEADLINE,
+    REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_FAILED,
     REASON_LEARNER_NOT_ASSIGNED_CONTENT,
@@ -2953,11 +2954,14 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
 
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
-    def test_can_redeem_content_not_in_catalog_service_422_unprocessable(
+    def test_can_redeem_content_not_in_catalog_service_still_200_ok(
         self, mock_transactions_cache_for_learner, mock_lms_client,
     ):
         """
-        Test that the can_redeem endpoint returns 422 Unprocessable if the content key is totally fake/typoed.
+        Test that the can_redeem endpoint still returns 200 OK if the content key does not exist according to
+        enterprise-catalog.  This could happen if the content actually doesn't exist, or it's just restricted and not
+        exposed via a catalog-agnostic endpoint.  Either way, don't throw in the towel, just say the content is
+        non-redeemable and return a null price.
         """
         mock_transactions_cache_for_learner.return_value = {
             'transactions': [],
@@ -2994,6 +2998,99 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
                 'Content not found',
                 response=MockResponse('Content not found', status.HTTP_404_NOT_FOUND),
             ),
+        ):
+            query_params = {'content_key': [content_key_for_redemption]}
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
+        assert response.status_code == status.HTTP_200_OK
+        response_list = response.json()
+
+        assert len(response_list) == 1
+
+        # Check the response for the first content_key given.
+        assert response_list[0]["content_key"] == content_key_for_redemption
+        assert response_list[0]["list_price"] is None
+        assert len(response_list[0]["redemptions"]) == 0
+        assert response_list[0]["has_successful_redemption"] is False
+        assert response_list[0]["redeemable_subsidy_access_policy"] is None
+        assert response_list[0]["can_redeem"] is False
+        assert response_list[0]["reasons"][0]["reason"] == REASON_CONTENT_NOT_IN_CATALOG
+
+    @mock.patch('enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
+    def test_can_redeem_content_malformed_from_downstream_subsidy_call_422_unprocessable(
+        self,
+        mock_transactions_cache_for_learner,
+        mock_content_get_and_cache_content_metadata
+    ):
+        """
+        Test that the can_redeem endpoint returns 422 UNPROCESSABLE if the content metatdata (for assigned content)
+        fetched from enterprise-subsidy is malformed due to a regression.
+        """
+        mock_transactions_cache_for_learner.return_value = {
+            'transactions': [],
+            'aggregates': {
+                'total_quantity': 0,
+            },
+        }
+        test_content_key_1 = f"course-v1:{self.content_key}+3T2020"
+
+        mock_get_subsidy_content_data = {
+            "content_uuid": str(uuid4()),
+            "content_key": self.content_key,
+            "source": "edX",
+            # Here's the meat of the test.  The `content_price` key from enterprise-subsidy should never be null.
+            "content_price": None,
+        }
+        mock_content_get_and_cache_content_metadata.return_value = mock_get_subsidy_content_data
+        self.mock_get_content_metadata.return_value = mock_get_subsidy_content_data
+
+        with mock.patch(
+            'enterprise_access.apps.subsidy_access_policy.content_metadata_api.get_and_cache_content_metadata',
+            side_effect=mock_get_subsidy_content_data,
+        ):
+            query_params = {'content_key': [test_content_key_1]}
+            response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+    @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
+    def test_can_redeem_content_malformed_from_downstream_catalog_call_422_unprocessable(
+        self, mock_transactions_cache_for_learner, mock_lms_client,
+    ):
+        """
+        Test that the can_redeem endpoint return 422 UNPROCESSABLE if the content key not assigned, DOES exist, but the
+        content metadata fetched from enterprise-catalog is malformed due to a regression.
+        """
+        mock_transactions_cache_for_learner.return_value = {
+            'transactions': [],
+            'aggregates': {
+                'total_quantity': 0,
+            },
+        }
+        content_key_for_redemption = "course-v1:Unredeemable+Content+3T2020"
+
+        self.mock_contains_key.return_value = False
+
+        # It's an unredeemable response, so mock out some admin users to return
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
+            'slug': 'sluggy',
+            'admin_users': [{'email': 'edx@example.org'}],
+        }
+
+        mock_course_metadata = {
+            'normalized_metadata': {
+                # Here's the meat of the test.  The `content_price` key from enterprise-catalog should never be null.
+                'content_price': None,
+            },
+            'normalized_metadata_by_run': {},
+        }
+        self.mock_catalog_get_and_cache_content_metadata.return_value = mock_course_metadata
+
+        with mock.patch(
+            'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
+            return_value=mock_course_metadata,
         ):
             query_params = {'content_key': [content_key_for_redemption]}
             response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)

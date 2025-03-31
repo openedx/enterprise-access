@@ -685,6 +685,25 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
         return redemptions_map
 
+    def _get_list_price_for_catalog_course_metadata(self, course_metadata, content_key):
+        """
+        Get the list_price dict for course metadata fetched from catalog.
+
+        Returns:
+            dict conforming to a "list price" dict.
+
+        Raises:
+            ContentPriceNullException if the metadata is too malformed to find a price.
+        """
+        if (decimal_dollars := course_metadata['normalized_metadata_by_run'].get(
+                content_key, {}).get('content_price')) is None:
+            decimal_dollars = course_metadata['normalized_metadata'].get('content_price')
+        if (decimal_dollars is None):
+            raise ContentPriceNullException(
+                f'Failed to obtain content price from enterprise-catalog for content_key {content_key}.'
+            )
+        return make_list_price_dict(decimal_dollars=decimal_dollars)
+
     @extend_schema(
         tags=[SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG],
         summary='Can redeem.',
@@ -815,20 +834,20 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                     #   this list_price for price display 100% of the time.
                     try:
                         course_metadata = get_and_cache_content_metadata(content_key, coerce_to_parent_course=True)
-                    except HTTPError as exc:
-                        raise ContentPriceNullException(
-                            f'Failed to obtain content metadata from enterprise-catalog'
-                            f' with enterprise customer {enterprise_customer_uuid}.'
-                        ) from exc
-                    if (decimal_dollars := course_metadata['normalized_metadata_by_run'].get(
-                            content_key, {}).get('content_price')) is None:
-                        decimal_dollars = course_metadata['normalized_metadata'].get('content_price')
-                    if (decimal_dollars is None):
-                        raise ContentPriceNullException(
-                            f'Failed to obtain content price from enterprise-catalog'
-                            f' with enterprise customer {enterprise_customer_uuid}.'
+                    except HTTPError:
+                        # We might normally re-raise the exception here (and have in the past), but this would cause
+                        # can-redeem requests to fail for courses which contain restricted runs where the customer does
+                        # not have restricted access.  The desired behavior is for the request to NOT fail, and the
+                        # frontend is already coded to discard the restricted runs.
+                        logger.warning(
+                            (
+                                'Failed to obtain content metadata from enterprise-catalog with enterprise customer '
+                                '%s. This can happen if the run is restricted.'
+                            ),
+                            enterprise_customer_uuid
                         )
-                    list_price_dict = make_list_price_dict(decimal_dollars=decimal_dollars)
+                    else:
+                        list_price_dict = self._get_list_price_for_catalog_course_metadata(course_metadata, content_key)
             except ContentPriceNullException as exc:
                 raise RedemptionRequestException(
                     detail=(
