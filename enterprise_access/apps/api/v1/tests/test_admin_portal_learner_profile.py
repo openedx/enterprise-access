@@ -17,6 +17,7 @@ class MockedErrorfulApiClient:
     def __init__(self):
         raise requests.exceptions.HTTPError('Mocked HTTPError')
 
+
 class TestAdminPortalLearnerProfileView(TestCase):
     """Unit tests for AdminLearnerProfileViewSet."""
 
