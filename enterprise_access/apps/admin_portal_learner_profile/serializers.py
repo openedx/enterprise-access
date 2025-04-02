@@ -40,6 +40,7 @@ class ErrorOrField(serializers.Field):
         return self.base_field.to_representation(value)
 
 
+# pylint: disable=abstract-method
 class AdminLearnerProfileRequestSerializer(serializers.Serializer):
     """Serializer for validating admin learner profile query parameters."""
     user_email = serializers.EmailField(required=True, help_text="The email address of the learner.")
@@ -47,6 +48,7 @@ class AdminLearnerProfileRequestSerializer(serializers.Serializer):
     enterprise_customer_uuid = serializers.UUIDField(required=True, help_text="The UUID of the enterprise customer.")
 
 
+# pylint: disable=abstract-method
 class AdminLearnerProfileResponseSerializer(serializers.Serializer):
     """Serializer for structuring the admin learner profile response."""
     subscriptions = ErrorOrField(

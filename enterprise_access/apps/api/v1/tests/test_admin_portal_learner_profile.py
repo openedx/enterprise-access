@@ -2,6 +2,7 @@
 """
 Tests for AdminPortalLearnerProfileViewset.
 """
+import requests
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -11,6 +12,10 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from enterprise_access.apps.api.v1.views.admin_portal_learner_profile import AdminLearnerProfileViewSet
 
+
+class MockedErrorfulApiClient:
+    def __init__(self):
+        raise requests.exceptions.HTTPError('Mocked HTTPError')
 
 class TestAdminPortalLearnerProfileView(TestCase):
     """Unit tests for AdminLearnerProfileViewSet."""
@@ -130,3 +135,28 @@ class TestAdminPortalLearnerProfileView(TestCase):
         self.assertEqual(len(response.data['subscriptions']), 1)
         self.assertEqual(len(response.data['group_memberships']), 1)
         self.assertEqual(len(response.data['enrollments'].get('in_progress')), 1)
+
+    @patch('enterprise_access.apps.admin_portal_learner_profile.api.LicenseManagerApiClient')
+    @patch('enterprise_access.apps.admin_portal_learner_profile.api.LmsApiClient')
+    def test_errors_are_formatted_as_strings(
+        self, MockLmsApiClient, MockLicenseManagerApiClient
+    ):
+        # Mock the API clients to raise an HTTPError
+        MockLicenseManagerApiClient.side_effect = MockedErrorfulApiClient
+        MockLmsApiClient.side_effect = MockedErrorfulApiClient
+
+        request = self.authenticate_request({
+            'user_email': 'test@example.com',
+            'lms_user_id': '456',
+            'enterprise_customer_uuid': '123e4567-e89b-12d3-a456-426614174000'
+        })
+
+        response = self.view(request)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('subscriptions', response.data)
+        self.assertIn('group_memberships', response.data)
+        self.assertIn('enrollments', response.data)
+        self.assertEqual(response.data['subscriptions']['error'], 'Failed to fetch subscriptions')
+        self.assertEqual(response.data['group_memberships']['error'], 'Failed to fetch group memberships')
+        self.assertEqual(response.data['enrollments']['error'], 'Failed to fetch enrollments')
