@@ -671,6 +671,146 @@ class TestLmsApiClient(TestCase):
             timeout=settings.LMS_CLIENT_TIMEOUT,
         )
 
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_enterprise_catalogs(self, mock_oauth_client, mock_json):
+        """
+        Tests that we can fetch a list of catalogs for a given customer/catalog query
+        with LmsApiClient().
+        """
+        customer_uuid = str(uuid4())
+        catalog_query_id = 123
+
+        mock_get = mock_oauth_client.return_value.get
+        mock_get.return_value = requests.Response()
+        mock_get.return_value.status_code = 200
+
+        mock_json.return_value = {
+            'count': 2,
+            'results': [
+                {'the first': 'catalog record'},
+                {'the second': 'catalog record'},
+            ]
+        }
+
+        client = LmsApiClient()
+        result = client.get_enterprise_catalogs(customer_uuid, catalog_query_id)
+
+        self.assertEqual(
+            [
+                {'the first': 'catalog record'},
+                {'the second': 'catalog record'},
+            ],
+            result,
+        )
+        expected_url = (
+            'http://edx-platform.example.com/enterprise/api/v1/enterprise_catalogs/'
+            f'?enterprise_customer={customer_uuid}&enterprise_catalog_query={catalog_query_id}'
+        )
+        mock_get.assert_called_once_with(
+            expected_url,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_enterprise_catalogs_error(self, mock_oauth_client):
+        """
+        Tests that we raise an exception appropriately when listing
+        enterprise catalogs with LmsApiClient().
+        """
+        customer_uuid = str(uuid4())
+        catalog_query_id = 123
+        mock_get = mock_oauth_client.return_value.get
+
+        mock_get.side_effect = requests.exceptions.HTTPError('whoopsie')
+        mock_get.return_value.status_code = 400
+
+        client = LmsApiClient()
+        with self.assertRaises(requests.exceptions.HTTPError):
+            client.get_enterprise_catalogs(customer_uuid, catalog_query_id)
+
+        expected_url = (
+            'http://edx-platform.example.com/enterprise/api/v1/enterprise_catalogs/'
+            f'?enterprise_customer={customer_uuid}&enterprise_catalog_query={catalog_query_id}'
+        )
+        mock_get.assert_called_once_with(
+            expected_url,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_create_enterprise_catalog_success(self, mock_oauth_client, mock_json):
+        """
+        Tests that we can create a new enterprise catalog record using the LmsApiClient.
+        """
+        customer_uuid = str(uuid4())
+        title = 'the title'
+        catalog_query_id = 555
+
+        mock_post = mock_oauth_client.return_value.post
+        mock_post.return_value = requests.Response()
+        mock_post.return_value.status_code = 201
+
+        mock_json.return_value = {
+            'uuid': 'im new here',
+            'enterprise_customer_uuid': customer_uuid,
+        }
+
+        client = LmsApiClient()
+        result = client.create_enterprise_catalog(customer_uuid, title, catalog_query_id)
+
+        self.assertEqual(
+            {
+                'uuid': 'im new here',
+                'enterprise_customer_uuid': customer_uuid,
+            },
+            result,
+        )
+
+        expected_url = 'http://edx-platform.example.com/enterprise/api/v1/enterprise_customer_catalog/'
+        expected_input = {
+            'enterprise_customer': customer_uuid,
+            'title': title,
+            'enterprise_catalog_query': catalog_query_id,
+        }
+        mock_post.assert_called_once_with(
+            expected_url,
+            json=expected_input,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_create_enterprise_catalog_error(self, mock_oauth_client):
+        """
+        Tests that we raise an exception appropriately when creating a
+        new customer catalog record with the LmsApiClient().
+        """
+        customer_uuid = str(uuid4())
+        title = 'the title'
+        catalog_query_id = 555
+
+        mock_post = mock_oauth_client.return_value.post
+
+        mock_post.side_effect = requests.exceptions.HTTPError('whoopsie')
+        mock_post.return_value.status_code = 400
+
+        client = LmsApiClient()
+        with self.assertRaises(requests.exceptions.HTTPError):
+            client.create_enterprise_catalog(customer_uuid, title, catalog_query_id)
+
+        expected_url = 'http://edx-platform.example.com/enterprise/api/v1/enterprise_customer_catalog/'
+        expected_input = {
+            'enterprise_customer': customer_uuid,
+            'title': title,
+            'enterprise_catalog_query': catalog_query_id,
+        }
+        mock_post.assert_called_once_with(
+            expected_url,
+            json=expected_input,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
     def test_unlink_users_from_enterprise(self, mock_oauth_client):
         """
