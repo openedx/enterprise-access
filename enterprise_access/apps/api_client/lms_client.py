@@ -49,6 +49,8 @@ class LmsApiClient(BaseOAuthClient):
     enterprise_api_v1_base_url = enterprise_base_url + 'api/v1/'
     enterprise_learner_endpoint = enterprise_api_v1_base_url + 'enterprise-learner/'
     enterprise_customer_endpoint = enterprise_api_v1_base_url + 'enterprise-customer/'
+    enterprise_catalogs_endpoint = enterprise_api_v1_base_url + 'enterprise_catalogs/'
+    create_enterprise_catalog_endpoint = enterprise_api_v1_base_url + 'enterprise_customer_catalog/'
     pending_enterprise_learner_endpoint = enterprise_api_v1_base_url + 'pending-enterprise-learner/'
     enterprise_group_membership_endpoint = enterprise_api_v1_base_url + 'enterprise-group/'
     pending_enterprise_admin_endpoint = enterprise_api_v1_base_url + 'pending-enterprise-admin/'
@@ -328,6 +330,70 @@ class LmsApiClient(BaseOAuthClient):
             logger.exception(
                 'Failed to create pending admin record for customer %s, email %s: %s',
                 enterprise_customer_uuid, user_email, response.content.decode()
+            )
+            raise
+
+    def get_enterprise_catalogs(self, enterprise_customer_uuid, catalog_query_id=None):
+        """
+        Arguments:
+            enterprise_customer_uuid (str): id of the enterprise customer
+            catalog_query_id (int): Optional id of the catalog query record
+              on which catalog records should be filtered.
+
+        Returns:
+            A list of all catalog records for the given customer, optionally filtered
+            to only those with the provided catalog query id.
+        """
+        endpoint = self.enterprise_catalogs_endpoint + f'?enterprise_customer={enterprise_customer_uuid}'
+        if catalog_query_id is not None:
+            endpoint += f'&enterprise_catalog_query={catalog_query_id}'
+
+        response = self.client.get(endpoint, timeout=settings.LMS_CLIENT_TIMEOUT)
+
+        try:
+            response.raise_for_status()
+            payload = response.json()
+            results = payload.get('results', [])
+            logger.info(
+                'Fetched %s catalog record(s) for customer %s', len(results), enterprise_customer_uuid,
+            )
+            return results
+        except requests.exceptions.HTTPError:
+            msg = 'Failed to fetch catalogs for customer %s and catalog query %s. Response content: %s'
+            logger.exception(msg, enterprise_customer_uuid, catalog_query_id, response.content.decode())
+            raise
+
+    def create_enterprise_catalog(self, enterprise_customer_uuid, catalog_title, catalog_query_id):
+        """
+        Arguments:
+            enterprise_customer_uuid (str): id of the enterprise customer
+            catalog_title (str): title of the catalog
+            catalog_query_id (int): id of the catalog query record associated with the catalog
+
+        Returns:
+            A create enterprise catalog dict.
+        """
+        payload = {
+            'enterprise_customer': enterprise_customer_uuid,
+            'title': catalog_title,
+            'enterprise_catalog_query': catalog_query_id,
+        }
+
+        response = self.client.post(
+            self.create_enterprise_catalog_endpoint,
+            json=payload,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+
+        try:
+            response.raise_for_status()
+            payload = response.json()
+            logger.info('Created catalog record %s', payload)
+            return payload
+        except requests.exceptions.HTTPError:
+            msg = 'Failed to create catalog for customer %s with title %s and catalog query %s. Response content: %s'
+            logger.exception(
+                msg, enterprise_customer_uuid, catalog_title, catalog_query_id, response.content.decode(),
             )
             raise
 
