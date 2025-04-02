@@ -2,8 +2,8 @@
 """
 Tests for AdminPortalLearnerProfileViewset.
 """
-import requests
 from unittest.mock import patch
+import requests
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
