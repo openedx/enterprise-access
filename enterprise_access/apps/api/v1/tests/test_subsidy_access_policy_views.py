@@ -10,16 +10,20 @@ from uuid import UUID, uuid4
 
 import ddt
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
 from enterprise_access.apps.content_assignments.constants import (
     AssignmentAutomaticExpiredReason,
     LearnerContentAssignmentStateChoices
 )
+
+from enterprise_access.apps.api.v1.views.subsidy_access_policy import SubsidyAccessPolicyGroupViewset
 from enterprise_access.apps.content_assignments.tests.factories import (
     AssignmentConfigurationFactory,
     LearnerContentAssignmentFactory
@@ -41,7 +45,10 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     PolicyTypes,
     TransactionStateChoices
 )
-from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+from enterprise_access.apps.subsidy_access_policy.models import (
+    PolicyGroupAssociation,
+    SubsidyAccessPolicy
+)
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
@@ -824,7 +831,6 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
         ])
 
-        self.maxDiff = None
         policy_for_edit = policy_class(
             enterprise_customer_uuid=self.enterprise_uuid,
             spend_limit=5,
@@ -2504,6 +2510,11 @@ class TestSubsidyAccessPolicyGroupViewset(CRUDViewTestMixin, APITestWithMocks):
 
     def setUp(self):
         super().setUp()
+        self.factory = APIRequestFactory()
+        self.User = get_user_model()
+        self.admin_user = self.User.objects.create_superuser(
+            username='admin', password='password', email='admin@example.com'
+        )
         self.assignment_configuration = AssignmentConfigurationFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
         )
@@ -2744,6 +2755,52 @@ class TestSubsidyAccessPolicyGroupViewset(CRUDViewTestMixin, APITestWithMocks):
         assert rows[0] == 'email,name,Recent Action,Enrollment Number,Activation Date,status'
         # Make sure the `subsidy_learners_aggregate_data` has been zipped with group membership data
         assert rows[1] == 'foobar@example.com,foobar,"Accepted: April 24, 2024",99,,accepted'
+
+    def test_delete_policy_group_association_success(self):
+        """
+        Test that the `delete_policy_group_association` endpoint deletes the correct record and returns
+        a proper response
+        """
+        view = SubsidyAccessPolicyGroupViewset.as_view({'delete': 'delete_policy_group_association'})
+
+        group_uuid = uuid4()
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 
+            'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+        redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            display_name='A redeemable policy',
+            enterprise_customer_uuid=TEST_ENTERPRISE_UUID,
+            spend_limit=3,
+            active=True,
+        )
+        self.policy_group_association = PolicyGroupAssociation.objects.create(
+            subsidy_access_policy=redeemable_policy,
+            enterprise_group_uuid=group_uuid
+        )
+        request_kwargs = {
+            'subsidy_uuid': str(self.redeemable_policy.uuid),
+            'group_uuid': str(group_uuid),
+        }
+        # self.subsidy_access_policy_delete_association_endpoint = reverse(
+        #     "api:v1:delete-group-association", kwargs={
+        #     'subsidy_uuid': self.redeemable_policy.uuid,
+        #     'group_uuid': group_uuid,
+        # },
+        # )
+
+
+        request = self.factory.delete(reverse('api:v1:delete-group-association', args=request_kwargs))
+        force_authenticate(request, user=self.admin_user)
+        response = view(request) #, str(self.redeemable_policy.uuid), str(group_uuid))
+        
+        print(response)
+        # response = self.client.delete(reverse('api:v1:delete-group-association', kwargs=request_kwargs))
+
+        # response = self.client.delete(self.subsidy_access_policy_delete_association_endpoint)
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+
 
 
 @ddt.ddt

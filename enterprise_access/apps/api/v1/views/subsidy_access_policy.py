@@ -79,7 +79,7 @@ SUBSIDY_ACCESS_POLICY_CRUD_API_TAG = 'Subsidy Access Policies CRUD'
 SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG = 'Subsidy Access Policy Redemption'
 SUBSIDY_ACCESS_POLICY_ALLOCATION_API_TAG = 'Subsidy Access Policy Allocation'
 GROUP_MEMBER_DATA_WITH_AGGREGATES_API_TAG = 'Group Member Data With Aggregates'
-
+DELETE_POLICY_GROUP_ASSOCIATION_API_TAG = 'Delete Policy Group Association'
 
 def group_members_with_aggregates_next_page(current_url):
     """Helper method to create the next page url"""
@@ -1137,3 +1137,28 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
             num_member_results,
         )
         return Response(data=member_response, status=200)
+
+    @extend_schema(
+        tags=[DELETE_POLICY_GROUP_ASSOCIATION_API_TAG],
+        summary='Delete a PolicyGroupAssociation record.',
+        responses={
+            status.HTTP_204_NO_CONTENT: None,
+            status.HTTP_404_NOT_FOUND: None,
+        },
+    )
+    @action(detail=False, methods=['delete'])
+    def delete_policy_group_association(self, request, subsidy_uuid, group_uuid, *args, uuid=None, **kwargs):
+        """
+        Delete a single `PolicyGroupAssociation` record by uuid.
+        Params:
+            subsidy_uuid: (required) The uuid associated with the subsidy access policy
+            group_uuid: (required) The uuid associated with the EnterpriseGroup in edx-enterprise
+        """
+        try:
+            policy_group_association = get_object_or_404(
+                PolicyGroupAssociation, subsidy_access_policy=subsidy_uuid, enterprise_group_uuid=group_uuid)
+            policy_group_association.delete()
+        except PolicyGroupAssociation.DoesNotExist:
+            return Response(None, status=status.HTTP_404_NOT_FOUND)
+    
+        return Response(status=status.HTTP_204_NO_CONTENT)
