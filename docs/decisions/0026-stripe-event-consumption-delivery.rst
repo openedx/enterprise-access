@@ -1,4 +1,4 @@
-0025 Stripe Event Consumption And Delivery
+0026 Stripe Event Consumption And Delivery
 ******************************************
 
 Status
@@ -28,7 +28,7 @@ The selected approach is to configure Stripe to POST two separate WebHook endpoi
 #. POST to a new django view in the edX backend (tentatively enterprise-access).
 #. POST to a custom SalesForce endpoint.
 
-.. image:: ../images/0025-stripe-event-consumption-delivery.png
+.. image:: ../images/0026-stripe-event-consumption-delivery.png
 
 Architecture of the edX backend WebHook endpoint
 ------------------------------------------------
@@ -43,7 +43,33 @@ Architecture of the edX backend WebHook endpoint
 
      * Use `de-duplication <https://docs.stripe.com/webhooks#handle-duplicate-events>`_.
 
-   * After successful ingestion, respond with HTTP 200 to tell Stripe to stop retrying sending the event.
+     * Validation, de-duplication, and storage should be atomic.
+
+   * After successful atomic ingestion, queue the event handler and respond with HTTP 200 to tell Stripe to stop
+     retrying sending the event.
+    
+     * Above all, a 200 response shall be returned IFF the event was successfully stored, regardless of whether the
+       event handler was queued.
+
+     * Sample Code::
+
+         def try_queue_event_handler():
+             try:
+                 event_handler.s(event_id).apply_async()
+             except:
+                 logger.warning("event handler not queued")
+
+         try:
+             with transaction.atomic():
+                 persist_the_event_data()
+                 # Force the event handler to be queued after COMMIT because the handler is a separate
+                 # process which isn't privy to the changes inside this transaction.
+                 transaction.on_commit(try_queue_event_handler)
+             # The event is guaranteed to be stored at this point, so we are free to tell Stripe to stop
+             # retrying, even if queuing the event handler failed.
+             return Response(200)
+         except:
+             raise  # Return non-2xx error response
 
 #. **Pick:** Implement an asynchronous event picker to continuously try to pick events to handle/forward.
 
