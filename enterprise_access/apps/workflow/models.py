@@ -2,8 +2,7 @@
 
 from uuid import uuid4
 
-from attrs import asdict, define, field, make_class
-from cattrs import structure
+from attrs import define, field, make_class
 from django.db import models
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -12,10 +11,11 @@ from jsonfield.fields import JSONField
 from model_utils.models import SoftDeletableModel, TimeStampedModel
 
 from .exceptions import UnitOfWorkException
+from .serialization import BaseInputOutput
 
 
 @define
-class Empty:
+class Empty(BaseInputOutput):
     pass
 
 
@@ -67,11 +67,11 @@ class AbstractUnitOfWork(TimeStampedModel, SoftDeletableModel):
 
     @property
     def input_object(self):
-        return self.input_class(**self.input_data)
+        return self.input_class.from_dict(self.input_data)
 
     @property
     def output_object(self):
-        return self.output_class(**self.output_data)
+        return self.output_class.from_dict(self.output_data)
 
     def process_input(self, accumulated_output=None, **kwargs):  # pylint: disable=unused-argument
         """
@@ -108,7 +108,7 @@ class AbstractUnitOfWork(TimeStampedModel, SoftDeletableModel):
                 accumulated_output=accumulated_output,
                 **kwargs,
             )
-            self.output_data = asdict(result)
+            self.output_data = result.to_dict()
             self.succeeded_at = timezone.now()
         except Exception as exc:
             self.failed_at = timezone.now()
@@ -166,7 +166,7 @@ class AbstractWorkflow(AbstractUnitOfWork):
             step_class.input_class.KEY: field(type=step_class.input_class, default=None)
             for step_class in self.steps
         }
-        return make_class(class_name, attributes)
+        return make_class(class_name, attributes, bases=(BaseInputOutput,))
 
     @cached_property
     def output_class(self):
@@ -181,11 +181,7 @@ class AbstractWorkflow(AbstractUnitOfWork):
             step_class.output_class.KEY: field(type=step_class.output_class, default=None)
             for step_class in self.steps
         }
-        return make_class(class_name, attributes)
-
-    @property
-    def input_object(self):
-        return structure(self.input_data, self.input_class)
+        return make_class(class_name, attributes, bases=(BaseInputOutput,))
 
     def get_input_object_for_step_type(self, step_type):
         return getattr(self.input_object, step_type.input_class.KEY, None)
@@ -210,7 +206,7 @@ class AbstractWorkflow(AbstractUnitOfWork):
         preceding_step_record = None
         for workflow_step_class in self.steps:
             input_object = self.get_input_object_for_step_type(workflow_step_class)
-            input_data = asdict(input_object) if input_object else {}
+            input_data = input_object.to_dict() if input_object else {}
             step_record_kwargs = {
                 'workflow_record_uuid': self.uuid,
                 'defaults': {

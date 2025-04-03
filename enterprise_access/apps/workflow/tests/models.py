@@ -6,10 +6,11 @@ workflow models, for unit-testing.
 from attrs import define
 
 from ..models import AbstractWorkflow, AbstractWorkflowStep
+from ..serialization import BaseInputOutput
 
 
 @define
-class TestStepInput:
+class TestStepInput(BaseInputOutput):
     KEY = 'test_step_input'
 
     argument_1: int = 0
@@ -17,21 +18,21 @@ class TestStepInput:
 
 
 @define
-class TestStepOutput:
+class TestStepOutput(BaseInputOutput):
     KEY = 'test_step_output'
 
     result: int = None
 
 
 @define
-class TestSquareInput:
+class TestSquareInput(BaseInputOutput):
     KEY = 'test_square_input'
 
     argument_1: int = 0
 
 
 @define
-class TestSquareOutput:
+class TestSquareOutput(BaseInputOutput):
     KEY = 'test_square_output'
 
     result: int = None

@@ -15,6 +15,11 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_OPERATOR_ROLE,
     SYSTEM_ENTERPRISE_PROVISIONING_ADMIN_ROLE
 )
+from enterprise_access.apps.provisioning.models import (
+    GetCreateCustomerStep,
+    GetCreateEnterpriseAdminUsersStep,
+    ProvisionNewCustomerWorkflow
+)
 from test_utils import APITest
 
 PROVISIONING_CREATE_ENDPOINT = reverse('api:v1:provisioning-create')
@@ -27,6 +32,12 @@ class TestProvisioningAuth(APITest):
     """
     Tests Authentication and Permission checking for provisioning.
     """
+    def tearDown(self):
+        super().tearDown()
+        GetCreateCustomerStep.objects.all().delete()
+        GetCreateEnterpriseAdminUsersStep.objects.all().delete()
+        ProvisionNewCustomerWorkflow.objects.all().delete()
+
     @ddt.data(
         # A role that's not mapped to any feature perms will get you a 403.
         (
@@ -73,15 +84,29 @@ class TestProvisioningAuth(APITest):
         ),
     )
     @ddt.unpack
-    @mock.patch('enterprise_access.apps.api.v1.views.provisioning.provisioning_api')
+    @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_enterprise_admin_users')
+    @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_enterprise_customer')
     def test_provisioning_create_allowed_for_provisioning_admins(
-            self, role_context_dict, expected_response_code, mock_provisioning_api,
+            self, role_context_dict, expected_response_code, mock_create_customer, mock_create_admins,
     ):
         """
         Tests that we get expected 200 response for the provisioning create view when
         the requesting user has the correct system role and provides a valid request payload.
         """
         self.set_jwt_cookie([role_context_dict])
+
+        mock_create_customer.return_value = {
+            "uuid": str(uuid.uuid4()),
+            "name": "Test customer",
+            "country": "US",
+            "slug": "test-customer",
+        }
+        mock_create_admins.return_value = {
+            "created_admins": [{
+                "user_email": "test-admin@example.com",
+            }],
+            "existing_admins": [],
+        }
 
         request_payload = {
             "enterprise_customer": {
@@ -98,12 +123,12 @@ class TestProvisioningAuth(APITest):
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
         assert response.status_code == expected_response_code
 
-        mock_provisioning_api.get_or_create_enterprise_customer.assert_called_once_with(
+        mock_create_customer.assert_called_once_with(
             **request_payload['enterprise_customer'],
         )
 
-        created_customer = mock_provisioning_api.get_or_create_enterprise_customer.return_value
-        mock_provisioning_api.get_or_create_enterprise_admin_users.assert_called_once_with(
+        created_customer = mock_create_customer.return_value
+        mock_create_admins.assert_called_once_with(
             enterprise_customer_uuid=created_customer['uuid'],
             user_emails=['test-admin@example.com'],
         )
@@ -132,7 +157,7 @@ class TestProvisioningEndToEnd(APITest):
                 'name': 'Test Customer',
                 'slug': 'test-customer',
                 'country': 'US',
-                'uuid': TEST_ENTERPRISE_UUID,
+                'uuid': str(TEST_ENTERPRISE_UUID),
             },
             'expected_get_customer_kwargs': {
                 'enterprise_customer_slug': 'test-customer',
@@ -150,7 +175,7 @@ class TestProvisioningEndToEnd(APITest):
                 'name': 'Test Customer',
                 'slug': 'test-customer',
                 'country': 'US',
-                'uuid': TEST_ENTERPRISE_UUID,
+                'uuid': str(TEST_ENTERPRISE_UUID),
             },
             'created_customer_data': None,
             'expected_get_customer_kwargs': {
@@ -220,12 +245,34 @@ class TestProvisioningEndToEnd(APITest):
         else:
             self.assertFalse(mock_client.create_enterprise_customer.called)
 
-        mock_client.get_enterprise_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
-        mock_client.get_enterprise_pending_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
+        mock_client.get_enterprise_admin_users.assert_called_once_with(str(TEST_ENTERPRISE_UUID))
+        mock_client.get_enterprise_pending_admin_users.assert_called_once_with(str(TEST_ENTERPRISE_UUID))
         mock_client.create_enterprise_admin_user.assert_has_calls([
-            mock.call(TEST_ENTERPRISE_UUID, 'alice@foo.com'),
-            mock.call(TEST_ENTERPRISE_UUID, 'bob@foo.com'),
+            mock.call(str(TEST_ENTERPRISE_UUID), 'alice@foo.com'),
+            mock.call(str(TEST_ENTERPRISE_UUID), 'bob@foo.com'),
         ], any_order=True)
+
+        # Assertions about workflow record count and state
+        self.assertEqual(ProvisionNewCustomerWorkflow.objects.count(), 1)
+        self.assertEqual(GetCreateCustomerStep.objects.count(), 1)
+        self.assertEqual(GetCreateEnterpriseAdminUsersStep.objects.count(), 1)
+        workflow_record = ProvisionNewCustomerWorkflow.objects.first()
+        self.assertEqual(
+            workflow_record.output_data['create_customer_output']['uuid'],
+            str(TEST_ENTERPRISE_UUID),
+        )
+        self.assertEqual(
+            workflow_record.output_data['create_enterprise_admin_users_output']['enterprise_customer_uuid'],
+            str(TEST_ENTERPRISE_UUID),
+        )
+        self.assertEqual(
+            workflow_record.output_data['create_enterprise_admin_users_output']['existing_admins'],
+            [],
+        )
+        self.assertCountEqual(
+            workflow_record.output_data['create_enterprise_admin_users_output']['created_admins'],
+            [{'user_email': 'alice@foo.com'}, {'user_email': 'bob@foo.com'}],
+        )
 
     @ddt.data(
         # No admin users exist, two pending admins created.
@@ -234,49 +281,49 @@ class TestProvisioningEndToEnd(APITest):
             'existing_pending_admin_users': [],
             'create_pending_admins_called': True,
             'create_admin_user_side_effect': [
-                {'user_email': 'alice@foo.com', 'enterprise_customer_uuid': TEST_ENTERPRISE_UUID},
-                {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': TEST_ENTERPRISE_UUID},
+                {'user_email': 'alice@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
+                {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
             ],
             'expected_create_pending_admin_calls': [
-                mock.call(TEST_ENTERPRISE_UUID, 'alice@foo.com'),
-                mock.call(TEST_ENTERPRISE_UUID, 'bob@foo.com'),
+                mock.call(str(TEST_ENTERPRISE_UUID), 'alice@foo.com'),
+                mock.call(str(TEST_ENTERPRISE_UUID), 'bob@foo.com'),
             ],
         },
         # One pending admin exists, one new one created.
         {
             'existing_admin_users': [],
             'existing_pending_admin_users': [
-                {'user_email': 'alice@foo.com', 'enterprise_customer_uuid': TEST_ENTERPRISE_UUID},
+                {'user_email': 'alice@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
             ],
             'create_pending_admins_called': True,
             'create_admin_user_side_effect': [
-                {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': TEST_ENTERPRISE_UUID},
+                {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
             ],
             'expected_create_pending_admin_calls': [
-                mock.call(TEST_ENTERPRISE_UUID, 'bob@foo.com'),
+                mock.call(str(TEST_ENTERPRISE_UUID), 'bob@foo.com'),
             ],
         },
         # One full admin exists, one new pending admin created.
         {
             'existing_admin_users': [
-                {'email': 'alice@foo.com', 'enterprise_customer_uuid': TEST_ENTERPRISE_UUID},
+                {'email': 'alice@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
             ],
             'existing_pending_admin_users': [],
             'create_pending_admins_called': True,
             'create_admin_user_side_effect': [
-                {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': TEST_ENTERPRISE_UUID},
+                {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
             ],
             'expected_create_pending_admin_calls': [
-                mock.call(TEST_ENTERPRISE_UUID, 'bob@foo.com'),
+                mock.call(str(TEST_ENTERPRISE_UUID), 'bob@foo.com'),
             ],
         },
         # One full admin exists, one pending exists, none created.
         {
             'existing_admin_users': [
-                {'email': 'alice@foo.com', 'enterprise_customer_uuid': TEST_ENTERPRISE_UUID},
+                {'email': 'alice@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
             ],
             'existing_pending_admin_users': [
-                {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': TEST_ENTERPRISE_UUID},
+                {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
             ],
             'create_pending_admins_called': False,
             'create_admin_user_side_effect': [],
@@ -294,7 +341,7 @@ class TestProvisioningEndToEnd(APITest):
             'name': 'Test Customer',
             'slug': 'test-customer',
             'country': 'US',
-            'uuid': TEST_ENTERPRISE_UUID,
+            'uuid': str(TEST_ENTERPRISE_UUID),
         }
         mock_client.get_enterprise_admin_users.return_value = test_data['existing_admin_users']
         mock_client.get_enterprise_pending_admin_users.return_value = test_data['existing_pending_admin_users']
@@ -343,8 +390,8 @@ class TestProvisioningEndToEnd(APITest):
         )
         self.assertFalse(mock_client.create_enterprise_customer.called)
 
-        mock_client.get_enterprise_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
-        mock_client.get_enterprise_pending_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
+        mock_client.get_enterprise_admin_users.assert_called_once_with(str(TEST_ENTERPRISE_UUID))
+        mock_client.get_enterprise_pending_admin_users.assert_called_once_with(str(TEST_ENTERPRISE_UUID))
         if test_data['create_pending_admins_called']:
             mock_client.create_enterprise_admin_user.assert_has_calls(
                 test_data['expected_create_pending_admin_calls'],
@@ -352,3 +399,25 @@ class TestProvisioningEndToEnd(APITest):
             )
         else:
             self.assertFalse(mock_client.create_enterprise_admin_user.called)
+
+        # Assertions about workflow record count and state
+        self.assertEqual(ProvisionNewCustomerWorkflow.objects.count(), 1)
+        self.assertEqual(GetCreateCustomerStep.objects.count(), 1)
+        self.assertEqual(GetCreateEnterpriseAdminUsersStep.objects.count(), 1)
+        workflow_record = ProvisionNewCustomerWorkflow.objects.first()
+        self.assertEqual(
+            workflow_record.output_data['create_customer_output']['uuid'],
+            str(TEST_ENTERPRISE_UUID),
+        )
+        self.assertEqual(
+            workflow_record.output_data['create_enterprise_admin_users_output']['enterprise_customer_uuid'],
+            str(TEST_ENTERPRISE_UUID),
+        )
+        self.assertCountEqual(
+            workflow_record.output_data['create_enterprise_admin_users_output']['existing_admins'],
+            expected_existing_admins,
+        )
+        self.assertCountEqual(
+            workflow_record.output_data['create_enterprise_admin_users_output']['created_admins'],
+            expected_created_admins,
+        )
