@@ -41,7 +41,6 @@ from enterprise_access.apps.subsidy_access_policy.exceptions import MissingAssig
 from enterprise_access.apps.subsidy_access_policy.models import (
     ALLOW_LATE_ENROLLMENT_KEY,
     REQUEST_CACHE_NAMESPACE,
-    AssignedLearnerCreditAccessPolicy,
     PerLearnerEnrollmentCreditAccessPolicy,
     PerLearnerSpendCreditAccessPolicy,
     SubsidyAccessPolicy,
@@ -1043,22 +1042,24 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         Tests the model-level validation of this policy type.
         """
         with self.assertRaisesRegex(ValidationError, 'must define a spend_limit'):
-            AssignedLearnerCreditAccessPolicy(
+            policy = AssignedLearnerCreditAccessPolicyFactory(
                 spend_limit=None,
                 assignment_configuration=self.assignment_configuration,
-            ).clean()
+            )
+            policy.clean()
         with self.assertRaisesRegex(ValidationError, 'must not define a per-learner spend limit'):
-            AssignedLearnerCreditAccessPolicy(
-                spend_limit=1,
+            policy = AssignedLearnerCreditAccessPolicyFactory(
                 assignment_configuration=self.assignment_configuration,
                 per_learner_spend_limit=1,
-            ).clean()
+            )
+            policy.clean()
         with self.assertRaisesRegex(ValidationError, 'must not define a per-learner enrollment limit'):
-            AssignedLearnerCreditAccessPolicy(
+            policy = AssignedLearnerCreditAccessPolicyFactory(
                 spend_limit=1,
                 assignment_configuration=self.assignment_configuration,
                 per_learner_enrollment_limit=1,
-            ).clean()
+            )
+            policy.clean()
 
     def test_save(self):
         """
