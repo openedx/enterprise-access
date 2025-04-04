@@ -990,10 +990,19 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
     Viewset for Subsidy Access Policy Group Associations.
     """
     permission_classes = (permissions.IsAuthenticated,)
-    permission_required = SUBSIDY_ACCESS_POLICY_READ_PERMISSION
+    # permission_required = SUBSIDY_ACCESS_POLICY_READ_PERMISSION
     authentication_classes = (JwtAuthentication, authentication.SessionAuthentication)
     filter_backends = (filters.NoFilterOnDetailBackend,)
     lookup_field = 'uuid'
+
+    def get_permission_required(self):
+        """
+        Return specific permission name based on the view being requested
+        """
+        if self.action == 'delete_policy_group_association':
+            return [SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION]
+        return [SUBSIDY_ACCESS_POLICY_READ_PERMISSION]
+
 
     @cached_property
     def enterprise_customer_uuid(self):
@@ -1154,11 +1163,11 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
             subsidy_uuid: (required) The uuid associated with the subsidy access policy
             group_uuid: (required) The uuid associated with the EnterpriseGroup in edx-enterprise
         """
+        # kira
         try:
             policy_group_association = get_object_or_404(
                 PolicyGroupAssociation, subsidy_access_policy=subsidy_uuid, enterprise_group_uuid=group_uuid)
             policy_group_association.delete()
         except PolicyGroupAssociation.DoesNotExist:
             return Response(None, status=status.HTTP_404_NOT_FOUND)
-    
         return Response(status=status.HTTP_204_NO_CONTENT)

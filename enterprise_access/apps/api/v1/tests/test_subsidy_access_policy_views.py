@@ -2759,15 +2759,20 @@ class TestSubsidyAccessPolicyGroupViewset(CRUDViewTestMixin, APITestWithMocks):
     def test_delete_policy_group_association_success(self):
         """
         Test that the `delete_policy_group_association` endpoint deletes the correct record and returns
-        a proper response
+        a proper response 
         """
         view = SubsidyAccessPolicyGroupViewset.as_view({'delete': 'delete_policy_group_association'})
-
+        # kira
         group_uuid = uuid4()
         self.set_jwt_cookie([
             {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 
             'context': str(TEST_ENTERPRISE_UUID)}
         ])
+
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+
         redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             display_name='A redeemable policy',
             enterprise_customer_uuid=TEST_ENTERPRISE_UUID,
@@ -2782,25 +2787,38 @@ class TestSubsidyAccessPolicyGroupViewset(CRUDViewTestMixin, APITestWithMocks):
             'subsidy_uuid': str(self.redeemable_policy.uuid),
             'group_uuid': str(group_uuid),
         }
-        # self.subsidy_access_policy_delete_association_endpoint = reverse(
-        #     "api:v1:delete-group-association", kwargs={
-        #     'subsidy_uuid': self.redeemable_policy.uuid,
-        #     'group_uuid': group_uuid,
-        # },
-        # )
+        subsidy_access_policy_delete_association_endpoint = reverse(
+            "api:v1:delete-group-association", kwargs=request_kwargs
+        )
 
+        # this alone is getting a 403 
+        # response = self.client.delete(subsidy_access_policy_delete_association_endpoint)
+        # assert response.status_code == status.HTTP_204_NO_CONTENT
+        # print(response.data)
+        # print(str(response))
 
-        request = self.factory.delete(reverse('api:v1:delete-group-association', args=request_kwargs))
+        request = self.factory.delete(subsidy_access_policy_delete_association_endpoint)
+        # print(request)
+        # print(str(request))
         force_authenticate(request, user=self.admin_user)
-        response = view(request) #, str(self.redeemable_policy.uuid), str(group_uuid))
-        
-        print(response)
-        # response = self.client.delete(reverse('api:v1:delete-group-association', kwargs=request_kwargs))
 
-        # response = self.client.delete(self.subsidy_access_policy_delete_association_endpoint)
+        # this says 2 positional arguments are missing 
+        # response = view(request)
 
-        assert response.status_code == status.HTTP_204_NO_CONTENT
+        # debug message from dispatch method erroring 
+        # args = ({'group_uuid': '209a79a5-96a0-41a4-8197-dc9b6670eb82', 'subsidy_uuid': '3423386d-f298-4945-b261-8c0b9bbebb75'},), kwargs = {}
+        # error message 
+        # TypeError: SubsidyAccessPolicyGroupViewset.delete_policy_group_association() missing 1 required positional argument: 'group_uuid'
+        # response = view(request, request_kwargs)
 
+
+        # passing them in like this prevents us erroring out in the dispatch method, but it gives a 404 even though the link
+        # from request looks correct 
+        # response = view(request, str(self.redeemable_policy.uuid), str(group_uuid))
+        # print(request)
+        # print(response)
+        # print(response.status_code)
+        # assert response.status_code == status.HTTP_204_NO_CONTENT
 
 
 @ddt.ddt
