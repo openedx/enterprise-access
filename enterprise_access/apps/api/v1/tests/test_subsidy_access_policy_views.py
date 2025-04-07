@@ -15,7 +15,7 @@ from django.core.exceptions import ValidationError
 from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
-from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework.test import APIRequestFactory
 
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
 from enterprise_access.apps.content_assignments.constants import (
@@ -2510,11 +2510,6 @@ class TestSubsidyAccessPolicyGroupViewset(CRUDViewTestMixin, APITestWithMocks):
 
     def setUp(self):
         super().setUp()
-        self.factory = APIRequestFactory()
-        self.User = get_user_model()
-        self.admin_user = self.User.objects.create_superuser(
-            username='admin', password='password', email='admin@example.com'
-        )
         self.assignment_configuration = AssignmentConfigurationFactory(
             enterprise_customer_uuid=self.enterprise_uuid,
         )
@@ -2761,13 +2756,13 @@ class TestSubsidyAccessPolicyGroupViewset(CRUDViewTestMixin, APITestWithMocks):
         Test that the `delete_policy_group_association` endpoint deletes the correct record and returns
         a proper response 
         """
-        view = SubsidyAccessPolicyGroupViewset.as_view({'delete': 'delete_policy_group_association'})
+        #view = SubsidyAccessPolicyGroupViewset.as_view({'delete': 'delete_policy_group_association'})
         # kira
         group_uuid = uuid4()
-        self.set_jwt_cookie([
-            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 
-            'context': str(TEST_ENTERPRISE_UUID)}
-        ])
+        #self.set_jwt_cookie([
+        #    {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
+        #    'context': str(TEST_ENTERPRISE_UUID)}
+        #])
 
         self.set_jwt_cookie([
             {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
@@ -2779,30 +2774,31 @@ class TestSubsidyAccessPolicyGroupViewset(CRUDViewTestMixin, APITestWithMocks):
             spend_limit=3,
             active=True,
         )
-        self.policy_group_association = PolicyGroupAssociation.objects.create(
+        policy_group_association = PolicyGroupAssociation.objects.create(
             subsidy_access_policy=redeemable_policy,
             enterprise_group_uuid=group_uuid
         )
         request_kwargs = {
-            'subsidy_uuid': str(self.redeemable_policy.uuid),
+            'uuid': str(self.redeemable_policy.uuid),
             'group_uuid': str(group_uuid),
         }
         subsidy_access_policy_delete_association_endpoint = reverse(
             "api:v1:delete-group-association", kwargs=request_kwargs
         )
 
-        # this alone is getting a 403 
-        # response = self.client.delete(subsidy_access_policy_delete_association_endpoint)
-        # assert response.status_code == status.HTTP_204_NO_CONTENT
+        # this alone is getting a 403
+        response = self.client.delete(subsidy_access_policy_delete_association_endpoint)
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        
         # print(response.data)
         # print(str(response))
 
-        request = self.factory.delete(subsidy_access_policy_delete_association_endpoint)
+        #request = self.factory.delete(subsidy_access_policy_delete_association_endpoint)
         # print(request)
         # print(str(request))
-        force_authenticate(request, user=self.admin_user)
+        #force_authenticate(request, user=self.admin_user)
 
-        # this says 2 positional arguments are missing 
+        # this says 2 positional arguments are missing
         # response = view(request)
 
         # debug message from dispatch method erroring 

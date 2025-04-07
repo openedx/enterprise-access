@@ -1156,17 +1156,17 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
         },
     )
     @action(detail=False, methods=['delete'])
-    def delete_policy_group_association(self, request, subsidy_uuid, group_uuid, *args, uuid=None, **kwargs):
+    def delete_policy_group_association(self, request, uuid, group_uuid, *args, **kwargs):
         """
         Delete a single `PolicyGroupAssociation` record by uuid.
         Params:
-            subsidy_uuid: (required) The uuid associated with the subsidy access policy
+            uuid: (required) The uuid associated with the subsidy access policy
             group_uuid: (required) The uuid associated with the EnterpriseGroup in edx-enterprise
         """
         # kira
         try:
             policy_group_association = get_object_or_404(
-                PolicyGroupAssociation, subsidy_access_policy=subsidy_uuid, enterprise_group_uuid=group_uuid)
+                PolicyGroupAssociation, subsidy_access_policy=uuid, enterprise_group_uuid=group_uuid)
             policy_group_association.delete()
         except PolicyGroupAssociation.DoesNotExist:
             return Response(None, status=status.HTTP_404_NOT_FOUND)

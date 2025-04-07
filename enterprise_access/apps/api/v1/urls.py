@@ -43,7 +43,7 @@ urlpatterns = [
         name='aggregated-subsidy-enrollments'
     ),
     path(
-        'subsidy-access-policies/<subsidy_uuid>/delete-group-association/<group_uuid>',
+        'subsidy-access-policies/<uuid>/delete-group-association/<group_uuid>',
         views.SubsidyAccessPolicyGroupViewset.as_view({'delete': 'delete_policy_group_association'}),
         name='delete-group-association'
     ),
