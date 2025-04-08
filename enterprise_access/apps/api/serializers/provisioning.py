@@ -49,16 +49,31 @@ class PendingCustomerAdminRequestSerializer(BaseSerializer):
     )
 
 
+class EnterpriseCatalogRequestSerializer(BaseSerializer):
+    """
+    Catalog object serializer for provisioning requests.
+    """
+    title = serializers.CharField(
+        help_text='The name of the Enterprise Catalog.',
+    )
+    catalog_query_id = serializers.IntegerField(
+        help_text='The id of the related Catalog Query.',
+    )
+
+
 class ProvisioningRequestSerializer(BaseSerializer):
     """
     Request serializer for provisioning create view.
     """
     enterprise_customer = EnterpriseCustomerRequestSerializer(
-        help_text='Object describing the requested Enterprise Customer.'
+        help_text='Object describing the requested Enterprise Customer.',
     )
     pending_admins = PendingCustomerAdminRequestSerializer(
         help_text='List of objects containing requested customer admin email addresses.',
         many=True,
+    )
+    enterprise_catalog = EnterpriseCatalogRequestSerializer(
+        help_text='Object describing the requested Enterprise Catalog.',
     )
 
 
@@ -98,9 +113,20 @@ class AdminObjectResponseSerializer(BaseSerializer):
     existing_admins = ExistingCustomerAdminResponseSerializer(many=True)
 
 
+class EnterpriseCatalogResponseSerializer(BaseSerializer):
+    """
+    Catalog object serializer for provisioning responses.
+    """
+    uuid = serializers.UUIDField()
+    enterprise_customer_uuid = serializers.UUIDField()
+    title = serializers.CharField()
+    catalog_query_id = serializers.IntegerField()
+
+
 class ProvisioningResponseSerializer(BaseSerializer):
     """
     Response serializer for provisioning create view.
     """
     enterprise_customer = EnterpriseCustomerResponseSerializer()
     customer_admins = AdminObjectResponseSerializer()
+    enterprise_catalog = EnterpriseCatalogResponseSerializer()

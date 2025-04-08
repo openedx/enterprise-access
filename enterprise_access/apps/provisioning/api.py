@@ -85,3 +85,26 @@ def get_or_create_enterprise_admin_users(enterprise_customer_uuid, user_emails):
             key=itemgetter('user_email'),
         ),
     }
+
+
+def get_or_create_enterprise_catalog(enterprise_customer_uuid, catalog_title, catalog_query_id, **kwargs):
+    """
+    Get or creates an enterprise catalog with the provided arguments.
+    """
+    client = LmsApiClient()
+    existing_catalogs = client.get_enterprise_catalogs(
+        enterprise_customer_uuid=enterprise_customer_uuid,
+        catalog_query_id=catalog_query_id,
+    )
+    if existing_catalogs:
+        matching_catalog = existing_catalogs[0]
+        logger.info('Provisioning: enterprise catalog with uuid %s already exists', matching_catalog.get('uuid'))
+        return matching_catalog
+
+    created_catalog = client.create_enterprise_catalog(
+        enterprise_customer_uuid=enterprise_customer_uuid,
+        catalog_title=catalog_title,
+        catalog_query_id=catalog_query_id,
+    )
+    logger.info('Provisioning: created enterprise catalog with uuid %s', created_catalog.get('uuid'))
+    return created_catalog

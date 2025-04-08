@@ -54,9 +54,10 @@ class ProvisioningCreateView(PermissionRequiredMixin, generics.CreateAPIView):
             record.get('user_email')
             for record in request_serializer.validated_data['pending_admins']
         ]
+        catalog_request_data = request_serializer.validated_data['enterprise_catalog']
 
         workflow_input_dict = ProvisionNewCustomerWorkflow.generate_input_dict(
-            customer_request_data, admin_emails,
+            customer_request_data, admin_emails, catalog_request_data,
         )
         workflow = ProvisionNewCustomerWorkflow.objects.create(input_data=workflow_input_dict)
         try:
@@ -70,6 +71,7 @@ class ProvisioningCreateView(PermissionRequiredMixin, generics.CreateAPIView):
         response_serializer = serializers.ProvisioningResponseSerializer({
             'enterprise_customer': workflow.customer_output_dict(),
             'customer_admins': workflow.admin_users_output_dict(),
+            'enterprise_catalog': workflow.catalog_output_dict(),
         })
         return Response(
             response_serializer.data,

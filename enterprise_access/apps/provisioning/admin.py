@@ -32,6 +32,7 @@ class ProvisionNewCustomerWorkflowAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
         'modified',
         'create_customer_step_link',
         'create_admin_users_step_link',
+        'create_catalog_step_link',
     )
 
     def create_customer_step_link(self, obj):
@@ -53,6 +54,16 @@ class ProvisionNewCustomerWorkflowAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
             step_record.pk,
         ))
     create_admin_users_step_link.short_description = 'Create Admin Users Step'
+
+    def create_catalog_step_link(self, obj):
+        step_record = obj.get_create_catalog_step()
+        if not step_record:
+            return None
+        return mark_safe('<a href="{}">{}</a>'.format(
+            reverse("admin:provisioning_getcreatecatalogstep_change", args=(step_record.pk,)),
+            step_record.pk,
+        ))
+    create_catalog_step_link.short_description = 'Create Catalog Step'
 
 
 class ProvisionWorkflowStepAdminBase(admin.ModelAdmin):
@@ -112,3 +123,22 @@ class GetCreateEnterpriseAdminUsersStep(DjangoQLSearchMixin, ProvisionWorkflowSt
             step_record.pk,
         ))
     preceding_step_link.short_description = 'Preceding customer creation step'
+
+
+@admin.register(models.GetCreateCatalogStep)
+class GetCreateCatalogStep(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
+    """
+    Admin model for the catalog creation step.
+    """
+    fields = ProvisionWorkflowStepAdminBase.fields + ('preceding_step_link',)
+    readonly_fields = ProvisionWorkflowStepAdminBase.readonly_fields + ('preceding_step_link',)
+
+    def preceding_step_link(self, obj):
+        step_record = obj.get_preceding_step_record()
+        if not step_record:
+            return None
+        return mark_safe('<a href="{}">{}</a>'.format(
+            reverse("admin:provisioning_getcreateenterpriseadminusersstep_change", args=(step_record.pk,)),
+            step_record.pk,
+        ))
+    preceding_step_link.short_description = 'Preceding admin users creation step'
