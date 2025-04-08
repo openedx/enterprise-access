@@ -26,6 +26,8 @@ PROVISIONING_CREATE_ENDPOINT = reverse('api:v1:provisioning-create')
 
 TEST_ENTERPRISE_UUID = uuid.uuid4()
 
+TEST_CATALOG_UUID = uuid.uuid4()
+
 
 @ddt.ddt
 class TestProvisioningAuth(APITest):
@@ -84,10 +86,12 @@ class TestProvisioningAuth(APITest):
         ),
     )
     @ddt.unpack
+    @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_enterprise_catalog')
     @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_enterprise_admin_users')
     @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_enterprise_customer')
     def test_provisioning_create_allowed_for_provisioning_admins(
-            self, role_context_dict, expected_response_code, mock_create_customer, mock_create_admins,
+        self, role_context_dict, expected_response_code, mock_create_customer,
+        mock_create_admins, mock_create_catalog
     ):
         """
         Tests that we get expected 200 response for the provisioning create view when
@@ -107,6 +111,12 @@ class TestProvisioningAuth(APITest):
             }],
             "existing_admins": [],
         }
+        mock_create_catalog.return_value = {
+            'uuid': str(TEST_CATALOG_UUID),
+            'enterprise_customer': str(TEST_ENTERPRISE_UUID),
+            'title': 'Test catalog',
+            'enterprise_catalog_query': 2,
+        }
 
         request_payload = {
             "enterprise_customer": {
@@ -119,6 +129,10 @@ class TestProvisioningAuth(APITest):
                     "user_email": "test-admin@example.com",
                 },
             ],
+            "enterprise_catalog": {
+                "title": "Test catalog",
+                "catalog_query_id": 2,
+            },
         }
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
         assert response.status_code == expected_response_code
@@ -202,6 +216,12 @@ class TestProvisioningEndToEnd(APITest):
             {'user_email': 'alice@foo.com', 'enterprise_customer_uuid': TEST_ENTERPRISE_UUID},
             {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': TEST_ENTERPRISE_UUID},
         ]
+        mock_client.get_enterprise_catalogs.return_value = [{
+            'uuid': str(TEST_CATALOG_UUID),
+            'enterprise_customer': str(TEST_ENTERPRISE_UUID),
+            'title': 'Test catalog',
+            'enterprise_catalog_query': 2,
+        }]
 
         request_payload = {
             "enterprise_customer": {
@@ -213,6 +233,10 @@ class TestProvisioningEndToEnd(APITest):
                 {'user_email': 'alice@foo.com'},
                 {'user_email': 'bob@foo.com'},
             ],
+            'enterprise_catalog': {
+                'title': 'Test catalog',
+                'catalog_query_id': 2,
+            },
         }
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
         assert response.status_code == status.HTTP_201_CREATED
@@ -230,6 +254,12 @@ class TestProvisioningEndToEnd(APITest):
                     {'user_email': 'bob@foo.com'},
                 ],
                 'existing_admins': [],
+            },
+            'enterprise_catalog': {
+                'uuid': str(TEST_CATALOG_UUID),
+                'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
+                'title': 'Test catalog',
+                'catalog_query_id': 2,
             },
         }
         actual_response_payload = response.json()
@@ -346,6 +376,12 @@ class TestProvisioningEndToEnd(APITest):
         mock_client.get_enterprise_admin_users.return_value = test_data['existing_admin_users']
         mock_client.get_enterprise_pending_admin_users.return_value = test_data['existing_pending_admin_users']
         mock_client.create_enterprise_admin_user.side_effect = test_data['create_admin_user_side_effect']
+        mock_client.get_enterprise_catalogs.return_value = [{
+            'uuid': str(TEST_CATALOG_UUID),
+            'enterprise_customer': str(TEST_ENTERPRISE_UUID),
+            'title': 'Test catalog',
+            'enterprise_catalog_query': 2,
+        }]
 
         request_payload = {
             'enterprise_customer': {
@@ -357,6 +393,10 @@ class TestProvisioningEndToEnd(APITest):
                 {'user_email': 'alice@foo.com'},
                 {'user_email': 'bob@foo.com'},
             ],
+            'enterprise_catalog': {
+                'title': 'Test catalog',
+                'catalog_query_id': 2,
+            },
         }
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
         assert response.status_code == status.HTTP_201_CREATED
@@ -380,6 +420,12 @@ class TestProvisioningEndToEnd(APITest):
             'customer_admins': {
                 'created_admins': expected_created_admins,
                 'existing_admins': expected_existing_admins,
+            },
+            'enterprise_catalog': {
+                'uuid': str(TEST_CATALOG_UUID),
+                'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
+                'title': 'Test catalog',
+                'catalog_query_id': 2,
             },
         }
         actual_response_payload = response.json()
@@ -421,3 +467,91 @@ class TestProvisioningEndToEnd(APITest):
             workflow_record.output_data['create_enterprise_admin_users_output']['created_admins'],
             expected_created_admins,
         )
+
+    @ddt.data(
+        {
+            'existing_catalogs': [],
+            'catalog_to_create': {
+                'uuid': str(TEST_CATALOG_UUID),
+                'enterprise_customer': str(TEST_ENTERPRISE_UUID),
+                'title': 'Test catalog',
+                'enterprise_catalog_query': 2,
+            },
+        },
+        {
+            'existing_catalogs': [{
+                'uuid': str(TEST_CATALOG_UUID),
+                'enterprise_customer': str(TEST_ENTERPRISE_UUID),
+                'title': 'Test catalog',
+                'enterprise_catalog_query': 2,
+            }],
+            'catalog_to_create': {},
+        },
+    )
+    @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
+    def test_catalog_fetched_or_created(self, test_data, mock_lms_api_client):
+        """
+        Tests cases where the customer exists, no admins are needed, and we
+        either fetch or create a catalog record
+        """
+        mock_client = mock_lms_api_client.return_value
+        mock_client.get_enterprise_customer_data.return_value = {
+            'name': 'Test Customer',
+            'slug': 'test-customer',
+            'country': 'US',
+            'uuid': str(TEST_ENTERPRISE_UUID),
+        }
+        mock_client.get_enterprise_admin_users.return_value = []
+        mock_client.get_enterprise_pending_admin_users.return_value = []
+        mock_client.get_enterprise_catalogs.return_value = test_data['existing_catalogs']
+        if test_data['catalog_to_create']:
+            mock_client.create_enterprise_catalog.return_value = test_data['catalog_to_create']
+
+        request_payload = {
+            'enterprise_customer': {
+                'name': 'Test Customer',
+                'slug': 'test-customer',
+                'country': 'US',
+            },
+            'pending_admins': [],
+            'enterprise_catalog': {
+                'title': 'Test catalog',
+                'catalog_query_id': 2,
+            },
+        }
+        response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
+        assert response.status_code == status.HTTP_201_CREATED
+
+        expected_response_payload = {
+            'enterprise_customer': {
+                'name': 'Test Customer',
+                'slug': 'test-customer',
+                'country': 'US',
+                'uuid': str(TEST_ENTERPRISE_UUID),
+            },
+            'customer_admins': {
+                'created_admins': [],
+                'existing_admins': [],
+            },
+            'enterprise_catalog': {
+                'uuid': str(TEST_CATALOG_UUID),
+                'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
+                'title': 'Test catalog',
+                'catalog_query_id': 2,
+            },
+        }
+        actual_response_payload = response.json()
+        self.assertEqual(actual_response_payload, expected_response_payload)
+
+        mock_client.get_enterprise_catalogs.assert_called_once_with(
+            enterprise_customer_uuid=str(TEST_ENTERPRISE_UUID),
+            catalog_query_id=2,
+        )
+        if test_data['catalog_to_create']:
+            mock_client.create_enterprise_catalog.assert_called_once_with(
+                enterprise_customer_uuid=str(TEST_ENTERPRISE_UUID),
+                catalog_title='Test catalog',
+                catalog_query_id=2,
+            )
+        else:
+            self.assertFalse(mock_client.create_enterprise_catalog.called)
