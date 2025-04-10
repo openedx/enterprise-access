@@ -45,6 +45,10 @@ subsidy_request.HistoricalLicenseRequest:
   ".. no_pii:": "This model has no PII"
 subsidy_request.HistoricalCouponCodeRequest:
   ".. no_pii:": "This model has no PII"
+subsidy_request.HistoricalLearnerCreditRequest:
+  ".. no_pii:": "This model has no PII"
+subsidy_request.HistoricalLearnerCreditRequestConfiguration:
+  ".. no_pii:": "This model has no PII"
 subsidy_request.HistoricalSubsidyRequestCustomerConfiguration:
   ".. no_pii:": "This model has no PII"
 subsidy_access_policy.HistoricalForcedPolicyRedemption:

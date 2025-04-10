@@ -9,6 +9,9 @@ class SubsidyRequestStates:
     APPROVED = 'approved'
     DECLINED = 'declined'
     ERROR = 'error'
+    CANCELLED = 'cancelled'
+    EXPIRED = 'expired'
+    REVERSED = 'reversed'
 
     CHOICES = (
         (REQUESTED, "Requested"),
@@ -16,6 +19,9 @@ class SubsidyRequestStates:
         (APPROVED, "Approved"),
         (DECLINED, "Declined"),
         (ERROR, "Error"),
+        (CANCELLED, "Cancelled"),
+        (EXPIRED, "Expired"),
+        (REVERSED, "Reversed"),
     )
 
 
