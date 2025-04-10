@@ -79,6 +79,7 @@ SUBSIDY_ACCESS_POLICY_CRUD_API_TAG = 'Subsidy Access Policies CRUD'
 SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG = 'Subsidy Access Policy Redemption'
 SUBSIDY_ACCESS_POLICY_ALLOCATION_API_TAG = 'Subsidy Access Policy Allocation'
 GROUP_MEMBER_DATA_WITH_AGGREGATES_API_TAG = 'Group Member Data With Aggregates'
+DELETE_POLICY_GROUP_ASSOCIATION_API_TAG = 'Delete Policy Group Association'
 
 
 def group_members_with_aggregates_next_page(current_url):
@@ -1009,10 +1010,17 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
     Viewset for Subsidy Access Policy Group Associations.
     """
     permission_classes = (permissions.IsAuthenticated,)
-    permission_required = SUBSIDY_ACCESS_POLICY_READ_PERMISSION
     authentication_classes = (JwtAuthentication, authentication.SessionAuthentication)
     filter_backends = (filters.NoFilterOnDetailBackend,)
     lookup_field = 'uuid'
+
+    def get_permission_required(self):
+        """
+        Return specific permission name based on the view being requested
+        """
+        if self.action == 'delete_policy_group_association':
+            return [SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION]
+        return [SUBSIDY_ACCESS_POLICY_READ_PERMISSION]
 
     @cached_property
     def enterprise_customer_uuid(self):
@@ -1020,11 +1028,14 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
         Returns the enterprise customer uuid from request data based.
         """
         enterprise_uuid = ''
-        policy_uuid = self.kwargs.get('uuid')
-        with suppress(ValidationError):  # Ignore if `policy_uuid` is not a valid uuid
-            policy = SubsidyAccessPolicy.objects.filter(uuid=policy_uuid).first()
-            if policy:
-                enterprise_uuid = policy.enterprise_customer_uuid
+        if self.action == 'delete_policy_group_association':
+            enterprise_uuid = self.kwargs.get('enterprise_uuid')
+        else:
+            policy_uuid = self.kwargs.get('uuid')
+            with suppress(ValidationError):  # Ignore if `policy_uuid` is not a valid uuid
+                policy = SubsidyAccessPolicy.objects.filter(uuid=policy_uuid).first()
+                if policy:
+                    enterprise_uuid = policy.enterprise_customer_uuid
         return enterprise_uuid
 
     def get_permission_object(self):
@@ -1156,3 +1167,28 @@ class SubsidyAccessPolicyGroupViewset(UserDetailsFromJwtMixin, PermissionRequire
             num_member_results,
         )
         return Response(data=member_response, status=200)
+
+    @extend_schema(
+        tags=[DELETE_POLICY_GROUP_ASSOCIATION_API_TAG],
+        summary='Delete a PolicyGroupAssociation record.',
+        responses={
+            status.HTTP_204_NO_CONTENT: None,
+            status.HTTP_404_NOT_FOUND: None,
+        },
+    )
+    @action(detail=False, methods=['delete'])
+    def delete_policy_group_association(
+        self, request, enterprise_uuid, group_uuid, *args, **kwargs  # pylint: disable=unused-argument
+    ):
+        """
+        Delete all `PolicyGroupAssociation` records associated with the group uuid.
+        Params:
+            enterprise_uuid: (required) The enterprise customer associated with the EnterpriseGroup
+            group_uuid: (required) The uuid associated with the EnterpriseGroup in edx-enterprise
+        """
+        try:
+            policy_group_associations = PolicyGroupAssociation.objects.filter(enterprise_group_uuid=group_uuid)
+            policy_group_associations.delete()
+        except PolicyGroupAssociation.DoesNotExist:
+            return Response(None, status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
