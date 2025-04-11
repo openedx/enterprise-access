@@ -42,7 +42,7 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     PolicyTypes,
     TransactionStateChoices
 )
-from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+from enterprise_access.apps.subsidy_access_policy.models import PolicyGroupAssociation, SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
@@ -825,7 +825,6 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
         ])
 
-        self.maxDiff = None
         policy_for_edit = policy_class(
             enterprise_customer_uuid=self.enterprise_uuid,
             spend_limit=5,
@@ -2745,6 +2744,53 @@ class TestSubsidyAccessPolicyGroupViewset(CRUDViewTestMixin, APITestWithMocks):
         assert rows[0] == 'email,name,Recent Action,Enrollment Number,Activation Date,status'
         # Make sure the `subsidy_learners_aggregate_data` has been zipped with group membership data
         assert rows[1] == 'foobar@example.com,foobar,"Accepted: April 24, 2024",99,,accepted'
+
+    def test_delete_policy_group_association_success(self):
+        """
+        Test that the `delete_policy_group_association` endpoint deletes the correct record and returns
+        a proper response
+        """
+        group_uuid = uuid4()
+        self.set_jwt_cookie([
+            {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
+        ])
+        redeemable_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            display_name='A redeemable policy',
+            enterprise_customer_uuid=TEST_ENTERPRISE_UUID,
+            spend_limit=3,
+            active=True,
+        )
+        redeemable_policy_2 = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            display_name='Another redeemable policy!',
+            enterprise_customer_uuid=TEST_ENTERPRISE_UUID,
+            spend_limit=3,
+            active=True,
+        )
+        PolicyGroupAssociation.objects.create(
+            subsidy_access_policy=redeemable_policy,
+            enterprise_group_uuid=group_uuid
+        )
+        PolicyGroupAssociation.objects.create(
+            subsidy_access_policy=redeemable_policy_2,
+            enterprise_group_uuid=group_uuid
+        )
+        assert PolicyGroupAssociation.objects.filter(
+            enterprise_group_uuid=group_uuid
+        ).count() == 2
+
+        request_kwargs = {
+            'enterprise_uuid': str(TEST_ENTERPRISE_UUID),
+            'group_uuid': str(group_uuid),
+        }
+        subsidy_access_policy_delete_association_endpoint = reverse(
+            "api:v1:delete-group-association", kwargs=request_kwargs
+        )
+
+        response = self.client.delete(subsidy_access_policy_delete_association_endpoint)
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert PolicyGroupAssociation.objects.filter(
+            enterprise_group_uuid=group_uuid
+        ).count() == 0
 
 
 @ddt.ddt
