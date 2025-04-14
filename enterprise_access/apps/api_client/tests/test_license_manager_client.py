@@ -1,15 +1,15 @@
 """
 Tests for License Manager client.
 """
-
+import uuid
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
 from django.conf import settings
 from django.test import RequestFactory, TestCase
-from requests import Response
 
 from enterprise_access.apps.api_client.license_manager_client import (
+    NEW_SUBSCRIPTION_CHANGE_REASON,
     LicenseManagerApiClient,
     LicenseManagerUserApiClient
 )
@@ -21,27 +21,113 @@ class TestLicenseManagerApiClient(TestCase):
     Test License Manager client.
     """
 
-    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient', autospec=True)
     def test_get_subscription(self, mock_oauth_client):
         """
         Verify client hits the right URL.
         """
-        mock_get = mock.Mock()
-        mock_get.return_value = Response()
-        mock_oauth_client.get = mock_get
+        mock_get = mock_oauth_client.return_value.get
 
         lm_client = LicenseManagerApiClient()
-        lm_client.get_subscription_overview('some_subscription_uuid')
+        result = lm_client.get_subscription_overview('some_subscription_uuid')
 
+        self.assertEqual(result, mock_get.return_value.json.return_value)
         expected_url = (
             'http://license-manager.example.com'
             '/api/v1/'
             'subscriptions/some_subscription_uuid'
             '/licenses/overview'
         )
-        mock_oauth_client.return_value.get.assert_called_with(
+        mock_get.assert_called_once_with(
             expected_url,
             timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT,
+        )
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient', autospec=True)
+    def test_get_customer_agreement(self, mock_oauth_client):
+        mock_get = mock_oauth_client.return_value.get
+        mock_get.return_value.json.return_value = {
+            'results': [{'foo': 'bar'}],
+        }
+
+        lm_client = LicenseManagerApiClient()
+        result = lm_client.get_customer_agreement('some-customer-uuid')
+
+        self.assertEqual(result, {'foo': 'bar'})
+        expected_url = (
+            'http://license-manager.example.com'
+            '/api/v1/customer-agreement/?enterprise_customer_uuid=some-customer-uuid'
+        )
+        mock_get.assert_called_with(expected_url)
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient', autospec=True)
+    def test_create_customer_agreement(self, mock_oauth_client):
+        mock_post = mock_oauth_client.return_value.post
+        customer_uuid = uuid.uuid4()
+        catalog_uuid = uuid.uuid4()
+        lm_client = LicenseManagerApiClient()
+
+        result = lm_client.create_customer_agreement(
+            customer_uuid, 'customer-slug', default_catalog_uuid=catalog_uuid,
+            disable_expiration_notifications=True,
+        )
+
+        self.assertEqual(result, mock_post.return_value.json.return_value)
+        expected_url = (
+            'http://license-manager.example.com'
+            '/api/v1/provisioning-admins/customer-agreement/'
+        )
+        expected_payload = {
+            'enterprise_customer_uuid': str(customer_uuid),
+            'enterprise_customer_slug': 'customer-slug',
+            'default_enterprise_catalog_uuid': str(catalog_uuid),
+            'disable_expiration_notifications': True,
+        }
+        mock_post.assert_called_once_with(
+            expected_url,
+            json=expected_payload,
+        )
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient', autospec=True)
+    def test_create_subscription_plan(self, mock_oauth_client):
+        mock_post = mock_oauth_client.return_value.post
+        customer_agreement_uuid = uuid.uuid4()
+        enterprise_catalog_uuid = uuid.uuid4()
+        salesforce_opportunity_line_item = '123abc'
+        title = 'My new subscription plan'
+        start_date = '2025-01-01'
+        expiration_date = '2026-12-31'
+        desired_num_licenses = 10
+
+        lm_client = LicenseManagerApiClient()
+
+        result = lm_client.create_subscription_plan(
+            customer_agreement_uuid, enterprise_catalog_uuid, salesforce_opportunity_line_item,
+            title, start_date, expiration_date, desired_num_licenses, other_field='foo'
+        )
+
+        self.assertEqual(result, mock_post.return_value.json.return_value)
+        expected_url = (
+            'http://license-manager.example.com'
+            '/api/v1/provisioning-admins/subscriptions/'
+        )
+        expected_payload = {
+            'customer_agreement': str(customer_agreement_uuid),
+            'enterprise_catalog_uuid': str(enterprise_catalog_uuid),
+            'salesforce_opportunity_line_item': salesforce_opportunity_line_item,
+            'title': title,
+            'start_date': start_date,
+            'expiration_date': expiration_date,
+            'desired_num_licenses': desired_num_licenses,
+            'change_reason': NEW_SUBSCRIPTION_CHANGE_REASON,
+            'for_internal_use_only': settings.PROVISIONING_DEFAULTS['subscription']['for_internal_use_only'],
+            'product': settings.PROVISIONING_DEFAULTS['subscription']['product_id'],
+            'is_active': settings.PROVISIONING_DEFAULTS['subscription']['is_active'],
+            'other_field': 'foo',
+        }
+        mock_post.assert_called_once_with(
+            expected_url,
+            json=expected_payload,
         )
 
 

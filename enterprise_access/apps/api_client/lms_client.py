@@ -200,7 +200,7 @@ class LmsApiClient(BaseOAuthClient):
             'slug': slug,
             'country': country,
             'site': {
-                'domain': settings.DEFAULT_CUSTOMER_SITE,
+                'domain': settings.PROVISIONING_DEFAULTS['customer']['site_domain'],
             },
             **kwargs,
         }
@@ -373,10 +373,11 @@ class LmsApiClient(BaseOAuthClient):
         Returns:
             A create enterprise catalog dict.
         """
+        query_id = catalog_query_id or settings.PROVISIONING_DEFAULTS['catalog']['catalog_query_id']
         payload = {
             'enterprise_customer': enterprise_customer_uuid,
             'title': catalog_title,
-            'enterprise_catalog_query': catalog_query_id,
+            'enterprise_catalog_query': query_id,
         }
 
         response = self.client.post(

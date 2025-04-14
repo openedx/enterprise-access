@@ -500,7 +500,7 @@ class TestLmsApiClient(TestCase):
         self.assertEqual(response_payload, mock_created_customer_payload)
         expected_url = 'http://edx-platform.example.com/enterprise/api/v1/enterprise-customer/'
         expected_input = {
-            'site': {'domain': settings.DEFAULT_CUSTOMER_SITE},
+            'site': {'domain': settings.PROVISIONING_DEFAULTS['customer']['site_domain']},
             **customer_input,
         }
         mock_post.assert_called_once_with(
@@ -608,7 +608,7 @@ class TestLmsApiClient(TestCase):
 
         expected_url = 'http://edx-platform.example.com/enterprise/api/v1/enterprise-customer/'
         expected_input = {
-            'site': {'domain': settings.DEFAULT_CUSTOMER_SITE},
+            'site': {'domain': settings.PROVISIONING_DEFAULTS['customer']['site_domain']},
             **customer_input,
         }
         mock_post.assert_called_once_with(

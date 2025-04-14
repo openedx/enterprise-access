@@ -541,4 +541,17 @@ SALES_CONTRACT_REFERENCE_PROVIDER_NAME = 'Salesforce OpportunityLineItem'
 SALES_CONTRACT_REFERENCE_PROVIDER_SLUG = 'salesforce_opportunity_line_item'
 
 # Settings for creation of enterprise customers
-DEFAULT_CUSTOMER_SITE = 'example.com'
+
+PROVISIONING_DEFAULTS = {
+    'customer': {
+        'site_domain': 'example.com',
+    },
+    'subscription': {
+        'is_active': True,
+        'product_id': 1,
+        'for_internal_use_only': True,
+    },
+    'catalog': {
+        'catalog_query_id': 1,
+    },
+}

@@ -12,13 +12,19 @@ from enterprise_access.apps.api_client.base_user import BaseUserApiClient
 logger = logging.getLogger(__name__)
 
 
+NEW_SUBSCRIPTION_CHANGE_REASON = 'new'
+
+
 class LicenseManagerApiClient(BaseOAuthClient):
     """
     API client for calls to the license-manager service.
     """
     api_base_url = settings.LICENSE_MANAGER_URL + '/api/v1/'
     subscriptions_endpoint = api_base_url + 'subscriptions/'
-    admin_license_view_endpoint = f"{api_base_url}admin-license-view/"
+    admin_license_view_endpoint = api_base_url + 'admin-license-view/'
+    customer_agreement_endpoint = api_base_url + 'customer-agreement/'
+    customer_agreement_provisioning_endpoint = api_base_url + 'provisioning-admins/customer-agreement/'
+    subscription_provisioning_endpoint = api_base_url + 'provisioning-admins/subscriptions/'
 
     def get_subscription_overview(self, subscription_uuid):
         """
@@ -102,6 +108,90 @@ class LicenseManagerApiClient(BaseOAuthClient):
             return response.json()
         except requests.exceptions.HTTPError as exc:
             logger.exception(exc)
+            raise
+
+    def get_customer_agreement(self, customer_uuid):
+        """
+        Fetches the first customer agreement for the customer with the given uuid,
+        returns None if no such agreements exist. The resulting dictionary also contains
+        a list of all active subscription plans for the agreement in the "subscriptions" key.
+        """
+        endpoint = self.customer_agreement_endpoint + f'?enterprise_customer_uuid={customer_uuid}'
+        response = self.client.get(endpoint)
+
+        try:
+            response.raise_for_status()
+            results = response.json().get('results', [])
+            if not results:
+                return None
+            return results[0]
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Error fetching customer agreements for customer id %s, response: %s, exc: %s',
+                customer_uuid, response.content.decode(), exc,
+            )
+            raise
+
+    def create_customer_agreement(self, customer_uuid, customer_slug, default_catalog_uuid=None, **kwargs):
+        """
+        Creates a Customer Agreement record for the provided customer.
+
+        Other allowed kwargs:
+          disable_expiration_notifications (boolean)
+          enable_auto_applied_subscriptions_with_universal_link (boolean)
+        """
+        endpoint = self.customer_agreement_provisioning_endpoint
+        payload = {
+            'enterprise_customer_uuid': str(customer_uuid),
+            'enterprise_customer_slug': customer_slug,
+            'default_enterprise_catalog_uuid': str(default_catalog_uuid) if default_catalog_uuid else None,
+        }
+        payload.update(kwargs)
+        response = self.client.post(endpoint, json=payload)
+        try:
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Error creating customer agreement for customer id %s, response: %s, exc: %s',
+                customer_uuid, response.content.decode(), exc
+            )
+            raise
+
+    def create_subscription_plan(
+        self, customer_agreement_uuid, enterprise_catalog_uuid, salesforce_opportunity_line_item,
+        title, start_date, expiration_date, desired_num_licenses,
+        **kwargs,
+    ):
+        """
+        Creates a Subscription Plan associated with the provided customer agreement.
+        """
+
+        endpoint = self.subscription_provisioning_endpoint
+        payload = {
+            'customer_agreement': str(customer_agreement_uuid),
+            'enterprise_catalog_uuid': str(enterprise_catalog_uuid),
+            'salesforce_opportunity_line_item': salesforce_opportunity_line_item,
+            'title': title,
+            'start_date': start_date,
+            'expiration_date': expiration_date,
+            'desired_num_licenses': desired_num_licenses,
+            'change_reason': NEW_SUBSCRIPTION_CHANGE_REASON,
+            'for_internal_use_only': settings.PROVISIONING_DEFAULTS['subscription']['for_internal_use_only'],
+            'product': settings.PROVISIONING_DEFAULTS['subscription']['product_id'],
+            'is_active': settings.PROVISIONING_DEFAULTS['subscription']['is_active'],
+        }
+        payload.update(kwargs)
+        response = self.client.post(endpoint, json=payload)
+        try:
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Failed to create subscription plan, response %s, exception: %s',
+                response.content.decode('utf-8'),
+                exc,
+            )
             raise
 
 
