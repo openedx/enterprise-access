@@ -5,10 +5,15 @@ from uuid import uuid4
 
 import ddt
 from django.forms import ValidationError
+from django.test import TestCase
 from pytest import mark
 
 from enterprise_access.apps.core.tests.factories import UserFactory
+from enterprise_access.apps.subsidy_access_policy.tests.factories import (
+    PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory
+)
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest, LearnerCreditRequestConfiguration
 from enterprise_access.apps.subsidy_request.tests.factories import CouponCodeRequestFactory, LicenseRequestFactory
 from test_utils import TestCaseWithMockedDiscoveryApiClient
 
@@ -110,3 +115,130 @@ class CouponCodeRequestTests(TestCaseWithMockedDiscoveryApiClient):
         subsidy.refresh_from_db()
         subsidy.save()
         assert self.mock_discovery_client.call_count == original_call_count + 1
+
+
+class LearnerCreditRequestTests(TestCase):
+    """
+    Test cases for the LearnerCreditRequest model.
+    """
+
+    def setUp(self):
+        """
+        Set up test data for each test case.
+        """
+        self.user = UserFactory()
+        self.subsidy_access_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
+        self.enterprise_customer_uuid = uuid4()
+        self.learner_credit_request = LearnerCreditRequest.objects.create(
+            user=self.user,
+            course_id="edX+DemoX",
+            course_title="Demo Course",
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            state=SubsidyRequestStates.REQUESTED,
+        )
+
+    def test_initial_state(self):
+        """
+          Ensure that a newly created LearnerCreditRequest starts in the REQUESTED state.
+          """
+        self.assertEqual(self.learner_credit_request.state, SubsidyRequestStates.REQUESTED)
+
+    def test_approve_success(self):
+        """
+        Verify that approving a request updates the state, assigns a reviewer, and sets the reviewed timestamp.
+        """
+        reviewer = UserFactory()
+        self.learner_credit_request.approve(reviewer)
+        self.assertEqual(self.learner_credit_request.state, SubsidyRequestStates.APPROVED)
+        self.assertEqual(self.learner_credit_request.reviewer, reviewer)
+        self.assertIsNotNone(self.learner_credit_request.reviewed_at)
+
+    def test_decline_success(self):
+        """
+        Verify that declining a request updates the state, assigns a reviewer, records a reason,
+        and sets the reviewed timestamp.
+        """
+        reviewer = UserFactory()
+        decline_reason = "Insufficient eligibility"
+        self.learner_credit_request.decline(reviewer, reason=decline_reason)
+        self.assertEqual(self.learner_credit_request.state, SubsidyRequestStates.DECLINED)
+        self.assertEqual(self.learner_credit_request.reviewer, reviewer)
+        self.assertEqual(self.learner_credit_request.decline_reason, decline_reason)
+        self.assertIsNotNone(self.learner_credit_request.reviewed_at)
+
+    def test_clean_invalid_without_review_data(self):
+        """
+        Ensure validation fails if a reviewed request lacks a reviewer and timestamp.
+        """
+        self.learner_credit_request.state = SubsidyRequestStates.PENDING
+        self.learner_credit_request.reviewed_at = None
+        self.learner_credit_request.reviewer = None
+        with self.assertRaises(ValidationError):
+            self.learner_credit_request.clean()
+
+    def test_clean_valid_with_review_data(self):
+        """
+        Ensure validation succeeds when a reviewed request has both reviewer and timestamp.
+        """
+        reviewer = UserFactory()
+        self.learner_credit_request.state = SubsidyRequestStates.PENDING
+        self.learner_credit_request.reviewed_at = datetime.now()
+        self.learner_credit_request.reviewer = reviewer
+        try:
+            self.learner_credit_request.clean()
+        except ValidationError:
+            self.fail("ValidationError raised unexpectedly!")
+
+    def test_unique_constraint(self):
+        """
+        Ensure that a LearnerCreditRequest cannot be created with the same user, course_id,
+        and enterprise_customer_uuid in REQUESTED or PENDING state.
+        """
+        with self.assertRaises(Exception):
+            LearnerCreditRequest.objects.create(
+                user=self.user,
+                course_id="edX+DemoX",
+                enterprise_customer_uuid=self.enterprise_customer_uuid,
+                state=SubsidyRequestStates.REQUESTED,
+                subsidy_access_policy=self.subsidy_access_policy
+            )
+
+
+class LearnerCreditRequestConfigurationTests(TestCase):
+    """
+    Test cases for the LearnerCreditRequestConfiguration model.
+    """
+
+    def setUp(self):
+        """
+        Set up test data for each test case.
+        """
+        self.subsidy_access_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
+        self.config = LearnerCreditRequestConfiguration.objects.create(active=True)
+        self.subsidy_access_policy.learner_credit_request_config = self.config
+        self.subsidy_access_policy.save()
+
+    def test_configuration_creation(self):
+        """
+        Ensure a LearnerCreditRequestConfiguration instance is created successfully.
+        """
+        self.assertIsNotNone(self.config.uuid)
+
+    def test_policy_association(self):
+        """
+        Verify that the configuration is correctly associated with a SubsidyAccessPolicy.
+        """
+        self.assertEqual(self.subsidy_access_policy.learner_credit_request_config, self.config)
+        self.assertTrue(self.subsidy_access_policy.bnr_enabled)
+
+    def test_bnr_enabled_property(self):
+        """
+        Verify that the bnr_enabled property returns the correct value.
+        """
+        # Test when learner_credit_request_config is set
+        self.assertTrue(self.subsidy_access_policy.bnr_enabled)
+
+        # Test when learner_credit_request_config is not set
+        self.subsidy_access_policy.learner_credit_request_config = None
+        self.subsidy_access_policy.save()
+        self.assertFalse(self.subsidy_access_policy.bnr_enabled)

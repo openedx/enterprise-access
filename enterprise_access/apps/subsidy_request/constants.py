@@ -4,19 +4,35 @@
 class SubsidyRequestStates:
     """ Possible states of a subsidy request. """
 
+    # Common states
     REQUESTED = 'requested'
     PENDING = 'pending'
     APPROVED = 'approved'
     DECLINED = 'declined'
     ERROR = 'error'
 
-    CHOICES = (
+    COMMON_STATES = (
         (REQUESTED, "Requested"),
         (PENDING, "Pending"),
         (APPROVED, "Approved"),
         (DECLINED, "Declined"),
         (ERROR, "Error"),
     )
+
+    # Learner credit request related states
+    ACCEPTED = 'accepted'
+    CANCELLED = 'cancelled'
+    EXPIRED = 'expired'
+    REVERSED = 'reversed'
+
+    LC_REQUEST_STATES = (
+        (ACCEPTED, "Accepted"),
+        (CANCELLED, "Cancelled"),
+        (EXPIRED, "Expired"),
+        (REVERSED, "Reversed"),
+    )
+
+    CHOICES = COMMON_STATES + LC_REQUEST_STATES
 
 
 class SubsidyTypeChoices:

@@ -158,6 +158,13 @@ class SubsidyAccessPolicy(TimeStampedModel):
             'it disappear from all frontends, effectively soft-deleting it. Default is False (deactivated).'
         ),
     )
+    learner_credit_request_config = models.OneToOneField(
+        'subsidy_request.LearnerCreditRequestConfiguration',  # pylint: disable=all
+        related_name="learner_credit_config",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
     retired = models.BooleanField(
         default=False,
         help_text=(
@@ -358,6 +365,13 @@ class SubsidyAccessPolicy(TimeStampedModel):
         Convenience property to determine if this policy is assignable.
         """
         return self.access_method == AccessMethods.ASSIGNED
+
+    @property
+    def bnr_enabled(self):
+        """
+        Returns True if learner_credit_request_config exists, otherwise False.
+        """
+        return self.learner_credit_request_config and self.learner_credit_request_config.active
 
     def clean(self):
         """
