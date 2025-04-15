@@ -25,9 +25,9 @@ backoff==1.10.0
     # via analytics-python
 billiard==4.2.1
     # via celery
-cattrs==24.1.2
+cattrs==24.1.3
     # via -r requirements/base.in
-celery==5.4.0
+celery==5.5.1
     # via
     #   -r requirements/base.in
     #   django-celery-results
@@ -54,7 +54,7 @@ click-plugins==1.1.1
     # via celery
 click-repl==0.3.0
     # via celery
-code-annotations==2.2.0
+code-annotations==2.3.0
     # via edx-toggles
 confluent-kafka[avro,schema-registry]==2.6.1
     # via
@@ -104,7 +104,7 @@ django==4.2.20
     #   jsonfield2
     #   openedx-events
     #   social-auth-app-django
-django-celery-results==2.5.1
+django-celery-results==2.6.0
     # via -r requirements/base.in
 django-cors-headers==4.7.0
     # via -r requirements/base.in
@@ -116,7 +116,7 @@ django-crum==0.7.9
     #   edx-django-utils
     #   edx-rbac
     #   edx-toggles
-django-extensions==3.2.3
+django-extensions==4.1
     # via -r requirements/base.in
 django-filter==25.1
     # via -r requirements/base.in
@@ -126,7 +126,7 @@ django-model-utils==5.0.0
     # via
     #   edx-celeryutils
     #   edx-rbac
-django-object-actions==4.3.0
+django-object-actions==5.0.0
     # via -r requirements/base.in
 django-rest-swagger==2.2.0
     # via -r requirements/base.in
@@ -140,7 +140,7 @@ django-waffle==4.2.0
     #   edx-toggles
 djangoql==0.18.1
     # via -r requirements/base.in
-djangorestframework==3.15.2
+djangorestframework==3.16.0
     # via
     #   -r requirements/base.in
     #   django-rest-swagger
@@ -162,7 +162,7 @@ drf-yasg==1.21.10
     # via edx-api-doc-tools
 edx-api-doc-tools==2.0.0
     # via -r requirements/base.in
-edx-auth-backends==4.4.0
+edx-auth-backends==4.5.0
     # via -r requirements/base.in
 edx-braze-client==0.2.5
     # via
@@ -174,7 +174,7 @@ edx-celeryutils==1.3.0
     # via -r requirements/base.in
 edx-django-release-util==1.4.0
     # via -r requirements/base.in
-edx-django-utils==7.2.0
+edx-django-utils==7.4.0
     # via
     #   -r requirements/base.in
     #   edx-drf-extensions
@@ -182,13 +182,13 @@ edx-django-utils==7.2.0
     #   edx-rest-api-client
     #   edx-toggles
     #   openedx-events
-edx-drf-extensions==10.5.0
+edx-drf-extensions==10.6.0
     # via
     #   -r requirements/base.in
     #   edx-rbac
 edx-enterprise-subsidy-client==2.0.1
     # via -r requirements/base.in
-edx-event-bus-kafka==6.0.0
+edx-event-bus-kafka==6.1.0
     # via -r requirements/base.in
 edx-opaque-keys[django]==2.12.0
     # via
@@ -197,7 +197,7 @@ edx-opaque-keys[django]==2.12.0
     #   openedx-events
 edx-rbac==1.10.0
     # via -r requirements/base.in
-edx-rest-api-client==6.1.0
+edx-rest-api-client==6.2.0
     # via
     #   -r requirements/base.in
     #   edx-enterprise-subsidy-client
@@ -228,7 +228,7 @@ jsonschema==4.23.0
     # via drf-spectacular
 jsonschema-specifications==2024.10.1
     # via jsonschema
-kombu==5.5.1
+kombu==5.5.2
     # via celery
 markupsafe==3.0.2
     # via jinja2
@@ -236,7 +236,7 @@ monotonic==1.6
     # via analytics-python
 mysqlclient==2.2.7
     # via -r requirements/base.in
-newrelic==10.7.0
+newrelic==10.9.0
     # via edx-django-utils
 oauthlib==3.2.2
     # via
@@ -244,7 +244,7 @@ oauthlib==3.2.2
     #   social-auth-core
 openapi-codec==1.3.2
     # via django-rest-swagger
-openedx-events==9.20.0
+openedx-events==10.0.0
     # via
     #   -r requirements/base.in
     #   edx-event-bus-kafka
@@ -271,7 +271,7 @@ pyjwt[crypto]==2.10.1
     #   social-auth-core
 pymemcache==4.0.0
     # via -r requirements/base.in
-pymongo==4.11.3
+pymongo==4.12.0
     # via edx-opaque-keys
 pynacl==1.5.0
     # via edx-django-utils
@@ -343,15 +343,13 @@ stevedore==5.4.1
     #   edx-opaque-keys
 text-unidecode==1.3
     # via python-slugify
-typing-extensions==4.13.0
+typing-extensions==4.13.2
     # via
     #   django-countries
     #   edx-opaque-keys
     #   referencing
-tzdata==2025.1
-    # via
-    #   celery
-    #   kombu
+tzdata==2025.2
+    # via kombu
 uritemplate==4.1.1
     # via
     #   coreapi
