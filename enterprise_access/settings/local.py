@@ -60,7 +60,7 @@ JWT_AUTH.update({
 
 ENABLE_AUTO_AUTH = True
 
-LOGGING = get_logger_config(debug=DEBUG)
+LOGGING = get_logger_config(debug=DEBUG, format_string=LOGGING_FORMAT_STRING)
 LOG_SQL = False
 
 

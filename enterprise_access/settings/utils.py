@@ -14,12 +14,23 @@ def get_env_setting(setting):
         raise ImproperlyConfigured(error_msg)
 
 
-def get_logger_config(logging_env="no_env",
-                      debug=False,
-                      service_variant='enterprise-access'):
+def get_logger_config(
+    logging_env: str = "no_env",
+    debug: bool = False,
+    service_variant: str = 'enterprise-access',
+    format_string: str = None,
+):
     """
-    Return the appropriate logging config dictionary. You should assign the
-    result of this to the LOGGING var in your settings.
+    Return the appropriate logging config dictionary, to be assigned to the LOGGING var in settings.
+
+    Arguments:
+        logging_env (str): Environment name.
+        debug (bool): Debug logging enabled.
+        service_variant (str): Name of the service.
+        format_string (str): Override format string for your logfiles.
+
+    Returns:
+        dict(string): Returns a dictionary of config values
     """
     hostname = platform.node().split(".")[0]
     syslog_format = (
@@ -34,14 +45,18 @@ def get_logger_config(logging_env="no_env",
 
     handlers = ['console']
 
+    standard_format = format_string or (
+        '%(asctime)s %(levelname)s %(process)d [%(name)s] '
+        '[user %(userid)s] [ip %(remoteip)s] [request_id %(request_id)s] '
+        '%(filename)s:%(lineno)d - %(message)s'
+    )
+
     logger_config = {
         'version': 1,
         'disable_existing_loggers': False,
         'formatters': {
             'standard': {
-                'format': '%(asctime)s %(levelname)s %(process)d '
-                          '[%(name)s] [user %(userid)s] [ip %(remoteip)s] [request_id %(request_id)s] '
-                          '%(filename)s:%(lineno)d - %(message)s',
+                'format': standard_format,
             },
             'syslog_format': {'format': syslog_format},
             'raw': {'format': '%(message)s'},
