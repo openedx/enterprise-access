@@ -592,7 +592,7 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
 
     group_associations = serializers.SerializerMethodField()
 
-    @extend_schema_field(LearnerContentAssignmentWithLearnerAcknowledgedResponseSerializer)
+    @extend_schema_field(LearnerContentAssignmentWithLearnerAcknowledgedResponseSerializer(many=True))
     def get_assignments_serializer(self, obj):
         """
         Return serialized assignments if the policy access method is of the 'assigned' type
