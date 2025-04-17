@@ -27,6 +27,10 @@ DICT_UPDATE_KEYS = ('JWT_AUTH',)
 MEDIA_STORAGE_BACKEND = {}
 FILE_STORAGE_BACKEND = {}
 
+# Allow extra headers for your specicfic production environment.
+# Set this variable in the config yaml, and the values will be appended to CORS_ALLOW_HEADERS.
+CORS_ALLOW_HEADERS_EXTRA = ()
+
 if 'ENTERPRISE_ACCESS_CFG' in environ:
     CONFIG_FILE = get_env_setting('ENTERPRISE_ACCESS_CFG')
     with open(CONFIG_FILE, encoding='utf-8') as f:
@@ -73,3 +77,11 @@ CELERY_BROKER_URL = "{}://{}:{}@{}/{}".format(
     CELERY_BROKER_VHOST
 )
 # END CELERY
+
+# BEGIN CORS
+# Inject extra allowed headers specific to a production environment.
+CORS_ALLOW_HEADERS = (
+    *CORS_ALLOW_HEADERS,
+    *CORS_ALLOW_HEADERS_EXTRA,
+)
+# END CORS
