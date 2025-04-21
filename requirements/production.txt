@@ -219,7 +219,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.1
+edx-enterprise-subsidy-client==2.0.2
     # via -r requirements/base.txt
 edx-event-bus-kafka==6.1.0
     # via -r requirements/base.txt
@@ -244,9 +244,9 @@ fastavro==1.10.0
     #   -r requirements/base.txt
     #   confluent-kafka
     #   openedx-events
-gevent==24.11.1
+gevent==25.4.1
     # via -r requirements/production.in
-greenlet==3.1.1
+greenlet==3.2.0
     # via gevent
 gunicorn==23.0.0
     # via -r requirements/production.in
@@ -282,7 +282,7 @@ jsonschema-specifications==2024.10.1
     # via
     #   -r requirements/base.txt
     #   jsonschema
-kombu==5.5.2
+kombu==5.5.3
     # via
     #   -r requirements/base.txt
     #   celery
@@ -315,7 +315,7 @@ openedx-events==10.0.0
     # via
     #   -r requirements/base.txt
     #   edx-event-bus-kafka
-packaging==24.2
+packaging==25.0
     # via
     #   -r requirements/base.txt
     #   drf-yasg
@@ -328,7 +328,7 @@ ply==3.11
     # via
     #   -r requirements/base.txt
     #   djangoql
-prompt-toolkit==3.0.50
+prompt-toolkit==3.0.51
     # via
     #   -r requirements/base.txt
     #   click-repl
