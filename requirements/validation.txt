@@ -170,7 +170,7 @@ dictdiffer==0.9.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pytest-dictsdiff
-dill==0.3.9
+dill==0.4.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -351,7 +351,7 @@ edx-drf-extensions==10.6.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.1
+edx-enterprise-subsidy-client==2.0.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -485,7 +485,7 @@ keyring==25.6.0
     # via
     #   -r requirements/quality.txt
     #   twine
-kombu==5.5.2
+kombu==5.5.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -547,7 +547,7 @@ openedx-events==10.0.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-event-bus-kafka
-packaging==24.2
+packaging==25.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -579,7 +579,7 @@ ply==3.11
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   djangoql
-prompt-toolkit==3.0.50
+prompt-toolkit==3.0.51
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt

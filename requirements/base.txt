@@ -186,7 +186,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/base.in
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.1
+edx-enterprise-subsidy-client==2.0.2
     # via -r requirements/base.in
 edx-event-bus-kafka==6.1.0
     # via -r requirements/base.in
@@ -228,7 +228,7 @@ jsonschema==4.23.0
     # via drf-spectacular
 jsonschema-specifications==2024.10.1
     # via jsonschema
-kombu==5.5.2
+kombu==5.5.3
     # via celery
 markupsafe==3.0.2
     # via jinja2
@@ -248,13 +248,13 @@ openedx-events==10.0.0
     # via
     #   -r requirements/base.in
     #   edx-event-bus-kafka
-packaging==24.2
+packaging==25.0
     # via drf-yasg
 pbr==6.1.1
     # via stevedore
 ply==3.11
     # via djangoql
-prompt-toolkit==3.0.50
+prompt-toolkit==3.0.51
     # via click-repl
 psutil==7.0.0
     # via edx-django-utils
