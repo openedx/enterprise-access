@@ -236,7 +236,7 @@ def get_normalized_metadata_for_assignment(assignment, content_metadata):
 
 
 def _curr_date(date_format=None):
-    curr_date = datetime.now()
+    curr_date = localized_utcnow()
     if not date_format:
         return curr_date
     return curr_date.strftime(date_format)
