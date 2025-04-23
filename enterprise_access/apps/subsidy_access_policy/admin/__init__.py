@@ -285,6 +285,7 @@ class PerLearnerSpendCreditAccessPolicy(DjangoQLSearchMixin, BaseSubsidyAccessPo
                     'retired_at',
                     'catalog_uuid',
                     'subsidy_uuid',
+                    'learner_credit_request_config',
                     'late_redemption_allowed_until',
                     'created',
                     'modified',
