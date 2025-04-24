@@ -76,32 +76,32 @@ class UtilsTests(TestCase):
     @ddt.data(
         # Start after is before the curr_date - START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
         {
-            "start_date": _days_from_now(5, DATE_FORMAT_ISO_8601),
+            "start_date": _days_from_now(5),
             "curr_date": _curr_date(),
             "expected_output": False
         },
         # Start after is before the curr_date - START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
 
         {
-            "start_date": _days_from_now(-5, DATE_FORMAT_ISO_8601),
+            "start_date": _days_from_now(-5),
             "curr_date": _curr_date(),
             "expected_output": False
         },
         # Start after is before the curr_date - START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
         {
-            "start_date": _days_from_now(15, DATE_FORMAT_ISO_8601),
+            "start_date": _days_from_now(15),
             "curr_date": _curr_date(),
             "expected_output": False
         },
         # Start date is before the curr_date - START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
         {
-            "start_date": _days_from_now(-15, DATE_FORMAT_ISO_8601),
+            "start_date": _days_from_now(-15),
             "curr_date": _curr_date(),
             "expected_output": True
         },
         # Start after is before the curr_date - START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
         {
-            "start_date": _curr_date(DATE_FORMAT_ISO_8601),
+            "start_date": _curr_date(),
             "curr_date": _curr_date(),
             "expected_output": False
         }
@@ -113,28 +113,28 @@ class UtilsTests(TestCase):
     @ddt.data(
         # endDate is the exact day as weeks to complete offset
         {
-            "end_date": _days_from_now(49, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(49),
             "curr_date": _curr_date(),
             "weeks_to_complete": 7,
             "expected_output": True
         },
         # weeks to complete is within endDate
         {
-            "end_date": _days_from_now(49, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(49),
             "curr_date": _curr_date(),
             "weeks_to_complete": 4,
             "expected_output": True
         },
         # weeks to complete is beyond end date
         {
-            "end_date": _days_from_now(49, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(49),
             "curr_date": _curr_date(),
             "weeks_to_complete": 8,
             "expected_output": False
         },
         # end date is current date
         {
-            "end_date": _curr_date(DATE_FORMAT_ISO_8601),
+            "end_date": _curr_date(),
             "curr_date": _curr_date(),
             "weeks_to_complete": 1,
             "expected_output": False
@@ -192,17 +192,8 @@ class UtilsTests(TestCase):
                _curr_date(BRAZE_TIMESTAMP_FORMAT)
 
     @ddt.data(
-        # self-paced, has time to complete
-        {
-            "start_date": _days_from_now(5, DATE_FORMAT_ISO_8601),
-            "end_date": _days_from_now(28, DATE_FORMAT_ISO_8601),
-            "course_metadata": {
-                "pacing_type": "self_paced",
-                "weeks_to_complete": 3,
-            },
-        },
-        # self-paced, does not have time to complete, but start date older than
-        # START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
+        # Self-paced, and start date is more than START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS days before today.
+        # Adjust the start date to become today.
         {
             "start_date": _days_from_now(-15, DATE_FORMAT_ISO_8601),
             "end_date": _days_from_now(10, DATE_FORMAT_ISO_8601),
@@ -210,9 +201,46 @@ class UtilsTests(TestCase):
                 "pacing_type": "self_paced",
                 "weeks_to_complete": 300,
             },
+            "expected_normalized_start_date_is_now": True,
         },
-        # self-paced, does not have time to complete, start date within
-        # START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS
+        # Self-paced, and there's enough time to complete.
+        # Adjust the start date to become today.
+        {
+            "start_date": _days_from_now(-5, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(28, DATE_FORMAT_ISO_8601),
+            "course_metadata": {
+                "pacing_type": "self_paced",
+                "weeks_to_complete": 3,
+            },
+            "expected_normalized_start_date_is_now": True,
+        },
+
+        ###
+        # All subsequent test cases should result in NOT adjusting the start date.
+        ###
+
+        # Course starts more than START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS days before today,
+        # BUT the course is instructor paced.
+        {
+            "start_date": _days_from_now(-15, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(28, DATE_FORMAT_ISO_8601),
+            "course_metadata": {
+                "pacing_type": "instructor_paced",
+                "weeks_to_complete": 300,
+            },
+        },
+        # Course starts in the past, there's enough time to complete,
+        # BUT the course is instructor paced.
+        {
+            "start_date": _days_from_now(-5, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(28, DATE_FORMAT_ISO_8601),
+            "course_metadata": {
+                "pacing_type": "instructor_paced",
+                "weeks_to_complete": 3,
+            },
+        },
+        # Course is Self-paced, BUT there's no time to complete and it started
+        # within START_DATE_DEFAULT_TO_TODAY_THRESHOLD_DAYS days ago.
         {
             "start_date": _days_from_now(-5, DATE_FORMAT_ISO_8601),
             "end_date": _days_from_now(10, DATE_FORMAT_ISO_8601),
@@ -221,30 +249,32 @@ class UtilsTests(TestCase):
                 "weeks_to_complete": 300,
             },
         },
-        # instructor paced
+        # NEW test case for fixing ENT-10263.
+        # Course is Self-paced, there's time to complete, BUT start date is in the future.
         {
             "start_date": _days_from_now(5, DATE_FORMAT_ISO_8601),
-            "end_date": _days_from_now(10, DATE_FORMAT_ISO_8601),
+            "end_date": _days_from_now(28, DATE_FORMAT_ISO_8601),
             "course_metadata": {
-                "pacing_type": "instructor_paced",
-                "weeks_to_complete": 8,
+                "pacing_type": "self_paced",
+                "weeks_to_complete": 3,
             },
         },
     )
     @ddt.unpack
-    def test_get_self_paced_normalized_start_date_self_paced(self, start_date, end_date, course_metadata):
-        pacing_type = course_metadata.get('pacing_type')
-        weeks_to_complete = course_metadata.get('weeks_to_complete')
-
-        can_complete_in_time = has_time_to_complete(_curr_date(), end_date, weeks_to_complete)
-        within_start_date_threshold = is_within_minimum_start_date_threshold(_curr_date(), start_date)
-
-        if pacing_type == 'self_paced' and (can_complete_in_time or within_start_date_threshold):
-            assert get_self_paced_normalized_start_date(start_date, end_date, course_metadata) == \
-                   _curr_date(BRAZE_TIMESTAMP_FORMAT)
-        else:
-            assert get_self_paced_normalized_start_date(start_date, end_date, course_metadata) == \
-                   start_date
+    def test_get_self_paced_normalized_start_date_self_paced(
+        self,
+        start_date,
+        end_date,
+        course_metadata,
+        expected_normalized_start_date_is_now=False,
+    ):
+        expected_normalized_start_date = (
+            _curr_date(BRAZE_TIMESTAMP_FORMAT)
+            if expected_normalized_start_date_is_now
+            else start_date
+        )
+        assert get_self_paced_normalized_start_date(start_date, end_date, course_metadata) == \
+            expected_normalized_start_date
 
     @ddt.data(
         # Expects course run associated with configured content_key for run-based assignment
