@@ -1745,6 +1745,13 @@ class ForcedPolicyRedemption(TimeStampedModel):
     )
     history = HistoricalRecords()
 
+    @property
+    def policy_uuid(self):
+        """
+        Convenience property used by this model's Admin class.
+        """
+        return self.subsidy_access_policy.uuid
+
     def __str__(self):
         return (
             f'<{self.__class__.__name__} policy_uuid={self.subsidy_access_policy.uuid}, '
@@ -1763,15 +1770,25 @@ class ForcedPolicyRedemption(TimeStampedModel):
             assignment_configuration.enterprise_customer_uuid,
             self.course_run_key,
         )
-        user_record = User.objects.filter(lms_user_id=self.lms_user_id).first()
-        if not user_record:
+
+        client = self.subsidy_access_policy.lms_api_client
+        ecu_record = client.get_enterprise_user(
+            self.subsidy_access_policy.enterprise_customer_uuid,
+            self.lms_user_id,
+        )
+        if not ecu_record:
+            raise Exception(f'No ECU record could be found for lms_user_id {self.lms_user_id}')
+
+        user_email = ecu_record.get('user', {}).get('email')
+        if not user_email:
             raise Exception(f'No email could be found for lms_user_id {self.lms_user_id}')
 
         return assignments_api.allocate_assignments(
             assignment_configuration,
-            [user_record.email],
+            [user_email],
             self.course_run_key,
             self.content_price_cents,
+            known_lms_user_ids=[self.lms_user_id],
         )
 
     def force_redeem(self, extra_metadata=None):

@@ -9,7 +9,6 @@ from django.utils import timezone
 
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
 from enterprise_access.apps.content_assignments.tests.factories import AssignmentConfigurationFactory
-from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_access_policy.constants import FORCE_ENROLLMENT_KEYWORD
 from enterprise_access.apps.subsidy_access_policy.exceptions import (
     SubsidyAccessPolicyLockAttemptFailed,
@@ -51,7 +50,7 @@ class BaseForcedRedemptionTestCase(MockPolicyDependenciesMixin, TestCase):
 
     def _setup_redemption_state(
         self, content_price=None, course_key=None, course_run_key=None, can_redeem=True,
-        subsidy_is_active=True, existing_transactions=None, existing_aggregates=None
+        subsidy_is_active=True, existing_transactions=None, existing_aggregates=None, user_email=None,
     ):
         """
         Helper to setup state of content metadata and the subsidy/transactions
@@ -77,6 +76,11 @@ class BaseForcedRedemptionTestCase(MockPolicyDependenciesMixin, TestCase):
         self.mock_subsidy_client.create_subsidy_transaction.return_value = {
             'uuid': MOCK_TRANSACTION_UUID_1,
             'modified': MOCK_DATETIME_1,
+        }
+        self.mock_lms_api_client.get_enterprise_user.return_value = {
+            'user': {
+                'email': user_email,
+            }
         }
 
 
@@ -188,14 +192,15 @@ class ForcedPolicyRedemptionAssignmentTests(BaseForcedRedemptionTestCase):
 
     def _setup_redemption_state(
         self, content_price=None, course_key=None, course_run_key=None, can_redeem=True,
-        subsidy_is_active=True, existing_transactions=None, existing_aggregates=None
+        subsidy_is_active=True, existing_transactions=None, existing_aggregates=None, user_email=None,
     ):
         """
         Setup state of the assignment content metadata mock.
         """
         super()._setup_redemption_state(
-            content_price=None, course_key=None, course_run_key=None, can_redeem=True,
-            subsidy_is_active=True, existing_transactions=None, existing_aggregates=None,
+            content_price=content_price, course_key=course_key, course_run_key=course_run_key,
+            can_redeem=can_redeem, subsidy_is_active=subsidy_is_active, existing_transactions=existing_transactions,
+            existing_aggregates=existing_aggregates, user_email=user_email,
         )
         self.mock_assignment_content_metadata.return_value = {
             'content_price': content_price or self.default_content_price,
@@ -226,9 +231,7 @@ class ForcedPolicyRedemptionAssignmentTests(BaseForcedRedemptionTestCase):
         test that we can force redemption.
         """
         policy = self._new_assignment_budget()
-        self._setup_redemption_state()
-
-        user = UserFactory(username='alice', email='alice@foo.com', lms_user_id=self.lms_user_id)
+        self._setup_redemption_state(user_email='alice@foo.com')
 
         forced_redemption_record = ForcedPolicyRedemptionFactory(
             subsidy_access_policy=policy,
@@ -253,7 +256,8 @@ class ForcedPolicyRedemptionAssignmentTests(BaseForcedRedemptionTestCase):
             requested_price_cents=self.default_content_price,
         )
 
-        assignment = LearnerContentAssignment.objects.filter(lms_user_id=user.lms_user_id).first()
+        assignment = LearnerContentAssignment.objects.filter(lms_user_id=self.lms_user_id).first()
         self.assertEqual(assignment.content_key, self.course_run_key)
+        self.assertEqual(assignment.learner_email, 'alice@foo.com')
         mock_send_email.delay.assert_called_once_with(assignment.uuid)
         mock_pending_learner_task.delay.assert_called_once_with(assignment.uuid)
