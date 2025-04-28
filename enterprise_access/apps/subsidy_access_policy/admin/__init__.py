@@ -421,6 +421,27 @@ class ForcedPolicyRedemptionAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
     Admin class for the forced redemption model/logic.
     """
     form = ForcedPolicyRedemptionForm
+
+    djangoql_completion_enabled_by_default = False
+    search_fields = [
+        'uuid',
+        'subsidy_access_policy__uuid',
+        'lms_user_id',
+        'course_run_key',
+    ]
+
+    list_display = [
+        'uuid',
+        'policy_uuid',
+        'lms_user_id',
+        'course_run_key',
+        'redeemed_at',
+        'errored_at',
+    ]
+    list_filter = [
+        'redeemed_at',
+        'errored_at',
+    ]
     autocomplete_fields = [
         'subsidy_access_policy',
     ]

@@ -261,7 +261,9 @@ def get_allocated_quantity_for_configuration(assignment_configuration):
     return aggregate['total_quantity'] or 0
 
 
-def allocate_assignments(assignment_configuration, learner_emails, content_key, content_price_cents):
+def allocate_assignments(
+    assignment_configuration, learner_emails, content_key, content_price_cents, known_lms_user_ids=None,
+):
     """
     Creates or updates an allocated assignment record
     for the given ``content_key`` in the given ``assignment_configuration``,
@@ -278,6 +280,9 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
       - ``content_key``: Either a course or course run key, representing the content to be allocated.
       - ``content_price_cents``: The cost of redeeming the content, in USD cents, at the time of allocation. Should
         always be an integer >= 0.
+      - ``known_lms_user_ids``: Optional list of known lms user ids corresponding to the provided emails.
+        If present, it's assumed to be *all* lms user ids for the provided emails, and that no duplicate
+        user emails are provided.
 
     Returns: A dictionary of updated, created, and unchanged assignment records. e.g.
       ```
@@ -313,9 +318,13 @@ def allocate_assignments(assignment_configuration, learner_emails, content_key, 
     # content_price_cents, and then persist that in the assignment records.
     content_quantity = content_price_cents * -1
 
-    lms_user_ids_by_email, emails_by_lms_user_id = _map_allocation_emails_with_lms_user_ids(
-        learner_emails_to_allocate,
-    )
+    if known_lms_user_ids:
+        lms_user_ids_by_email = dict(zip(learner_emails_to_allocate, known_lms_user_ids))
+        emails_by_lms_user_id = dict(zip(known_lms_user_ids, learner_emails_to_allocate))
+    else:
+        lms_user_ids_by_email, emails_by_lms_user_id = _map_allocation_emails_with_lms_user_ids(
+            learner_emails_to_allocate,
+        )
     existing_assignments = _get_existing_assignments_for_allocation(
         assignment_configuration,
         learner_emails_to_allocate,
