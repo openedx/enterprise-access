@@ -7,9 +7,11 @@ from rest_framework import serializers
 
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
+    LearnerCreditRequest,
+    LearnerCreditRequestConfiguration,
     LicenseRequest,
     SubsidyRequest,
-    SubsidyRequestCustomerConfiguration
+    SubsidyRequestCustomerConfiguration,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,3 +123,34 @@ class SubsidyRequestCustomerConfigurationSerializer(serializers.ModelSerializer)
         # Pop enterprise_customer_uuid so that it's read-only for updates.
         validated_data.pop('enterprise_customer_uuid', None)
         return super().update(instance, validated_data)
+
+
+class LearnerCreditRequestConfigurationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the `LearnerCreditRequestConfiguration` model.
+    """
+
+    class Meta:
+        model = LearnerCreditRequestConfiguration
+        fields = "__all__"
+        read_only_fields = ["uuid", "active", "created", "modified"]
+
+
+class LearnerCreditRequestSerializer(SubsidyRequestSerializer):
+    """
+    Serializer for the `LearnerCreditRequest` model.
+    """
+
+    learner_credit_request_config = serializers.PrimaryKeyRelatedField(
+        queryset=LearnerCreditRequestConfiguration.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+
+    class Meta:
+        model = LearnerCreditRequest
+        fields = SubsidyRequestSerializer.Meta.fields + [
+            "learner_credit_request_config"
+        ]
+        read_only_fields = SubsidyRequestSerializer.Meta.read_only_fields
+        extra_kwargs = SubsidyRequestSerializer.Meta.extra_kwargs

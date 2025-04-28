@@ -47,8 +47,9 @@ from enterprise_access.apps.core import constants
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
+    LearnerCreditRequest,
     LicenseRequest,
-    SubsidyRequestCustomerConfiguration
+    SubsidyRequestCustomerConfiguration,
 )
 from enterprise_access.apps.track.segment import track_event
 from enterprise_access.utils import get_subsidy_model
@@ -688,6 +689,126 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             serialized_coupon_code_requests,
             status=status.HTTP_200_OK,
         )
+
+
+@extend_schema_view(
+    retrieve=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Retrieve a learner credit request.',
+    ),
+    list=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='List learner credit requests.',
+    ),
+    create=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Create a learner credit request.',
+    ),
+    overview=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Learner credit request overview.',
+    ),
+)
+class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
+    """
+    Viewset for learner credit requests.
+    """
+
+    queryset = LearnerCreditRequest.objects.order_by("-created")
+    serializer_class = serializers.LearnerCreditRequestSerializer
+
+    subsidy_type = SubsidyTypeChoices.LEARNER_CREDIT
+
+    def get_queryset(self):
+        """
+        Filter requests based on user role.
+        """
+        queryset = super().get_queryset()
+        enterprise_uuid = self.request.query_params.get("enterprise_customer_uuid")
+
+        # Non-admin users can only see their own requests
+        if not (self.request.user.is_staff or self.request.user.is_superuser):
+            queryset = queryset.filter(user=self.request.user)
+
+        # Filter by enterprise if provided
+        if enterprise_uuid:
+            queryset = queryset.filter(enterprise_customer_uuid=enterprise_uuid)
+
+        return queryset
+
+    def _validate_subsidy_request(self):
+        """
+        Validate request creation:
+        - Inherit basic validation from parent.
+        - Ensure policy_uuid is provided and valid.
+        - Ensure Browse & Request is active for the policy.
+        - No duplicate PENDING/REQUESTED requests for the same course and policy.
+        """
+        super()._validate_subsidy_request()
+
+        policy_uuid = self.request.data.get("policy_uuid")
+        if not policy_uuid:
+            raise SubsidyRequestCreationError(
+                "policy_uuid is required.", status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            policy = SubsidyAccessPolicy.objects.get(uuid=policy_uuid)
+            self.request.validated_policy = (
+                policy  # Store validated policy for use in create
+            )
+        except SubsidyAccessPolicy.DoesNotExist:
+            raise SubsidyRequestCreationError(
+                f"Invalid policy_uuid: {policy_uuid}.", status.HTTP_400_BAD_REQUEST
+            )
+
+        if (
+            not policy.learner_credit_request_config
+            or not policy.learner_credit_request_config.active
+        ):
+            raise SubsidyRequestCreationError(
+                f"Browse & Request is not active for policy UUID: {policy_uuid}.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        enterprise_customer_uuid = policy.enterprise_customer_uuid
+        course_id = self.request.data.get("course_id")
+
+        if LearnerCreditRequest.objects.filter(
+            user__lms_user_id=self.lms_user_id,
+            enterprise_customer_uuid=enterprise_customer_uuid,
+            course_id=course_id,
+            state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.PENDING],
+        ).exists():
+            error_msg = (
+                f"You already have an active learner credit request for course {course_id} "
+                f"under policy UUID: {policy_uuid}."
+            )
+            raise SubsidyRequestCreationError(
+                error_msg, status.HTTP_422_UNPROCESSABLE_ENTITY
+            )
+
+    def create(self, request, *args, **kwargs):
+        """
+        Create a learner credit request.
+        """
+        try:
+            self._validate_subsidy_request()
+        except SubsidyRequestCreationError as exc:
+            return Response({"detail": exc.message}, status=exc.http_status_code)
+
+        policy = self.request.validated_policy
+        request.data.update(
+            {
+                "user": request.user.id,
+                "enterprise_customer_uuid": str(policy.enterprise_customer_uuid),
+                "learner_credit_request_config": str(
+                    policy.learner_credit_request_config.uuid
+                ),
+            }
+        )
+
+        return super().create(request, *args, **kwargs)
 
 
 @extend_schema_view(
