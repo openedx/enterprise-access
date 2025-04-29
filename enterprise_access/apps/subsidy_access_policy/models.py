@@ -19,7 +19,6 @@ from simple_history.models import HistoricalRecords
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
-from enterprise_access.apps.core.models import User
 from enterprise_access.cache_utils import request_cache, versioned_cache_key
 from enterprise_access.utils import format_traceback, is_none, is_not_none, localized_utcnow
 
@@ -159,7 +158,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         ),
     )
     learner_credit_request_config = models.OneToOneField(
-        'subsidy_request.LearnerCreditRequestConfiguration',  # pylint: disable=all
+        'subsidy_request.LearnerCreditRequestConfiguration',
         related_name="learner_credit_config",
         on_delete=models.SET_NULL,
         null=True,
