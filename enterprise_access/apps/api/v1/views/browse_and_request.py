@@ -44,12 +44,13 @@ from enterprise_access.apps.api.utils import (
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
     LicenseRequest,
-    SubsidyRequestCustomerConfiguration,
+    SubsidyRequestCustomerConfiguration
 )
 from enterprise_access.apps.track.segment import track_event
 from enterprise_access.utils import get_subsidy_model
@@ -739,13 +740,10 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
     def _validate_subsidy_request(self):
         """
         Validate request creation:
-        - Inherit basic validation from parent.
         - Ensure policy_uuid is provided and valid.
         - Ensure Browse & Request is active for the policy.
         - No duplicate PENDING/REQUESTED requests for the same course and policy.
         """
-        super()._validate_subsidy_request()
-
         policy_uuid = self.request.data.get("policy_uuid")
         if not policy_uuid:
             raise SubsidyRequestCreationError(
@@ -778,7 +776,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
             user__lms_user_id=self.lms_user_id,
             enterprise_customer_uuid=enterprise_customer_uuid,
             course_id=course_id,
-            state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.PENDING],
+            state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.PENDING]
         ).exists():
             error_msg = (
                 f"You already have an active learner credit request for course {course_id} "
@@ -788,6 +786,10 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
                 error_msg, status.HTTP_422_UNPROCESSABLE_ENTITY
             )
 
+    @permission_required(
+        constants.REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
     def create(self, request, *args, **kwargs):
         """
         Create a learner credit request.
