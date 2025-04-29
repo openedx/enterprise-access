@@ -14,7 +14,6 @@ from model_utils.models import SoftDeletableModel, TimeStampedModel
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_update_with_history
 
-from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
     SubsidyRequestStates,
@@ -340,7 +339,7 @@ class LearnerCreditRequest(SubsidyRequest):
     """
 
     assignment = models.OneToOneField(
-        'content_assignments.LearnerContentAssignment',  # pylint: disable=all
+        'content_assignments.LearnerContentAssignment',
         related_name="credit_request",
         on_delete=models.SET_NULL,
         null=True,

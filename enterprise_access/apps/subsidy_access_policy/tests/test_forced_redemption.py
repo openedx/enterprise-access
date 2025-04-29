@@ -231,7 +231,7 @@ class ForcedPolicyRedemptionAssignmentTests(BaseForcedRedemptionTestCase):
         test that we can force redemption.
         """
         policy = self._new_assignment_budget()
-        self._setup_redemption_state(user_email='alice@foo.com')
+        self._setup_redemption_state(user_email='Alice@foo.com')
 
         forced_redemption_record = ForcedPolicyRedemptionFactory(
             subsidy_access_policy=policy,
@@ -258,6 +258,6 @@ class ForcedPolicyRedemptionAssignmentTests(BaseForcedRedemptionTestCase):
 
         assignment = LearnerContentAssignment.objects.filter(lms_user_id=self.lms_user_id).first()
         self.assertEqual(assignment.content_key, self.course_run_key)
-        self.assertEqual(assignment.learner_email, 'alice@foo.com')
+        self.assertEqual(assignment.learner_email, 'Alice@foo.com')
         mock_send_email.delay.assert_called_once_with(assignment.uuid)
         mock_pending_learner_task.delay.assert_called_once_with(assignment.uuid)

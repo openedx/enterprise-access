@@ -319,7 +319,10 @@ def allocate_assignments(
     content_quantity = content_price_cents * -1
 
     if known_lms_user_ids:
-        lms_user_ids_by_email = dict(zip(learner_emails_to_allocate, known_lms_user_ids))
+        lms_user_ids_by_email = dict(zip(
+            [email.lower() for email in learner_emails_to_allocate],
+            known_lms_user_ids
+        ))
         emails_by_lms_user_id = dict(zip(known_lms_user_ids, learner_emails_to_allocate))
     else:
         lms_user_ids_by_email, emails_by_lms_user_id = _map_allocation_emails_with_lms_user_ids(
