@@ -56,6 +56,14 @@ class Command(BaseCommand):
             metavar='NUM_DAYS',
             help='The amount of days before the course start date to send a nudge email through braze',
         )
+        parser.add_argument(
+            '--batch_size',
+            type=int,
+            dest='batch_size',
+            default=50,
+            metavar='ASSIGNMENTS_PER_BATCH',
+            help='The amount of days before the course start date to send a nudge email through braze',
+        )
 
     @staticmethod
     def to_datetime(value):
@@ -75,6 +83,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options['dry_run']
         days_before_course_start_date = options['days_before_course_start_date']
+        batch_size = options['batch_size']
 
         for assignment_configuration in AssignmentConfiguration.objects.filter(active=True):
             if not hasattr(assignment_configuration, 'subsidy_access_policy'):
@@ -120,7 +129,7 @@ class Command(BaseCommand):
                 )
                 continue
 
-            paginator = Paginator(accepted_assignments, 100)
+            paginator = Paginator(accepted_assignments, batch_size)
             for page_number in paginator.page_range:
                 assignments = paginator.page(page_number)
 
