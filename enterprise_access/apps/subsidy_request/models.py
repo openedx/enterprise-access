@@ -1,4 +1,7 @@
 """ Models for subsidy_request. """
+# AED 2025-05-01: pylint runner is crashing in github actions
+# when this file is not disabled.
+# pylint: skip-file
 
 import collections
 from uuid import uuid4
