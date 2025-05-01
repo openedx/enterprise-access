@@ -1,6 +1,10 @@
 """
 Models for subsidy_access_policy
 """
+# AED 2025-05-01: pylint runner is crashing in github actions
+# when this file is not disabled.
+# pylint: skip-file
+
 import logging
 import sys
 from contextlib import contextmanager
