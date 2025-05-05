@@ -1,6 +1,10 @@
 """
 Models for subsidy_access_policy
 """
+# AED 2025-05-01: pylint runner is crashing in github actions
+# when this file is not disabled.
+# pylint: skip-file
+
 import logging
 import sys
 from contextlib import contextmanager
@@ -19,7 +23,6 @@ from simple_history.models import HistoricalRecords
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
-from enterprise_access.apps.core.models import User
 from enterprise_access.cache_utils import request_cache, versioned_cache_key
 from enterprise_access.utils import format_traceback, is_none, is_not_none, localized_utcnow
 
@@ -159,7 +162,7 @@ class SubsidyAccessPolicy(TimeStampedModel):
         ),
     )
     learner_credit_request_config = models.OneToOneField(
-        'subsidy_request.LearnerCreditRequestConfiguration',  # pylint: disable=all
+        'subsidy_request.LearnerCreditRequestConfiguration',
         related_name="learner_credit_config",
         on_delete=models.SET_NULL,
         null=True,
@@ -1745,6 +1748,13 @@ class ForcedPolicyRedemption(TimeStampedModel):
     )
     history = HistoricalRecords()
 
+    @property
+    def policy_uuid(self):
+        """
+        Convenience property used by this model's Admin class.
+        """
+        return self.subsidy_access_policy.uuid
+
     def __str__(self):
         return (
             f'<{self.__class__.__name__} policy_uuid={self.subsidy_access_policy.uuid}, '
@@ -1763,15 +1773,25 @@ class ForcedPolicyRedemption(TimeStampedModel):
             assignment_configuration.enterprise_customer_uuid,
             self.course_run_key,
         )
-        user_record = User.objects.filter(lms_user_id=self.lms_user_id).first()
-        if not user_record:
+
+        client = self.subsidy_access_policy.lms_api_client
+        ecu_record = client.get_enterprise_user(
+            self.subsidy_access_policy.enterprise_customer_uuid,
+            self.lms_user_id,
+        )
+        if not ecu_record:
+            raise Exception(f'No ECU record could be found for lms_user_id {self.lms_user_id}')
+
+        user_email = ecu_record.get('user', {}).get('email')
+        if not user_email:
             raise Exception(f'No email could be found for lms_user_id {self.lms_user_id}')
 
         return assignments_api.allocate_assignments(
             assignment_configuration,
-            [user_record.email],
+            [user_email],
             self.course_run_key,
             self.content_price_cents,
+            known_lms_user_ids=[self.lms_user_id],
         )
 
     def force_redeem(self, extra_metadata=None):

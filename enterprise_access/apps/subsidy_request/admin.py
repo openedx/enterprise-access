@@ -165,3 +165,76 @@ class SubsidyRequestCustomerConfigurationAdmin(DjangoQLSearchMixin, admin.ModelA
         obj.changed_by = current_user
 
         super().save_model(request, obj, form, change)
+
+
+@admin.register(models.LearnerCreditRequest)
+class LearnerCreditRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
+    """ Admin configuration for the LearnerCreditRequest model. """
+
+    list_display = (
+        'uuid',
+        'user',
+        'enterprise_customer_uuid',
+        'course_id',
+        'state',
+        'assignment',
+    )
+
+    read_only_fields = (
+        'assignment',
+        'learner_credit_request_config',
+    )
+
+    fields = (
+        'assignment',
+        'learner_credit_request_config',
+    )
+
+    class Meta:
+        """
+        Meta class for ``LearnerCreditRequestAdmin``.
+        """
+
+        model = models.LearnerCreditRequest
+
+    def get_readonly_fields(self, request, obj=None):
+        return super().read_only_fields + self.read_only_fields
+
+    def get_fields(self, request, obj=None):
+        return super().fields + self.fields
+
+
+@admin.register(models.LearnerCreditRequestConfiguration)
+class LearnerCreditRequestConfigurationAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
+    """ Admin configuration for the LearnerCreditRequestConfiguration model. """
+
+    list_display = (
+        'uuid',
+        'active',
+        'created',
+        'modified',
+    )
+
+    search_fields = ('uuid',)
+
+    list_filter = ('active',)
+
+    fields = (
+        'uuid',
+        'active',
+        'created',
+        'modified',
+    )
+
+    readonly_fields = (
+        'uuid',
+        'created',
+        'modified',
+    )
+
+    class Meta:
+        """
+        Meta class for ``LearnerCreditRequestConfigurationAdmin``.
+        """
+
+        model = models.LearnerCreditRequestConfiguration
