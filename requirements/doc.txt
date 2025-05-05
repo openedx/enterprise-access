@@ -74,7 +74,7 @@ chardet==5.2.0
     # via
     #   -r requirements/test.txt
     #   tox
-charset-normalizer==3.4.1
+charset-normalizer==3.4.2
     # via
     #   -r requirements/test.txt
     #   requests
@@ -131,7 +131,7 @@ coverage[toml]==7.8.0
     # via
     #   -r requirements/test.txt
     #   pytest-cov
-cryptography==44.0.2
+cryptography==44.0.3
     # via
     #   -r requirements/test.txt
     #   pyjwt
@@ -259,7 +259,7 @@ drf-yasg==1.21.10
     # via
     #   -r requirements/test.txt
     #   edx-api-doc-tools
-edx-api-doc-tools==2.0.0
+edx-api-doc-tools==2.1.0
     # via -r requirements/test.txt
 edx-auth-backends==4.5.0
     # via -r requirements/test.txt
@@ -388,7 +388,7 @@ monotonic==1.6
     #   analytics-python
 mysqlclient==2.2.7
     # via -r requirements/test.txt
-newrelic==10.10.0
+newrelic==10.11.0
     # via
     #   -r requirements/test.txt
     #   edx-django-utils
@@ -403,7 +403,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==10.0.0
+openedx-events==10.1.0
     # via
     #   -r requirements/test.txt
     #   edx-event-bus-kafka
@@ -465,7 +465,7 @@ pyjwt[crypto]==2.10.1
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==3.3.6
+pylint==3.3.7
     # via
     #   -r requirements/test.txt
     #   edx-lint
@@ -487,7 +487,7 @@ pylint-plugin-utils==0.8.2
     #   pylint-django
 pymemcache==4.0.0
     # via -r requirements/test.txt
-pymongo==4.12.0
+pymongo==4.12.1
     # via
     #   -r requirements/test.txt
     #   edx-opaque-keys
@@ -537,7 +537,7 @@ pyyaml==6.0.2
     #   edx-django-release-util
 readme-renderer==44.0
     # via -r requirements/doc.in
-redis==5.2.1
+redis==6.0.0
     # via -r requirements/test.txt
 referencing==0.36.2
     # via
@@ -594,7 +594,7 @@ social-auth-app-django==5.4.3
     # via
     #   -r requirements/test.txt
     #   edx-auth-backends
-social-auth-core==4.6.0
+social-auth-core==4.6.1
     # via
     #   -r requirements/test.txt
     #   edx-auth-backends
