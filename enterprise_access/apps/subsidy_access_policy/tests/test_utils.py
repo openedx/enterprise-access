@@ -2,16 +2,101 @@
 Tests for subsidy_access_policy utils.
 """
 import uuid
+from datetime import datetime, timedelta
+from unittest.mock import patch
 
 from django.test import TestCase
 
-from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+from enterprise_access.apps.subsidy_access_policy.tests.factories import (
+    AssignedLearnerCreditAccessPolicyFactory,
+    PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
+    PerLearnerSpendCapLearnerCreditAccessPolicyFactory
+)
+from enterprise_access.apps.subsidy_access_policy.utils import (
+    create_idempotency_key_for_transaction,
+    sort_subsidy_access_policies_for_redemption
+)
 
 
 class SubsidyAccessPolicyUtilsTests(TestCase):
     """
     SubsidyAccessPolicy utils tests.
     """
+
+    def setUp(self):
+        super().setUp()
+
+        now = datetime.utcnow()
+        yesterday = now - timedelta(days=1)
+        tomorrow = now + timedelta(days=1)
+        day_after_tomorrow = now + timedelta(days=2)
+
+        self.mock_subsidy_one = {
+            'id': 1,
+            'active_datetime': yesterday,
+            'expiration_datetime': tomorrow,
+            'is_active': True,
+            'current_balance': 100,
+        }
+        self.mock_subsidy_two = {
+            'id': 2,
+            'active_datetime': yesterday,
+            'expiration_datetime': tomorrow,
+            'is_active': True,
+            'current_balance': 50,
+        }
+        self.mock_subsidy_three = {
+            'id': 3,
+            'active_datetime': yesterday,
+            'expiration_datetime': day_after_tomorrow,
+            'is_active': True,
+            'current_balance': 50,
+        }
+        self.mock_subsidy_four = {
+            'id': 4,
+            'active_datetime': yesterday,
+            'expiration_datetime': tomorrow,
+            'is_active': True,
+            'current_balance': 100,
+        }
+
+        self.policy_one = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
+        self.policy_two = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
+        self.policy_three = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
+        self.policy_four = PerLearnerSpendCapLearnerCreditAccessPolicyFactory.create()
+        self.policy_five = AssignedLearnerCreditAccessPolicyFactory.create()
+
+        # Map policies to subsidy mocks
+        self.policy_subsidy_map = {
+            self.policy_one.pk: self.mock_subsidy_one,
+            self.policy_two.pk: self.mock_subsidy_two,
+            self.policy_three.pk: self.mock_subsidy_three,
+            self.policy_four.pk: self.mock_subsidy_four,
+            self.policy_five.pk: self.mock_subsidy_one,
+        }
+
+        policy_subsidy_map = self.policy_subsidy_map
+
+        def mocked_subsidy_record(policy_instance):
+            return policy_subsidy_map[policy_instance.pk]
+
+        self.subsidy_record_patcher = patch(
+            'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_record',
+            new=mocked_subsidy_record
+        )
+        self.subsidy_record_patcher.start()
+        self.addCleanup(self.subsidy_record_patcher.stop)
+
+    def test_setup(self):
+        """
+        Ensure each policy has the correctly mocked subsidy object.
+        """
+        assert self.policy_one.subsidy_record() == self.mock_subsidy_one
+        assert self.policy_two.subsidy_record() == self.mock_subsidy_two
+        assert self.policy_three.subsidy_record() == self.mock_subsidy_three
+        assert self.policy_four.subsidy_record() == self.mock_subsidy_four
+        assert self.policy_five.subsidy_record() == self.mock_subsidy_one
 
     def test_create_idempotency_key_for_transaction_fixed_output(self):
         """
@@ -83,3 +168,40 @@ class SubsidyAccessPolicyUtilsTests(TestCase):
 
         assert len(different_keys) == len(modified_inputs_should_change_output) + 1
         assert len(same_keys) == 1
+
+    def test_sort_subsidy_access_policies_for_redemption_priority(self):
+        """
+        Test resolve given two policies with different balances, different expiration
+        the sooner expiration policy should be returned.
+        """
+        queryset = SubsidyAccessPolicy.objects.filter(pk__in=[
+            self.policy_one.pk,
+            self.policy_five.pk,
+            self.policy_four.pk,
+        ])
+        sorted_policies = sort_subsidy_access_policies_for_redemption(queryset=queryset)
+        assert sorted_policies[0] == self.policy_five
+
+    def test_sort_subsidy_access_policies_for_redemption_subsidy_balance(self):
+        """
+        Test resolve given two policies with same balances, same expiration
+        but different type-priority.
+        """
+        queryset = SubsidyAccessPolicy.objects.filter(pk__in=[
+            self.policy_one.pk,
+            self.policy_two.pk
+        ])
+        sorted_policies = sort_subsidy_access_policies_for_redemption(queryset=queryset)
+        assert sorted_policies[0] == self.policy_two
+
+    def test_sort_subsidy_access_policies_for_redemption_expiration(self):
+        """
+        Test resolve given two policies with different balances, different expiration
+        the sooner expiration policy should be returned.
+        """
+        queryset = SubsidyAccessPolicy.objects.filter(pk__in=[
+            self.policy_three.pk,
+            self.policy_one.pk
+        ])
+        sorted_policies = sort_subsidy_access_policies_for_redemption(queryset=queryset)
+        assert sorted_policies[0] == self.policy_one

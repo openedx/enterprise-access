@@ -44,6 +44,21 @@ def create_idempotency_key_for_transaction(subsidy_uuid, **metadata):
     return f'{LEDGERED_SUBSIDY_IDEMPOTENCY_KEY_PREFIX}-{subsidy_uuid}-{hashed_metadata}'
 
 
+def sort_subsidy_access_policies_for_redemption(queryset):
+    """
+    Sorts the query set during can-redeem by the following parameters
+           - priority (of type)
+           - expiration, sooner to expire first
+           - balance, lower balance first
+    """
+    if queryset.count() <= 1:
+        return queryset
+    return sorted(
+        queryset,
+        key=lambda p: (p.priority, p.subsidy_expiration_datetime, p.subsidy_balance())
+    )
+
+
 class ProxyAwareHistoricalRecords(HistoricalRecords):
     """
     This specialized HistoricalRecords model field is to be used specifically for tracking history on instances of proxy
