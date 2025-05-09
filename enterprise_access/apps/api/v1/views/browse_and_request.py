@@ -720,23 +720,6 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
 
     subsidy_type = SubsidyTypeChoices.LEARNER_CREDIT
 
-    def get_queryset(self):
-        """
-        Filter requests based on user role.
-        """
-        queryset = super().get_queryset()
-        enterprise_uuid = self.request.query_params.get("enterprise_customer_uuid")
-
-        # Non-admin users can only see their own requests
-        if not (self.request.user.is_staff or self.request.user.is_superuser):
-            queryset = queryset.filter(user=self.request.user)
-
-        # Filter by enterprise if provided
-        if enterprise_uuid:
-            queryset = queryset.filter(enterprise_customer_uuid=enterprise_uuid)
-
-        return queryset
-
     def _validate_subsidy_request(self):
         """
         Validate request creation:
@@ -752,18 +735,13 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
 
         try:
             policy = SubsidyAccessPolicy.objects.get(uuid=policy_uuid)
-            self.request.validated_policy = (
-                policy  # Store validated policy for use in create
-            )
+            self.request.validated_policy = policy  # Store validated policy for use in create
         except SubsidyAccessPolicy.DoesNotExist:
             raise SubsidyRequestCreationError(
                 f"Invalid policy_uuid: {policy_uuid}.", status.HTTP_400_BAD_REQUEST
             )
 
-        if (
-            not policy.learner_credit_request_config
-            or not policy.learner_credit_request_config.active
-        ):
+        if not policy.bnr_enabled:
             raise SubsidyRequestCreationError(
                 f"Browse & Request is not active for policy UUID: {policy_uuid}.",
                 status.HTTP_400_BAD_REQUEST,

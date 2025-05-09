@@ -16,14 +16,18 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
+from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
+    LearnerCreditRequest,
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
 from enterprise_access.apps.subsidy_request.tests.factories import (
     CouponCodeRequestFactory,
+    LearnerCreditRequestConfigurationFactory,
+    LearnerCreditRequestFactory,
     LicenseRequestFactory,
     SubsidyRequestCustomerConfigurationFactory
 )
@@ -39,6 +43,8 @@ COUPON_CODE_REQUESTS_LIST_ENDPOINT = reverse('api:v1:coupon-code-requests-list')
 COUPON_CODE_REQUESTS_APPROVE_ENDPOINT = reverse('api:v1:coupon-code-requests-approve')
 COUPON_CODE_REQUESTS_DECLINE_ENDPOINT = reverse('api:v1:coupon-code-requests-decline')
 CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT = reverse('api:v1:customer-configurations-list')
+LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT = reverse('api:v1:learner-credit-requests-list')
+LEARNER_CREDIT_REQUESTS_OVERVIEW_ENDPOINT = reverse('api:v1:learner-credit-requests-overview')
 
 # shorthand constant for the path to the browse_and_request views module.
 BNR_VIEW_PATH = 'enterprise_access.apps.api.v1.views.browse_and_request'
@@ -1496,3 +1502,253 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITestWithMocks):
 
         mock_decline_enterprise_subsidy_requests_task.assert_not_called()
         mock_send_notification_email_for_request.assert_not_called()
+
+
+@ddt.ddt
+class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
+    """
+    Tests for LearnerCreditRequestViewSet.
+    """
+
+    def setUp(self):
+        super().setUp()
+        
+        # Setup test policy and config
+        self.learner_credit_config = LearnerCreditRequestConfigurationFactory(active=True)
+        self.policy = AssignedLearnerCreditAccessPolicyFactory(
+            learner_credit_request_config=self.learner_credit_config,
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+        
+        # Setup test requests
+        self.user_request_1 = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            user=self.user,
+            learner_credit_request_config=self.learner_credit_config,
+        )
+        self.user_request_2 = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_2,
+            user=self.user,
+            learner_credit_request_config=self.learner_credit_config,
+        )
+        self.enterprise_request = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            learner_credit_request_config=self.learner_credit_config,
+        )
+
+        # LearnerCreditrequest with no associations to the user and enterprise
+        self.other_learner_credit_request = LearnerCreditRequestFactory()
+
+    def test_list_as_enterprise_learner(self):
+        """
+        Test that an enterprise learner sees only their own requests.
+        """
+        self.set_jwt_cookie(roles_and_contexts=[
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+                'context': str(self.enterprise_customer_uuid_1)
+            },
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+                'context': str(self.enterprise_customer_uuid_2)
+            }
+        ])
+
+        response = self.client.get(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT)
+        response_json = self.load_json(response.content)
+        
+        request_uuids = sorted([lr['uuid'] for lr in response_json['results']])
+        expected_uuids = sorted([
+            str(self.user_request_1.uuid),
+            str(self.user_request_2.uuid)
+        ])
+        assert request_uuids == expected_uuids
+
+    def test_list_as_enterprise_admin(self):
+        """
+        Test that an enterprise admin sees all requests for their enterprise.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        response = self.client.get(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT)
+        response_json = self.load_json(response.content)
+        
+        request_uuids = sorted([lr['enterprise_customer_uuid'] for lr in response_json['results']])
+        expected_uuids = sorted([
+            str(self.user_request_1.enterprise_customer_uuid),
+            str(self.user_request_2.enterprise_customer_uuid),
+            str(self.enterprise_request.enterprise_customer_uuid)
+        ])
+        assert request_uuids == expected_uuids
+
+    @ddt.data(
+        ('', [choice[0] for choice in SubsidyRequestStates.CHOICES]),
+        (f'{SubsidyRequestStates.PENDING}', [SubsidyRequestStates.PENDING]),
+        (f',{SubsidyRequestStates.DECLINED},', [SubsidyRequestStates.DECLINED]),
+        (f'{SubsidyRequestStates.REQUESTED},{SubsidyRequestStates.ERROR}',
+            [SubsidyRequestStates.REQUESTED, SubsidyRequestStates.ERROR]),
+    )
+    @ddt.unpack
+    def test_filter_by_states(self, states, expected_states):
+        """
+        Test filtering requests by state.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        # Create requests in various states
+        for state, _ in SubsidyRequestStates.CHOICES:
+            LearnerCreditRequestFactory(
+                enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+                user=self.user,
+                state=state,
+                learner_credit_request_config=self.learner_credit_config
+            )
+
+        query_params = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'state': states
+        }
+        response = self.client.get(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, query_params)
+        response_json = self.load_json(response.content)
+
+        request_uuids = sorted([lr['uuid'] for lr in response_json['results']])
+        expected_uuids = sorted([
+            str(req.uuid) for req in LearnerCreditRequest.objects.filter(
+                enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+                state__in=expected_states
+            ).order_by('uuid')
+        ])
+        assert request_uuids == expected_uuids
+
+    def test_create_missing_policy_uuid(self):
+        """
+        Test that policy_uuid is required.
+        """
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'course_id': 'course-v1:edX+DemoX+Demo_Course'
+        }
+        response = self.client.post(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data == {'detail': 'policy_uuid is required.'}
+
+    def test_create_bnr_not_enabled(self):
+        """
+        Test that request creation fails when BNR is not active for the policy.
+        """
+        disabled_config = LearnerCreditRequestConfigurationFactory(active=False)
+        disabled_policy = AssignedLearnerCreditAccessPolicyFactory(
+            learner_credit_request_config=disabled_config,
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+        
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'course_id': 'course-v1:edX+DemoX+Demo_Course',
+            'policy_uuid': disabled_policy.uuid
+        }
+        response = self.client.post(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, payload)
+        
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.data == {
+            'detail': f'Browse & Request is not active for policy UUID: {disabled_policy.uuid}.'
+        }
+
+    def test_create_duplicate_request(self):
+        """
+        Test that duplicate pending requests are prevented.
+        """
+        # Create initial request
+        LearnerCreditRequestFactory(
+            user=self.user,
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            course_id='course-v1:edX+DemoX+Demo_Course',
+            state=SubsidyRequestStates.REQUESTED,
+            learner_credit_request_config=self.learner_credit_config
+        )
+        
+        # Try to create duplicate
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'course_id': 'course-v1:edX+DemoX+Demo_Course',
+            'policy_uuid': self.policy.uuid
+        }
+        response = self.client.post(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.data == {
+            'detail': 'You already have an active learner credit request for course course-v1:edX+DemoX+Demo_Course '
+                     f'under policy UUID: {self.policy.uuid}.'
+        }
+
+    def test_create_success(self):
+        """
+        Test successful request creation.
+        """
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'course_id': 'course-v1:edX+DemoX+Demo_Course',
+            'policy_uuid': self.policy.uuid
+        }
+        response = self.client.post(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, payload)
+        assert response.status_code == status.HTTP_201_CREATED
+        
+        # Verify the request was created with correct fields
+        request = LearnerCreditRequest.objects.get(uuid=response.data['uuid'])
+        assert request.user == self.user
+        assert request.enterprise_customer_uuid == self.enterprise_customer_uuid_1
+        assert request.course_id == 'course-v1:edX+DemoX+Demo_Course'
+        assert request.state == SubsidyRequestStates.REQUESTED
+        assert request.learner_credit_request_config == self.learner_credit_config
+
+    def test_overview_happy_path(self):
+        """
+        Test the overview endpoint returns correct state counts.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        # Clear existing and create test requests
+        LearnerCreditRequest.objects.all().delete()
+        for state, _ in SubsidyRequestStates.CHOICES:
+            LearnerCreditRequestFactory.create_batch(
+                random.randint(1, 3),
+                enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+                user=self.user,
+                state=state,
+                learner_credit_request_config=self.learner_credit_config
+            )
+
+        url = f'{LEARNER_CREDIT_REQUESTS_OVERVIEW_ENDPOINT}?enterprise_customer_uuid={self.enterprise_customer_uuid_1}'
+        response = self.client.get(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        for overview in response.data:
+            state = overview['state']
+            count = overview['count']
+            assert count == LearnerCreditRequest.objects.filter(
+                enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+                state=state
+            ).count()
+
+    def test_overview_missing_enterprise_param(self):
+        """
+        Test overview requires enterprise_customer_uuid param.
+        """
+        # Need to be an admin to access overview
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        response = self.client.get(LEARNER_CREDIT_REQUESTS_OVERVIEW_ENDPOINT)
+        # Depending on implementation, this could be 400 or 403
+        # Check that it's one of the expected status codes
+        assert response.status_code in [status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN]

@@ -133,7 +133,7 @@ class LearnerCreditRequestConfigurationSerializer(serializers.ModelSerializer):
     class Meta:
         model = LearnerCreditRequestConfiguration
         fields = "__all__"
-        read_only_fields = ["uuid", "active", "created", "modified"]
+        read_only_fields = ["uuid", "created", "modified"]
 
 
 class LearnerCreditRequestSerializer(SubsidyRequestSerializer):

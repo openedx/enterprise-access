@@ -12,6 +12,8 @@ from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
+    LearnerCreditRequest,
+    LearnerCreditRequestConfiguration,
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
@@ -71,3 +73,24 @@ class SubsidyRequestCustomerConfigurationFactory(factory.django.DjangoModelFacto
 
     class Meta:
         model = SubsidyRequestCustomerConfiguration
+
+
+class LearnerCreditRequestConfigurationFactory(factory.django.DjangoModelFactory):
+    """
+    Test factory for the `LearnerCreditRequestConfiguration` model.
+    """
+    uuid = factory.LazyFunction(uuid4)
+    active = True
+
+    class Meta:
+        model = LearnerCreditRequestConfiguration
+
+
+class LearnerCreditRequestFactory(SubsidyRequestFactory):
+    """
+    Test factory for the `LearnerCreditRequest` model.
+    """
+    learner_credit_request_config = factory.SubFactory(LearnerCreditRequestConfigurationFactory)
+
+    class Meta:
+        model = LearnerCreditRequest
