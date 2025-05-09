@@ -6,6 +6,7 @@ from .admin_portal_learner_profile import AdminLearnerProfileViewSet
 from .bffs.learner_portal import LearnerPortalBFFViewSet
 from .browse_and_request import (
     CouponCodeRequestViewSet,
+    LearnerCreditRequestViewSet,
     LicenseRequestViewSet,
     SubsidyRequestCustomerConfigurationViewSet,
     SubsidyRequestViewSet

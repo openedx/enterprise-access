@@ -33,6 +33,7 @@ class SubsidyAccessPolicyFactory(factory.django.DjangoModelFactory):
     description = 'A generic description'
     spend_limit = factory.LazyAttribute(lambda _: FAKER.pyint(min_value=1))
     active = True
+    learner_credit_request_config = None
 
 
 class PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(SubsidyAccessPolicyFactory):
