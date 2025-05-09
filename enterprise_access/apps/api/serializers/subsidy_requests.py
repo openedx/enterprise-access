@@ -11,7 +11,7 @@ from enterprise_access.apps.subsidy_request.models import (
     LearnerCreditRequestConfiguration,
     LicenseRequest,
     SubsidyRequest,
-    SubsidyRequestCustomerConfiguration,
+    SubsidyRequestCustomerConfiguration
 )
 
 logger = logging.getLogger(__name__)
