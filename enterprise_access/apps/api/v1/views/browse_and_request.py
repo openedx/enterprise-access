@@ -736,10 +736,10 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         try:
             policy = SubsidyAccessPolicy.objects.get(uuid=policy_uuid)
             self.request.validated_policy = policy  # Store validated policy for use in create
-        except SubsidyAccessPolicy.DoesNotExist:
+        except SubsidyAccessPolicy.DoesNotExist as exc:
             raise SubsidyRequestCreationError(
                 f"Invalid policy_uuid: {policy_uuid}.", status.HTTP_400_BAD_REQUEST
-            )
+            ) from exc
 
         if not policy.bnr_enabled:
             raise SubsidyRequestCreationError(
