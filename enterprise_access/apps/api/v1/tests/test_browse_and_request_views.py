@@ -1512,14 +1512,14 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
 
     def setUp(self):
         super().setUp()
-        
+
         # Setup test policy and config
         self.learner_credit_config = LearnerCreditRequestConfigurationFactory(active=True)
         self.policy = AssignedLearnerCreditAccessPolicyFactory(
             learner_credit_request_config=self.learner_credit_config,
             enterprise_customer_uuid=self.enterprise_customer_uuid_1
         )
-        
+
         # Setup test requests
         self.user_request_1 = LearnerCreditRequestFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
@@ -1556,7 +1556,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
 
         response = self.client.get(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT)
         response_json = self.load_json(response.content)
-        
+
         request_uuids = sorted([lr['uuid'] for lr in response_json['results']])
         expected_uuids = sorted([
             str(self.user_request_1.uuid),
@@ -1575,7 +1575,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
 
         response = self.client.get(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT)
         response_json = self.load_json(response.content)
-        
+
         request_uuids = sorted([lr['enterprise_customer_uuid'] for lr in response_json['results']])
         expected_uuids = sorted([
             str(self.user_request_1.enterprise_customer_uuid),
@@ -1647,14 +1647,14 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
             learner_credit_request_config=disabled_config,
             enterprise_customer_uuid=self.enterprise_customer_uuid_1
         )
-        
+
         payload = {
             'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
             'course_id': 'course-v1:edX+DemoX+Demo_Course',
             'policy_uuid': disabled_policy.uuid
         }
         response = self.client.post(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, payload)
-        
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.data == {
             'detail': f'Browse & Request is not active for policy UUID: {disabled_policy.uuid}.'
@@ -1672,7 +1672,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
             state=SubsidyRequestStates.REQUESTED,
             learner_credit_request_config=self.learner_credit_config
         )
-        
+
         # Try to create duplicate
         payload = {
             'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
@@ -1682,8 +1682,8 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         response = self.client.post(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, payload)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
         assert response.data == {
-            'detail': 'You already have an active learner credit request for course course-v1:edX+DemoX+Demo_Course '
-                     f'under policy UUID: {self.policy.uuid}.'
+            "detail": "You already have an active learner credit request for course course-v1:edX+DemoX+Demo_Course "
+            f"under policy UUID: {self.policy.uuid}."
         }
 
     def test_create_success(self):
@@ -1697,7 +1697,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         }
         response = self.client.post(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, payload)
         assert response.status_code == status.HTTP_201_CREATED
-        
+
         # Verify the request was created with correct fields
         request = LearnerCreditRequest.objects.get(uuid=response.data['uuid'])
         assert request.user == self.user
