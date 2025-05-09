@@ -694,6 +694,10 @@ class SubsidyAccessPolicyCanRedeemElementResponseSerializer(serializers.Serializ
             "List of reasons why each of the enterprise's subsidy access policies are not redeemable, grouped by reason"
         )
     )
+    display_reason = serializers.CharField(
+        allow_null=True,
+        help_text="A single reason user text derived from 'reasons' to be displayed in the interface",
+    )
 
 
 # pylint: disable=abstract-method
