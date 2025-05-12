@@ -372,6 +372,7 @@ class LearnerDashboardResponseSerializer(BaseLearnerPortalResponseSerializer):
 
     enterprise_course_enrollments = EnterpriseCourseEnrollmentSerializer(many=True)
     all_enrollments_by_status = LearnerEnrollmentsByStatusSerializer()
+    has_bnr_enabled_policy = serializers.BooleanField()
 
 
 class LearnerSearchResponseSerializer(BaseLearnerPortalResponseSerializer):
