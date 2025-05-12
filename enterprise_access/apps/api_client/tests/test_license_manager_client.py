@@ -102,8 +102,9 @@ class TestLicenseManagerApiClient(TestCase):
         lm_client = LicenseManagerApiClient()
 
         result = lm_client.create_subscription_plan(
-            customer_agreement_uuid, enterprise_catalog_uuid, salesforce_opportunity_line_item,
-            title, start_date, expiration_date, desired_num_licenses, other_field='foo'
+            customer_agreement_uuid, salesforce_opportunity_line_item,
+            title, start_date, expiration_date, desired_num_licenses,
+            enterprise_catalog_uuid=enterprise_catalog_uuid, other_field='foo'
         )
 
         self.assertEqual(result, mock_post.return_value.json.return_value)

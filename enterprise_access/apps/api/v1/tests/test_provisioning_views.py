@@ -28,6 +28,73 @@ TEST_ENTERPRISE_UUID = uuid.uuid4()
 
 TEST_CATALOG_UUID = uuid.uuid4()
 
+TEST_AGREEMENT_UUID = uuid.uuid4()
+
+TEST_SUBSCRIPTION_UUID = uuid.uuid4()
+
+DEFAULT_CUSTOMER_RECORD = {
+    "uuid": str(TEST_ENTERPRISE_UUID),
+    "name": "Test customer",
+    "country": "US",
+    "slug": "test-customer",
+}
+
+DEFAULT_CATALOG_RECORD = {
+    'uuid': str(TEST_CATALOG_UUID),
+    'enterprise_customer': str(TEST_ENTERPRISE_UUID),
+    'title': 'Test catalog',
+    'enterprise_catalog_query': 2,
+}
+
+DEFAULT_SUBSCRIPTION_PLAN_RECORD = {
+    "uuid": str(TEST_SUBSCRIPTION_UUID),
+    "title": "provisioning test 1",
+    "salesforce_opportunity_line_item": "00k000000000000123",
+    "created": "2025-05-16T15:20:19.159640+00:00",
+    "start_date": "2025-06-01T00:00:00+00:00",
+    "expiration_date": "2026-03-31T00:00:00+00:00",
+    "is_active": True,
+    "is_current": False,
+    "plan_type": "Standard Paid",
+    "enterprise_catalog_uuid": str(TEST_CATALOG_UUID),
+}
+
+DEFAULT_AGREEMENT_RECORD = {
+    "uuid": str(TEST_AGREEMENT_UUID),
+    "enterprise_customer_uuid": str(TEST_ENTERPRISE_UUID),
+    "default_catalog_uuid": None,
+    "subscriptions": [DEFAULT_SUBSCRIPTION_PLAN_RECORD],
+}
+
+DEFAULT_REQUEST_PAYLOAD = {
+    'enterprise_customer': {
+        'name': 'Test Customer',
+        'slug': 'test-customer',
+        'country': 'US',
+    },
+    'pending_admins': [],
+    'enterprise_catalog': {
+        'title': 'Test catalog',
+        'catalog_query_id': 2,
+    },
+    'customer_agreement': {},
+    'subscription_plan': {
+        'title': 'provisioning test 1',
+        'salesforce_opportunity_line_item': '00k000000000000123',
+        'start_date': '2025-06-01T00:00:00Z',
+        'expiration_date': '2026-03-31T00:00:00Z',
+        'product_id': 1,
+        'desired_num_licenses': 5,
+    },
+}
+
+EXPECTED_CATALOG_RESPONSE = {
+    'uuid': str(TEST_CATALOG_UUID),
+    'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
+    'title': 'Test catalog',
+    'catalog_query_id': 2,
+}
+
 
 @ddt.ddt
 class TestProvisioningAuth(APITest):
@@ -86,12 +153,13 @@ class TestProvisioningAuth(APITest):
         ),
     )
     @ddt.unpack
+    @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_customer_agreement')
     @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_enterprise_catalog')
     @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_enterprise_admin_users')
     @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_enterprise_customer')
     def test_provisioning_create_allowed_for_provisioning_admins(
         self, role_context_dict, expected_response_code, mock_create_customer,
-        mock_create_admins, mock_create_catalog
+        mock_create_admins, mock_create_catalog, mock_create_agreement,
     ):
         """
         Tests that we get expected 200 response for the provisioning create view when
@@ -99,41 +167,23 @@ class TestProvisioningAuth(APITest):
         """
         self.set_jwt_cookie([role_context_dict])
 
-        mock_create_customer.return_value = {
-            "uuid": str(uuid.uuid4()),
-            "name": "Test customer",
-            "country": "US",
-            "slug": "test-customer",
-        }
+        mock_create_customer.return_value = DEFAULT_CUSTOMER_RECORD
         mock_create_admins.return_value = {
             "created_admins": [{
                 "user_email": "test-admin@example.com",
             }],
             "existing_admins": [],
         }
-        mock_create_catalog.return_value = {
-            'uuid': str(TEST_CATALOG_UUID),
-            'enterprise_customer': str(TEST_ENTERPRISE_UUID),
-            'title': 'Test catalog',
-            'enterprise_catalog_query': 2,
-        }
+        mock_create_catalog.return_value = DEFAULT_CATALOG_RECORD
+        mock_create_agreement.return_value = DEFAULT_AGREEMENT_RECORD
 
-        request_payload = {
-            "enterprise_customer": {
-                "name": "Test customer",
-                "country": "US",
-                "slug": "test-customer",
+        request_payload = {**DEFAULT_REQUEST_PAYLOAD}
+        request_payload['pending_admins'] = [
+            {
+                "user_email": "test-admin@example.com",
             },
-            "pending_admins": [
-                {
-                    "user_email": "test-admin@example.com",
-                },
-            ],
-            "enterprise_catalog": {
-                "title": "Test catalog",
-                "catalog_query_id": 2,
-            },
-        }
+        ]
+
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
         assert response.status_code == expected_response_code
 
@@ -167,12 +217,7 @@ class TestProvisioningEndToEnd(APITest):
         # Data representing the state where a net-new customer is created.
         {
             'existing_customer_data': None,
-            'created_customer_data': {
-                'name': 'Test Customer',
-                'slug': 'test-customer',
-                'country': 'US',
-                'uuid': str(TEST_ENTERPRISE_UUID),
-            },
+            'created_customer_data': DEFAULT_CUSTOMER_RECORD,
             'expected_get_customer_kwargs': {
                 'enterprise_customer_slug': 'test-customer',
             },
@@ -185,12 +230,7 @@ class TestProvisioningEndToEnd(APITest):
         },
         # Data representing the state where a customer with the given slug exists.
         {
-            'existing_customer_data': {
-                'name': 'Test Customer',
-                'slug': 'test-customer',
-                'country': 'US',
-                'uuid': str(TEST_ENTERPRISE_UUID),
-            },
+            'existing_customer_data': DEFAULT_CUSTOMER_RECORD,
             'created_customer_data': None,
             'expected_get_customer_kwargs': {
                 'enterprise_customer_slug': 'test-customer',
@@ -199,8 +239,9 @@ class TestProvisioningEndToEnd(APITest):
             'expected_create_customer_kwargs': None
         },
     )
+    @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_customer_agreement')
     @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
-    def test_get_or_create_customer_and_admins_created(self, test_data, mock_lms_api_client):
+    def test_get_or_create_customer_and_admins_created(self, test_data, mock_lms_api_client, mock_create_agreement):
         """
         Tests cases where admins don't exist and customer is fetched or created.
         """
@@ -216,54 +257,32 @@ class TestProvisioningEndToEnd(APITest):
             {'user_email': 'alice@foo.com', 'enterprise_customer_uuid': TEST_ENTERPRISE_UUID},
             {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': TEST_ENTERPRISE_UUID},
         ]
-        mock_client.get_enterprise_catalogs.return_value = [{
-            'uuid': str(TEST_CATALOG_UUID),
-            'enterprise_customer': str(TEST_ENTERPRISE_UUID),
-            'title': 'Test catalog',
-            'enterprise_catalog_query': 2,
-        }]
+        mock_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
+        mock_create_agreement.return_value = DEFAULT_AGREEMENT_RECORD
 
-        request_payload = {
-            "enterprise_customer": {
-                'name': 'Test Customer',
-                'slug': 'test-customer',
-                'country': 'US',
-            },
-            'pending_admins': [
-                {'user_email': 'alice@foo.com'},
-                {'user_email': 'bob@foo.com'},
-            ],
-            'enterprise_catalog': {
-                'title': 'Test catalog',
-                'catalog_query_id': 2,
-            },
-        }
+        request_payload = {**DEFAULT_REQUEST_PAYLOAD}
+        request_payload['pending_admins'] = [
+            {'user_email': 'alice@foo.com'},
+            {'user_email': 'bob@foo.com'},
+        ]
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
         assert response.status_code == status.HTTP_201_CREATED
 
-        expected_response_payload = {
-            'enterprise_customer': {
-                'name': 'Test Customer',
-                'slug': 'test-customer',
-                'country': 'US',
-                'uuid': str(TEST_ENTERPRISE_UUID),
-            },
-            'customer_admins': {
+        actual_response_payload = response.json()
+        self.assertEqual(
+            actual_response_payload['enterprise_customer'],
+            DEFAULT_CUSTOMER_RECORD,
+        )
+        self.assertEqual(
+            actual_response_payload['customer_admins'],
+            {
                 'created_admins': [
                     {'user_email': 'alice@foo.com'},
                     {'user_email': 'bob@foo.com'},
                 ],
                 'existing_admins': [],
             },
-            'enterprise_catalog': {
-                'uuid': str(TEST_CATALOG_UUID),
-                'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
-                'title': 'Test catalog',
-                'catalog_query_id': 2,
-            },
-        }
-        actual_response_payload = response.json()
-        self.assertEqual(actual_response_payload, expected_response_payload)
+        )
 
         mock_client.get_enterprise_customer_data.assert_called_once_with(
             **test_data['expected_get_customer_kwargs'],
@@ -360,44 +379,29 @@ class TestProvisioningEndToEnd(APITest):
             'expected_create_pending_admin_calls': [],
         },
     )
+    @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
     @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
-    def test_customer_fetched_admins_fetched_or_created(self, test_data, mock_lms_api_client):
+    def test_customer_fetched_admins_fetched_or_created(
+        self, test_data, mock_lms_api_client, mock_license_manager_client
+    ):
         """
         Tests cases where [pending]admins are fetched or created, but the customer
         already exists
         """
         mock_client = mock_lms_api_client.return_value
-        mock_client.get_enterprise_customer_data.return_value = {
-            'name': 'Test Customer',
-            'slug': 'test-customer',
-            'country': 'US',
-            'uuid': str(TEST_ENTERPRISE_UUID),
-        }
+        mock_client.get_enterprise_customer_data.return_value = DEFAULT_CUSTOMER_RECORD
         mock_client.get_enterprise_admin_users.return_value = test_data['existing_admin_users']
         mock_client.get_enterprise_pending_admin_users.return_value = test_data['existing_pending_admin_users']
         mock_client.create_enterprise_admin_user.side_effect = test_data['create_admin_user_side_effect']
-        mock_client.get_enterprise_catalogs.return_value = [{
-            'uuid': str(TEST_CATALOG_UUID),
-            'enterprise_customer': str(TEST_ENTERPRISE_UUID),
-            'title': 'Test catalog',
-            'enterprise_catalog_query': 2,
-        }]
+        mock_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
+        mock_license_client = mock_license_manager_client.return_value
+        mock_license_client.get_customer_agreement.return_value = DEFAULT_AGREEMENT_RECORD
 
-        request_payload = {
-            'enterprise_customer': {
-                'name': 'Test Customer',
-                'slug': 'test-customer',
-                'country': 'US',
-            },
-            'pending_admins': [
-                {'user_email': 'alice@foo.com'},
-                {'user_email': 'bob@foo.com'},
-            ],
-            'enterprise_catalog': {
-                'title': 'Test catalog',
-                'catalog_query_id': 2,
-            },
-        }
+        request_payload = {**DEFAULT_REQUEST_PAYLOAD}
+        request_payload['pending_admins'] = [
+            {'user_email': 'alice@foo.com'},
+            {'user_email': 'bob@foo.com'},
+        ]
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
         assert response.status_code == status.HTTP_201_CREATED
 
@@ -410,26 +414,15 @@ class TestProvisioningEndToEnd(APITest):
             {'user_email': record['user_email']}
             for record in test_data['create_admin_user_side_effect']
         ]
-        expected_response_payload = {
-            'enterprise_customer': {
-                'name': 'Test Customer',
-                'slug': 'test-customer',
-                'country': 'US',
-                'uuid': str(TEST_ENTERPRISE_UUID),
-            },
-            'customer_admins': {
+
+        actual_response_payload = response.json()
+        self.assertEqual(
+            actual_response_payload['customer_admins'],
+            {
                 'created_admins': expected_created_admins,
                 'existing_admins': expected_existing_admins,
             },
-            'enterprise_catalog': {
-                'uuid': str(TEST_CATALOG_UUID),
-                'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
-                'title': 'Test catalog',
-                'catalog_query_id': 2,
-            },
-        }
-        actual_response_payload = response.json()
-        self.assertEqual(actual_response_payload, expected_response_payload)
+        )
 
         mock_client.get_enterprise_customer_data.assert_called_once_with(
             enterprise_customer_slug='test-customer',
@@ -471,77 +464,39 @@ class TestProvisioningEndToEnd(APITest):
     @ddt.data(
         {
             'existing_catalogs': [],
-            'catalog_to_create': {
-                'uuid': str(TEST_CATALOG_UUID),
-                'enterprise_customer': str(TEST_ENTERPRISE_UUID),
-                'title': 'Test catalog',
-                'enterprise_catalog_query': 2,
-            },
+            'catalog_to_create': DEFAULT_CATALOG_RECORD,
         },
         {
-            'existing_catalogs': [{
-                'uuid': str(TEST_CATALOG_UUID),
-                'enterprise_customer': str(TEST_ENTERPRISE_UUID),
-                'title': 'Test catalog',
-                'enterprise_catalog_query': 2,
-            }],
+            'existing_catalogs': [DEFAULT_CATALOG_RECORD],
             'catalog_to_create': {},
         },
     )
+    @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_customer_agreement')
     @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
-    def test_catalog_fetched_or_created(self, test_data, mock_lms_api_client):
+    def test_catalog_fetched_or_created(self, test_data, mock_lms_api_client, mock_create_agreement):
         """
         Tests cases where the customer exists, no admins are needed, and we
         either fetch or create a catalog record
         """
         mock_client = mock_lms_api_client.return_value
-        mock_client.get_enterprise_customer_data.return_value = {
-            'name': 'Test Customer',
-            'slug': 'test-customer',
-            'country': 'US',
-            'uuid': str(TEST_ENTERPRISE_UUID),
-        }
+        mock_client.get_enterprise_customer_data.return_value = DEFAULT_CUSTOMER_RECORD
         mock_client.get_enterprise_admin_users.return_value = []
         mock_client.get_enterprise_pending_admin_users.return_value = []
         mock_client.get_enterprise_catalogs.return_value = test_data['existing_catalogs']
         if test_data['catalog_to_create']:
             mock_client.create_enterprise_catalog.return_value = test_data['catalog_to_create']
 
-        request_payload = {
-            'enterprise_customer': {
-                'name': 'Test Customer',
-                'slug': 'test-customer',
-                'country': 'US',
-            },
-            'pending_admins': [],
-            'enterprise_catalog': {
-                'title': 'Test catalog',
-                'catalog_query_id': 2,
-            },
-        }
-        response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
-        assert response.status_code == status.HTTP_201_CREATED
+        mock_create_agreement.return_value = DEFAULT_AGREEMENT_RECORD
 
-        expected_response_payload = {
-            'enterprise_customer': {
-                'name': 'Test Customer',
-                'slug': 'test-customer',
-                'country': 'US',
-                'uuid': str(TEST_ENTERPRISE_UUID),
-            },
-            'customer_admins': {
-                'created_admins': [],
-                'existing_admins': [],
-            },
-            'enterprise_catalog': {
-                'uuid': str(TEST_CATALOG_UUID),
-                'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
-                'title': 'Test catalog',
-                'catalog_query_id': 2,
-            },
-        }
+        request_payload = {**DEFAULT_REQUEST_PAYLOAD}
+        response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
+
+        assert response.status_code == status.HTTP_201_CREATED
         actual_response_payload = response.json()
-        self.assertEqual(actual_response_payload, expected_response_payload)
+        self.assertEqual(
+            actual_response_payload['enterprise_catalog'],
+            EXPECTED_CATALOG_RESPONSE,
+        )
 
         mock_client.get_enterprise_catalogs.assert_called_once_with(
             enterprise_customer_uuid=str(TEST_ENTERPRISE_UUID),
@@ -555,3 +510,129 @@ class TestProvisioningEndToEnd(APITest):
             )
         else:
             self.assertFalse(mock_client.create_enterprise_catalog.called)
+
+    @ddt.data(
+        # Case: No agreement exists, must create
+        {
+            'existing_agreement': None,
+            'created_agreement': DEFAULT_AGREEMENT_RECORD,
+        },
+        # Case: Agreement already exists
+        {
+            'existing_agreement': DEFAULT_AGREEMENT_RECORD,
+            'created_agreement': None,
+        },
+    )
+    @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
+    @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
+    def test_customer_agreement_fetched_or_created(
+        self, test_data, mock_lms_api_client, mock_license_manager_client
+    ):
+        # Mock customer and catalog step as in existing test
+        mock_lms_client = mock_lms_api_client.return_value
+        mock_lms_client.get_enterprise_customer_data.return_value = DEFAULT_CUSTOMER_RECORD
+        mock_lms_client.get_enterprise_admin_users.return_value = []
+        mock_lms_client.get_enterprise_pending_admin_users.return_value = []
+        mock_lms_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
+        # Customer Agreement API mocks
+        mock_license_client = mock_license_manager_client.return_value
+        mock_license_client.get_customer_agreement.return_value = test_data['existing_agreement']
+
+        if test_data['created_agreement']:
+            mock_license_client.create_customer_agreement.return_value = test_data['created_agreement']
+            mock_license_client.create_subscription_plan.return_value = DEFAULT_SUBSCRIPTION_PLAN_RECORD
+
+        request_payload = {**DEFAULT_REQUEST_PAYLOAD}
+        if test_data['created_agreement']:
+            request_payload['customer_agreement'] = {
+                'default_catalog_uuid': str(TEST_CATALOG_UUID),
+            }
+
+        response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Response JSON must include the created or fetched agreement
+        actual_response_payload = response.json()
+        self.assertEqual(
+            actual_response_payload['customer_agreement'],
+            DEFAULT_AGREEMENT_RECORD,
+        )
+
+        # Workflow record/step assertions
+        workflow = ProvisionNewCustomerWorkflow.objects.all()[0]
+        self.assertIsNotNone(workflow.get_create_customer_agreement_step())
+
+        # API call assertions
+        mock_license_client.get_customer_agreement.assert_called_once_with(str(TEST_ENTERPRISE_UUID))
+        if test_data['created_agreement']:
+            mock_license_client.create_customer_agreement.assert_called_once_with(
+                str(TEST_ENTERPRISE_UUID),
+                'test-customer',
+                default_catalog_uuid=str(TEST_CATALOG_UUID),
+            )
+        else:
+            self.assertFalse(mock_license_client.create_customer_agreement.called)
+
+    @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
+    @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
+    def test_new_subscription_plan_created(self, mock_lms_api_client, mock_license_manager_client):
+        # Setup mocks for prior workflow steps
+        mock_lms_client = mock_lms_api_client.return_value
+        mock_lms_client.get_enterprise_customer_data.return_value = DEFAULT_CUSTOMER_RECORD
+        mock_lms_client.get_enterprise_admin_users.return_value = []
+        mock_lms_client.get_enterprise_pending_admin_users.return_value = []
+        mock_lms_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
+
+        # Agreement and subscription plan creation
+        mock_license_client = mock_license_manager_client.return_value
+        mock_license_client.get_customer_agreement.return_value = None
+        mock_license_client.create_customer_agreement.return_value = {
+            **DEFAULT_AGREEMENT_RECORD, "subscriptions": []
+        }
+        mock_license_client.create_subscription_plan.return_value = DEFAULT_SUBSCRIPTION_PLAN_RECORD
+
+        # Make the provisioning request
+        response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=DEFAULT_REQUEST_PAYLOAD)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        actual_response = response.json()
+        # The subscription_plan in the response should match what the license manager returned
+        self.assertIn('subscription_plan', actual_response)
+        self.assertEqual(
+            actual_response['subscription_plan']['uuid'],
+            DEFAULT_SUBSCRIPTION_PLAN_RECORD['uuid'],
+        )
+        self.assertEqual(
+            actual_response['subscription_plan']['title'],
+            DEFAULT_SUBSCRIPTION_PLAN_RECORD['title'],
+        )
+        self.assertEqual(
+            actual_response['subscription_plan']['salesforce_opportunity_line_item'],
+            DEFAULT_SUBSCRIPTION_PLAN_RECORD['salesforce_opportunity_line_item'],
+        )
+        self.assertTrue(actual_response['subscription_plan']['is_active'])
+
+        # Workflow record/step assertions
+        workflow = ProvisionNewCustomerWorkflow.objects.all()[0]
+        self.assertIsNotNone(workflow.get_create_subscription_plan_step())
+
+        # LicenseManagerApiClient should be called to create agreement and subscription plan
+        mock_license_client.get_customer_agreement.assert_called_once_with(
+            str(TEST_ENTERPRISE_UUID)
+        )
+        mock_license_client.create_customer_agreement.assert_called_once_with(
+            str(TEST_ENTERPRISE_UUID),
+            'test-customer',
+            default_catalog_uuid=None,
+        )
+        mock_license_client.create_subscription_plan.assert_called_once_with(
+            customer_agreement_uuid=str(TEST_AGREEMENT_UUID),
+            title='provisioning test 1',
+            salesforce_opportunity_line_item='00k000000000000123',
+            start_date='2025-06-01T00:00:00+00:00',
+            expiration_date='2026-03-31T00:00:00+00:00',
+            desired_num_licenses=5,
+            enterprise_catalog_uuid=str(TEST_CATALOG_UUID),
+            product_id=1,
+        )

@@ -61,6 +61,30 @@ class EnterpriseCatalogRequestSerializer(BaseSerializer):
     )
 
 
+class CustomerAgreementRequestSerializer(BaseSerializer):
+    """
+    Customer Agreement serializer for provisioning requests.
+    """
+    default_catalog_uuid = serializers.UUIDField(
+        help_text='Optional, default catalog uuid to be used for the customer agreement',
+        required=False,
+        allow_null=True,
+    )
+
+
+class SubscriptionPlanRequestSerializer(BaseSerializer):
+    """
+    Subscription Plan serializer for provisioning requests.
+    """
+    title = serializers.CharField()
+    salesforce_opportunity_line_item = serializers.CharField()
+    start_date = serializers.DateTimeField()
+    expiration_date = serializers.DateTimeField()
+    product_id = serializers.IntegerField()
+    desired_num_licenses = serializers.IntegerField()
+    enterprise_catalog_uuid = serializers.UUIDField(required=False, allow_null=True)
+
+
 class ProvisioningRequestSerializer(BaseSerializer):
     """
     Request serializer for provisioning create view.
@@ -75,6 +99,10 @@ class ProvisioningRequestSerializer(BaseSerializer):
     enterprise_catalog = EnterpriseCatalogRequestSerializer(
         help_text='Object describing the requested Enterprise Catalog.',
     )
+    customer_agreement = CustomerAgreementRequestSerializer(
+        help_text='Object describing the requested Customer Agreement.',
+    )
+    subscription_plan = SubscriptionPlanRequestSerializer()
 
 
 ## All the RESPONSE serializers go under here ##
@@ -123,6 +151,32 @@ class EnterpriseCatalogResponseSerializer(BaseSerializer):
     catalog_query_id = serializers.IntegerField()
 
 
+class SubscriptionPlanResponseSerializer(BaseSerializer):
+    """
+    Subscription Plan serializer for provisioning responses.
+    """
+    uuid = serializers.UUIDField()
+    title = serializers.CharField()
+    salesforce_opportunity_line_item = serializers.CharField()
+    created = serializers.DateTimeField()
+    start_date = serializers.DateTimeField()
+    expiration_date = serializers.DateTimeField()
+    is_active = serializers.BooleanField()
+    is_current = serializers.BooleanField()
+    plan_type = serializers.CharField()
+    enterprise_catalog_uuid = serializers.UUIDField()
+
+
+class CustomerAgreementResponseSerializer(BaseSerializer):
+    """
+    Customer Agreement serializer for provisioning responses.
+    """
+    uuid = serializers.UUIDField()
+    enterprise_customer_uuid = serializers.UUIDField()
+    default_catalog_uuid = serializers.UUIDField()
+    subscriptions = SubscriptionPlanResponseSerializer(many=True)
+
+
 class ProvisioningResponseSerializer(BaseSerializer):
     """
     Response serializer for provisioning create view.
@@ -130,3 +184,5 @@ class ProvisioningResponseSerializer(BaseSerializer):
     enterprise_customer = EnterpriseCustomerResponseSerializer()
     customer_admins = AdminObjectResponseSerializer()
     enterprise_catalog = EnterpriseCatalogResponseSerializer()
+    customer_agreement = CustomerAgreementResponseSerializer()
+    subscription_plan = SubscriptionPlanResponseSerializer()
