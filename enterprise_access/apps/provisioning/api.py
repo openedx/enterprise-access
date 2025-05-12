@@ -132,15 +132,14 @@ def get_or_create_customer_agreement(enterprise_customer_uuid, customer_slug, de
 
 
 def get_or_create_subscription_plan(
-    customer_agreement_dict, plan_title, catalog_uuid, opp_line_item,
+    customer_agreement_uuid, existing_subscription_list, plan_title, catalog_uuid, opp_line_item,
     start_date, expiration_date, desired_num_licenses, product_id, **kwargs
 ):
     """
     Get or create a new subscription plan, provided an existing customer agreement dictionary.
     """
-    existing_subscriptions = customer_agreement_dict.get('subscriptions', [])
     matching_subscription = next((
-        _sub for _sub in existing_subscriptions
+        _sub for _sub in existing_subscription_list
         if _sub.get('salesforce_opportunity_line_item') == opp_line_item
     ), None)
     if matching_subscription:
@@ -152,14 +151,14 @@ def get_or_create_subscription_plan(
 
     client = LicenseManagerApiClient()
     created_subscription = client.create_subscription_plan(
-        customer_agreement_uuid=customer_agreement_dict['uuid'],
-        enterprise_catalog_uuid=catalog_uuid,
+        customer_agreement_uuid=customer_agreement_uuid,
         title=plan_title,
         salesforce_opportunity_line_item=opp_line_item,
-        product_id=product_id,
         start_date=start_date,
         expiration_date=expiration_date,
         desired_num_licenses=desired_num_licenses,
+        enterprise_catalog_uuid=catalog_uuid,
+        product_id=product_id,
         **kwargs,
     )
     logger.info(

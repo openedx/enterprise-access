@@ -383,15 +383,17 @@ class TestGetOrCreateSubscriptionPlan(TestCase):
     """
     @mock.patch.object(provisioning_api, 'LicenseManagerApiClient', autospec=True)
     def test_get_existing_subscription_plan(self, mock_license_manager_client):
-        customer_agreement_dict = {
-            'uuid': 'agreement-uuid',
-            'subscriptions': [
-                {'uuid': 'sub-uuid', 'title': 'Test Plan', 'salesforce_opportunity_line_item': 'opp-line-item'}
-            ]
-        }
+        existing_subscriptions = [
+            {
+                'uuid': 'sub-uuid',
+                'title': 'Test Plan',
+                'salesforce_opportunity_line_item': 'opp-line-item',
+            },
+        ]
 
         result = provisioning_api.get_or_create_subscription_plan(
-            customer_agreement_dict,
+            customer_agreement_uuid=None,
+            existing_subscription_list=existing_subscriptions,
             plan_title='Test Plan',
             catalog_uuid='catalog-uuid',
             opp_line_item='opp-line-item',
@@ -401,16 +403,11 @@ class TestGetOrCreateSubscriptionPlan(TestCase):
             product_id=None,
         )
 
-        self.assertEqual(result, customer_agreement_dict['subscriptions'][0])
+        self.assertEqual(result, existing_subscriptions[0])
         mock_license_manager_client.assert_not_called()
 
     @mock.patch.object(provisioning_api, 'LicenseManagerApiClient', autospec=True)
     def test_create_new_subscription_plan(self, mock_license_manager_client):
-        customer_agreement_dict = {
-            'uuid': 'agreement-uuid',
-            'subscriptions': []
-        }
-
         created_subscription = {
             'uuid': 'new-sub-uuid',
             'salesforce_opportunity_line_item': 'opp-line-item',
@@ -420,7 +417,8 @@ class TestGetOrCreateSubscriptionPlan(TestCase):
         mock_client.create_subscription_plan.return_value = created_subscription
 
         result = provisioning_api.get_or_create_subscription_plan(
-            customer_agreement_dict,
+            customer_agreement_uuid='agreement-uuid',
+            existing_subscription_list=[],
             plan_title='New Plan',
             catalog_uuid='catalog-uuid',
             opp_line_item='opp-line-item',
@@ -446,17 +444,13 @@ class TestGetOrCreateSubscriptionPlan(TestCase):
 
     @mock.patch.object(provisioning_api, 'LicenseManagerApiClient', autospec=True)
     def test_create_subscription_plan_exception(self, mock_license_manager_client):
-        customer_agreement_dict = {
-            'uuid': 'agreement-uuid',
-            'subscriptions': []
-        }
-
         mock_client = mock_license_manager_client.return_value
         mock_client.create_subscription_plan.side_effect = Exception('API error')
 
         with self.assertRaises(Exception) as context:
             provisioning_api.get_or_create_subscription_plan(
-                customer_agreement_dict,
+                customer_agreement_uuid='agreement-uuid',
+                existing_subscription_list=[],
                 plan_title='New Plan',
                 catalog_uuid='catalog-uuid',
                 opp_line_item='opp-line-item',
