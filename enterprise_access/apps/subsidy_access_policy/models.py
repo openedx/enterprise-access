@@ -376,6 +376,24 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         return self.learner_credit_request_config and self.learner_credit_request_config.active
 
+    @classmethod
+    def has_bnr_enabled_policy_for_enterprise(cls, enterprise_customer_uuid):
+        """
+        Check if any active SubsidyAccessPolicy for the given enterprise_customer_uuid has bnr_enabled.
+
+        Args:
+            enterprise_customer_uuid (UUID): The UUID of the enterprise customer.
+
+        Returns:
+            bool: True if bnr_enabled is True for any active policy, otherwise False.
+        """
+        return cls.objects.filter(
+            enterprise_customer_uuid=enterprise_customer_uuid,
+            active=True,
+            learner_credit_request_config__isnull=False,
+            learner_credit_request_config__active=True
+        ).exists()
+
     def clean(self):
         """
         Used to help validate field values before saving this model instance.
