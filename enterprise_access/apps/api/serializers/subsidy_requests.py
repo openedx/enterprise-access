@@ -146,11 +146,17 @@ class LearnerCreditRequestSerializer(SubsidyRequestSerializer):
         required=False,
         allow_null=True,
     )
+    assignment = serializers.PrimaryKeyRelatedField(
+        queryset='content_assignments.LearnerContentAssignment.objects.all()',
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = LearnerCreditRequest
         fields = SubsidyRequestSerializer.Meta.fields + [
-            "learner_credit_request_config"
+            "learner_credit_request_config",
+            "assignment",
         ]
         read_only_fields = SubsidyRequestSerializer.Meta.read_only_fields
         extra_kwargs = SubsidyRequestSerializer.Meta.extra_kwargs
