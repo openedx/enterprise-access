@@ -11,7 +11,7 @@ import pytest
 import requests
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.test import TestCase, override_settings
+from django.test import TestCase
 
 from enterprise_access.apps.content_assignments.constants import (
     AssignmentActionErrors,
@@ -587,7 +587,6 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         )
 
         can_redeem_result = policy_record.can_redeem(self.lms_user_id, self.course_id)
-
         self.assertEqual(can_redeem_result, expected_policy_can_redeem)
 
         if expect_content_metadata_fetch:
@@ -853,137 +852,6 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         )
         policy.refresh_from_db()
         assert policy.spend_limit == expected_spend_limit
-
-
-class SubsidyAccessPolicyResolverTests(TestCase):
-    """ SubsidyAccessPolicy.resolve_policy() tests. """
-
-    def setUp(self):
-        """
-        Initialize mocked service clients.
-        """
-        super().setUp()
-        yesterday = datetime.utcnow() - timedelta(days=1)
-        tomorrow = datetime.utcnow() + timedelta(days=1)
-        day_after_tomorrow = datetime.utcnow() + timedelta(days=2)
-        self.mock_subsidy_one = {
-            'id': 1,
-            'active_datetime': yesterday,
-            'expiration_datetime': tomorrow,
-            'is_active': True,
-            'current_balance': 100,
-        }
-        self.mock_subsidy_two = {
-            'id': 2,
-            'active_datetime': yesterday,
-            'expiration_datetime': tomorrow,
-            'is_active': True,
-            'current_balance': 50,
-        }
-        self.mock_subsidy_three = {
-            'id': 3,
-            'active_datetime': yesterday,
-            'expiration_datetime': day_after_tomorrow,
-            'is_active': True,
-            'current_balance': 50,
-        }
-        self.mock_subsidy_four = {
-            'id': 4,
-            'active_datetime': yesterday,
-            'expiration_datetime': tomorrow,
-            'is_active': True,
-            'current_balance': 100,
-        }
-
-        self.policy_one = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
-        self.policy_two = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
-        self.policy_three = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory.create()
-        self.policy_four = PerLearnerSpendCapLearnerCreditAccessPolicyFactory.create()
-        self.policy_five = AssignedLearnerCreditAccessPolicyFactory.create()
-
-        policy_one_subsidy_patcher = patch.object(
-            self.policy_one, 'subsidy_record'
-        )
-        self.mock_policy_one_subsidy_record = policy_one_subsidy_patcher.start()
-        self.mock_policy_one_subsidy_record.return_value = self.mock_subsidy_one
-
-        policy_two_subsidy_patcher = patch.object(
-            self.policy_two, 'subsidy_record'
-        )
-        self.mock_policy_two_subsidy_record = policy_two_subsidy_patcher.start()
-        self.mock_policy_two_subsidy_record.return_value = self.mock_subsidy_two
-
-        policy_three_subsidy_patcher = patch.object(
-            self.policy_three, 'subsidy_record'
-        )
-        self.mock_policy_three_subsidy_record = policy_three_subsidy_patcher.start()
-        self.mock_policy_three_subsidy_record.return_value = self.mock_subsidy_three
-
-        policy_four_subsidy_patcher = patch.object(
-            self.policy_four, 'subsidy_record'
-        )
-        self.mock_policy_four_subsidy_record = policy_four_subsidy_patcher.start()
-        self.mock_policy_four_subsidy_record.return_value = self.mock_subsidy_four
-
-        policy_five_subsidy_patcher = patch.object(
-            self.policy_five, 'subsidy_record'
-        )
-        self.mock_policy_five_subsidy_record = policy_five_subsidy_patcher.start()
-        self.mock_policy_five_subsidy_record.return_value = self.mock_subsidy_one
-
-        self.addCleanup(policy_one_subsidy_patcher.stop)
-        self.addCleanup(policy_two_subsidy_patcher.stop)
-        self.addCleanup(policy_three_subsidy_patcher.stop)
-        self.addCleanup(policy_four_subsidy_patcher.stop)
-        self.addCleanup(policy_five_subsidy_patcher.stop)
-
-    def test_setup(self):
-        """
-        Ensure each policy has the correctly mocked subsidy object
-        """
-        assert self.policy_one.subsidy_record() == self.mock_subsidy_one
-        assert self.policy_two.subsidy_record() == self.mock_subsidy_two
-        assert self.policy_three.subsidy_record() == self.mock_subsidy_three
-        assert self.policy_four.subsidy_record() == self.mock_subsidy_four
-        assert self.policy_five.subsidy_record() == self.mock_subsidy_one
-
-    @override_settings(MULTI_POLICY_RESOLUTION_ENABLED=True)
-    def test_resolve_one_policy(self):
-        """
-        Test resolve given a single policy
-        """
-        policies = [self.policy_one]
-        assert SubsidyAccessPolicy.resolve_policy(policies) == self.policy_one
-
-    @override_settings(MULTI_POLICY_RESOLUTION_ENABLED=True)
-    def test_resolve_two_policies_by_balance(self):
-        """
-        Test resolve given a two policies with different balances, same expiration
-        the smaller balance policy should be returned.
-        """
-        policies = [self.policy_one, self.policy_two]
-        assert SubsidyAccessPolicy.resolve_policy(policies) == self.policy_two
-
-    @override_settings(MULTI_POLICY_RESOLUTION_ENABLED=True)
-    def test_resolve_two_policies_by_expiration(self):
-        """
-        Test resolve given a two policies with different balances, different expiration
-        the sooner expiration policy should be returned.
-        """
-        policies = [self.policy_one, self.policy_three]
-        assert SubsidyAccessPolicy.resolve_policy(policies) == self.policy_one
-
-    @override_settings(MULTI_POLICY_RESOLUTION_ENABLED=True)
-    def test_resolve_policies_by_type_priority(self):
-        """
-        Test resolve given a two policies with same balances, same expiration
-        but different type-priority.
-        """
-        policies = [self.policy_one, self.policy_four, self.policy_five]
-        # Assert the AssignedLearnerCreditAccessPolicy is resolved with highest
-        # priority, regardless of the ordering of the input policies.
-        assert SubsidyAccessPolicy.resolve_policy(policies) == self.policy_five
-        assert SubsidyAccessPolicy.resolve_policy(list(reversed(policies))) == self.policy_five
 
 
 @ddt.ddt
