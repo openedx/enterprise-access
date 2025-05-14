@@ -14,6 +14,7 @@ router.register("policy-allocation", views.SubsidyAccessPolicyAllocateViewset, '
 router.register("subsidy-access-policies", views.SubsidyAccessPolicyViewSet, 'subsidy-access-policies')
 router.register("license-requests", views.LicenseRequestViewSet, 'license-requests')
 router.register("coupon-code-requests", views.CouponCodeRequestViewSet, 'coupon-code-requests')
+router.register('learner-credit-requests', views.LearnerCreditRequestViewSet, 'learner-credit-requests')
 router.register("customer-configurations", views.SubsidyRequestCustomerConfigurationViewSet, 'customer-configurations')
 router.register("assignment-configurations", views.AssignmentConfigurationViewSet, 'assignment-configurations')
 router.register(

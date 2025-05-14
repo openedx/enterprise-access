@@ -44,9 +44,11 @@ from enterprise_access.apps.api.utils import (
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
+    LearnerCreditRequest,
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
@@ -688,6 +690,105 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             serialized_coupon_code_requests,
             status=status.HTTP_200_OK,
         )
+
+
+@extend_schema_view(
+    retrieve=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Retrieve a learner credit request.',
+    ),
+    list=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='List learner credit requests.',
+    ),
+    create=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Create a learner credit request.',
+    ),
+    overview=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Learner credit request overview.',
+    ),
+)
+class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
+    """
+    Viewset for learner credit requests.
+    """
+
+    queryset = LearnerCreditRequest.objects.order_by("-created")
+    serializer_class = serializers.LearnerCreditRequestSerializer
+
+    subsidy_type = SubsidyTypeChoices.LEARNER_CREDIT
+
+    def _validate_subsidy_request(self):
+        """
+        Validate request creation:
+        - Ensure policy_uuid is provided and valid.
+        - Ensure Browse & Request is active for the policy.
+        - No duplicate PENDING/REQUESTED requests for the same course and policy.
+        """
+        policy_uuid = self.request.data.get("policy_uuid")
+        if not policy_uuid:
+            raise SubsidyRequestCreationError(
+                "policy_uuid is required.", status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            policy = SubsidyAccessPolicy.objects.get(uuid=policy_uuid)
+            self.request.validated_policy = policy  # Store validated policy for use in create
+        except SubsidyAccessPolicy.DoesNotExist as exc:
+            raise SubsidyRequestCreationError(
+                f"Invalid policy_uuid: {policy_uuid}.", status.HTTP_400_BAD_REQUEST
+            ) from exc
+
+        if not policy.bnr_enabled:
+            raise SubsidyRequestCreationError(
+                f"Browse & Request is not active for policy UUID: {policy_uuid}.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        enterprise_customer_uuid = policy.enterprise_customer_uuid
+        course_id = self.request.data.get("course_id")
+
+        if LearnerCreditRequest.objects.filter(
+            user__lms_user_id=self.lms_user_id,
+            enterprise_customer_uuid=enterprise_customer_uuid,
+            course_id=course_id,
+            state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.APPROVED]
+        ).exists():
+            error_msg = (
+                f"You already have an active learner credit request for course {course_id} "
+                f"under policy UUID: {policy_uuid}."
+            )
+            raise SubsidyRequestCreationError(
+                error_msg, status.HTTP_422_UNPROCESSABLE_ENTITY
+            )
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    def create(self, request, *args, **kwargs):
+        """
+        Create a learner credit request.
+        """
+        try:
+            self._validate_subsidy_request()
+        except SubsidyRequestCreationError as exc:
+            return Response({"detail": exc.message}, status=exc.http_status_code)
+
+        policy = self.request.validated_policy
+        request.data.update(
+            {
+                "user": request.user.id,
+                "enterprise_customer_uuid": str(policy.enterprise_customer_uuid),
+                "learner_credit_request_config": str(
+                    policy.learner_credit_request_config.uuid
+                ),
+            }
+        )
+
+        return super().create(request, *args, **kwargs)
 
 
 @extend_schema_view(
