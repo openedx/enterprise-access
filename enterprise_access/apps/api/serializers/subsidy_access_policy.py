@@ -21,6 +21,9 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
 )
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 
+from enterprise_access.apps.api.serializers.subsidy_requests import LearnerCreditRequestSerializer
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
 from .content_assignments.assignment import (
     LearnerContentAssignmentResponseSerializer,
     LearnerContentAssignmentWithLearnerAcknowledgedResponseSerializer
@@ -589,6 +592,8 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
         source='subsidy_expiration_datetime',
     )
     learner_content_assignments = serializers.SerializerMethodField('get_assignments_serializer')
+    
+    learner_requests = serializers.SerializerMethodField('get_learner_requests')
 
     group_associations = serializers.SerializerMethodField()
 
@@ -617,6 +622,36 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
             context=context,
         )
         return serializer.data
+    
+    @extend_schema_field(LearnerCreditRequestSerializer(many=True))
+    def get_learner_requests(self, obj):
+        """
+        Return serialized learner credit requests associated with the user and policy's enterprise customer,
+        filtered by the specific learner credit request configuration associated with this policy.
+        
+        Returns:
+            list: Serialized learner credit requests if policy has BNR enabled and user is authenticated.
+                Empty list otherwise.
+        """
+        # Early returns if BNR not enabled or no user ID
+        if not obj.bnr_enabled:
+            return []
+
+        lms_user_id = self.context.get('lms_user_id')
+        if not lms_user_id:
+            return []
+
+        learner_requests = LearnerCreditRequest.objects.filter(
+            user__lms_user_id=lms_user_id,
+            enterprise_customer_uuid=obj.enterprise_customer_uuid,
+            state__in=[SubsidyRequestStates.APPROVED, SubsidyRequestStates.REQUESTED],
+            learner_credit_request_config=obj.learner_credit_request_config
+        )
+
+        if not learner_requests:
+            return []
+
+        return LearnerCreditRequestSerializer(learner_requests, many=True).data
 
     @extend_schema_field(serializers.IntegerField)
     def get_remaining_balance_per_user(self, obj):
