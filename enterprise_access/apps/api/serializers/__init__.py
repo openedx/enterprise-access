@@ -32,6 +32,8 @@ from .subsidy_access_policy import (
     SubsidyAccessPolicyListRequestSerializer,
     SubsidyAccessPolicyRedeemableResponseSerializer,
     SubsidyAccessPolicyRedeemRequestSerializer,
+    SubsidyAccessPolicyCanRequestRequestSerializer,
+    SubsidyAccessPolicyCanRequestElementResponseSerializer,
     SubsidyAccessPolicyRedemptionRequestSerializer,
     SubsidyAccessPolicyResponseSerializer,
     SubsidyAccessPolicyUpdateRequestSerializer
