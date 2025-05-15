@@ -42,7 +42,15 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     PolicyTypes,
     TransactionStateChoices
 )
-from enterprise_access.apps.subsidy_access_policy.models import PolicyGroupAssociation, SubsidyAccessPolicy
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
+from enterprise_access.apps.core.models import User
+from enterprise_access.apps.subsidy_access_policy.models import (
+    PolicyGroupAssociation,
+    SubsidyAccessPolicy,
+    PerLearnerSpendCreditAccessPolicy,
+    PerLearnerEnrollmentCreditAccessPolicy
+)
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
@@ -1133,7 +1141,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
 
     def setUp(self):
         super().setUp()
-
+        self.maxDiff = None
         self.enterprise_uuid = '12aacfee-8ffa-4cb3-bed1-059565a57f06'
 
         self.set_jwt_cookie([{
@@ -1154,6 +1162,10 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         self.subsidy_access_policy_credits_available_endpoint = reverse('api:v1:policy-redemption-credits-available')
         self.subsidy_access_policy_can_redeem_endpoint = reverse(
             "api:v1:policy-redemption-can-redeem",
+            kwargs={"enterprise_customer_uuid": self.enterprise_uuid},
+        )
+        self.subsidy_access_policy_can_request_endpoint = reverse(
+            "api:v1:policy-redemption-can-request",
             kwargs={"enterprise_customer_uuid": self.enterprise_uuid},
         )
         self.setup_mocks()
@@ -1719,12 +1731,105 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'spend_limit': 1000000,
             'late_redemption_allowed_until': None,
             'per_learner_enrollment_limit': None,
+            'learner_requests': [],
             'per_learner_spend_limit': None,
             'assignment_configuration': str(assignment_configuration.uuid),
             'learner_credit_request_config': str(learner_credit_config.uuid),
         }
         self.assertEqual(response_json[0]['learner_content_assignments'][0], expected_learner_content_assignment)
         self.assertEqual(response_json[0], expected_response)
+
+    def test_can_request_endpoint(self):
+        """
+        Test the can-request endpoint for subsidy access policy.
+        """
+        # Create a policy with BnR enabled
+        learner_credit_config = LearnerCreditRequestConfiguration.objects.create()
+        policy = PerLearnerSpendCreditAccessPolicy.objects.create(
+            catalog_uuid='7c9daa69-519c-4313-ad81-90862bc08ca2',
+            subsidy_uuid='7c9daa69-519c-4313-ad81-90862bc08ca3',
+            per_learner_spend_limit=None,
+            description='anything',
+            active=True,
+            enterprise_customer_uuid=self.enterprise_uuid,
+        )
+        policy.learner_credit_request_config = learner_credit_config
+        policy.save()
+
+        # Set up the request
+        content_key = "course-v1:edX+Privacy101+3T2020"
+        lms_user_id = 1234
+
+        url = reverse(
+            "api:v1:policy-redemption-can-request",
+            kwargs={"enterprise_customer_uuid": self.enterprise_uuid}
+        )
+        query_params = {
+            'content_key': content_key,
+            'lms_user_id': lms_user_id
+        }
+        # Make sure the learner_credit_config is active to enable BnR
+        learner_credit_config.active = True
+        learner_credit_config.save()
+
+        # Mock the catalog_contains_content_key method to return True
+        with mock.patch(
+            'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key',
+            return_value=True
+        ):
+            response = self.client.get(url, query_params)
+        self.assertEqual(response.status_code, 200)
+        response_data = response.json()
+        self.assertTrue(response_data.get('can_request'))
+        self.assertEqual(response_data.get('content_key'), content_key)
+        self.assertEqual(response_data.get('requestable_subsidy_access_policy')['uuid'], str(policy.uuid))
+
+        # Test when no BnR enabled policies exist
+        learner_credit_config.active = False
+        learner_credit_config.save()
+
+        response = self.client.get(url, query_params)
+        self.assertEqual(response.status_code, 400)
+        response_data = response.json()
+        self.assertFalse(response_data.get('can_request'))
+        self.assertEqual(response_data.get('reason'), 'No policies with BnR enabled found')
+
+        # Test when content is not in catalog
+        learner_credit_config.active = True
+        learner_credit_config.save()
+
+        with mock.patch(
+            'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key',
+            return_value=False
+        ):
+            response = self.client.get(url, query_params)
+        self.assertEqual(response.status_code, 400)
+        response_data = response.json()
+        self.assertFalse(response_data.get('can_request'))
+        self.assertEqual(response_data.get('reason'), REASON_CONTENT_NOT_IN_CATALOG)
+        # Test when user already has an existing request for this course it will not be allowed
+        existing_request = LearnerCreditRequest.objects.create(
+            user=self.user,
+            course_id=content_key,
+            enterprise_customer_uuid=self.enterprise_uuid,
+            state=SubsidyRequestStates.REQUESTED,
+        )
+
+        # Call the endpoint again with the same parameters
+        query_params = {
+            'content_key': content_key,
+            'lms_user_id': self.user.lms_user_id
+        }
+        with mock.patch(
+            'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key',
+            return_value=True
+        ):
+            response = self.client.get(url, query_params)
+        self.assertEqual(response.status_code, 400)
+        response_data = response.json()
+        self.assertFalse(response_data.get('can_request'))
+        self.assertIn("already have an active request", response_data.get('reason'))
+        self.assertEqual(response_data.get('existing_request'), str(existing_request.uuid))
 
 
 class BaseCanRedeemTestMixin:
@@ -1910,6 +2015,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
         assert response_list[0]["can_redeem"] is True
         assert len(response_list[0]["reasons"]) == 0
+        assert response_list[0]['display_reason'] is None
 
         # Check the response for the second content_key given.
         assert response_list[1]["content_key"] == test_content_key_2
@@ -1922,6 +2028,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         assert response_list[1]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
         assert response_list[1]["can_redeem"] is True
         assert len(response_list[1]["reasons"]) == 0
+        assert response_list[1]['display_reason'] is None
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient', return_value=mock.MagicMock())
@@ -2120,6 +2227,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
                 "policy_uuids": [str(self.redeemable_policy.uuid)],
             },
         ]
+        assert response_list[0]['display_reason'] == expected_user_message
 
         # Check the response for the second content_key given.
         assert response_list[1]["content_key"] == test_content_key_2
@@ -2139,6 +2247,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
                 "policy_uuids": [str(self.redeemable_policy.uuid)],
             },
         ]
+        assert response_list[1]["display_reason"] == expected_user_message
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     def test_can_redeem_policy_existing_redemptions(self, mock_transactions_cache_for_learner):
@@ -2206,6 +2315,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         self.assertIsNone(response_list[0]["redeemable_subsidy_access_policy"])
         self.assertFalse(response_list[0]["can_redeem"])
         self.assertEqual(response_list[0]["reasons"], [])
+        assert response_list[0]["display_reason"] is None
 
         # We call this to fetch the list_price
         self.mock_get_content_metadata.assert_called_once_with("course-v1:demox+1234+2T2023")
@@ -2280,6 +2390,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
         assert response_list[0]["can_redeem"] is True
         assert response_list[0]["reasons"] == []
+        assert response_list[0]["display_reason"] is None
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
@@ -2379,6 +2490,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
                 "policy_uuids": [str(self.redeemable_policy.uuid)],
             },
         ]
+        assert response_list[0]["display_reason"] == MissingSubsidyAccessReasonUserMessages.BEYOND_ENROLLMENT_DEADLINE
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_versioned_subsidy_client')
     def test_can_redeem_subsidy_client_http_error(self, mock_get_client):
@@ -2902,6 +3014,7 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
             str(self.assigned_learner_credit_policy.uuid)
         assert response_list[0]["can_redeem"] is True
         assert len(response_list[0]["reasons"]) == 0
+        assert response_list[0]["display_reason"] is None
 
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
@@ -3003,6 +3116,7 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
             },
         ]
         assert response_list[0]["reasons"] == expected_reasons
+        assert response_list[0]["display_reason"] == expected_message
 
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
@@ -3067,6 +3181,7 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
         assert response_list[0]["redeemable_subsidy_access_policy"] is None
         assert response_list[0]["can_redeem"] is False
         assert response_list[0]["reasons"][0]["reason"] == REASON_CONTENT_NOT_IN_CATALOG
+        assert response_list[0]["display_reason"] == MissingSubsidyAccessReasonUserMessages.CONTENT_NOT_IN_CATALOG
 
     @mock.patch('enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')

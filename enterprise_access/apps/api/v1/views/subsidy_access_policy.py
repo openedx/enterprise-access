@@ -35,6 +35,8 @@ from enterprise_access.apps.core.constants import (
     SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION,
     SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION
 )
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.events.signals import SUBSIDY_REDEEMED
 from enterprise_access.apps.events.utils import send_subsidy_redemption_event_to_event_bus
 from enterprise_access.apps.subsidy_access_policy.constants import (
@@ -70,6 +72,7 @@ from enterprise_access.apps.subsidy_access_policy.subsidy_api import (
     get_and_cache_subsidy_learners_aggregate_data,
     get_redemptions_by_content_and_policy_for_learner
 )
+from enterprise_access.apps.subsidy_access_policy.utils import sort_subsidy_access_policies_for_redemption
 
 from .utils import PaginationWithPageCount
 
@@ -170,21 +173,25 @@ def _get_reasons_for_no_redeemable_policies(enterprise_customer_uuid, non_redeem
       message, and a list of policy UUIDs for which that reason holds.
     """
     reasons = []
+    display_reason = None
     lms_client = LmsApiClient()
     enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
     admin_contact = _get_admin_contact_email(enterprise_customer_data)
 
     for reason, policies in non_redeemable_policies_by_reason.items():
+        user_message = _get_user_message_for_reason(reason, admin_contact)
         reasons.append({
             "reason": reason,
-            "user_message": _get_user_message_for_reason(reason, admin_contact),
+            "user_message": user_message,
             "metadata": {
                 "enterprise_administrators": admin_contact,
             },
             "policy_uuids": [policy.uuid for policy in policies],
         })
+        if not display_reason:
+            display_reason = user_message
 
-    return reasons
+    return reasons, display_reason
 
 
 def _get_admin_contact_email(enterprise_customer_data):
@@ -466,7 +473,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
         if self.action == 'can_redeem':
             enterprise_uuid = self.kwargs.get('enterprise_customer_uuid')
-        
+
         if self.action == 'can_request':
             enterprise_uuid = self.kwargs.get('enterprise_customer_uuid')
 
@@ -496,15 +503,27 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         each access policy evaluated.
 
         Returns:
-            tuple of (list of SubsidyAccessPolicy, dict mapping str -> list of SubsidyAccessPolicy): The first tuple
-            element is a list of redeemable policies, and the second tuple element is a mapping of reason strings to
-            non-redeemable policies.  The reason strings are non-specific, short explanations for why each bucket of
-            policies has been deemed non-redeemable.
+            tuple of (list of SubsidyAccessPolicy, dict mapping str -> list of SubsidyAccessPolicy):
+            The first tuple element is a list of redeemable policies, and the second tuple element is a mapping of
+            reason strings to non-redeemable policies.  The reason strings are non-specific, short explanations for
+            why each bucket of policies has been deemed non-redeemable. Both elements in the tuple are intentionally
+            sorted based on prioritization of both redemption and non-redeemable policy reasons.
+
+            THe sort logic is as such:
+                - priority (of type)
+                - expiration, sooner to expire first
+                - balance, lower balance first
         """
         redeemable_policies = []
         non_redeemable_policies = defaultdict(list)
-        all_policies_for_enterprise = self.get_queryset()
-        for policy in all_policies_for_enterprise:
+        # Sort policies by:
+        # - priority (of type)
+        # - expiration, sooner to expire first
+        # - balance, lower balance first
+        all_sorted_policies_for_enterprise = sort_subsidy_access_policies_for_redemption(
+            queryset=self.get_queryset()
+        )
+        for policy in all_sorted_policies_for_enterprise:
             try:
                 redeemable, reason, _ = policy.can_redeem(
                     lms_user_id, content_key, skip_customer_user_check=skip_customer_user_check
@@ -525,11 +544,11 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 # is short and generic because the bucketing logic simply treats entire string as the bucket key.
                 non_redeemable_policies[reason].append(policy)
 
-        return (redeemable_policies, non_redeemable_policies)
+        return redeemable_policies, non_redeemable_policies
 
     def policies_with_credit_available(self, enterprise_customer_uuid, lms_user_id):
         """
-        Return policies with credit availble, associated with the given customer, and redeemable by the given learner.
+        Return policies with credit available, associated with the given customer, and redeemable by the given learner.
         """
         policies = []
         all_policies_for_enterprise = self.get_queryset().filter(
@@ -636,12 +655,11 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                     )
                     return Response(redemption_result, status=status.HTTP_200_OK)
                 else:
-                    raise RedemptionRequestException(
-                        detail=_get_reasons_for_no_redeemable_policies(
-                            policy.enterprise_customer_uuid,
-                            {reason: [policy]}
-                        )
+                    non_redeemable_policies_reasons_list, _ = _get_reasons_for_no_redeemable_policies(
+                        policy.enterprise_customer_uuid,
+                        {reason: [policy]}
                     )
+                    raise RedemptionRequestException(detail=non_redeemable_policies_reasons_list)
         except SubsidyAccessPolicyLockAttemptFailed as exc:
             logger.exception(exc)
             raise SubsidyAccessPolicyLockedException() from exc
@@ -767,6 +785,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         element_responses = []
         for content_key in content_keys:
             reasons = []
+            display_reason = None
             redeemable_policies = []
             non_redeemable_policies = []
             resolved_policy = None
@@ -808,13 +827,14 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 )
 
             if not successful_redemptions and not redeemable_policies:
-                reasons.extend(_get_reasons_for_no_redeemable_policies(
+                non_redeemable_policies_reason_list, display_reason = _get_reasons_for_no_redeemable_policies(
                     enterprise_customer_uuid,
                     non_redeemable_policies
-                ))
+                )
+                reasons.extend(non_redeemable_policies_reason_list)
 
             if redeemable_policies:
-                resolved_policy = SubsidyAccessPolicy.resolve_policy(redeemable_policies)
+                resolved_policy = redeemable_policies[0]
 
             try:
                 if resolved_policy:
@@ -867,6 +887,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 "redeemable_subsidy_access_policy": resolved_policy,
                 "can_redeem": bool(resolved_policy),
                 "reasons": reasons,
+                "display_reason": display_reason,
             }
             element_responses.append(element_response)
 
@@ -920,34 +941,55 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             raise NotFound(detail='No active policies for this customer')
 
         # 1. Find policies with BnR enabled
-        bnr_enabled_policies = [policy for policy in policies_for_customer if policy.bnr_enabled]
+        bnr_enabled_policies = policies_for_customer.filter(
+            learner_credit_request_config__isnull=False,
+            learner_credit_request_config__active=True
+        )
         if not bnr_enabled_policies:
             return Response({
-                'can_request': False, 
+                'can_request': False,
                 'reason': 'No policies with BnR enabled found'
             }, status=400)
-            
+
         # 2. Check if content exists in catalogs for BnR enabled policies
-        valid_policies = []
-        for policy in bnr_enabled_policies:
-            if policy.catalog_contains_content_key(content_key):
-                valid_policies.append(policy)
-                
-        if not valid_policies:
+        # Filter policies to those that contain the content key in their catalog
+        valid_policies = bnr_enabled_policies.filter(
+            pk__in=[
+                policy.pk for policy in bnr_enabled_policies
+                if policy.catalog_contains_content_key(content_key)
+            ]
+        )
+
+        if not valid_policies.exists():
             return Response({
                 'can_request': False,
                 'reason': REASON_CONTENT_NOT_IN_CATALOG
             }, status=400)
 
-        if valid_policies:
-            resolved_policy = SubsidyAccessPolicy.resolve_policy(valid_policies)
-        
-        
-        return Response({
+        # 3. Check for existing pending request by this learner
+        existing_request = LearnerCreditRequest.objects.filter(
+            user__lms_user_id=lms_user_id,
+            enterprise_customer_uuid=enterprise_customer_uuid,
+            course_id=content_key,
+            state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.APPROVED]
+        ).first()
+
+        if existing_request:
+            return Response({
+                'can_request': False,
+                'reason': f"You already have an active request for this course in state: {existing_request.state}",
+                'existing_request': str(existing_request.uuid)
+            }, status=400)
+
+        # Sort policies to find the best one for redemption
+        requestable_policy = sort_subsidy_access_policies_for_redemption(valid_policies)[0]
+        response_data = {
             'content_key': content_key,
             'can_request': True,
-            'redeemable_subsidy_access_policy': resolved_policy.uuid
-        }, status=200)
+            'requestable_subsidy_access_policy': requestable_policy
+        }
+        response_serializer = serializers.SubsidyAccessPolicyCanRequestElementResponseSerializer(response_data)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
 
 class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequiredMixin, viewsets.GenericViewSet):
@@ -1033,7 +1075,7 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
                     )
                     return Response(response_serializer.data, status=status.HTTP_202_ACCEPTED)
                 else:
-                    non_allocatable_reason_list = _get_reasons_for_no_redeemable_policies(
+                    non_allocatable_reason_list, _ = _get_reasons_for_no_redeemable_policies(
                         policy.enterprise_customer_uuid,
                         {reason: [policy]}
                     )
