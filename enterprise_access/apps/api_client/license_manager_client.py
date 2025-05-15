@@ -160,7 +160,7 @@ class LicenseManagerApiClient(BaseOAuthClient):
 
     def create_subscription_plan(
         self, customer_agreement_uuid, enterprise_catalog_uuid, salesforce_opportunity_line_item,
-        title, start_date, expiration_date, desired_num_licenses,
+        title, start_date, expiration_date, desired_num_licenses, product_id=None,
         **kwargs,
     ):
         """
@@ -178,7 +178,7 @@ class LicenseManagerApiClient(BaseOAuthClient):
             'desired_num_licenses': desired_num_licenses,
             'change_reason': NEW_SUBSCRIPTION_CHANGE_REASON,
             'for_internal_use_only': settings.PROVISIONING_DEFAULTS['subscription']['for_internal_use_only'],
-            'product': settings.PROVISIONING_DEFAULTS['subscription']['product_id'],
+            'product': product_id or settings.PROVISIONING_DEFAULTS['subscription']['product_id'],
             'is_active': settings.PROVISIONING_DEFAULTS['subscription']['is_active'],
         }
         payload.update(kwargs)

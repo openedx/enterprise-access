@@ -39,10 +39,12 @@ class SubsidyTypeChoices:
     """ Type of subsidies. """
     LICENSE = 'license'
     COUPON = 'coupon'  # aka A la cart
+    LEARNER_CREDIT = 'learner_credit'
 
     CHOICES = (
         (LICENSE, 'License Subsidy'),
         (COUPON, 'Coupon Subsidy'),
+        (LEARNER_CREDIT, 'Learner Credit Subsidy'),
     )
 
 
@@ -67,6 +69,7 @@ class SegmentEvents:
     COUPON_CODE_REQUEST_CREATED = 'edx.server.enterprise-access.coupon-code-request-lifecycle.created'
     COUPON_CODE_REQUEST_APPROVED = 'edx.server.enterprise-access.coupon-code-request-lifecycle.approved'
     COUPON_CODE_REQUEST_DECLINED = 'edx.server.enterprise-access.coupon-code-request-lifecycle.declined'
+    LEARNER_CREDIT_REQUEST_CREATED = 'edx.server.enterprise-access.learner-credit-request-lifecycle.created'
     SUBSIDY_REQUEST_CONFIGURATION_CREATED = ('edx.server.enterprise-access.'
                                              'subsidy-request-configuration-lifecycle.created')
     SUBSIDY_REQUEST_CONFIGURATION_UPDATED = ('edx.server.enterprise-access.'
@@ -74,7 +77,8 @@ class SegmentEvents:
 
     SUBSIDY_REQUEST_CREATED = {
         SubsidyTypeChoices.LICENSE: LICENSE_REQUEST_CREATED,
-        SubsidyTypeChoices.COUPON: COUPON_CODE_REQUEST_CREATED
+        SubsidyTypeChoices.COUPON: COUPON_CODE_REQUEST_CREATED,
+        SubsidyTypeChoices.LEARNER_CREDIT: LEARNER_CREDIT_REQUEST_CREATED,
     }
     SUBSIDY_REQUEST_APPROVED = {
         SubsidyTypeChoices.LICENSE: LICENSE_REQUEST_APPROVED,

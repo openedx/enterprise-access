@@ -4,6 +4,7 @@ Python API for provisioning operations.
 import logging
 from operator import itemgetter
 
+from ..api_client.license_manager_client import LicenseManagerApiClient
 from ..api_client.lms_client import LmsApiClient
 
 logger = logging.getLogger(__name__)
@@ -108,3 +109,61 @@ def get_or_create_enterprise_catalog(enterprise_customer_uuid, catalog_title, ca
     )
     logger.info('Provisioning: created enterprise catalog with uuid %s', created_catalog.get('uuid'))
     return created_catalog
+
+
+def get_or_create_customer_agreement(enterprise_customer_uuid, customer_slug, default_catalog_uuid=None, **kwargs):
+    """
+    Get or create a customer agreement record from the license-manager service.
+    """
+    client = LicenseManagerApiClient()
+    existing_agreement = client.get_customer_agreement(enterprise_customer_uuid)
+    if existing_agreement:
+        logger.info('Provisioning: customer agreement with uuid %s already_exists', existing_agreement.get('uuid'))
+        return existing_agreement
+
+    created_agreement = client.create_customer_agreement(
+        enterprise_customer_uuid,
+        customer_slug,
+        default_catalog_uuid=default_catalog_uuid,
+        **kwargs,
+    )
+    logger.info('Provisioning: created customer agreement with uuid %s', created_agreement.get('uuid'))
+    return created_agreement
+
+
+def get_or_create_subscription_plan(
+    customer_agreement_dict, plan_title, catalog_uuid, opp_line_item,
+    start_date, expiration_date, desired_num_licenses, product_id, **kwargs
+):
+    """
+    Get or create a new subscription plan, provided an existing customer agreement dictionary.
+    """
+    existing_subscriptions = customer_agreement_dict.get('subscriptions', [])
+    matching_subscription = next((
+        _sub for _sub in existing_subscriptions
+        if _sub.get('salesforce_opportunity_line_item') == opp_line_item
+    ), None)
+    if matching_subscription:
+        logger.info(
+            'Provisioning: subscription plan with uuid %s and salesforce_opportunity_line_item %s already exists',
+            matching_subscription['uuid'], matching_subscription['salesforce_opportunity_line_item']
+        )
+        return matching_subscription
+
+    client = LicenseManagerApiClient()
+    created_subscription = client.create_subscription_plan(
+        customer_agreement_uuid=customer_agreement_dict['uuid'],
+        enterprise_catalog_uuid=catalog_uuid,
+        title=plan_title,
+        salesforce_opportunity_line_item=opp_line_item,
+        product_id=product_id,
+        start_date=start_date,
+        expiration_date=expiration_date,
+        desired_num_licenses=desired_num_licenses,
+        **kwargs,
+    )
+    logger.info(
+        'Provisioning: created new subscription plan with uuid %s and salesforce_opportunity_line_item %s',
+        created_subscription['uuid'], created_subscription['salesforce_opportunity_line_item'],
+    )
+    return created_subscription

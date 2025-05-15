@@ -376,6 +376,24 @@ class SubsidyAccessPolicy(TimeStampedModel):
         """
         return self.learner_credit_request_config and self.learner_credit_request_config.active
 
+    @classmethod
+    def has_bnr_enabled_policy_for_enterprise(cls, enterprise_customer_uuid):
+        """
+        Check if any active SubsidyAccessPolicy for the given enterprise_customer_uuid has bnr_enabled.
+
+        Args:
+            enterprise_customer_uuid (UUID): The UUID of the enterprise customer.
+
+        Returns:
+            bool: True if bnr_enabled is True for any active policy, otherwise False.
+        """
+        return cls.objects.filter(
+            enterprise_customer_uuid=enterprise_customer_uuid,
+            active=True,
+            learner_credit_request_config__isnull=False,
+            learner_credit_request_config__active=True
+        ).exists()
+
     def clean(self):
         """
         Used to help validate field values before saving this model instance.
@@ -1026,47 +1044,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
             yield lock_id
         finally:
             self.release_lock(lms_user_id, content_key)
-
-    @classmethod
-    def resolve_policy(cls, redeemable_policies):
-        """
-        Select one out of multiple policies which have already been deemed redeemable.
-
-        Prioritize learner credit policies, and then prioritize policies with a sooner expiration date,
-        and then subsidies that have smaller balances.  The type priority is codified in ``*_POLICY_TYPE_PRIORITY``
-        variables in constants.py.
-
-        Deficiencies:
-        * If multiple policies with equal policy types, balances, and expiration dates tie for first place,
-          the result is non-deterministic.
-
-        Original spec:
-        https://2u-internal.atlassian.net/wiki/spaces/SOL/pages/229212214/Commission+Subsidy+Access+Policy+API#Policy-Resolver
-
-        Args:
-            redeemable_policies (list of SubsidyAccessPolicy): A list of subsidy access policies to select one from.
-
-        Returns:
-           SubsidyAccessPolicy: one policy selected from the input list.
-        """
-        # gate for experimental functionality to resolve multiple policies
-        if not getattr(settings, 'MULTI_POLICY_RESOLUTION_ENABLED', False):
-            logger.info('resolve_policy MULTI_POLICY_RESOLUTION_ENABLED disabled')
-            return redeemable_policies[0]
-
-        if len(redeemable_policies) == 1:
-            return redeemable_policies[0]
-
-        # resolve policies by:
-        # - priority (of type)
-        # - expiration, sooner to expire first
-        # - balance, lower balance first
-        sorted_policies = sorted(
-            redeemable_policies,
-            key=lambda p: (p.priority, p.subsidy_expiration_datetime, p.subsidy_balance()),
-        )
-        logger.info('resolve_policy multiple policies resolved')
-        return sorted_policies[0]
 
     def create_deposit(
         self,

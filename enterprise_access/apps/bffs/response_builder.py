@@ -14,6 +14,7 @@ from enterprise_access.apps.bffs.serializers import (
     LearnerSearchResponseSerializer,
     LearnerSkillsQuizResponseSerializer
 )
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +165,9 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
         self.response_data.update({
             'enterprise_course_enrollments': self.enterprise_course_enrollments,
             'all_enrollments_by_status': self.all_enrollments_by_status,
+            'has_bnr_enabled_policy': bool(SubsidyAccessPolicy.has_bnr_enabled_policy_for_enterprise(
+                self.context.enterprise_customer_uuid
+            )),
         })
 
 

@@ -1910,6 +1910,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
         assert response_list[0]["can_redeem"] is True
         assert len(response_list[0]["reasons"]) == 0
+        assert response_list[0]['display_reason'] is None
 
         # Check the response for the second content_key given.
         assert response_list[1]["content_key"] == test_content_key_2
@@ -1922,6 +1923,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         assert response_list[1]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
         assert response_list[1]["can_redeem"] is True
         assert len(response_list[1]["reasons"]) == 0
+        assert response_list[1]['display_reason'] is None
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient', return_value=mock.MagicMock())
@@ -2120,6 +2122,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
                 "policy_uuids": [str(self.redeemable_policy.uuid)],
             },
         ]
+        assert response_list[0]['display_reason'] == expected_user_message
 
         # Check the response for the second content_key given.
         assert response_list[1]["content_key"] == test_content_key_2
@@ -2139,6 +2142,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
                 "policy_uuids": [str(self.redeemable_policy.uuid)],
             },
         ]
+        assert response_list[1]["display_reason"] == expected_user_message
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     def test_can_redeem_policy_existing_redemptions(self, mock_transactions_cache_for_learner):
@@ -2206,6 +2210,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         self.assertIsNone(response_list[0]["redeemable_subsidy_access_policy"])
         self.assertFalse(response_list[0]["can_redeem"])
         self.assertEqual(response_list[0]["reasons"], [])
+        assert response_list[0]["display_reason"] is None
 
         # We call this to fetch the list_price
         self.mock_get_content_metadata.assert_called_once_with("course-v1:demox+1234+2T2023")
@@ -2280,6 +2285,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         assert response_list[0]["redeemable_subsidy_access_policy"]["uuid"] == str(self.redeemable_policy.uuid)
         assert response_list[0]["can_redeem"] is True
         assert response_list[0]["reasons"] == []
+        assert response_list[0]["display_reason"] is None
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
@@ -2379,6 +2385,7 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
                 "policy_uuids": [str(self.redeemable_policy.uuid)],
             },
         ]
+        assert response_list[0]["display_reason"] == MissingSubsidyAccessReasonUserMessages.BEYOND_ENROLLMENT_DEADLINE
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_versioned_subsidy_client')
     def test_can_redeem_subsidy_client_http_error(self, mock_get_client):
@@ -2902,6 +2909,7 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
             str(self.assigned_learner_credit_policy.uuid)
         assert response_list[0]["can_redeem"] is True
         assert len(response_list[0]["reasons"]) == 0
+        assert response_list[0]["display_reason"] is None
 
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
@@ -3003,6 +3011,7 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
             },
         ]
         assert response_list[0]["reasons"] == expected_reasons
+        assert response_list[0]["display_reason"] == expected_message
 
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
@@ -3067,6 +3076,7 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
         assert response_list[0]["redeemable_subsidy_access_policy"] is None
         assert response_list[0]["can_redeem"] is False
         assert response_list[0]["reasons"][0]["reason"] == REASON_CONTENT_NOT_IN_CATALOG
+        assert response_list[0]["display_reason"] == MissingSubsidyAccessReasonUserMessages.CONTENT_NOT_IN_CATALOG
 
     @mock.patch('enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
