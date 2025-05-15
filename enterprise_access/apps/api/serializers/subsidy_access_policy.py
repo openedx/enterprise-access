@@ -407,6 +407,24 @@ class SubsidyAccessPolicyCanRedeemRequestSerializer(serializers.Serializer):
 
 
 # pylint: disable=abstract-method
+class SubsidyAccessPolicyCanRequestRequestSerializer(serializers.Serializer):
+    """
+    Request serializer to validate can_request endpoint query params.
+
+    For view: SubsidyAccessPolicyRequestViewset.can_request
+    """
+    content_key = serializers.ListField(
+        child=ContentKeyField(required=True),
+        allow_empty=False,
+        help_text='Content keys about which requestability will be queried.',
+    )
+    lms_user_id = serializers.IntegerField(
+        required=False,
+        help_text='The user identifier for which requestability will be queried (only applicable to staff users).',
+    )
+
+
+# pylint: disable=abstract-method
 class SubsidyAccessPolicyDeleteRequestSerializer(serializers.Serializer):
     """
     Request Serializer for DELETE parameters to an API call to delete a subsidy access policy.
@@ -692,6 +710,21 @@ class SubsidyAccessPolicyCanRedeemElementResponseSerializer(serializers.Serializ
         child=SubsidyAccessPolicyCanRedeemReasonResponseSerializer(),
         help_text=(
             "List of reasons why each of the enterprise's subsidy access policies are not redeemable, grouped by reason"
+        )
+    )
+
+class SubsidyAccessPolicyCanRequestElementResponseSerializer(serializers.Serializer):
+    """
+    Response serializer representing a single element of the response list for the can_request endpoint.
+    """
+    content_key = ContentKeyField(help_text="Requested content_key to which the rest of this element pertains.")
+    can_request = serializers.BooleanField(
+        help_text="True if the learner can request access to this content."
+    )
+    redeemable_subsidy_access_policy = SubsidyAccessPolicyRedeemableResponseSerializer(
+        help_text=(
+            "One subsidy access policy selected from potentially multiple redeemable policies for the requested "
+            "content_key and lms_user_id."
         )
     )
 

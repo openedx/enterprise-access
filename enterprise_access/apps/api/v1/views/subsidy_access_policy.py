@@ -466,6 +466,9 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
 
         if self.action == 'can_redeem':
             enterprise_uuid = self.kwargs.get('enterprise_customer_uuid')
+        
+        if self.action == 'can_request':
+            enterprise_uuid = self.kwargs.get('enterprise_customer_uuid')
 
         return enterprise_uuid
 
@@ -876,6 +879,75 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             many=True,
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+    @extend_schema(
+        tags=[SUBSIDY_ACCESS_POLICY_REDEMPTION_API_TAG],
+        summary='Can request.',
+        parameters=[serializers.SubsidyAccessPolicyCanRequestRequestSerializer],
+        responses={
+            status.HTTP_200_OK: serializers.SubsidyAccessPolicyCanRequestElementResponseSerializer(many=True),
+            # TODO: refine these other possible responses:
+            # status.HTTP_403_FORBIDDEN: PermissionDenied,
+            # status.HTTP_404_NOT_FOUND: NotFound,
+        },
+    )
+    @action(
+        detail=False,
+        methods=['get'],
+        url_name='can-request',
+        url_path='enterprise-customer/(?P<enterprise_customer_uuid>[^/.]+)/can-request',
+        pagination_class=None,
+    )
+    def can_request(self, request, enterprise_customer_uuid):
+        """
+        Check if a learner can request access to content. The flow is:
+        1. Find BnR enabled policies first
+        2. Check if content key exists in those policies
+        3. Check for existing pending request by this learner
+        """
+        serializer = serializers.SubsidyAccessPolicyCanRequestRequestSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        content_key = serializer.data['content_key']
+        lms_user_id_override = serializer.data.get('lms_user_id') if request.user.is_staff else None
+        lms_user_id = lms_user_id_override or self.lms_user_id or request.user.lms_user_id
+        if not lms_user_id:
+            raise NotFound(detail='Could not determine a value for lms_user_id')
+
+        # Get all active policies for this customer
+        policies_for_customer = self.get_queryset()
+        if not policies_for_customer:
+            raise NotFound(detail='No active policies for this customer')
+
+        # 1. Find policies with BnR enabled
+        bnr_enabled_policies = [policy for policy in policies_for_customer if policy.bnr_enabled]
+        if not bnr_enabled_policies:
+            return Response({
+                'can_request': False, 
+                'reason': 'No policies with BnR enabled found'
+            }, status=400)
+            
+        # 2. Check if content exists in catalogs for BnR enabled policies
+        valid_policies = []
+        for policy in bnr_enabled_policies:
+            if policy.catalog_contains_content_key(content_key):
+                valid_policies.append(policy)
+                
+        if not valid_policies:
+            return Response({
+                'can_request': False,
+                'reason': REASON_CONTENT_NOT_IN_CATALOG
+            }, status=400)
+
+        if valid_policies:
+            resolved_policy = SubsidyAccessPolicy.resolve_policy(valid_policies)
+        
+        
+        return Response({
+            'content_key': content_key,
+            'can_request': True,
+            'redeemable_subsidy_access_policy': resolved_policy.uuid
+        }, status=200)
 
 
 class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequiredMixin, viewsets.GenericViewSet):
