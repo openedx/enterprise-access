@@ -2123,7 +2123,14 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
                 "policy_uuids": [str(self.redeemable_policy.uuid)],
             },
         ]
-        assert response_list[0]['display_reason'] == expected_user_message
+        assert response_list[0]['display_reason'] == {
+            "reason": REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
+            "user_message": expected_user_message,
+            "metadata": {
+                "enterprise_administrators": expected_enterprise_admins,
+            },
+            "policy_uuids": [str(self.redeemable_policy.uuid)],
+        }
 
         # Check the response for the second content_key given.
         assert response_list[1]["content_key"] == test_content_key_2
@@ -2143,7 +2150,14 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
                 "policy_uuids": [str(self.redeemable_policy.uuid)],
             },
         ]
-        assert response_list[1]["display_reason"] == expected_user_message
+        assert response_list[1]["display_reason"] == {
+            "reason": REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
+            "user_message": expected_user_message,
+            "metadata": {
+                "enterprise_administrators": expected_enterprise_admins,
+            },
+            "policy_uuids": [str(self.redeemable_policy.uuid)],
+        }
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
     def test_can_redeem_policy_existing_redemptions(self, mock_transactions_cache_for_learner):
@@ -2375,18 +2389,16 @@ class TestSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITestWithMo
         ):
             query_params = {'content_key': test_content_key}
             response = self.client.get(self.subsidy_access_policy_can_redeem_endpoint, query_params)
-
+        reason = {
+            "reason": REASON_BEYOND_ENROLLMENT_DEADLINE,
+            "user_message": MissingSubsidyAccessReasonUserMessages.BEYOND_ENROLLMENT_DEADLINE,
+            "metadata": mock.ANY,
+            "policy_uuids": [str(self.redeemable_policy.uuid)],
+        }
         assert response.status_code == status.HTTP_200_OK
         response_list = response.json()
-        assert response_list[0]["reasons"] == [
-            {
-                "reason": REASON_BEYOND_ENROLLMENT_DEADLINE,
-                "user_message": MissingSubsidyAccessReasonUserMessages.BEYOND_ENROLLMENT_DEADLINE,
-                "metadata": mock.ANY,
-                "policy_uuids": [str(self.redeemable_policy.uuid)],
-            },
-        ]
-        assert response_list[0]["display_reason"] == MissingSubsidyAccessReasonUserMessages.BEYOND_ENROLLMENT_DEADLINE
+        assert response_list[0]["reasons"] == [reason]
+        assert response_list[0]["display_reason"] == reason
 
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_versioned_subsidy_client')
     def test_can_redeem_subsidy_client_http_error(self, mock_get_client):
@@ -3012,7 +3024,7 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
             },
         ]
         assert response_list[0]["reasons"] == expected_reasons
-        assert response_list[0]["display_reason"] == expected_message
+        assert response_list[0]["display_reason"] == expected_reasons[0]
 
     @mock.patch('enterprise_access.apps.api.v1.views.subsidy_access_policy.LmsApiClient')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
@@ -3077,7 +3089,16 @@ class TestAssignedSubsidyAccessPolicyCanRedeemView(BaseCanRedeemTestMixin, APITe
         assert response_list[0]["redeemable_subsidy_access_policy"] is None
         assert response_list[0]["can_redeem"] is False
         assert response_list[0]["reasons"][0]["reason"] == REASON_CONTENT_NOT_IN_CATALOG
-        assert response_list[0]["display_reason"] == MissingSubsidyAccessReasonUserMessages.CONTENT_NOT_IN_CATALOG
+        assert response_list[0]["display_reason"] == {
+            "reason": REASON_CONTENT_NOT_IN_CATALOG,
+            "user_message": MissingSubsidyAccessReasonUserMessages.CONTENT_NOT_IN_CATALOG,
+            'policy_uuids': [str(self.assigned_learner_credit_policy.uuid)],
+            'metadata': {
+                'enterprise_administrators': [
+                    {'email': 'edx@example.org'}
+                ]
+            }
+        }
 
     @mock.patch('enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata')
     @mock.patch('enterprise_access.apps.subsidy_access_policy.subsidy_api.get_and_cache_transactions_for_learner')
