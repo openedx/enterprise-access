@@ -148,7 +148,7 @@ coverage[toml]==7.8.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pytest-cov
-cryptography==44.0.3
+cryptography==45.0.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -351,7 +351,7 @@ edx-drf-extensions==10.6.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.3
+edx-enterprise-subsidy-client==2.0.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -388,12 +388,12 @@ factory-boy==3.3.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==37.1.0
+faker==37.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   factory-boy
-fastavro==1.10.0
+fastavro==1.11.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -522,7 +522,7 @@ mysqlclient==2.2.7
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-newrelic==10.11.0
+newrelic==10.12.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -542,7 +542,7 @@ openapi-codec==1.3.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==10.2.0
+openedx-events==10.2.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -568,7 +568,7 @@ platformdirs==4.3.8
     #   pylint
     #   tox
     #   virtualenv
-pluggy==1.5.0
+pluggy==1.6.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -641,7 +641,7 @@ pymemcache==4.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-pymongo==4.12.1
+pymongo==4.13.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -651,7 +651,7 @@ pynacl==1.5.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-django-utils
-pyproject-api==1.9.0
+pyproject-api==1.9.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -708,7 +708,7 @@ readme-renderer==44.0
     # via
     #   -r requirements/quality.txt
     #   twine
-redis==6.0.0
+redis==6.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -749,7 +749,7 @@ rich==14.0.0
     # via
     #   -r requirements/quality.txt
     #   twine
-rpds-py==0.24.0
+rpds-py==0.25.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -821,7 +821,7 @@ tomlkit==0.13.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pylint
-tox==4.25.0
+tox==4.26.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
