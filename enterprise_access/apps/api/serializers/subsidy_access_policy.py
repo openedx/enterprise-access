@@ -592,7 +592,7 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
         source='subsidy_expiration_datetime',
     )
     learner_content_assignments = serializers.SerializerMethodField('get_assignments_serializer')
-    
+
     learner_requests = serializers.SerializerMethodField('get_learner_requests')
 
     group_associations = serializers.SerializerMethodField()
@@ -622,7 +622,7 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
             context=context,
         )
         return serializer.data
-    
+
     @extend_schema_field(LearnerCreditRequestSerializer(many=True))
     def get_learner_requests(self, obj):
         """

@@ -1705,6 +1705,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'remaining_balance': 5000,
             'subsidy_expiration_date': '2030-01-01 12:00:00Z',
             'learner_content_assignments': [expected_learner_content_assignment],
+            'learner_requests': [],
             'group_associations': [str(TEST_ENTERPRISE_GROUP_UUID)],
             'policy_type': 'AssignedLearnerCreditAccessPolicy',
             'enterprise_customer_uuid': self.enterprise_uuid,
