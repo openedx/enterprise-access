@@ -13,6 +13,7 @@ from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import HTTPError
 from rest_framework import serializers
 
+from enterprise_access.apps.api.serializers.subsidy_requests import LearnerCreditRequestSerializer
 from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
 from enterprise_access.apps.subsidy_access_policy.constants import (
     CENTS_PER_DOLLAR,
@@ -20,10 +21,9 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     PolicyTypes
 )
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
-
-from enterprise_access.apps.api.serializers.subsidy_requests import LearnerCreditRequestSerializer
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
+
 from .content_assignments.assignment import (
     LearnerContentAssignmentResponseSerializer,
     LearnerContentAssignmentWithLearnerAcknowledgedResponseSerializer
@@ -592,7 +592,6 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
         source='subsidy_expiration_datetime',
     )
     learner_content_assignments = serializers.SerializerMethodField('get_assignments_serializer')
-    
     learner_requests = serializers.SerializerMethodField('get_learner_requests')
 
     group_associations = serializers.SerializerMethodField()
@@ -622,13 +621,13 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
             context=context,
         )
         return serializer.data
-    
+
     @extend_schema_field(LearnerCreditRequestSerializer(many=True))
     def get_learner_requests(self, obj):
         """
         Return serialized learner credit requests associated with the user and policy's enterprise customer,
         filtered by the specific learner credit request configuration associated with this policy.
-        
+
         Returns:
             list: Serialized learner credit requests if policy has BNR enabled and user is authenticated.
                 Empty list otherwise.
