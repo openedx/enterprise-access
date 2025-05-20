@@ -628,7 +628,7 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
         """
         Return serialized learner credit requests associated with the user and policy's enterprise customer,
         filtered by the specific learner credit request configuration associated with this policy.
-        
+
         Returns:
             list: Serialized learner credit requests if policy has BNR enabled and user is authenticated.
                 Empty list otherwise.
