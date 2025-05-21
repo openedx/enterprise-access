@@ -634,13 +634,12 @@ class LmsApiClient(BaseOAuthClient):
                             'recent_action': recent_action,
                             'user_email': user_email,
                         })
-            return results
         except requests.exceptions.HTTPError:
             logger.exception('Failed to fetch data from LMS. URL: [%s].', url)
         except KeyError:
             logger.exception('Incorrect data received from LMS. [%s]', url)
 
-        return None
+        return results
 
     def update_pending_learner_status(self, enterprise_group_uuid, learner_email):
         """
