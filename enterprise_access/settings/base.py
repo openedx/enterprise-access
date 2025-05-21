@@ -59,6 +59,8 @@ INSTALLED_APPS = (
 
 THIRD_PARTY_APPS = (
     'corsheaders',
+    'crispy_forms',
+    'crispy_bootstrap5',
     'csrf.apps.CsrfAppConfig',  # Enables frontend apps to retrieve CSRF tokens,
     'djangoql',
     'django_celery_results',
@@ -557,6 +559,12 @@ PROVISIONING_DEFAULTS = {
         'is_active': True,
         'product_id': 1,
         'for_internal_use_only': True,
+        'trial_product_choices': [
+            (1, 'Standard Paid'),
+        ],
+        'trial_catalog_query_choices': [
+            (2, 'All open courses'),
+        ],
     },
     'catalog': {
         'catalog_query_id': 1,
@@ -566,3 +574,6 @@ PROVISIONING_DEFAULTS = {
 # Enable the customer billing API endpoints under /api/v1/customer-billing/*
 ENABLE_CUSTOMER_BILLING_API = False
 STRIPE_API_KEY = None
+
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"

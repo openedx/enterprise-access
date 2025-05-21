@@ -40,7 +40,7 @@ cffi==1.17.1
     #   pynacl
 charset-normalizer==3.4.2
     # via requests
-click==8.2.0
+click==8.2.1
     # via
     #   celery
     #   click-didyoumean
@@ -66,7 +66,9 @@ coreapi==2.3.3
     #   openapi-codec
 coreschema==0.0.4
     # via coreapi
-cryptography==45.0.2
+crispy-bootstrap5==2025.4
+    # via -r requirements/base.in
+cryptography==45.0.3
     # via
     #   pyjwt
     #   social-auth-core
@@ -78,8 +80,10 @@ django==4.2.21
     # via
     #   -c requirements/common_constraints.txt
     #   -r requirements/base.in
+    #   crispy-bootstrap5
     #   django-celery-results
     #   django-cors-headers
+    #   django-crispy-forms
     #   django-crum
     #   django-extensions
     #   django-filter
@@ -110,6 +114,10 @@ django-cors-headers==4.7.0
     # via -r requirements/base.in
 django-countries==7.6.1
     # via -r requirements/base.in
+django-crispy-forms==2.4
+    # via
+    #   -r requirements/base.in
+    #   crispy-bootstrap5
 django-crum==0.7.9
     # via
     #   -r requirements/base.in
@@ -174,7 +182,7 @@ edx-celeryutils==1.4.0
     # via -r requirements/base.in
 edx-django-release-util==1.5.0
     # via -r requirements/base.in
-edx-django-utils==7.4.0
+edx-django-utils==8.0.0
     # via
     #   -r requirements/base.in
     #   edx-drf-extensions
@@ -186,7 +194,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/base.in
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.5
+edx-enterprise-subsidy-client==2.0.6
     # via -r requirements/base.in
 edx-event-bus-kafka==6.1.0
     # via -r requirements/base.in
@@ -224,7 +232,7 @@ jsonfield==3.1.0
     # via edx-celeryutils
 jsonfield2==4.0.0.post0
     # via -r requirements/base.in
-jsonschema==4.23.0
+jsonschema==4.24.0
     # via drf-spectacular
 jsonschema-specifications==2025.4.1
     # via jsonschema
@@ -236,8 +244,6 @@ monotonic==1.6
     # via analytics-python
 mysqlclient==2.2.7
     # via -r requirements/base.in
-newrelic==10.12.0
-    # via edx-django-utils
 oauthlib==3.2.2
     # via
     #   requests-oauthlib
@@ -308,9 +314,10 @@ requests==2.32.3
     #   edx-rest-api-client
     #   requests-oauthlib
     #   social-auth-core
+    #   stripe
 requests-oauthlib==2.0.0
     # via social-auth-core
-rpds-py==0.25.0
+rpds-py==0.25.1
     # via
     #   jsonschema
     #   referencing
@@ -350,6 +357,7 @@ typing-extensions==4.13.2
     #   django-countries
     #   edx-opaque-keys
     #   referencing
+    #   stripe
 tzdata==2025.2
     # via kombu
 uritemplate==4.1.1
