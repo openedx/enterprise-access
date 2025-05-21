@@ -55,7 +55,7 @@ charset-normalizer==3.4.2
     # via
     #   -r requirements/base.txt
     #   requests
-click==8.2.0
+click==8.2.1
     # via
     #   -r requirements/base.txt
     #   celery
@@ -91,7 +91,9 @@ coreschema==0.0.4
     # via
     #   -r requirements/base.txt
     #   coreapi
-cryptography==45.0.2
+crispy-bootstrap5==2025.4
+    # via -r requirements/base.txt
+cryptography==45.0.3
     # via
     #   -r requirements/base.txt
     #   pyjwt
@@ -104,8 +106,10 @@ defusedxml==0.7.1
 django==4.2.21
     # via
     #   -r requirements/base.txt
+    #   crispy-bootstrap5
     #   django-celery-results
     #   django-cors-headers
+    #   django-crispy-forms
     #   django-crum
     #   django-extensions
     #   django-filter
@@ -136,6 +140,10 @@ django-cors-headers==4.7.0
     # via -r requirements/base.txt
 django-countries==7.6.1
     # via -r requirements/base.txt
+django-crispy-forms==2.4
+    # via
+    #   -r requirements/base.txt
+    #   crispy-bootstrap5
 django-crum==0.7.9
     # via
     #   -r requirements/base.txt
@@ -207,7 +215,7 @@ edx-celeryutils==1.4.0
     # via -r requirements/base.txt
 edx-django-release-util==1.5.0
     # via -r requirements/base.txt
-edx-django-utils==7.4.0
+edx-django-utils==8.0.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
@@ -219,7 +227,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.5
+edx-enterprise-subsidy-client==2.0.6
     # via -r requirements/base.txt
 edx-event-bus-kafka==6.1.0
     # via -r requirements/base.txt
@@ -274,7 +282,7 @@ jsonfield==3.1.0
     #   edx-celeryutils
 jsonfield2==4.0.0.post0
     # via -r requirements/base.txt
-jsonschema==4.23.0
+jsonschema==4.24.0
     # via
     #   -r requirements/base.txt
     #   drf-spectacular
@@ -298,10 +306,6 @@ mysqlclient==2.2.7
     # via
     #   -r requirements/base.txt
     #   -r requirements/production.in
-newrelic==10.12.0
-    # via
-    #   -r requirements/base.txt
-    #   edx-django-utils
 oauthlib==3.2.2
     # via
     #   -r requirements/base.txt
@@ -404,11 +408,12 @@ requests==2.32.3
     #   edx-rest-api-client
     #   requests-oauthlib
     #   social-auth-core
+    #   stripe
 requests-oauthlib==2.0.0
     # via
     #   -r requirements/base.txt
     #   social-auth-core
-rpds-py==0.25.0
+rpds-py==0.25.1
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -463,6 +468,7 @@ typing-extensions==4.13.2
     #   django-countries
     #   edx-opaque-keys
     #   referencing
+    #   stripe
 tzdata==2025.2
     # via
     #   -r requirements/base.txt
