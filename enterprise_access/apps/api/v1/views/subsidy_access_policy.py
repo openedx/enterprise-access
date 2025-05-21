@@ -35,8 +35,6 @@ from enterprise_access.apps.core.constants import (
     SUBSIDY_ACCESS_POLICY_REDEMPTION_PERMISSION,
     SUBSIDY_ACCESS_POLICY_WRITE_PERMISSION
 )
-from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
-from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.events.signals import SUBSIDY_REDEEMED
 from enterprise_access.apps.events.utils import send_subsidy_redemption_event_to_event_bus
 from enterprise_access.apps.subsidy_access_policy.constants import (
@@ -73,6 +71,8 @@ from enterprise_access.apps.subsidy_access_policy.subsidy_api import (
     get_redemptions_by_content_and_policy_for_learner
 )
 from enterprise_access.apps.subsidy_access_policy.utils import sort_subsidy_access_policies_for_redemption
+from enterprise_access.apps.subsidy_request.constants import LC_NON_RE_REQUESTABLE_STATES
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
 
 from .utils import PaginationWithPageCount
 
@@ -971,7 +971,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             user__lms_user_id=lms_user_id,
             enterprise_customer_uuid=enterprise_customer_uuid,
             course_id=content_key,
-            state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.APPROVED]
+            state__in=LC_NON_RE_REQUESTABLE_STATES
         ).first()
 
         if existing_request:

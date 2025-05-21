@@ -55,11 +55,14 @@ class ProvisioningCreateView(PermissionRequiredMixin, generics.CreateAPIView):
             for record in request_serializer.validated_data['pending_admins']
         ]
         catalog_request_data = request_serializer.validated_data['enterprise_catalog']
+        customer_agreement_data = request_serializer.validated_data['customer_agreement']
+        subscription_plan_data = request_serializer.validated_data['subscription_plan']
 
         workflow_input_dict = ProvisionNewCustomerWorkflow.generate_input_dict(
-            customer_request_data, admin_emails, catalog_request_data,
+            customer_request_data, admin_emails, catalog_request_data, customer_agreement_data, subscription_plan_data
         )
         workflow = ProvisionNewCustomerWorkflow.objects.create(input_data=workflow_input_dict)
+
         try:
             workflow.execute()
         except UnitOfWorkException as exc:
@@ -72,6 +75,8 @@ class ProvisioningCreateView(PermissionRequiredMixin, generics.CreateAPIView):
             'enterprise_customer': workflow.customer_output_dict(),
             'customer_admins': workflow.admin_users_output_dict(),
             'enterprise_catalog': workflow.catalog_output_dict(),
+            'customer_agreement': workflow.customer_agreement_output_dict(),
+            'subscription_plan': workflow.subscription_plan_output_dict(),
         })
         return Response(
             response_serializer.data,

@@ -42,14 +42,10 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     PolicyTypes,
     TransactionStateChoices
 )
-from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
-from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
-from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.models import (
-    PolicyGroupAssociation,
-    SubsidyAccessPolicy,
     PerLearnerSpendCreditAccessPolicy,
-    PerLearnerEnrollmentCreditAccessPolicy
+    PolicyGroupAssociation,
+    SubsidyAccessPolicy
 )
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
@@ -58,7 +54,8 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PolicyGroupAssociationFactory
 )
 from enterprise_access.apps.subsidy_access_policy.utils import create_idempotency_key_for_transaction
-from enterprise_access.apps.subsidy_request.models import LearnerCreditRequestConfiguration
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest, LearnerCreditRequestConfiguration
 from test_utils import TEST_ENTERPRISE_GROUP_UUID, TEST_USER_RECORD, APITestWithMocks
 
 SUBSIDY_ACCESS_POLICY_LIST_ENDPOINT = reverse('api:v1:subsidy-access-policies-list')
@@ -1717,6 +1714,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'remaining_balance': 5000,
             'subsidy_expiration_date': '2030-01-01 12:00:00Z',
             'learner_content_assignments': [expected_learner_content_assignment],
+            'learner_requests': [],
             'group_associations': [str(TEST_ENTERPRISE_GROUP_UUID)],
             'policy_type': 'AssignedLearnerCreditAccessPolicy',
             'enterprise_customer_uuid': self.enterprise_uuid,
@@ -1731,7 +1729,6 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             'spend_limit': 1000000,
             'late_redemption_allowed_until': None,
             'per_learner_enrollment_limit': None,
-            'learner_requests': [],
             'per_learner_spend_limit': None,
             'assignment_configuration': str(assignment_configuration.uuid),
             'learner_credit_request_config': str(learner_credit_config.uuid),
