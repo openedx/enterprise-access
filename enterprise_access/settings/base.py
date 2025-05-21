@@ -57,6 +57,8 @@ INSTALLED_APPS = (
 
 THIRD_PARTY_APPS = (
     'corsheaders',
+    'crispy_forms',
+    'crispy_bootstrap5',
     'csrf.apps.CsrfAppConfig',  # Enables frontend apps to retrieve CSRF tokens,
     'djangoql',
     'django_celery_results',
@@ -558,3 +560,7 @@ PROVISIONING_DEFAULTS = {
         'catalog_query_id': 1,
     },
 }
+
+# Crispy forms
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"

@@ -5,11 +5,13 @@ analytics-python
 cattrs
 celery
 confluent-kafka[avro,schema-registry]
+crispy-bootstrap5
 Django>=2.2          # Web application framework
 djangoql
 django-cors-headers
 django-celery-results
 django-countries
+django-crispy-forms
 django-crum
 django-extensions
 django-filter

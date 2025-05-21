@@ -338,7 +338,7 @@ class GetCreateSubscriptionPlanStepOutput(BaseInputOutput):
     The output object to be used for the business logic of get-or-creating
     a Subscription Plan
     """
-    KEY = 'create_subscription_plan_input'
+    KEY = 'create_subscription_plan_output'
 
     uuid: UUID = field(validator=is_uuid)
     title: str = field(validator=is_str)
@@ -471,3 +471,14 @@ class ProvisionNewCustomerWorkflow(AbstractWorkflow):
 
     def subscription_plan_output_dict(self):
         return self.output_data[GetCreateSubscriptionPlanStepOutput.KEY]
+
+
+class AdminTriggerProvisionNewCustomerWorkflow(ProvisionNewCustomerWorkflow):
+    """
+    A proxy model for ProvisionNewCustomerWorkflow, used specifically to provide
+    an admin interface for triggering new provisioning workflows.
+    """
+    class Meta:
+        proxy = True
+        verbose_name = "Trigger New Customer Provisioning Workflow"
+        verbose_name_plural = "Trigger New Customer Provisioning Workflows"
