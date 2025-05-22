@@ -182,7 +182,6 @@ class LearnerCreditRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
 
     read_only_fields = (
         'assignment',
-        'learner_credit_request_config',
     )
 
     fields = (
