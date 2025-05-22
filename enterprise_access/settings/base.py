@@ -10,6 +10,8 @@ from enterprise_access.apps.core.constants import (
     CONTENT_ASSIGNMENTS_ADMIN_ROLE,
     CONTENT_ASSIGNMENTS_LEARNER_ROLE,
     CONTENT_ASSIGNMENTS_OPERATOR_ROLE,
+    CUSTOMER_BILLING_ADMIN_ROLE,
+    CUSTOMER_BILLING_OPERATOR_ROLE,
     PROVISIONING_ADMIN_ROLE,
     REQUESTS_ADMIN_ROLE,
     REQUESTS_LEARNER_ROLE,
@@ -334,6 +336,7 @@ SYSTEM_TO_FEATURE_ROLE_MAPPING = {
         REQUESTS_ADMIN_ROLE,
         BFF_OPERATOR_ROLE,
         PROVISIONING_ADMIN_ROLE,
+        CUSTOMER_BILLING_OPERATOR_ROLE,
     ],
     SYSTEM_ENTERPRISE_ADMIN_ROLE: [
         # enterprise admins only need learner-level access to Subsidy Access Policy APIs since they aren't responsible
@@ -342,6 +345,7 @@ SYSTEM_TO_FEATURE_ROLE_MAPPING = {
         CONTENT_ASSIGNMENTS_ADMIN_ROLE,
         REQUESTS_ADMIN_ROLE,
         BFF_ADMIN_ROLE,
+        CUSTOMER_BILLING_ADMIN_ROLE,
     ],
     SYSTEM_ENTERPRISE_LEARNER_ROLE: [
         SUBSIDY_ACCESS_POLICY_LEARNER_ROLE,
@@ -558,3 +562,7 @@ PROVISIONING_DEFAULTS = {
         'catalog_query_id': 1,
     },
 }
+
+# Enable the customer billing API endpoints under /api/v1/customer-billing/*
+ENABLE_CUSTOMER_BILLING_API = False
+STRIPE_API_KEY = None

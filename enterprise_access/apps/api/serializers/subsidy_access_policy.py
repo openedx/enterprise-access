@@ -609,6 +609,7 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
         source='subsidy_expiration_datetime',
     )
     learner_content_assignments = serializers.SerializerMethodField('get_assignments_serializer')
+
     learner_requests = serializers.SerializerMethodField('get_learner_requests')
 
     group_associations = serializers.SerializerMethodField()
@@ -745,9 +746,9 @@ class SubsidyAccessPolicyCanRedeemElementResponseSerializer(serializers.Serializ
             "List of reasons why each of the enterprise's subsidy access policies are not redeemable, grouped by reason"
         )
     )
-    display_reason = serializers.CharField(
+    display_reason = SubsidyAccessPolicyCanRedeemReasonResponseSerializer(
         allow_null=True,
-        help_text="A single, user-facing description of the most salient reason for non-redeemability.",
+        help_text="A single, user-facing object of the most salient reason for non-redeemability.",
     )
 
 

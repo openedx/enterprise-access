@@ -5,6 +5,7 @@ import logging
 
 from rest_framework import serializers
 
+from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
@@ -147,7 +148,7 @@ class LearnerCreditRequestSerializer(SubsidyRequestSerializer):
         allow_null=True,
     )
     assignment = serializers.PrimaryKeyRelatedField(
-        queryset='content_assignments.LearnerContentAssignment.objects.all()',
+        queryset=LearnerContentAssignment.objects.all(),
         required=False,
         allow_null=True,
     )

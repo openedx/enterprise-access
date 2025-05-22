@@ -188,8 +188,11 @@ def _get_reasons_for_no_redeemable_policies(enterprise_customer_uuid, non_redeem
             },
             "policy_uuids": [policy.uuid for policy in policies],
         })
-        if not display_reason:
-            display_reason = user_message
+
+    # Validate a reason exist before picking the most relevant reason already assumed to
+    # be the first item in the list of non-redeemable policies sorted by the most salient policy
+    if len(reasons) > 0:
+        display_reason = reasons[0]
 
     return reasons, display_reason
 
