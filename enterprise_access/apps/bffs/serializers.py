@@ -150,6 +150,7 @@ class EnterpriseCustomerSerializer(BaseBffSerializer):
     enable_slug_login = serializers.BooleanField()
     disable_search = serializers.BooleanField()
     show_integration_warning = serializers.BooleanField()
+    enable_learner_credit_message_box = serializers.BooleanField()
 
 
 class EnterpriseCustomerUserSerializer(BaseBffSerializer):
