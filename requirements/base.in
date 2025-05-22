@@ -39,5 +39,6 @@ pymemcache
 pytz
 redis
 rules
+stripe
 drf-spectacular
 django-log-request-id

@@ -33,6 +33,8 @@ class ProvisionNewCustomerWorkflowAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
         'create_customer_step_link',
         'create_admin_users_step_link',
         'create_catalog_step_link',
+        'create_customer_agreement_step_link',
+        'create_subscription_plan_step_link',
     )
 
     def create_customer_step_link(self, obj):
@@ -64,6 +66,26 @@ class ProvisionNewCustomerWorkflowAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
             step_record.pk,
         ))
     create_catalog_step_link.short_description = 'Create Catalog Step'
+
+    def create_customer_agreement_step_link(self, obj):
+        step_record = obj.get_create_customer_agreement_step()
+        if not step_record:
+            return None
+        return mark_safe('<a href="{}">{}</a>'.format(
+            reverse("admin:provisioning_getcreatecustomeragreementstep_change", args=(step_record.pk,)),
+            step_record.pk,
+        ))
+    create_customer_agreement_step_link.short_description = 'Create Customer Agreement Step'
+
+    def create_subscription_plan_step_link(self, obj):
+        step_record = obj.get_create_subscription_plan_step()
+        if not step_record:
+            return None
+        return mark_safe('<a href="{}">{}</a>'.format(
+            reverse("admin:provisioning_getcreatesubscriptionplanstep_change", args=(step_record.pk,)),
+            step_record.pk,
+        ))
+    create_subscription_plan_step_link.short_description = 'Create Subscription Plan Step'
 
 
 class ProvisionWorkflowStepAdminBase(admin.ModelAdmin):
@@ -107,7 +129,7 @@ class GetCreateCustomerStepAdmin(DjangoQLSearchMixin, ProvisionWorkflowStepAdmin
 
 
 @admin.register(models.GetCreateEnterpriseAdminUsersStep)
-class GetCreateEnterpriseAdminUsersStep(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
+class GetCreateEnterpriseAdminUsersStepAdmin(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
     """
     Admin model for the admin user creation step.
     """
@@ -126,7 +148,7 @@ class GetCreateEnterpriseAdminUsersStep(DjangoQLSearchMixin, ProvisionWorkflowSt
 
 
 @admin.register(models.GetCreateCatalogStep)
-class GetCreateCatalogStep(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
+class GetCreateCatalogStepAdmin(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
     """
     Admin model for the catalog creation step.
     """
@@ -142,3 +164,41 @@ class GetCreateCatalogStep(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
             step_record.pk,
         ))
     preceding_step_link.short_description = 'Preceding admin users creation step'
+
+
+@admin.register(models.GetCreateCustomerAgreementStep)
+class GetCreateCustomerAgreementStepAdmin(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
+    """
+    Admin model for the customer agreement creation step.
+    """
+    fields = ProvisionWorkflowStepAdminBase.fields + ('preceding_step_link',)
+    readonly_fields = ProvisionWorkflowStepAdminBase.readonly_fields + ('preceding_step_link',)
+
+    def preceding_step_link(self, obj):
+        step_record = obj.get_preceding_step_record()
+        if not step_record:
+            return None
+        return mark_safe('<a href="{}">{}</a>'.format(
+            reverse("admin:provisioning_getcreatecatalogstep_change", args=(step_record.pk,)),
+            step_record.pk,
+        ))
+    preceding_step_link.short_description = 'Preceding catalog creation step'
+
+
+@admin.register(models.GetCreateSubscriptionPlanStep)
+class GetCreateSubscriptionPlanStepAdmin(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
+    """
+    Admin model for the subscription plan creation step.
+    """
+    fields = ProvisionWorkflowStepAdminBase.fields + ('preceding_step_link',)
+    readonly_fields = ProvisionWorkflowStepAdminBase.readonly_fields + ('preceding_step_link',)
+
+    def preceding_step_link(self, obj):
+        step_record = obj.get_preceding_step_record()
+        if not step_record:
+            return None
+        return mark_safe('<a href="{}">{}</a>'.format(
+            reverse("admin:provisioning_getcreatecustomeragreementstep_change", args=(step_record.pk,)),
+            step_record.pk,
+        ))
+    preceding_step_link.short_description = 'Preceding customer agreement creation step'
