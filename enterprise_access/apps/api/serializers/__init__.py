@@ -26,6 +26,8 @@ from .subsidy_access_policy import (
     SubsidyAccessPolicyCanRedeemElementResponseSerializer,
     SubsidyAccessPolicyCanRedeemReasonResponseSerializer,
     SubsidyAccessPolicyCanRedeemRequestSerializer,
+    SubsidyAccessPolicyCanRequestElementResponseSerializer,
+    SubsidyAccessPolicyCanRequestRequestSerializer,
     SubsidyAccessPolicyCreditsAvailableRequestSerializer,
     SubsidyAccessPolicyCreditsAvailableResponseSerializer,
     SubsidyAccessPolicyCRUDSerializer,

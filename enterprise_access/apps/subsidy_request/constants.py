@@ -35,6 +35,18 @@ class SubsidyRequestStates:
     CHOICES = COMMON_STATES + LC_REQUEST_STATES
 
 
+# List of states where a learner cannot make a new request for a course
+# if they already have a request in one of these states.
+LC_NON_RE_REQUESTABLE_STATES = [
+    SubsidyRequestStates.REQUESTED,
+    SubsidyRequestStates.APPROVED,
+    SubsidyRequestStates.ACCEPTED,
+    SubsidyRequestStates.ERROR,
+    SubsidyRequestStates.CANCELLED,
+    SubsidyRequestStates.DECLINED,
+]
+
+
 class SubsidyTypeChoices:
     """ Type of subsidies. """
     LICENSE = 'license'
