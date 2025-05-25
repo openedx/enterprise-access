@@ -181,7 +181,8 @@ class LearnerCreditRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
     )
 
     read_only_fields = (
-        'assignment',
+        'uuid',
+        'get_course_partners',
     )
 
     fields = (
@@ -197,7 +198,7 @@ class LearnerCreditRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
         model = models.LearnerCreditRequest
 
     def get_readonly_fields(self, request, obj=None):
-        return super().read_only_fields + self.read_only_fields
+        return self.read_only_fields
 
     def get_fields(self, request, obj=None):
         return super().fields + self.fields
