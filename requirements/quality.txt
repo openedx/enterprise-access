@@ -40,7 +40,7 @@ billiard==4.2.1
     # via
     #   -r requirements/test.txt
     #   celery
-cachetools==5.5.2
+cachetools==6.0.0
     # via
     #   -r requirements/test.txt
     #   tox
@@ -68,7 +68,7 @@ charset-normalizer==3.4.2
     # via
     #   -r requirements/test.txt
     #   requests
-click==8.2.0
+click==8.2.1
     # via
     #   -r requirements/test.txt
     #   celery
@@ -117,11 +117,11 @@ coreschema==0.0.4
     # via
     #   -r requirements/test.txt
     #   coreapi
-coverage[toml]==7.8.0
+coverage[toml]==7.8.2
     # via
     #   -r requirements/test.txt
     #   pytest-cov
-cryptography==45.0.2
+cryptography==45.0.3
     # via
     #   -r requirements/test.txt
     #   pyjwt
@@ -259,7 +259,7 @@ edx-celeryutils==1.4.0
     # via -r requirements/test.txt
 edx-django-release-util==1.5.0
     # via -r requirements/test.txt
-edx-django-utils==7.4.0
+edx-django-utils==8.0.0
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
@@ -271,7 +271,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.5
+edx-enterprise-subsidy-client==2.0.6
     # via -r requirements/test.txt
 edx-event-bus-kafka==6.1.0
     # via -r requirements/test.txt
@@ -311,7 +311,7 @@ filelock==3.18.0
     #   -r requirements/test.txt
     #   tox
     #   virtualenv
-freezegun==1.5.1
+freezegun==1.5.2
     # via -r requirements/test.txt
 id==1.5.0
     # via twine
@@ -394,10 +394,6 @@ more-itertools==10.7.0
     #   jaraco-functools
 mysqlclient==2.2.7
     # via -r requirements/test.txt
-newrelic==10.12.0
-    # via
-    #   -r requirements/test.txt
-    #   edx-django-utils
 nh3==0.2.21
     # via readme-renderer
 oauthlib==3.2.2
@@ -560,6 +556,7 @@ requests==2.32.3
     #   requests-oauthlib
     #   requests-toolbelt
     #   social-auth-core
+    #   stripe
     #   twine
 requests-oauthlib==2.0.0
     # via
@@ -571,7 +568,7 @@ rfc3986==2.0.0
     # via twine
 rich==14.0.0
     # via twine
-rpds-py==0.25.0
+rpds-py==0.25.1
     # via
     #   -r requirements/test.txt
     #   jsonschema
@@ -639,6 +636,7 @@ typing-extensions==4.13.2
     #   django-countries
     #   edx-opaque-keys
     #   referencing
+    #   stripe
 tzdata==2025.2
     # via
     #   -r requirements/test.txt
