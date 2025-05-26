@@ -134,7 +134,6 @@ dill==0.4.0
 distlib==0.3.9
     # via virtualenv
     # via
-    #   -c requirements/common_constraints.txt
     #   -r requirements/base.txt
     #   crispy-bootstrap5
     #   django-celery-results
@@ -470,7 +469,7 @@ pyyaml==6.0.2
     #   drf-spectacular
     #   drf-yasg
     #   edx-django-release-util
-redis==6.1.0
+redis==6.2.0
     # via -r requirements/base.txt
 referencing==0.36.2
     # via
@@ -536,7 +535,7 @@ stevedore==5.4.1
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
-stripe==12.1.0
+stripe==12.2.0
     # via -r requirements/base.txt
 text-unidecode==1.3
     # via

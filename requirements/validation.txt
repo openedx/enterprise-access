@@ -157,7 +157,6 @@ cryptography==45.0.3
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pyjwt
-    #   secretstorage
     #   social-auth-core
 ddt==1.7.2
     # via
@@ -184,7 +183,7 @@ distlib==0.3.9
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   virtualenv
-django==4.2.21
+django==5.2.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -462,11 +461,6 @@ jaraco-functools==4.1.0
     # via
     #   -r requirements/quality.txt
     #   keyring
-jeepney==0.9.0
-    # via
-    #   -r requirements/quality.txt
-    #   keyring
-    #   secretstorage
 jinja2==3.1.6
     # via
     #   -r requirements/quality.txt
@@ -714,7 +708,7 @@ readme-renderer==44.0
     # via
     #   -r requirements/quality.txt
     #   twine
-redis==6.1.0
+redis==6.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -766,10 +760,6 @@ rules==3.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-secretstorage==3.3.3
-    # via
-    #   -r requirements/quality.txt
-    #   keyring
 semantic-version==2.10.0
     # via
     #   -r requirements/quality.txt
@@ -818,7 +808,7 @@ stevedore==5.4.1
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
-stripe==12.1.0
+stripe==12.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
