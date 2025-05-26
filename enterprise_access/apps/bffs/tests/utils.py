@@ -116,6 +116,7 @@ class TestHandlerContextMixin(TestCase):
             'sender_alias': None,
             'disable_search': False,
             'show_integration_warning': False,
+            'enable_learner_credit_message_box': True,
         }
         self.mock_active_enterprise_customer = {
             **self.mock_enterprise_customer
