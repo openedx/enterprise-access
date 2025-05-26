@@ -1754,7 +1754,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         policy.save()
 
         # Set up the request
-        content_key = "course-v1:edX+Privacy101+3T2020"
+        content_key = "edX+CS101"
         lms_user_id = 1234
 
         url = reverse(
