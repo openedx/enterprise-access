@@ -416,7 +416,7 @@ class SubsidyAccessPolicyCanRequestRequestSerializer(serializers.Serializer):
 
     For view: SubsidyAccessPolicyRedeemViewset.can_request
     """
-    content_key = ContentKeyField(
+    content_key = serializers.CharField(
         required=True,
         help_text='Content key about which requestability will be queried.',
     )
@@ -756,7 +756,10 @@ class SubsidyAccessPolicyCanRequestElementResponseSerializer(serializers.Seriali
     """
     Response serializer representing a single element of the response list for the can_request endpoint.
     """
-    content_key = ContentKeyField(help_text="Requested content_key to which the rest of this element pertains.")
+    content_key = serializers.CharField(
+        required=True,
+        help_text='Requested content_key to which the rest of this element pertains.',
+    )
     reason = serializers.CharField(
         allow_null=True,
         required=False,
