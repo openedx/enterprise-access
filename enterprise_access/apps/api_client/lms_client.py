@@ -4,6 +4,7 @@ API client for calls to the LMS.
 import logging
 import os
 
+from typing import cast
 import requests
 from django.conf import settings
 from edx_django_utils.cache import TieredCache
@@ -731,24 +732,59 @@ class LmsUserApiClient(BaseUserApiClient):
     enterprise_course_enrollments_endpoint = (
         f'{enterprise_learner_portal_api_base_url}enterprise_course_enrollments/'
     )
+    accounts_endpoint = '/api/user/v1/accounts'
 
-    def get_enterprise_customers_for_user(self, username, traverse_pagination=False):
+    def get_lms_user_account(
+        self,
+        username: str | None = None,
+        email: str | None = None,
+    ) -> dict | None:
         """
-        Fetches enterprise learner data for a given username.
+        Fetch LMS learner data for a given username or email.
+        """
+        if bool(username) != bool(email):
+            raise ValueError('Expected exactly one of `username` or `email`.')
+        if username:
+            query_params = {'username': username}
+        else:
+            query_params = {'email': cast(str, email)}
+        response = self.get(
+            self.accounts_endpoint,
+            params=query_params,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+        if response.status_code == status.HTTP_404_NOT_FOUND:
+            return None
+        response.raise_for_status()
+        return response.json()
+
+    def get_enterprise_customers_for_user(
+        self,
+        username: str | None = None,
+        email: str | None = None,
+        traverse_pagination: bool = False,
+    ) -> dict:
+        """
+        Fetches enterprise learner data for a given username or email.
 
         Arguments:
-            username (str): Username of the learner
+            username (str): Username of the learner.
+            email (str): Email of the learner.
+            traverse_pagination (bool): Read past the first page of results if True.
 
         Returns:
             dict: Dictionary representation of the JSON response from the API
         """
-        query_params = {
-            'username': username,
-        }
+        if bool(username) != bool(email):
+            raise ValueError('Expected exactly one of `username` or `email`.')
+        if username:
+            query_params = {'username': username}
+        else:
+            query_params = {'email': cast(str, email)}
         results = []
         initial_response_data = None
         current_response = None
-        next_url = self.enterprise_learner_endpoint
+        next_url: str | None = self.enterprise_learner_endpoint
         try:
             while next_url:
                 current_response = self.get(
@@ -780,7 +816,7 @@ class LmsUserApiClient(BaseUserApiClient):
             return consolidated_response
         except requests.exceptions.HTTPError as exc:
             logger.exception(
-                f"Failed to fetch enterprise learner for learner {username}: {exc} "
+                f"Failed to fetch enterprise learner for learner {username if username else email}: {exc} "
                 f"Response content: {current_response.content if current_response else None}"
             )
             raise

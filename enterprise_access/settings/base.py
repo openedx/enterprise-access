@@ -563,6 +563,11 @@ PROVISIONING_DEFAULTS = {
     },
 }
 
+# Self-Service Purchasing settings.
+
+# Duration of trial period.
+SSP_TRIAL_PERIOD_DAYS = 14
+
 # Enable the customer billing API endpoints under /api/v1/customer-billing/*
 ENABLE_CUSTOMER_BILLING_API = False
 STRIPE_API_KEY = None
