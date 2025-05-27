@@ -571,9 +571,30 @@ PROVISIONING_DEFAULTS = {
     },
 }
 
-# Enable the customer billing API endpoints under /api/v1/customer-billing/*
-ENABLE_CUSTOMER_BILLING_API = False
-STRIPE_API_KEY = None
-
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+################### Self-Service Purchasing (SSP) settings ###################
+
+# Stripe API key used for privileged read/write operations from a system user.
+STRIPE_API_KEY = None
+
+# Duration of trial period.
+SSP_TRIAL_PERIOD_DAYS = 14
+
+# Placeholder Stripe products, override in prod.
+SSP_PRODUCTS = {
+    'quarterly_license_plan': {
+        'stripe_price_id': 'price_1234_replace-me',
+        'quantity_range': (5, 30),
+    },
+    'yearly_license_plan': {
+        'stripe_price_id': 'price_9876_replace-me',
+        'quantity_range': (5, 30),
+    },
+}
+
+# Enable the customer billing API endpoints under /api/v1/customer-billing/*
+ENABLE_CUSTOMER_BILLING_API = False
+
+################# End Self-Service Purchasing (SSP) settings #################

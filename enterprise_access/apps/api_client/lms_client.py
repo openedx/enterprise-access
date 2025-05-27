@@ -56,6 +56,7 @@ class LmsApiClient(BaseOAuthClient):
     pending_enterprise_admin_endpoint = enterprise_api_v1_base_url + 'pending-enterprise-admin/'
     enterprise_flex_membership_endpoint = enterprise_api_v1_base_url + 'enterprise-group-membership/'
     enterprise_course_enrollment_admin_endpoint = enterprise_api_v1_base_url + 'enterprise-course-enrollment-admin/'
+    user_accounts_endpoint = '/api/user/v1/accounts'
 
     def get_course_enrollments_for_learner_profile(self, enterprise_uuid, lms_user_id):
         """
@@ -716,6 +717,30 @@ class LmsApiClient(BaseOAuthClient):
             )
             raise exc
 
+    def get_lms_user_account(
+        self,
+        username: str | None = None,
+        email: str | None = None,
+    ) -> dict | None:
+        """
+        Fetch LMS learner data for a given username or email.
+        """
+        if bool(username) == bool(email):
+            raise ValueError('Expected exactly one of `username` or `email`.')
+        if username:
+            query_params = {'username': username}
+        else:
+            query_params = {'email': email}
+        response = self.client.get(
+            self.user_accounts_endpoint,
+            params=query_params,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+        if response.status_code == status.HTTP_404_NOT_FOUND:
+            return None
+        response.raise_for_status()
+        return response.json()
+
 
 class LmsUserApiClient(BaseUserApiClient):
     """
@@ -732,23 +757,33 @@ class LmsUserApiClient(BaseUserApiClient):
         f'{enterprise_learner_portal_api_base_url}enterprise_course_enrollments/'
     )
 
-    def get_enterprise_customers_for_user(self, username, traverse_pagination=False):
+    def get_enterprise_customers_for_user(
+        self,
+        username: str | None = None,
+        email: str | None = None,
+        traverse_pagination: bool = False,
+    ) -> dict:
         """
-        Fetches enterprise learner data for a given username.
+        Fetches enterprise learner data for a given username or email.
 
         Arguments:
-            username (str): Username of the learner
+            username (str): Username of the learner.
+            email (str): Email of the learner.
+            traverse_pagination (bool, Optional): Read past the first page of results if True.
 
         Returns:
             dict: Dictionary representation of the JSON response from the API
         """
-        query_params = {
-            'username': username,
-        }
+        if bool(username) == bool(email):
+            raise ValueError('Expected exactly one of `username` or `email`.')
+        if username:
+            query_params = {'username': username}
+        else:
+            query_params = {'email': email}
         results = []
         initial_response_data = None
         current_response = None
-        next_url = self.enterprise_learner_endpoint
+        next_url: str | None = self.enterprise_learner_endpoint
         try:
             while next_url:
                 current_response = self.get(
@@ -780,7 +815,7 @@ class LmsUserApiClient(BaseUserApiClient):
             return consolidated_response
         except requests.exceptions.HTTPError as exc:
             logger.exception(
-                f"Failed to fetch enterprise learner for learner {username}: {exc} "
+                f"Failed to fetch enterprise learner for learner {username if username else email}: {exc} "
                 f"Response content: {current_response.content if current_response else None}"
             )
             raise
