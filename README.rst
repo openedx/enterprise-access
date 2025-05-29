@@ -38,7 +38,7 @@ a shell with ``make app-shell`` and then running ``make requirements`` should in
 
 From your host, run ``make dev.up.with-events``, which will start a local kafka container for you.
 Visit http://localhost:9021/clusters to access the local "Confluent Control Center".
-Confluent is like a cloud wrapper around vanilla Kafka.
+Confluent is like a cloud wrapper around "vanilla" Kafka.
 
 Your ``devstack.py`` settings should already be configured to point at this event broker,
 and to configure enterprise-access as an openedx event consumer and produer.
