@@ -577,3 +577,16 @@ STRIPE_API_KEY = None
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        "OPTIONS": {
+            "location": MEDIA_ROOT,
+            "base_url": MEDIA_URL,
+        },
+    },
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+    },
+}

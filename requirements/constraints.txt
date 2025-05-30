@@ -11,9 +11,6 @@
 # Common constraints for edx repos
 -c common_constraints.txt
 
-# For python greater than or equal to 3.9 backports.zoneinfo causing failures
-backports.zoneinfo; python_version<'3.9'
-
 # confluent-kafka 2.7.0 increased CPU usage
 confluent-kafka<2.6.2
 
