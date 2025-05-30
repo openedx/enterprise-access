@@ -191,7 +191,10 @@ class TestLicenseManagerUserApiClient(MockLicenseManagerMetadataMixin):
 
         # Assert query parameters are correctly set
         parsed_params = parse_qs(parsed_url.query)
-        expected_params = {'enterprise_customer_uuid': [self.mock_enterprise_customer_uuid]}
+        expected_params = {
+            'enterprise_customer_uuid': [self.mock_enterprise_customer_uuid],
+            'page_size': ['100'],
+        }
         self.assertEqual(parsed_params, expected_params)
 
         # Assert headers are correctly set
