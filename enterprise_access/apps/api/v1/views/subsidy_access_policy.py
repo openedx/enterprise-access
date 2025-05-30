@@ -981,7 +981,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             return Response({
                 'can_request': False,
                 'reason': f"You already have an active request for this course in state: {existing_request.state}",
-                'existing_request': str(existing_request.uuid)
+                'existing_request': serializers.LearnerCreditRequestSerializer(existing_request).data
             }, status=400)
 
         # Sort policies to find the best one for redemption

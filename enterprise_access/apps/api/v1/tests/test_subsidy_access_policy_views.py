@@ -15,6 +15,7 @@ from requests.exceptions import HTTPError
 from rest_framework import status
 from rest_framework.reverse import reverse
 
+from enterprise_access.apps.api.serializers.subsidy_requests import LearnerCreditRequestSerializer
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
 from enterprise_access.apps.content_assignments.constants import (
     AssignmentAutomaticExpiredReason,
@@ -1826,7 +1827,8 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         response_data = response.json()
         self.assertFalse(response_data.get('can_request'))
         self.assertIn("already have an active request", response_data.get('reason'))
-        self.assertEqual(response_data.get('existing_request'), str(existing_request.uuid))
+        expected_serialized = LearnerCreditRequestSerializer(existing_request).data
+        self.assertEqual(response_data.get('existing_request'), expected_serialized)
 
 
 class BaseCanRedeemTestMixin:
