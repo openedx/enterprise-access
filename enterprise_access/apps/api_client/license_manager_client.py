@@ -221,6 +221,7 @@ class LicenseManagerUserApiClient(BaseUserApiClient):
         """
         query_params = {
             'enterprise_customer_uuid': enterprise_customer_uuid,
+            'page_size': 100,
             **kwargs,
         }
         url = self.learner_licenses_endpoint
