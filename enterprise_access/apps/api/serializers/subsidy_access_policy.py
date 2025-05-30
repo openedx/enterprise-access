@@ -774,6 +774,11 @@ class SubsidyAccessPolicyCanRequestElementResponseSerializer(serializers.Seriali
             "content_key and lms_user_id."
         )
     )
+    existing_request = LearnerCreditRequestSerializer(
+        required=False,
+        allow_null=True,
+        help_text="The existing learner credit request object if one exists."
+    )
 
 
 # pylint: disable=abstract-method
