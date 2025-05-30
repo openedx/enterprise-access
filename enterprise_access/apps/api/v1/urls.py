@@ -58,13 +58,4 @@ urlpatterns = [
     ),
 ]
 
-if settings.ENABLE_CUSTOMER_BILLING_API:
-    urlpatterns += [
-        path(
-            'customer-billing/stripe-webhook',
-            views.CustomerBillingStripeWebHookView.as_view({'post': 'stripe_webhook'}),
-            name='stripe-webhook'
-        ),
-    ]
-
 urlpatterns += router.urls
