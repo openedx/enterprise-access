@@ -559,6 +559,10 @@ PROVISIONING_DEFAULTS = {
         'is_active': True,
         'product_id': 1,
         'for_internal_use_only': True,
+        'all_product_choices': [
+            (1, 'Standard Paid'),
+            (2, 'Trial'),
+        ],
         'trial_product_choices': [
             (1, 'Standard Paid'),
         ],
@@ -568,6 +572,9 @@ PROVISIONING_DEFAULTS = {
     },
     'catalog': {
         'catalog_query_id': 1,
+        'all_catalog_query_choices': [
+            (2, 'All open courses'),
+        ],
     },
 }
 
