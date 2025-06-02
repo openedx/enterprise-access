@@ -48,9 +48,9 @@ cachetools==6.0.0
     # via
     #   -r requirements/validation.txt
     #   tox
-cattrs==24.1.3
+cattrs==25.1.0
     # via -r requirements/validation.txt
-celery==5.5.2
+celery==5.5.3
     # via
     #   -r requirements/validation.txt
     #   django-celery-results
@@ -145,7 +145,7 @@ dictdiffer==0.9.0
     # via
     #   -r requirements/validation.txt
     #   pytest-dictsdiff
-diff-cover==9.3.1
+diff-cover==9.3.2
     # via -r requirements/dev.in
 dill==0.4.0
     # via
@@ -397,7 +397,7 @@ keyring==25.6.0
     # via
     #   -r requirements/validation.txt
     #   twine
-kombu==5.5.3
+kombu==5.5.4
     # via
     #   -r requirements/validation.txt
     #   celery
@@ -457,6 +457,7 @@ packaging==25.0
     #   -r requirements/validation.txt
     #   build
     #   drf-yasg
+    #   kombu
     #   pyproject-api
     #   pytest
     #   tox
@@ -597,7 +598,7 @@ readme-renderer==44.0
     # via
     #   -r requirements/validation.txt
     #   twine
-redis==6.1.0
+redis==6.2.0
     # via -r requirements/validation.txt
 referencing==0.36.2
     # via
@@ -687,7 +688,7 @@ stevedore==5.4.1
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
-stripe==12.1.0
+stripe==12.2.0
     # via -r requirements/validation.txt
 text-unidecode==1.3
     # via
@@ -704,6 +705,7 @@ twine==6.1.0
 typing-extensions==4.13.2
     # via
     #   -r requirements/validation.txt
+    #   cattrs
     #   django-countries
     #   edx-opaque-keys
     #   referencing

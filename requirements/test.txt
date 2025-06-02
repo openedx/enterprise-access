@@ -41,9 +41,9 @@ billiard==4.2.1
     #   celery
 cachetools==6.0.0
     # via tox
-cattrs==24.1.3
+cattrs==25.1.0
     # via -r requirements/base.txt
-celery==5.5.2
+celery==5.5.3
     # via
     #   -r requirements/base.txt
     #   django-celery-results
@@ -334,7 +334,7 @@ jsonschema-specifications==2025.4.1
     # via
     #   -r requirements/base.txt
     #   jsonschema
-kombu==5.5.3
+kombu==5.5.4
     # via
     #   -r requirements/base.txt
     #   celery
@@ -367,6 +367,7 @@ packaging==25.0
     # via
     #   -r requirements/base.txt
     #   drf-yasg
+    #   kombu
     #   pyproject-api
     #   pytest
     #   tox
@@ -470,7 +471,7 @@ pyyaml==6.0.2
     #   drf-spectacular
     #   drf-yasg
     #   edx-django-release-util
-redis==6.1.0
+redis==6.2.0
     # via -r requirements/base.txt
 referencing==0.36.2
     # via
@@ -536,7 +537,7 @@ stevedore==5.4.1
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
-stripe==12.1.0
+stripe==12.2.0
     # via -r requirements/base.txt
 text-unidecode==1.3
     # via
@@ -549,6 +550,7 @@ tox==4.26.0
 typing-extensions==4.13.2
     # via
     #   -r requirements/base.txt
+    #   cattrs
     #   django-countries
     #   edx-opaque-keys
     #   referencing
