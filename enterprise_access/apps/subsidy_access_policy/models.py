@@ -372,9 +372,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
     @property
     def bnr_enabled(self):
         """
-        Returns True if learner_credit_request_config exists, otherwise False.
+        Returns True if learner_credit_request_config exists and is active, otherwise False.
         """
-        return self.learner_credit_request_config and self.learner_credit_request_config.active
+        return bool(self.learner_credit_request_config and self.learner_credit_request_config.active)
 
     @classmethod
     def has_bnr_enabled_policy_for_enterprise(cls, enterprise_customer_uuid):
