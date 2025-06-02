@@ -194,6 +194,7 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
             'late_redemption_allowed_until',
             'is_late_redemption_allowed',
             'created',
+            'bnr_enabled',
         ]
         read_only_fields = fields
 

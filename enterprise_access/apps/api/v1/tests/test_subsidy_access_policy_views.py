@@ -324,7 +324,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'group_associations': [str(enterprise_group_uuid)],
             'late_redemption_allowed_until': None,
             'is_late_redemption_allowed': False,
-            'created': self.redeemable_policy.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+            'created': self.redeemable_policy.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+            'bnr_enabled': False,
         }, response.json())
 
     @ddt.data(
@@ -420,7 +421,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'group_associations': [],
                 'late_redemption_allowed_until': None,
                 'is_late_redemption_allowed': False,
-                'created': self.non_redeemable_policy.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+                'created': self.non_redeemable_policy.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                'bnr_enabled': False,
             },
             {
                 'access_method': 'direct',
@@ -453,6 +455,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'late_redemption_allowed_until': None,
                 'is_late_redemption_allowed': False,
                 'created': self.redeemable_policy.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+                'bnr_enabled': False,
             },
         ]
 
@@ -555,6 +558,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'late_redemption_allowed_until': None,
             'is_late_redemption_allowed': False,
             'created': self.redeemable_policy.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+            'bnr_enabled': False,
         }
         self.assertEqual(expected_response, response.json())
 
@@ -671,6 +675,7 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'group_associations': [],
             'is_late_redemption_allowed': False,
             'created': policy_for_edit.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+            'bnr_enabled': False,
         }
 
         if 'retired' in request_payload:
