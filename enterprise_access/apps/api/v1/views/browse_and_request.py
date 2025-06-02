@@ -720,6 +720,8 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
 
     subsidy_type = SubsidyTypeChoices.LEARNER_CREDIT
 
+    search_fields = ['user__email', 'course_title']
+
     def _validate_subsidy_request(self):
         """
         Validate request creation:
