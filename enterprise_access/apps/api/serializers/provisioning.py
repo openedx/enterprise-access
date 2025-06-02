@@ -3,6 +3,7 @@ Serializers for the provisioning app.
 """
 import logging
 
+from django.conf import settings
 from django_countries.serializer_fields import CountryField
 from rest_framework import serializers
 
@@ -56,7 +57,9 @@ class EnterpriseCatalogRequestSerializer(BaseSerializer):
     title = serializers.CharField(
         help_text='The name of the Enterprise Catalog.',
     )
-    catalog_query_id = serializers.IntegerField(
+    catalog_query_id = serializers.ChoiceField(
+        choices=settings.PROVISIONING_DEFAULTS['catalog']['all_catalog_query_choices'],
+        default=settings.PROVISIONING_DEFAULTS['subscription']['trial_catalog_query_choices'],
         help_text='The id of the related Catalog Query.',
     )
 
@@ -76,13 +79,29 @@ class SubscriptionPlanRequestSerializer(BaseSerializer):
     """
     Subscription Plan serializer for provisioning requests.
     """
-    title = serializers.CharField()
-    salesforce_opportunity_line_item = serializers.CharField()
-    start_date = serializers.DateTimeField()
-    expiration_date = serializers.DateTimeField()
-    product_id = serializers.IntegerField()
-    desired_num_licenses = serializers.IntegerField()
-    enterprise_catalog_uuid = serializers.UUIDField(required=False, allow_null=True)
+    title = serializers.CharField(
+        help_text='The title of the subscription plan.',
+    )
+    salesforce_opportunity_line_item = serializers.CharField(
+        help_text='The Salesforce Opportunity Line Item id associated with this subscription plan.',
+    )
+    start_date = serializers.DateTimeField(
+        help_text='The date and time at which the subscription plan becomes usable.',
+    )
+    expiration_date = serializers.DateTimeField(
+        help_text='The date and time at which the subscription plan becomes unusable.'
+    )
+    product_id = serializers.ChoiceField(
+        choices=settings.PROVISIONING_DEFAULTS['subscription']['all_product_choices'],
+        help_text='The internal edX Enterprise Subscription Product record.',
+    )
+    desired_num_licenses = serializers.IntegerField(
+        help_text='The number of licenses to create for this plan.'
+    )
+    enterprise_catalog_uuid = serializers.UUIDField(
+        required=False, allow_null=True, default=None,
+        help_text='Optional. The enterprise catalog uuid associated with this subscription plan.',
+    )
 
 
 class ProvisioningRequestSerializer(BaseSerializer):
@@ -101,6 +120,8 @@ class ProvisioningRequestSerializer(BaseSerializer):
     )
     customer_agreement = CustomerAgreementRequestSerializer(
         help_text='Object describing the requested Customer Agreement.',
+        required=False,
+        allow_null=True,
     )
     subscription_plan = SubscriptionPlanRequestSerializer()
 
