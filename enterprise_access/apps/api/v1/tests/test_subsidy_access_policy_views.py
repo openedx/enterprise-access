@@ -1791,7 +1791,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
         learner_credit_config.save()
 
         response = self.client.get(url, query_params)
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
         response_data = response.json()
         self.assertFalse(response_data.get('can_request'))
         self.assertEqual(response_data.get('reason'), 'No policies with BnR enabled found')
@@ -1805,7 +1805,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             return_value=False
         ):
             response = self.client.get(url, query_params)
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
         response_data = response.json()
         self.assertFalse(response_data.get('can_request'))
         self.assertEqual(response_data.get('reason'), REASON_CONTENT_NOT_IN_CATALOG)
@@ -1827,7 +1827,7 @@ class TestSubsidyAccessPolicyRedeemViewset(APITestWithMocks):
             return_value=True
         ):
             response = self.client.get(url, query_params)
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
         response_data = response.json()
         self.assertFalse(response_data.get('can_request'))
         self.assertIn("already have an active request", response_data.get('reason'))
