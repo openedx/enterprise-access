@@ -366,7 +366,13 @@ class LearnerCreditRequest(SubsidyRequest):
             models.UniqueConstraint(
                 fields=['user', 'enterprise_customer_uuid', 'course_id'],
                 name='unique_learner_course_request',
-                condition=models.Q(state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.PENDING]),
+                condition=models.Q(
+                    state__in=[
+                        SubsidyRequestStates.REQUESTED,
+                        SubsidyRequestStates.APPROVED,
+                        SubsidyRequestStates.ERROR,
+                        SubsidyRequestStates.ACCEPTED
+                    ]),
             )
         ]
 

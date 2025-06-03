@@ -756,7 +756,12 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
             user__lms_user_id=self.lms_user_id,
             enterprise_customer_uuid=enterprise_customer_uuid,
             course_id=course_id,
-            state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.APPROVED]
+            state__in=[
+                SubsidyRequestStates.REQUESTED,
+                SubsidyRequestStates.APPROVED,
+                SubsidyRequestStates.ACCEPTED,
+                SubsidyRequestStates.ERROR
+            ]
         ).exists():
             error_msg = (
                 f"You already have an active learner credit request for course {course_id} "

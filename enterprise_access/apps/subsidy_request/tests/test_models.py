@@ -117,6 +117,7 @@ class CouponCodeRequestTests(TestCaseWithMockedDiscoveryApiClient):
         assert self.mock_discovery_client.call_count == original_call_count + 1
 
 
+@ddt.ddt
 class LearnerCreditRequestTests(TestCase):
     """
     Test cases for the LearnerCreditRequest model.
@@ -170,7 +171,7 @@ class LearnerCreditRequestTests(TestCase):
         """
         Ensure validation fails if a reviewed request lacks a reviewer and timestamp.
         """
-        self.learner_credit_request.state = SubsidyRequestStates.PENDING
+        self.learner_credit_request.state = SubsidyRequestStates.APPROVED
         self.learner_credit_request.reviewed_at = None
         self.learner_credit_request.reviewer = None
         with self.assertRaises(ValidationError):
@@ -181,7 +182,7 @@ class LearnerCreditRequestTests(TestCase):
         Ensure validation succeeds when a reviewed request has both reviewer and timestamp.
         """
         reviewer = UserFactory()
-        self.learner_credit_request.state = SubsidyRequestStates.PENDING
+        self.learner_credit_request.state = SubsidyRequestStates.APPROVED
         self.learner_credit_request.reviewed_at = datetime.now()
         self.learner_credit_request.reviewer = reviewer
         try:
@@ -189,17 +190,23 @@ class LearnerCreditRequestTests(TestCase):
         except ValidationError:
             self.fail("ValidationError raised unexpectedly!")
 
-    def test_unique_constraint(self):
+    @ddt.data(
+        SubsidyRequestStates.REQUESTED,
+        SubsidyRequestStates.APPROVED,
+        SubsidyRequestStates.ERROR,
+        SubsidyRequestStates.ACCEPTED,
+    )
+    def test_unique_constraint(self, state):
         """
         Ensure that a LearnerCreditRequest cannot be created with the same user, course_id,
-        and enterprise_customer_uuid in REQUESTED or PENDING state.
+        and enterprise_customer_uuid in REQUESTED, APPROVED, ERROR or ACCEPTED state.
         """
         with self.assertRaises(Exception):
             LearnerCreditRequest.objects.create(
                 user=self.user,
                 course_id="edX+DemoX",
                 enterprise_customer_uuid=self.enterprise_customer_uuid,
-                state=SubsidyRequestStates.REQUESTED,
+                state=state,
                 subsidy_access_policy=self.subsidy_access_policy
             )
 
