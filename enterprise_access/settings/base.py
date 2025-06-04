@@ -549,8 +549,6 @@ BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_85_CAMPAIGN = ''
 SALES_CONTRACT_REFERENCE_PROVIDER_NAME = 'Salesforce OpportunityLineItem'
 SALES_CONTRACT_REFERENCE_PROVIDER_SLUG = 'salesforce_opportunity_line_item'
 
-# Settings for creation of enterprise customers
-
 PROVISIONING_DEFAULTS = {
     'customer': {
         'site_domain': 'example.com',
@@ -578,6 +576,13 @@ PROVISIONING_DEFAULTS = {
     },
 }
 
+# Add a mapping from product_id to catalog_query_id
+PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING = {
+    1: 1,  # Product 1 maps to catalog query 1
+    2: 2,
+    # Add more mappings as needed
+}
+
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
@@ -603,5 +608,6 @@ SSP_PRODUCTS = {
 
 # Enable the customer billing API endpoints under /api/v1/customer-billing/*
 ENABLE_CUSTOMER_BILLING_API = False
+STRIPE_API_KEY = None
 
 ################# End Self-Service Purchasing (SSP) settings #################
