@@ -359,7 +359,7 @@ class LearnerCreditRequest(SubsidyRequest):
         help_text="The learner credit request configuration associated with this request.",
     )
 
-    amount = models.BigIntegerField(
+    course_price = models.BigIntegerField(
         null=True,
         blank=True,
         help_text="Cost of the content in USD Cents.",
@@ -372,7 +372,13 @@ class LearnerCreditRequest(SubsidyRequest):
             models.UniqueConstraint(
                 fields=['user', 'enterprise_customer_uuid', 'course_id'],
                 name='unique_learner_course_request',
-                condition=models.Q(state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.PENDING]),
+                condition=models.Q(
+                    state__in=[
+                        SubsidyRequestStates.REQUESTED,
+                        SubsidyRequestStates.APPROVED,
+                        SubsidyRequestStates.ERROR,
+                        SubsidyRequestStates.ACCEPTED
+                    ]),
             )
         ]
 

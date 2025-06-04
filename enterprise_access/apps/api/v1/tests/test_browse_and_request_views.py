@@ -1651,7 +1651,8 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         payload = {
             'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
             'course_id': 'course-v1:edX+DemoX+Demo_Course',
-            'policy_uuid': disabled_policy.uuid
+            'policy_uuid': disabled_policy.uuid,
+            'course_price': 1000
         }
         response = self.client.post(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, payload)
 
@@ -1677,7 +1678,8 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         payload = {
             'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
             'course_id': 'course-v1:edX+DemoX+Demo_Course',
-            'policy_uuid': self.policy.uuid
+            'policy_uuid': self.policy.uuid,
+            'course_price': 1000
         }
         response = self.client.post(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, payload)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
@@ -1693,7 +1695,8 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         payload = {
             'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
             'course_id': 'course-v1:edX+DemoX+Demo_Course',
-            'policy_uuid': self.policy.uuid
+            'policy_uuid': self.policy.uuid,
+            'course_price': 1000
         }
         response = self.client.post(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, payload)
         assert response.status_code == status.HTTP_201_CREATED
@@ -1705,6 +1708,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         assert request.course_id == 'course-v1:edX+DemoX+Demo_Course'
         assert request.state == SubsidyRequestStates.REQUESTED
         assert request.learner_credit_request_config == self.learner_credit_config
+        assert request.course_price == 1000
 
     def test_overview_happy_path(self):
         """

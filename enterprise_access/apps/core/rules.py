@@ -515,12 +515,6 @@ rules.add_perm(
     has_implicit_access_to_provisioning_admin,
 )
 
-# Grants billing plan creation permissions to operators only.
-rules.add_perm(
-    constants.CUSTOMER_BILLING_CREATE_PLAN_PERMISSION,
-    has_customer_billing_operator_access,
-)
-
 # Grants billing plan "create portal session" permissions to operators+admins.
 rules.add_perm(
     constants.CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,

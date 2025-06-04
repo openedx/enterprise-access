@@ -16,7 +16,11 @@ from .content_assignments.assignment_configuration import (
     AssignmentConfigurationResponseSerializer,
     AssignmentConfigurationUpdateRequestSerializer
 )
-from .customer_billing import CustomerBillingCreatePlanRequestSerializer
+from .customer_billing import (
+    CustomerBillingCreateCheckoutSessionRequestSerializer,
+    CustomerBillingCreateCheckoutSessionSuccessResponseSerializer,
+    CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer
+)
 from .provisioning import ProvisioningRequestSerializer, ProvisioningResponseSerializer
 from .subsidy_access_policy import (
     GroupMemberWithAggregatesRequestSerializer,

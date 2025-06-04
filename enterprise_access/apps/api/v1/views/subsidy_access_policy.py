@@ -952,7 +952,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             return Response({
                 'can_request': False,
                 'reason': 'No policies with BnR enabled found'
-            }, status=400)
+            }, status=status.HTTP_200_OK)
 
         # 2. Check if content exists in catalogs for BnR enabled policies
         # Filter policies to those that contain the content key in their catalog
@@ -967,7 +967,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
             return Response({
                 'can_request': False,
                 'reason': REASON_CONTENT_NOT_IN_CATALOG
-            }, status=400)
+            }, status=status.HTTP_200_OK)
 
         # 3. Check for existing pending request by this learner
         existing_request = LearnerCreditRequest.objects.filter(
@@ -982,7 +982,7 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
                 'can_request': False,
                 'reason': f"You already have an active request for this course in state: {existing_request.state}",
                 'existing_request': str(existing_request.uuid)
-            }, status=400)
+            }, status=status.HTTP_200_OK)
 
         # Sort policies to find the best one for redemption
         requestable_policy = sort_subsidy_access_policies_for_redemption(valid_policies)[0]
