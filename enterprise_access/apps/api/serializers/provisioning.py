@@ -117,6 +117,8 @@ class ProvisioningRequestSerializer(BaseSerializer):
     )
     enterprise_catalog = EnterpriseCatalogRequestSerializer(
         help_text='Object describing the requested Enterprise Catalog.',
+        required=False,
+        allow_null=True,
     )
     customer_agreement = CustomerAgreementRequestSerializer(
         help_text='Object describing the requested Customer Agreement.',
