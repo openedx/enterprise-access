@@ -1,5 +1,5 @@
 """
-REST API views for the Stripe PoC.
+REST API views for the billing provider (Stripe) integration.
 """
 import json
 import logging
@@ -7,6 +7,7 @@ import logging
 import requests
 import stripe
 from django.conf import settings
+from django.http import HttpResponseServerError
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import extend_schema
 from edx_rbac.decorators import permission_required
@@ -17,9 +18,10 @@ from rest_framework.response import Response
 
 from enterprise_access.apps.api import serializers
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
-from enterprise_access.apps.core.constants import (
-    CUSTOMER_BILLING_CREATE_PLAN_PERMISSION,
-    CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION
+from enterprise_access.apps.core.constants import CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION
+from enterprise_access.apps.customer_billing.api import (
+    CreateCheckoutSessionValidationError,
+    create_free_trial_checkout_session
 )
 
 stripe.api_key = settings.STRIPE_API_KEY
@@ -28,28 +30,36 @@ logger = logging.getLogger(__name__)
 CUSTOMER_BILLING_API_TAG = 'Customer Billing'
 
 
-class CustomerBillingStripeWebHookView(viewsets.ViewSet):
+class CustomerBillingViewSet(viewsets.ViewSet):
     """
-    Viewset supporting the Stripe WebHook to receive events.
+    Viewset supporting operations pertaining to customer billing.
     """
-    # This unauthenticated endpoint will rely on view logic to perform authentication via signature validation.
-    permission_classes = (permissions.AllowAny,)
+    authentication_classes = (JwtAuthentication,)
+    permission_classes = (permissions.IsAuthenticated,)
 
     @extend_schema(
         tags=[CUSTOMER_BILLING_API_TAG],
         summary='Listen for events from Stripe.',
     )
-    @action(detail=False, methods=['post'])
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='stripe-webhook',
+        # Authentication performed via signature validation.
+        # TODO: Move inline authentication logic to custom authentication class which returns a
+        # configured Stripe system user.
+        authentication_classes=(),
+        # TODO: After adopting a custom authentication class, replace this permission class with one
+        # that reads the request.user and validates it against the configured system user representing
+        # Stripe.
+        permission_classes=(permissions.AllowAny,),
+    )
     @csrf_exempt
-    def stripe_webhook(self, request, *args, **kwargs):
+    def stripe_webhook(self, request):
         """
         Listen for events from Stripe, and take specific actions. Typically the action is to send a confirmation email.
 
-        PoC Notes:
-        * For a real production implementation we should implement signature validation:
-          - https://docs.stripe.com/webhooks/signature
-          - This endpoint is un-authenticated, so the only defense we have against spoofed events is signature
-            validation.
+        TODO:
         * For a real production implementation we should implement event de-duplication:
           - https://docs.stripe.com/webhooks/process-undelivered-events
           - This is a safeguard against the remote possibility that an event is sent twice. This could happen if the
@@ -60,7 +70,9 @@ class CustomerBillingStripeWebHookView(viewsets.ViewSet):
         payload = request.body
         event = None
 
+        # TODO: move inline authentication logic into a custom authentication class.
         try:
+            # TODO: migrate deprecated `construct_from()` call to newer `construct_event()`.
             event = stripe.Event.construct_from(json.loads(payload), stripe.api_key)
         except ValueError:
             return Response(
@@ -82,82 +94,102 @@ class CustomerBillingStripeWebHookView(viewsets.ViewSet):
 
         return Response(status=status.HTTP_200_OK)
 
-
-class CustomerBillingViewSet(viewsets.ViewSet):
-    """
-    Viewset supporting all operations pertaining to customer billing.
-    """
-    permission_classes = (permissions.IsAuthenticated,)
-    authentication_classes = (JwtAuthentication,)
-
     @extend_schema(
         tags=[CUSTOMER_BILLING_API_TAG],
-        summary='Create a new billing plan given form data from a prospective customer, and return an invoice.',
-        request=serializers.CustomerBillingCreatePlanRequestSerializer,
+        summary='Create a new checkout session given form data from a prospective customer.',
+        request=serializers.CustomerBillingCreateCheckoutSessionRequestSerializer,
+        responses={
+            status.HTTP_201_CREATED: serializers.CustomerBillingCreateCheckoutSessionSuccessResponseSerializer,
+            status.HTTP_422_UNPROCESSABLE_ENTITY: (
+                serializers.CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer
+            ),
+        },
     )
-    @action(detail=False, methods=['post'])
-    @permission_required(CUSTOMER_BILLING_CREATE_PLAN_PERMISSION)
-    def create_plan(self, request, *args, **kwargs):
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='create-checkout-session',
+    )
+    def create_checkout_session(self, request, *args, **kwargs):
         """
-        Create a new billing plan (as a free trial).  Response dict is a pass-through Stripe Checkout Session object.
+        Create a new Stripe checkout session for a free trial and return it's client_secret.
 
-        Response structure defined here: https://docs.stripe.com/api/checkout/sessions/create
+        Notes:
+        * This endpoint is designed to be called AFTER logistration, but BEFORE displaying a payment entry form.  A
+          Stripe "Checkout Session" object is a prerequisite to rendering the Stripe embedded component for payment
+          entry.
+        * The @permission_required() decorator has NOT been added. This endpoint only requires an authenticated LMS
+          user, which is more permissive than our usual requirement for a user with an enterprise role.
+        * This endpoint is NOT idempotent and will create new checkout sessions on each subsequent call.
+          TODO: introduce an idempotency key and a new model to hold pending requests.
+
+        Request/response structure:
+
+            POST /api/v1/customer-billing/create_checkout_session
+            >>> {
+            >>>     "admin_email": "dr@evil.inc",
+            >>>     "enterprise_slug": "my-sluggy"
+            >>>     "quantity": 7,
+            >>>     "stripe_price_id": "price_1MoBy5LkdIwHu7ixZhnattbh"
+            >>> }
+            HTTP 201 CREATED
+            >>> {
+            >>>     "checkout_session_client_secret": "cs_Hu7ixZhnattbh1MoBy5LkdIw"
+            >>> }
+            HTTP 422 UNPROCESSABLE ENTITY (only admin_email validation failed)
+            >>> {
+            >>>     "admin_email": {
+            >>>         "error_code": "not_registered",
+            >>>         "developer_message": "The provided email has not yet been registered."
+            >>>     }
+            >>> }
+            HTTP 422 UNPROCESSABLE ENTITY (only enterprise_slug validation failed)
+            >>> {
+            >>>     "enterprise_slug": {
+            >>>         "error_code": "existing_enterprise_customer_for_admin",
+            >>>         "developer_message": "Slug invalid: Admin belongs to existing customer..."
+            >>>     }
+            >>> }
         """
-        serializer = serializers.CustomerBillingCreatePlanRequestSerializer(data=request.data)
+        serializer = serializers.CustomerBillingCreateCheckoutSessionRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         validated_data = serializer.validated_data
-        form_email = validated_data['email']
-        form_slug = validated_data['slug']
-        form_num_licenses = validated_data['num_licenses']
-        form_stripe_price_id = validated_data['stripe_price_id']
 
-        lms_client = LmsApiClient()
-
-        # First, try to get the enterprise customer data. For this PoC, I'm not prepared to support existing customers,
-        # so block the request if that happens.
-        enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_slug=form_slug)
-        if enterprise_customer_data:
-            message = f'Existing customer found for slug {form_slug}. Cannot create plan.'
-            logger.warning(message)
-            return Response(message, status=status.HTTP_403_FORBIDDEN)
-        else:
-            logger.info(f'No existing customer found for slug {form_slug}. Creating plan.')
-
-        # Eagerly find an existing Stripe customer if one already exists with the same email.
-        stripe_customer_search_result = stripe.Customer.search(query=f"email: '{form_email}'")
-        found_stripe_customer_by_email = next(iter(stripe_customer_search_result['data']), None)
-
-        checkout_session = stripe.checkout.Session.create(
-            # Passing None to ``customer`` causes Stripe to create a new one, so try first to use an existing customer.
-            customer=found_stripe_customer_by_email['id'] if found_stripe_customer_by_email else None,
-            mode="subscription",
-            # Avoid needing to create custom frontends for PoC by using a hosted checkout page.
-            ui_mode="custom",
-            # This normally wouldn't work because the customer doesn't exist yet --- I'd propose we modify the admin
-            # portal to support an empty state with a message like "turning cogs, check back later." if there's no
-            # Enterprise Customer but there is a Stripe Customer.
-            return_url=f"https://portal.edx.org/{form_slug}",
-            line_items=[{
-                "price": form_stripe_price_id,
-                "quantity": form_num_licenses,
-            }],
-            # Defer payment collection until the last moment, then cancel
-            # the subscription if payment info has not been submitted.
-            subscription_data={
-                "trial_period_days": 7,
-                "trial_settings": {
-                    "end_behavior": {"missing_payment_method": "cancel"},
-                },
-            },
+        # Simplify tracking create_plan requests using k="v" machine-readable formatting.
+        logger.info(
+            'Handling request to create free trial plan. '
+            f'enterprise_slug="{validated_data["enterprise_slug"]}" '
+            f'quantity="{validated_data["quantity"]}" '
+            f'stripe_price_id="{validated_data["stripe_price_id"]}"'
         )
-        return Response(checkout_session, status=status.HTTP_201_CREATED)
+        try:
+            session = create_free_trial_checkout_session(**serializer.validated_data)
+        except CreateCheckoutSessionValidationError as exc:
+            response_serializer = serializers.CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer(
+                data=exc.validation_errors_by_field,
+            )
+            if not response_serializer.is_valid():
+                return HttpResponseServerError()
+            return Response(response_serializer.data, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        response_serializer = serializers.CustomerBillingCreateCheckoutSessionSuccessResponseSerializer(
+            data={'checkout_session_client_secret': session.client_secret},
+        )
+        if not response_serializer.is_valid():
+            return HttpResponseServerError()
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         tags=[CUSTOMER_BILLING_API_TAG],
         summary='Create a new Customer Portal Session.',
     )
-    @action(detail=True, methods=['get'])
+    @action(
+        detail=True,
+        methods=['get'],
+        url_path='create-portal-session',
+    )
+    # UUID in path is used as the "permission object" for role-based auth.
     @permission_required(CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION, fn=lambda request, pk: pk)
     def create_portal_session(self, request, pk=None, **kwargs):
         """
@@ -179,4 +211,5 @@ class CustomerBillingViewSet(viewsets.ViewSet):
             return_url=f"https://portal.edx.org/{enterprise_customer_data['slug']}",
         )
 
+        # TODO: pull out session fields actually needed, and structure a response.
         return Response(customer_portal_session, status=status.HTTP_200_OK)
