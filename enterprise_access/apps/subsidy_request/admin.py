@@ -188,6 +188,7 @@ class LearnerCreditRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
     fields = (
         'assignment',
         'learner_credit_request_config',
+        'course_price',
     )
 
     class Meta:
