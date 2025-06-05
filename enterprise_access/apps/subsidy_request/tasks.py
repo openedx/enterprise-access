@@ -28,11 +28,11 @@ def _get_course_partners(course_data):
 
 
 @shared_task(base=LoggedTaskWithRetry)
-def update_course_info_for_subsidy_request_task(subsidy_type, subsidy_request_uuid):
+def update_course_info_for_subsidy_request_task(model_name, subsidy_request_uuid):
     """
     Get course info (e.g. title, partners) from lms and update subsidy_request with it.
     """
-    subsidy_model = get_subsidy_model(subsidy_type)
+    subsidy_model = apps.get_model('subsidy_request', model_name)
     subsidy_request = subsidy_model.objects.get(uuid=subsidy_request_uuid)
 
     discovery_client = DiscoveryApiClient()
