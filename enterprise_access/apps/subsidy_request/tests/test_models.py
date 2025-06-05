@@ -14,7 +14,12 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
 )
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest, LearnerCreditRequestConfiguration
-from enterprise_access.apps.subsidy_request.tests.factories import CouponCodeRequestFactory, LicenseRequestFactory
+from enterprise_access.apps.subsidy_request.tasks import update_course_info_for_subsidy_request_task
+from enterprise_access.apps.subsidy_request.tests.factories import (
+    CouponCodeRequestFactory,
+    LearnerCreditRequestFactory,
+    LicenseRequestFactory
+)
 from test_utils import TestCaseWithMockedDiscoveryApiClient
 
 now = datetime.utcnow()
@@ -71,11 +76,12 @@ class LicenseRequestTests(TestCaseWithMockedDiscoveryApiClient):
         original_call_count = self.mock_discovery_client.call_count
 
         subsidy = LicenseRequestFactory(course_title=None, course_partners=None)
-        assert self.mock_discovery_client.call_count == original_call_count + 1
+        update_course_info_for_subsidy_request_task("LicenseRequest", str(subsidy.uuid))
 
         subsidy.refresh_from_db()
-        subsidy.save()
-        assert self.mock_discovery_client.call_count == original_call_count + 1
+        assert subsidy.course_title is not None
+        assert subsidy.course_partners is not None
+        assert self.mock_discovery_client.call_count > original_call_count
 
 
 @ddt.ddt
@@ -110,11 +116,12 @@ class CouponCodeRequestTests(TestCaseWithMockedDiscoveryApiClient):
         original_call_count = self.mock_discovery_client.call_count
 
         subsidy = CouponCodeRequestFactory(course_title=None, course_partners=None)
-        assert self.mock_discovery_client.call_count == original_call_count + 1
+        update_course_info_for_subsidy_request_task("CouponCodeRequest", str(subsidy.uuid))
 
         subsidy.refresh_from_db()
-        subsidy.save()
-        assert self.mock_discovery_client.call_count == original_call_count + 1
+        assert subsidy.course_title is not None
+        assert subsidy.course_partners is not None
+        assert self.mock_discovery_client.call_count > original_call_count
 
 
 @ddt.ddt
@@ -209,6 +216,18 @@ class LearnerCreditRequestTests(TestCase):
                 state=state,
                 subsidy_access_policy=self.subsidy_access_policy
             )
+
+    def test_update_course_info_from_discovery(self):
+        """
+        course data should be fetched from discovery if not set on subsidy object
+        during a save().
+        """
+
+        subsidy = LearnerCreditRequestFactory(course_title=None, course_partners=None)
+        update_course_info_for_subsidy_request_task("LearnerCreditRequest", str(subsidy.uuid))
+        subsidy.refresh_from_db()
+        assert subsidy.course_title is not None
+        assert subsidy.course_partners is not None
 
 
 class LearnerCreditRequestConfigurationTests(TestCase):

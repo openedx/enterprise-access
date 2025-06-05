@@ -291,26 +291,6 @@ class SubsidyRequestCustomerConfiguration(TimeStampedModel):
         self.changed_by = value
 
 
-@receiver(models.signals.post_save, sender=CouponCodeRequest)
-@receiver(models.signals.post_save, sender=LicenseRequest)
-def update_course_info_for_subsidy_request(sender, **kwargs):  # pylint: disable=unused-argument
-    """ Post save hook to grab course info from discovery service """
-
-    subsidy_request = kwargs['instance']
-    if subsidy_request.course_title and subsidy_request.course_partners:
-        return
-
-    if isinstance(subsidy_request, CouponCodeRequest):
-        subsidy_type = SubsidyTypeChoices.COUPON
-    else:
-        subsidy_type = SubsidyTypeChoices.LICENSE
-
-    update_course_info_for_subsidy_request_task.delay(
-        subsidy_type,
-        str(subsidy_request.uuid),
-    )
-
-
 class LearnerCreditRequestConfiguration(TimeStampedModel):
     """
     Stores configuration for learner credit requests.
@@ -396,3 +376,18 @@ class LearnerCreditRequest(SubsidyRequest):
         self.decline_reason = reason
         self.reviewed_at = localized_utcnow()
         self.save()
+
+
+@receiver(models.signals.post_save, sender=CouponCodeRequest)
+@receiver(models.signals.post_save, sender=LicenseRequest)
+@receiver(models.signals.post_save, sender=LearnerCreditRequest)
+def update_course_info_for_subsidy_request(sender, **kwargs):
+    subsidy_request = kwargs['instance']
+    if subsidy_request.course_title and subsidy_request.course_partners:
+        return
+
+    model_name = subsidy_request.__class__.__name__
+    update_course_info_for_subsidy_request_task.delay(
+        model_name,
+        str(subsidy_request.uuid),
+    )
