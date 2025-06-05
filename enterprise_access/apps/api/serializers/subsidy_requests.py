@@ -152,12 +152,18 @@ class LearnerCreditRequestSerializer(SubsidyRequestSerializer):
         required=False,
         allow_null=True,
     )
+    course_price = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Cost of the content in USD Cents.",
+    )
 
     class Meta:
         model = LearnerCreditRequest
         fields = SubsidyRequestSerializer.Meta.fields + [
             "learner_credit_request_config",
             "assignment",
+            "course_price",
         ]
         read_only_fields = SubsidyRequestSerializer.Meta.read_only_fields
         extra_kwargs = SubsidyRequestSerializer.Meta.extra_kwargs

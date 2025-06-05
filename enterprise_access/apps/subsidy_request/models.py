@@ -359,6 +359,12 @@ class LearnerCreditRequest(SubsidyRequest):
         help_text="The learner credit request configuration associated with this request.",
     )
 
+    course_price = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="Cost of the content in USD Cents.",
+    )
+
     history = HistoricalRecords()
 
     class Meta:
