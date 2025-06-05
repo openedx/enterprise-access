@@ -54,8 +54,8 @@ class ProvisioningCreateView(PermissionRequiredMixin, generics.CreateAPIView):
             record.get('user_email')
             for record in request_serializer.validated_data['pending_admins']
         ]
-        catalog_request_data = request_serializer.validated_data['enterprise_catalog']
-        customer_agreement_data = request_serializer.validated_data['customer_agreement']
+        catalog_request_data = request_serializer.validated_data.get('enterprise_catalog')
+        customer_agreement_data = request_serializer.validated_data.get('customer_agreement')
         subscription_plan_data = request_serializer.validated_data['subscription_plan']
 
         workflow_input_dict = ProvisionNewCustomerWorkflow.generate_input_dict(

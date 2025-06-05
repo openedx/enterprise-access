@@ -511,6 +511,65 @@ class TestProvisioningEndToEnd(APITest):
         else:
             self.assertFalse(mock_client.create_enterprise_catalog.called)
 
+    @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_customer_agreement')
+    @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
+    def test_catalog_created_with_generated_title_and_inferred_query_id(
+        self, mock_lms_api_client, mock_create_agreement
+    ):
+        """
+        Tests the case where no enterprise_catalog is provided in the request payload.
+        The catalog title should be generated from the customer name, and the
+        catalog_query_id should be inferred from the subscription plan's product_id.
+        """
+        # Setup mocks
+        mock_client = mock_lms_api_client.return_value
+        mock_client.get_enterprise_customer_data.return_value = DEFAULT_CUSTOMER_RECORD
+        mock_client.get_enterprise_admin_users.return_value = []
+        mock_client.get_enterprise_pending_admin_users.return_value = []
+        mock_client.get_enterprise_catalogs.return_value = []  # No existing catalogs
+
+        # Expected catalog record with generated title and inferred query_id
+        expected_created_catalog = {
+            'uuid': str(TEST_CATALOG_UUID),
+            'enterprise_customer': str(TEST_ENTERPRISE_UUID),
+            'title': 'Test customer Subscription Catalog',  # Generated from customer name
+            'enterprise_catalog_query': 42,   # Inferred from product_id 1 mapping, see settings/test.py
+        }
+        mock_client.create_enterprise_catalog.return_value = expected_created_catalog
+
+        mock_create_agreement.return_value = DEFAULT_AGREEMENT_RECORD
+
+        # Create request payload WITHOUT enterprise_catalog section
+        request_payload = {**DEFAULT_REQUEST_PAYLOAD}
+        request_payload.pop('enterprise_catalog')
+
+        response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
+
+        # Assertions
+        assert response.status_code == status.HTTP_201_CREATED
+        actual_response_payload = response.json()
+
+        expected_catalog_response = {
+            'uuid': str(TEST_CATALOG_UUID),
+            'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID),
+            'title': 'Test customer Subscription Catalog',
+            'catalog_query_id': 42,
+        }
+
+        self.assertEqual(
+            actual_response_payload['enterprise_catalog'],
+            expected_catalog_response,
+        )
+        mock_client.get_enterprise_catalogs.assert_called_once_with(
+            enterprise_customer_uuid=str(TEST_ENTERPRISE_UUID),
+            catalog_query_id=42,  # Should use the inferred catalog_query_id
+        )
+        mock_client.create_enterprise_catalog.assert_called_once_with(
+            enterprise_customer_uuid=str(TEST_ENTERPRISE_UUID),
+            catalog_title='Test customer Subscription Catalog',  # Should use generated title
+            catalog_query_id=42,  # Should use the inferred catalog_query_id
+        )
+
     @ddt.data(
         # Case: No agreement exists, must create
         {

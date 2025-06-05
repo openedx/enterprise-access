@@ -2,9 +2,11 @@
 Workflow models for the customer-and-subsidy-provisioning business domain.
 """
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
 from attrs import define, field, validators
+from django.conf import settings
 from django_countries import countries
 
 from enterprise_access.apps.workflow.exceptions import UnitOfWorkException
@@ -170,8 +172,8 @@ class GetCreateCatalogStepInput(BaseInputOutput):
     """
     KEY = 'create_catalog_input'
 
-    title: str = field(validator=is_str)
-    catalog_query_id: int = field(validator=is_int)
+    title: Optional[str] = field(default=None, validator=validators.optional(is_str))
+    catalog_query_id: Optional[int] = field(default=None, validator=validators.optional(is_int))
 
 
 @define
@@ -214,16 +216,51 @@ class GetCreateCatalogStep(AbstractWorkflowStep):
         Returns:
           An instance of ``self.output_class``.
         """
-        input_object = self.input_object
         customer_uuid_str = str(accumulated_output.create_customer_output.uuid)
+        customer_name = accumulated_output.create_customer_output.name
+
+        workflow_input = self.get_workflow_record().input_object
+
         result_dict = get_or_create_enterprise_catalog(
             enterprise_customer_uuid=customer_uuid_str,
-            catalog_title=input_object.title,
-            catalog_query_id=input_object.catalog_query_id
+            catalog_title=self._get_catalog_title(workflow_input, customer_name),
+            catalog_query_id=self._get_catalog_query_id(workflow_input),
         )
+
         result_dict['enterprise_customer_uuid'] = result_dict['enterprise_customer']
         result_dict['catalog_query_id'] = result_dict['enterprise_catalog_query']
         return self.output_class.from_dict(result_dict)
+
+    def _get_catalog_title(self, workflow_input, customer_name):
+        """
+        Generate a title if not provided in workflow input.
+        """
+        if (title_input := self.input_object.title):
+            return title_input
+
+        subsidy_type = getattr(workflow_input.create_subscription_plan_input, 'SUBSIDY_TYPE', '')
+        if subsidy_type:
+            subsidy_type = ' ' + subsidy_type
+        return f"{customer_name}{subsidy_type} Catalog"
+
+    def _get_catalog_query_id(self, workflow_input):
+        """
+        If not provided in the workflow input, helps infer the catalog_query_id
+        based on subscription plan product id.
+        """
+        # Determine catalog_query_id
+        if (catalog_query_id_input := self.input_object.catalog_query_id):
+            return catalog_query_id_input
+
+        # Need to get product_id from subscription plan input to infer catalog_query_id
+        product_id = workflow_input.create_subscription_plan_input.product_id
+
+        if product_id and product_id in settings.PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING:
+            return settings.PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING[product_id]
+        else:
+            raise CreateCatalogStepException(
+                f"Cannot infer catalog_query_id: product_id {product_id} not found in mapping"
+            )
 
     def get_workflow_record(self):
         return ProvisionNewCustomerWorkflow.objects.filter(
@@ -250,7 +287,7 @@ class GetCreateCustomerAgreementStepInput(BaseInputOutput):
     """
     KEY = 'create_customer_agreement_input'
 
-    default_catalog_uuid: UUID = field(default=None, validator=validators.optional(is_uuid))
+    default_catalog_uuid: Optional[UUID] = field(default=None, validator=validators.optional(is_uuid))
 
 
 @define
@@ -322,6 +359,7 @@ class GetCreateSubscriptionPlanStepInput(BaseInputOutput):
     a Subscription Plan
     """
     KEY = 'create_subscription_plan_input'
+    SUBSIDY_TYPE = 'Subscription'
 
     title: str = field(validator=is_str)
     salesforce_opportunity_line_item: str = field(validator=is_str)
@@ -427,8 +465,8 @@ class ProvisionNewCustomerWorkflow(AbstractWorkflow):
             GetCreateEnterpriseAdminUsersInput.KEY: {
                 'user_emails': admin_email_list,
             },
-            GetCreateCatalogStepInput.KEY: catalog_request_dict,
-            GetCreateCustomerAgreementStepInput.KEY: customer_agreement_request_dict,
+            GetCreateCatalogStepInput.KEY: catalog_request_dict or {},
+            GetCreateCustomerAgreementStepInput.KEY: customer_agreement_request_dict or {},
             GetCreateSubscriptionPlanStepInput.KEY: subscription_plan_request_dict,
         }
 
