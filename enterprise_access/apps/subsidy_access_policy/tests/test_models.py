@@ -3,7 +3,7 @@ Tests for subsidy_access_policy models.
 """
 import contextlib
 from datetime import datetime, timedelta
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, MagicMock, PropertyMock, patch
 from uuid import uuid4
 
 import ddt
@@ -852,6 +852,85 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         )
         policy.refresh_from_db()
         assert policy.spend_limit == expected_spend_limit
+
+    def test_per_learner_spend_policy_can_redeem_with_bnr_enabled(self):
+        """
+        Test that PerLearnerSpendCreditAccessPolicy.can_redeem correctly delegates
+        to a new instance of AssignedLearnerCreditAccessPolicy when bnr_enabled is True.
+        """
+        policy = self.per_learner_spend_policy
+        mock_return_value = (True, None, [])
+
+        # This mock instance will be returned by the patched constructor
+        mock_assigned_policy_instance = MagicMock()
+        mock_assigned_policy_instance.can_redeem.return_value = mock_return_value
+
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=True
+        ), patch(
+            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy',
+            return_value=mock_assigned_policy_instance
+        ) as mock_assigned_class:
+            result = policy.can_redeem(self.lms_user_id, self.course_id, skip_customer_user_check=True)
+
+            self.assertEqual(result, mock_return_value)
+            mock_assigned_class.assert_called_once_with()
+            mock_assigned_policy_instance.can_redeem.assert_called_once_with(
+                self.lms_user_id, self.course_id, True, False, **{}
+            )
+
+    def test_per_learner_spend_policy_redeem_with_bnr_enabled(self):
+        """
+        Test that PerLearnerSpendCreditAccessPolicy.redeem correctly delegates
+        to a new instance of AssignedLearnerCreditAccessPolicy when bnr_enabled is True.
+        """
+        policy = self.per_learner_spend_policy
+        mock_return_value = {'uuid': 'test-transaction-uuid'}
+        all_transactions = [{'uuid': 'some-other-uuid'}]
+        metadata = {'source': 'bnr_test'}
+
+        mock_assigned_policy_instance = MagicMock()
+        mock_assigned_policy_instance.redeem.return_value = mock_return_value
+
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=True
+        ), patch(
+            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy',
+            return_value=mock_assigned_policy_instance
+        ) as mock_assigned_class:
+            result = policy.redeem(self.lms_user_id, self.course_id, all_transactions, metadata=metadata)
+
+            self.assertEqual(result, mock_return_value)
+            mock_assigned_class.assert_called_once_with()
+            mock_assigned_policy_instance.redeem.assert_called_once_with(
+                self.lms_user_id, self.course_id, all_transactions, metadata=metadata, **{}
+            )
+
+    def test_per_learner_spend_policy_can_redeem_with_bnr_disabled(self):
+        """
+        Test that PerLearnerSpendCreditAccessPolicy.can_redeem does NOT delegate
+        when bnr_enabled is False and calls its standard logic instead.
+        """
+        policy = self.per_learner_spend_policy
+
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=False
+        ), patch(
+            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_redeem'
+        ) as mock_assigned_can_redeem, patch(
+            'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.can_redeem',
+            return_value=(False, 'mock_reason', [])
+        ) as mock_super_can_redeem:
+            policy.can_redeem(self.lms_user_id, self.course_id)
+
+            mock_assigned_can_redeem.assert_not_called()
+            mock_super_can_redeem.assert_called_once()
 
 
 @ddt.ddt

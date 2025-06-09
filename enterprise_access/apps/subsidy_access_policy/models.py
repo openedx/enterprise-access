@@ -1190,7 +1190,24 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
         return self.per_learner_enrollment_limit - existing_transaction_count
 
 
-class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
+class SubsidyAccessPolicyRequestAssignmentMixin:
+
+    def assignment_request_can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False,
+                                      skip_enrollment_deadline_check=False, **kwargs
+                                      ):
+        policy_instance = AssignedLearnerCreditAccessPolicy()
+        return policy_instance.can_redeem(lms_user_id, content_key, skip_customer_user_check,
+                                          skip_enrollment_deadline_check, **kwargs
+                                          )
+
+    def assignment_request_redeem(self, lms_user_id, content_key, all_transactions, metadata=None, **kwargs):
+        policy_instance = AssignedLearnerCreditAccessPolicy()
+        return policy_instance.redeem(lms_user_id, content_key, all_transactions, metadata=metadata, **kwargs)
+
+
+class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
+                                        SubsidyAccessPolicyRequestAssignmentMixin
+                                        ):
     """
     Policy that limits the amount of learner spend for enrollment transactions.
 
@@ -1211,14 +1228,17 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         proxy = True
 
     def can_redeem(
-        self, lms_user_id, content_key,
-        skip_customer_user_check=False, skip_enrollment_deadline_check=False,
-        **kwargs,
+        self, lms_user_id, content_key, skip_customer_user_check=False, skip_enrollment_deadline_check=False,
+            **kwargs
     ):
         """
         Determines whether learner can redeem a subsidy access policy given the
         limits specified on the policy.
         """
+        if self.bnr_enabled:
+            return self.assignment_request_can_redeem(
+                lms_user_id, content_key, skip_customer_user_check, skip_enrollment_deadline_check, **kwargs
+            )
         # perform generic access checks
         should_attempt_redemption, reason, existing_redemptions = super().can_redeem(
             lms_user_id,
@@ -1239,13 +1259,34 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             content_price = self.get_content_price(content_key)
             if self.content_would_exceed_limit(spent_amount, self.per_learner_spend_limit, content_price):
                 self._log_redeemability(
-                    False, REASON_LEARNER_MAX_SPEND_REACHED, lms_user_id, content_key, extra=existing_redemptions,
+                    False, REASON_LEARNER_MAX_SPEND_REACHED, lms_user_id, content_key,
+                    extra=existing_redemptions,
                 )
                 return (False, REASON_LEARNER_MAX_SPEND_REACHED, existing_redemptions)
 
         # learner can redeem the subsidy access policy
         self._log_redeemability(True, None, lms_user_id, content_key)
         return (True, None, existing_redemptions)
+
+    def redeem(self, lms_user_id, content_key, all_transactions, metadata=None, **kwargs):
+        """
+        Redeem a subsidy for the given learner and content.
+
+        If bnr_enabled is True, calls assignment_request_redeem to use the assignment-based
+        workflow, otherwise calls the parent redeem method.
+
+        Returns:
+            A ledger transaction.
+
+        Raises:
+            SubsidyAPIHTTPError if the Subsidy API request failed.
+            ValueError if the access method of this policy is invalid.
+        """
+        if self.bnr_enabled:
+            return self.assignment_request_redeem(lms_user_id, content_key, all_transactions, metadata=metadata,
+                                                  **kwargs
+                                                  )
+        return super().redeem(lms_user_id, content_key, all_transactions, metadata=metadata, **kwargs)
 
     def credit_available(self, lms_user_id, *args, **kwargs):
         """
