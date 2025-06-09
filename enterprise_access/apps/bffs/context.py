@@ -61,7 +61,7 @@ class HandlerContext:
         self.data = {}  # Stores processed data for the response
 
         # Initialize common context data
-        self._initialize_common_context_data()
+        self.load_common_context_data()
 
     @property
     def request(self):
@@ -120,10 +120,6 @@ class HandlerContext:
         return self.data.get('should_update_active_enterprise_customer_user')
 
     @property
-    def secured_algolia_api_key(self):
-        return self.data.get('secured_algolia_api_key')
-
-    @property
     def catalog_uuids_to_catalog_query_uuids(self):
         return self.data.get('catalog_uuids_to_catalog_query_uuids')
 
@@ -149,7 +145,7 @@ class HandlerContext:
         """
         self._status_code = status_code
 
-    def _initialize_common_context_data(self):
+    def load_common_context_data(self):
         """
         Initializes common context data, like enterprise customer UUID and user ID.
         """
@@ -169,7 +165,7 @@ class HandlerContext:
 
         # Initialize the enterprise customer users metadata derived from the LMS
         try:
-            self._initialize_enterprise_customer_users()
+            self.load_enterprise_customer_users()
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception(
                 'Error initializing enterprise customer users for request user %s, '
@@ -210,7 +206,7 @@ class HandlerContext:
         if not self.enterprise_customer_uuid:
             self._enterprise_customer_uuid = self.enterprise_customer.get('uuid')
 
-    def _initialize_enterprise_customer_users(self):
+    def load_enterprise_customer_users(self):
         """
         Initializes the enterprise customer users for the request user.
         """
@@ -255,7 +251,7 @@ class HandlerContext:
     def update_algolia_keys(self, api_key, catalog_mapping):
         """
         Updates the Algolia API keys in the context.
-        
+
         Args:
             api_key: The secured Algolia API key
             catalog_mapping: Dictionary mapping catalog UUIDs to query UUIDs
@@ -266,12 +262,12 @@ class HandlerContext:
             'secured_algolia_api_key': api_key,
             'catalog_uuids_to_catalog_query_uuids': catalog_mapping or {}
         })
-        
+
     @property
     def secured_algolia_api_key(self):
         """Get the secured Algolia API key."""
         return self._algolia_api_key
-        
+
     @property
     def catalog_uuids_to_catalog_query_uuids(self):
         """Get the mapping of catalog UUIDs to query UUIDs."""

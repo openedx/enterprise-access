@@ -286,7 +286,7 @@ class AlgoliaDataMixin(BFFContextDataMixin):
     Mixin to handle Algolia search functionality and API key management.
     """
 
-    def _initialize_secured_algolia_api_keys(self):
+    def load_secured_algolia_api_key(self):
         """
         Fetches and initializes the secured Algolia API keys for the request user.
         Updates the context with the fetched keys.
@@ -312,13 +312,13 @@ class AlgoliaDataMixin(BFFContextDataMixin):
                     self.context.enterprise_customer_uuid,
                     self.context.enterprise_customer_slug,
                 )
-            
+
             # Update context with the fetched data
             self.context.update_algolia_keys(
                 secured_algolia_api_key,
                 catalog_uuids_to_catalog_query_uuids
             )
-            
+
             # Log if no Algolia key or catalog mapping was found
             if not (secured_algolia_api_key and catalog_uuids_to_catalog_query_uuids):
                 logger.info(
@@ -336,12 +336,12 @@ class AlgoliaDataMixin(BFFContextDataMixin):
                         f'{self.context.enterprise_customer_uuid}'
                     ),
                 )
-        
+
         except HTTPError as exc:
             exception_response = exc.response.json()
             exception_response_user_message = exception_response.get('user_message')
             exception_response_developer_message = exception_response.get('developer_message')
-            
+
             logger.exception(
                 'HTTP Error initializing the secured algolia api keys for request user %s, '
                 'enterprise customer uuid %s',
@@ -353,7 +353,7 @@ class AlgoliaDataMixin(BFFContextDataMixin):
                 developer_message=exception_response_developer_message or str(exc),
                 status_code=exc.response.status_code
             )
-            
+
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception(
                 'Error initializing the secured algolia api keys for request user %s, '
