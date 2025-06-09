@@ -3,6 +3,7 @@ Handlers for bffs app.
 """
 import json
 import logging
+import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, NotRequired, Tuple, TypedDict, Union
 
@@ -301,6 +302,7 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
         """
         Load and process subsidies for learners
         """
+        time.sleep(5)
         empty_subsidies = {
             'subscriptions': {
                 'customer_agreement': None,
@@ -786,6 +788,7 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
         Helper method to encapsulate the two-step enrollment process
         into a single unit of work for the concurrent runner.
         """
+        time.sleep(5)
         self.load_default_enterprise_enrollment_intentions()
         self.enroll_in_redeemable_default_enterprise_enrollment_intentions()
 
