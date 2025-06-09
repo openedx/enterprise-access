@@ -15,7 +15,11 @@ from enterprise_access.apps.bffs.api import (
     invalidate_subscription_licenses_cache
 )
 from enterprise_access.apps.bffs.context import HandlerContext
-from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin, LearnerDashboardDataMixin
+from enterprise_access.apps.bffs.mixins import (
+    AlgoliaDataMixin,
+    BaseLearnerDataMixin,
+    LearnerDashboardDataMixin
+)
 from enterprise_access.apps.bffs.serializers import EnterpriseCustomerUserSubsidiesSerializer
 
 logger = logging.getLogger(__name__)
@@ -64,7 +68,7 @@ class BaseHandler:
         )
 
 
-class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
+class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMixin):
     """
     A base handler class for learner-focused routes.
 
@@ -87,8 +91,6 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
     def load_and_process(self):
         """
         Loads and processes data. This is a basic implementation that can be overridden by subclasses.
-
-        The method in this class simply calls common learner logic to ensure the context is set up.
         """
         try:
             # Verify enterprise customer attrs have learner portal enabled
@@ -96,6 +98,9 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
 
             # Transform enterprise customer data
             self.transform_enterprise_customers()
+
+            # Initialize Algolia API keys after customer data is available
+            self._initialize_secured_algolia_api_keys()
 
             # Retrieve and process subscription licenses. Handles activation and auto-apply logic.
             self.load_and_process_subsidies()

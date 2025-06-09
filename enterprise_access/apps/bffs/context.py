@@ -56,6 +56,8 @@ class HandlerContext:
         self._enterprise_customer_slug = None
         self._lms_user_id = getattr(self.user, 'lms_user_id', None)
         self._enterprise_features = {}
+        self._algolia_api_key = None
+        self._catalog_uuids_to_catalog_query_uuids = {}
         self.data = {}  # Stores processed data for the response
 
         # Initialize common context data
@@ -208,54 +210,6 @@ class HandlerContext:
         if not self.enterprise_customer_uuid:
             self._enterprise_customer_uuid = self.enterprise_customer.get('uuid')
 
-        # Initialize the secured algolia api keys metadata derived from enterprise catalog
-        try:
-            self._initialize_secured_algolia_api_keys()
-        except HTTPError as exc:
-            exception_response = exc.response.json()
-            exception_response_user_message = exception_response.get('user_message')
-            exception_response_developer_message = exception_response.get('developer_message')
-            logger.exception(
-                'HTTP Error initializing the secured algolia api keys for request user %s, '
-                'enterprise customer uuid %s',
-                self.lms_user_id,
-                enterprise_customer_uuid,
-            )
-            self.add_error(
-                user_message=exception_response_user_message or 'HTTP Error initializing the secured algolia api keys',
-                developer_message=exception_response_developer_message or
-                f'Could not initialize the secured algolia api keys. Error: {exc}',
-            )
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.exception(
-                'Error initializing the secured algolia api keys for request user %s, '
-                'enterprise customer uuid %s',
-                self.lms_user_id,
-                enterprise_customer_uuid,
-            )
-            self.add_error(
-                user_message='Error initializing the secured algolia api keys',
-                developer_message=f'Could not initialize the secured algolia api keys. Error: {exc}',
-            )
-
-        if not (self.secured_algolia_api_key and self.catalog_uuids_to_catalog_query_uuids):
-            logger.info(
-                'No secured algolia key found for request user %s, enterprise customer uuid %s, '
-                'and/or enterprise slug %s',
-                self.lms_user_id,
-                enterprise_customer_uuid,
-                enterprise_customer_slug,
-            )
-            self.add_error(
-                user_message='No secured algolia api key or catalog query mapping found',
-                developer_message=(
-                    f'No secured algolia api key or catalog query mapping found for request '
-                    f'user {self.lms_user_id} and enterprise uuid '
-                    f'{enterprise_customer_uuid}, and/or enterprise slug {enterprise_customer_slug}'
-                ),
-            )
-            return
-
     def _initialize_enterprise_customer_users(self):
         """
         Initializes the enterprise customer users for the request user.
@@ -298,33 +252,30 @@ class HandlerContext:
             )
         })
 
-    def _initialize_secured_algolia_api_keys(self):
+    def update_algolia_keys(self, api_key, catalog_mapping):
         """
-        Initializes the secured algolia api key for the request user.
+        Updates the Algolia API keys in the context.
+        
+        Args:
+            api_key: The secured Algolia API key
+            catalog_mapping: Dictionary mapping catalog UUIDs to query UUIDs
         """
-        secured_algolia_api_key_data = get_and_cache_secured_algolia_search_keys(
-            self.request,
-            self._enterprise_customer_uuid,
-        )
-
-        secured_algolia_api_key = None
-        catalog_uuids_to_catalog_query_uuids = {}
-        try:
-            secured_algolia_api_key, catalog_uuids_to_catalog_query_uuids = transform_secured_algolia_api_key_response(
-                secured_algolia_api_key_data
-            )
-        except Exception:  # pylint: disable=broad-except
-            logger.exception(
-                'Error transforming secured algolia api key for request user %s,'
-                'enterprise customer uuid %s and/or slug %s',
-                self.lms_user_id,
-                self.enterprise_customer_uuid,
-                self.enterprise_customer_slug,
-            )
+        self._algolia_api_key = api_key
+        self._catalog_uuids_to_catalog_query_uuids = catalog_mapping or {}
         self.data.update({
-            'secured_algolia_api_key': secured_algolia_api_key,
-            'catalog_uuids_to_catalog_query_uuids': catalog_uuids_to_catalog_query_uuids
+            'secured_algolia_api_key': api_key,
+            'catalog_uuids_to_catalog_query_uuids': catalog_mapping or {}
         })
+        
+    @property
+    def secured_algolia_api_key(self):
+        """Get the secured Algolia API key."""
+        return self._algolia_api_key
+        
+    @property
+    def catalog_uuids_to_catalog_query_uuids(self):
+        """Get the mapping of catalog UUIDs to query UUIDs."""
+        return self._catalog_uuids_to_catalog_query_uuids
 
     def add_error(self, status_code=None, **kwargs):
         """

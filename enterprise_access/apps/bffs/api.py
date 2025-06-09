@@ -54,11 +54,11 @@ def get_and_cache_enterprise_customer_users(request, **kwargs):
     username = request.user.username
     cache_key = enterprise_customer_users_cache_key(username)
     cached_response = request_cache(namespace=REQUEST_CACHE_NAMESPACE).get_cached_response(cache_key)
-    if cached_response.is_found:
-        logger.info(
-            f'enterprise_customer_users cache hit for username {username}'
-        )
-        return cached_response.value
+    # if cached_response.is_found:
+    #     logger.info(
+    #         f'enterprise_customer_users cache hit for username {username}'
+    #     )
+    #     return cached_response.value
 
     client = LmsUserApiClient(request)
     response_payload = client.get_enterprise_customers_for_user(
