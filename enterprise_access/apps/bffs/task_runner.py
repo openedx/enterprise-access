@@ -68,10 +68,6 @@ class ConcurrentTaskRunner:
                     })
         return results
 
-    def __enter__(self):
-        """Entering the 'with' block returns the runner instance."""
-        return self
-
     def handle_failed_tasks(self, task_results, error_callback):
         """
         Process any failed tasks from the results.
@@ -87,6 +83,10 @@ class ConcurrentTaskRunner:
         failed_tasks = [result for result in task_results if result['error'] is not None]
         for failed_task in failed_tasks:
             error_callback(failed_task['task_name'], str(failed_task['error']))
+
+    def __enter__(self):
+        """Entering the 'with' block returns the runner instance."""
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exiting the 'with' block. No cleanup needed."""
