@@ -2,8 +2,6 @@
 Mixins for accessing `HandlerContext` data for bffs app
 """
 
-import time
-
 import logging
 from urllib.error import HTTPError
 
@@ -293,8 +291,6 @@ class AlgoliaDataMixin(BFFContextDataMixin):
         Fetches and initializes the secured Algolia API keys for the request user.
         Updates the context with the fetched keys.
         """
-        time.sleep(5)
-
         try:
             secured_algolia_api_key_data = get_and_cache_secured_algolia_search_keys(
                 self.context.request,

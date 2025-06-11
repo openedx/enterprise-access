@@ -4,8 +4,7 @@ Handlers for bffs app.
 import json
 import logging
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
-from typing import Any, Callable, Dict, List, NotRequired, Tuple, TypedDict, Union
+from enum import Enum, auto
 
 from enterprise_access.apps.api_client.constants import LicenseStatuses
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerUserApiClient
@@ -20,137 +19,12 @@ from enterprise_access.apps.bffs.api import (
 from enterprise_access.apps.bffs.context import HandlerContext
 from enterprise_access.apps.bffs.mixins import AlgoliaDataMixin, BaseLearnerDataMixin, LearnerDashboardDataMixin
 from enterprise_access.apps.bffs.serializers import EnterpriseCustomerUserSubsidiesSerializer
+from enterprise_access.apps.bffs.task_runner import ConcurrentTaskRunner
 
 logger = logging.getLogger(__name__)
 
 
-class Task(TypedDict):
-    """
-    Defines the structure for a task.
-    - func: The function to execute (required).
-    - args: A tuple of positional arguments for the func (optional).
-    - kwargs: A dict of keyword arguments for the func (optional).
-    """
-
-    func: Callable[..., Any]
-    args: NotRequired[Tuple]
-    kwargs: NotRequired[Dict[str, Any]]
-
-
-class ConcurrentTaskRunner:
-    """
-    A context manager for running I/O-bound tasks concurrently.
-
-    This class creates and manages a ThreadPoolExecutor, ensuring that
-    resources are properly shut down. It's designed to be used with a
-    `with` statement for guaranteed cleanup.
-
-    Usage:
-        with ConcurrentTaskRunner(max_workers=5) as runner:
-            results = runner.execute(tasks)
-    """
-
-    DEFAULT_MAX_WORKERS = 5
-    DEFAULT_TIMEOUT_SECONDS = 15
-
-    def __init__(self, max_workers: int = None):
-        """Initializes the runner and its persistent ThreadPoolExecutor."""
-        self._executor = ThreadPoolExecutor(max_workers=max_workers or self.DEFAULT_MAX_WORKERS)
-
-    def __enter__(self):
-        """Enables the use of the 'with' statement."""
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Ensures the executor is shut down when the context is exited."""
-        self._executor.shutdown(wait=True)
-
-    def execute_methods(self, *methods: Callable[[], Any], **kwargs) -> List[Union[Any, Exception]]:
-        tasks: List[Task] = [{"func": method} for method in methods]
-        return self.execute(tasks, **kwargs)
-
-    def execute(
-        self,
-        tasks: List[Task],
-        timeout_seconds: int = None
-    ) -> List[Union[Any, Exception]]:
-        """
-        Executes a list of tasks concurrently, preserving result order
-        and propagating exceptions to the caller.
-
-        Args:
-            tasks: A list of Task dictionaries to be executed.
-            timeout_seconds: The maximum time to wait for each task.
-
-        Returns:
-            A list where each element is either the result of the
-            corresponding task or the Exception it raised. The order
-            matches the input `tasks` list.
-        """
-        if not tasks:
-            return []
-
-        futures: List[Future] = [
-            self._executor.submit(
-                task["func"],
-                *task.get("args", ()),
-                **task.get("kwargs", {})
-            )
-            for task in tasks
-        ]
-
-        results: List[Union[Any, Exception]] = []
-        for i, future in enumerate(futures):
-            func_name = tasks[i]["func"].__name__
-            try:
-                result = future.result(timeout=timeout_seconds or self.DEFAULT_TIMEOUT_SECONDS)
-                results.append(result)
-            except Exception as exc:  # pylint: disable=broad-except
-                logging.exception(f"Task '{func_name}' generated an exception")
-                results.append(exc)
-
-        return results
-
-    @staticmethod
-    def run_methods_and_raise_on_error(
-        methods: List[Callable[[], Any]],
-        max_workers: int = None,
-        timeout_seconds: int = None
-    ) -> List[Any]:
-        """
-        Convenience wrapper to run no-argument methods concurrently.
-
-        This handles runner creation and raises the first exception encountered.
-        """
-        tasks: List[Task] = [{"func": method} for method in methods]
-        return ConcurrentTaskRunner.run_and_raise_on_error(
-            tasks,
-            max_workers=max_workers,
-            timeout_seconds=timeout_seconds,
-        )
-
-    @staticmethod
-    def run_and_raise_on_error(
-        tasks: List[Task],
-        max_workers: int = None,
-        timeout_seconds: int = None
-    ) -> List[Any]:
-        """
-        Runs a batch of tasks concurrently in a self-contained operation.
-
-        This utility creates a runner, executes tasks, and raises the first
-        exception encountered, returning a clean list of results on success.
-        """
-        max_workers = max_workers or ConcurrentTaskRunner.DEFAULT_MAX_WORKERS
-        timeout_seconds = timeout_seconds or ConcurrentTaskRunner.DEFAULT_TIMEOUT_SECONDS
-
-        with ConcurrentTaskRunner(max_workers=max_workers) as runner:
-            results = runner.execute(tasks, timeout_seconds=timeout_seconds)
-
-        exceptions = [res for res in results if isinstance(res, Exception)]
-        if exceptions:
-            raise exceptions[0]
-        return results
+MOCK_TASK_DELAY = 5
 
 
 class BaseHandler:
@@ -204,6 +78,12 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
     across all learner-focused page routes, such as the learner dashboard, search, and course routes.
     """
 
+    class CONCURRENCY_GROUPS(Enum):
+        """
+        Group names for concurrent tasks.
+        """
+        DEFAULT = auto()
+
     def __init__(self, context):
         """
          Initializes the BaseLearnerPortalHandler with a HandlerContext and API clients.
@@ -216,6 +96,58 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
         self.license_manager_user_api_client = LicenseManagerUserApiClient(self.context.request)
         self.lms_api_client = LmsApiClient()
 
+    def _get_concurrent_tasks(self):
+        """
+        Establishes the data structure for tasks and adds base tasks.
+        Subclasses may call this method via super() to extend the tasks
+        for any specific group.
+        """
+        # Initialize groups
+        tasks = {
+            self.CONCURRENCY_GROUPS.DEFAULT: [],
+        }
+
+        # Add tasks to default group
+        tasks[self.CONCURRENCY_GROUPS.DEFAULT].extend([
+            self.load_and_process_subsidies,
+            self.load_secured_algolia_api_key,
+            self.load_and_process_default_enrollment_intentions,
+        ])
+
+        return tasks
+
+    def load_secured_algolia_api_key(self):
+        """
+        Temporary override to add delay.
+        """
+        time.sleep(MOCK_TASK_DELAY)
+        super().load_secured_algolia_api_key()
+
+    def load_and_process_subsidies(self):
+        """
+        Load and process subsidies for learners
+        """
+        time.sleep(MOCK_TASK_DELAY)
+        empty_subsidies = {
+            'subscriptions': {
+                'customer_agreement': None,
+            },
+        }
+        self.context.data['enterprise_customer_user_subsidies'] =\
+            EnterpriseCustomerUserSubsidiesSerializer(empty_subsidies).data
+
+        # Retrieve and process subsidies
+        self.load_and_process_subscription_licenses()
+
+    def load_and_process_default_enrollment_intentions(self):
+        """
+        Helper method to encapsulate the two-step enrollment process
+        into a single unit of work for the concurrent runner.
+        """
+        time.sleep(MOCK_TASK_DELAY)
+        self.load_default_enterprise_enrollment_intentions()
+        self.enroll_in_redeemable_default_enterprise_enrollment_intentions()
+
     def load_and_process(self):
         """
         Loads and processes data. This is a basic implementation that can be overridden by subclasses.
@@ -226,16 +158,7 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
 
             # Transform enterprise customer data
             self.transform_enterprise_customers()
-
-            ConcurrentTaskRunner.run_methods_and_raise_on_error(
-                methods=[
-                    self.load_secured_algolia_api_key,
-                    self.load_and_process_subsidies,
-                    self.load_and_process_default_enrollment_intentions,
-                ],
-                max_workers=3,
-            )
-        except Exception as exc:  # pylint: disable=broad-exception-caught
+        except Exception as exc:  # pylint: disable=broad-except
             logger.exception(
                 "Error loading/processing learner portal handler for request user %s and enterprise customer %s",
                 self.context.lms_user_id,
@@ -245,6 +168,26 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
                 user_message="Could not load and/or process common data",
                 developer_message=f"Unable to load and/or process common learner portal data: {exc}",
             )
+            return
+
+        all_tasks_to_run = self._get_concurrent_tasks()
+        with ConcurrentTaskRunner(task_definitions=all_tasks_to_run) as runner:
+            task_results = runner.run_group(self.CONCURRENCY_GROUPS.DEFAULT)
+            def handle_task_error(task_name, error_message):
+                logger.error(
+                    "Error running concurrent task '%s' for request user %s and enterprise customer %s: %s",
+                    task_name,
+                    self.context.lms_user_id,
+                    self.context.enterprise_customer_uuid,
+                    error_message,
+                )
+                self.add_error(
+                    user_message="Could not load and/or process a concurrent task",
+                    developer_message=(
+                        f"Unable to load and/or process concurrent task '{task_name}': {error_message}"
+                    ),
+                )
+            runner.handle_failed_tasks(task_results, handle_task_error)
 
     def ensure_learner_portal_enabled(self):
         """
@@ -297,22 +240,6 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
             logger.warning(
                 f"No linked enterprise customer users found in the context for request user {self.context.lms_user_id}"
             )
-
-    def load_and_process_subsidies(self):
-        """
-        Load and process subsidies for learners
-        """
-        time.sleep(5)
-        empty_subsidies = {
-            'subscriptions': {
-                'customer_agreement': None,
-            },
-        }
-        self.context.data['enterprise_customer_user_subsidies'] =\
-            EnterpriseCustomerUserSubsidiesSerializer(empty_subsidies).data
-
-        # Retrieve and process subsidies
-        self.load_and_process_subscription_licenses()
 
     def transform_enterprise_customer_user(self, enterprise_customer_user):
         """
@@ -783,15 +710,6 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
                 'subscription_license_uuid': license_uuids_by_course_run_key.get(course_run_key),
             })
 
-    def load_and_process_default_enrollment_intentions(self):
-        """
-        Helper method to encapsulate the two-step enrollment process
-        into a single unit of work for the concurrent runner.
-        """
-        time.sleep(5)
-        self.load_default_enterprise_enrollment_intentions()
-        self.enroll_in_redeemable_default_enterprise_enrollment_intentions()
-
     def _request_default_enrollment_realizations(self, license_uuids_by_course_run_key):
         """
         Sends the request to bulk enroll into default enrollment intentions via the LMS
@@ -842,27 +760,23 @@ class DashboardHandler(LearnerDashboardDataMixin, BaseLearnerPortalHandler):
     of data specific to the learner dashboard.
     """
 
-    def load_and_process(self):
+    def _get_concurrent_tasks(self):
         """
-        Loads and processes data for the learner dashboard route.
-
-        This method overrides the `load_and_process` method in `BaseLearnerPortalHandler`.
+        This is the key method. It extends the tasks from its parent.
         """
-        super().load_and_process()
+        tasks = super()._get_concurrent_tasks()
+        tasks[self.CONCURRENCY_GROUPS.DEFAULT].extend([
+            self.load_enterprise_course_enrollments,
+        ])
+        return tasks
 
-        try:
-            # Load data specific to the dashboard route
-            self.load_enterprise_course_enrollments()
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.exception(
-                "Error loading and/or processing dashboard data for user %s and enterprise customer %s",
-                self.context.lms_user_id,
-                self.context.enterprise_customer_uuid,
-            )
-            self.add_error(
-                user_message="Could not load and/or processing the learner dashboard.",
-                developer_message=f"Failed to load and/or processing the learner dashboard data: {e}",
-            )
+    def load_enterprise_course_enrollments(self):
+        """
+        Temporary override to add delay.
+        """
+        time.sleep(MOCK_TASK_DELAY)
+        # raise Exception('Failed to load enterprise course enrollments?!')
+        return super().load_enterprise_course_enrollments()
 
 
 class SearchHandler(BaseLearnerPortalHandler):

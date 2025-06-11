@@ -2,16 +2,13 @@
 HandlerContext for bffs app.
 """
 import logging
-from urllib.error import HTTPError
 
 from rest_framework import status
 
 from enterprise_access.apps.bffs import serializers
 from enterprise_access.apps.bffs.api import (
     get_and_cache_enterprise_customer_users,
-    get_and_cache_secured_algolia_search_keys,
-    transform_enterprise_customer_users_data,
-    transform_secured_algolia_api_key_response
+    transform_enterprise_customer_users_data
 )
 
 logger = logging.getLogger(__name__)
@@ -56,8 +53,6 @@ class HandlerContext:
         self._enterprise_customer_slug = None
         self._lms_user_id = getattr(self.user, 'lms_user_id', None)
         self._enterprise_features = {}
-        self._algolia_api_key = None
-        self._catalog_uuids_to_catalog_query_uuids = {}
         self.data = {}  # Stores processed data for the response
 
         # Initialize common context data
@@ -122,6 +117,11 @@ class HandlerContext:
     @property
     def catalog_uuids_to_catalog_query_uuids(self):
         return self.data.get('catalog_uuids_to_catalog_query_uuids')
+
+    @property
+    def secured_algolia_api_key(self):
+        """Get the secured Algolia API key."""
+        return self.data.get('secured_algolia_api_key')
 
     @property
     def is_request_user_linked_to_enterprise_customer(self):
@@ -256,22 +256,10 @@ class HandlerContext:
             api_key: The secured Algolia API key
             catalog_mapping: Dictionary mapping catalog UUIDs to query UUIDs
         """
-        self._algolia_api_key = api_key
-        self._catalog_uuids_to_catalog_query_uuids = catalog_mapping or {}
         self.data.update({
             'secured_algolia_api_key': api_key,
             'catalog_uuids_to_catalog_query_uuids': catalog_mapping or {}
         })
-
-    @property
-    def secured_algolia_api_key(self):
-        """Get the secured Algolia API key."""
-        return self._algolia_api_key
-
-    @property
-    def catalog_uuids_to_catalog_query_uuids(self):
-        """Get the mapping of catalog UUIDs to query UUIDs."""
-        return self._catalog_uuids_to_catalog_query_uuids
 
     def add_error(self, status_code=None, **kwargs):
         """
