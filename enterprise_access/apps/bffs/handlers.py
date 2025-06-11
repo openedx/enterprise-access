@@ -762,7 +762,7 @@ class DashboardHandler(LearnerDashboardDataMixin, BaseLearnerPortalHandler):
 
     def _get_concurrent_tasks(self):
         """
-        This is the key method. It extends the tasks from its parent.
+        Add additional concurrent tasks for the dashboard.
         """
         tasks = super()._get_concurrent_tasks()
         tasks[self.CONCURRENCY_GROUPS.DEFAULT].extend([
