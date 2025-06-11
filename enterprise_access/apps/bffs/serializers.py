@@ -162,7 +162,15 @@ class EnterpriseCustomerUserSerializer(BaseBffSerializer):
     active = serializers.BooleanField()
 
 
-class BaseResponseSerializer(BaseBffSerializer):
+class MinimalBffResponseSerializer(BaseBffSerializer):
+    """
+    Every response serializer should come with errors and warnings.
+    """
+    errors = ErrorSerializer(many=True, required=False, default=list)
+    warnings = WarningSerializer(many=True, required=False, default=list)
+
+
+class BaseResponseSerializer(MinimalBffResponseSerializer):
     """
     Serializer for base response.
     """
@@ -177,8 +185,6 @@ class BaseResponseSerializer(BaseBffSerializer):
         child=serializers.UUIDField(),
         help_text='Mapping of catalog UUIDs to catalog query UUIDs.',
     )
-    errors = ErrorSerializer(many=True, required=False, default=list)
-    warnings = WarningSerializer(many=True, required=False, default=list)
     enterprise_features = serializers.DictField(required=False, default=dict)
 
 
