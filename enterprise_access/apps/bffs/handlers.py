@@ -23,7 +23,6 @@ from enterprise_access.apps.bffs.task_runner import ConcurrentTaskRunner
 
 logger = logging.getLogger(__name__)
 
-
 MOCK_TASK_DELAY = 5
 
 
@@ -170,6 +169,7 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
             )
             return
 
+        # Run concurrent tasks
         all_tasks_to_run = self._get_concurrent_tasks()
         with ConcurrentTaskRunner(task_definitions=all_tasks_to_run) as runner:
             task_results = runner.run_group(self.CONCURRENCY_GROUPS.DEFAULT)
