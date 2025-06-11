@@ -23,7 +23,7 @@ from enterprise_access.apps.bffs.task_runner import ConcurrentTaskRunner
 
 logger = logging.getLogger(__name__)
 
-MOCK_TASK_DELAY = 5
+MOCK_TASK_DELAY = 0
 
 
 class BaseHandler:
@@ -77,7 +77,7 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
     across all learner-focused page routes, such as the learner dashboard, search, and course routes.
     """
 
-    class CONCURRENCY_GROUPS(Enum):
+    class BASE_CONCURRENCY_GROUPS(Enum):
         """
         Group names for concurrent tasks.
         """
@@ -103,11 +103,11 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
         """
         # Initialize groups
         tasks = {
-            self.CONCURRENCY_GROUPS.DEFAULT: [],
+            self.BASE_CONCURRENCY_GROUPS.DEFAULT: [],
         }
 
         # Add tasks to default group
-        tasks[self.CONCURRENCY_GROUPS.DEFAULT].extend([
+        tasks[self.BASE_CONCURRENCY_GROUPS.DEFAULT].extend([
             self.load_and_process_subsidies,
             self.load_secured_algolia_api_key,
             self.load_and_process_default_enrollment_intentions,
@@ -172,7 +172,7 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
         # Run concurrent tasks
         all_tasks_to_run = self._get_concurrent_tasks()
         with ConcurrentTaskRunner(task_definitions=all_tasks_to_run) as runner:
-            task_results = runner.run_group(self.CONCURRENCY_GROUPS.DEFAULT)
+            task_results = runner.run_group(self.BASE_CONCURRENCY_GROUPS.DEFAULT)
             def handle_task_error(task_name, error_message):
                 logger.error(
                     "Error running concurrent task '%s' for request user %s and enterprise customer %s: %s",
@@ -760,12 +760,18 @@ class DashboardHandler(LearnerDashboardDataMixin, BaseLearnerPortalHandler):
     of data specific to the learner dashboard.
     """
 
+    class DASHBOARD_CONCURRENCY_GROUPS(Enum):
+        """
+        Group names for concurrent tasks.
+        """
+        DEFAULT = auto()
+
     def _get_concurrent_tasks(self):
         """
         Add additional concurrent tasks for the dashboard.
         """
         tasks = super()._get_concurrent_tasks()
-        tasks[self.CONCURRENCY_GROUPS.DEFAULT].extend([
+        tasks[self.BASE_CONCURRENCY_GROUPS.DEFAULT].extend([
             self.load_enterprise_course_enrollments,
         ])
         return tasks
