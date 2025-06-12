@@ -577,9 +577,13 @@ PROVISIONING_DEFAULTS = {
 }
 
 # Add a mapping from product_id to catalog_query_id
+# we type the keys as strings instead of ints and have related
+# code look up by str(the_value) to avoid any complications
+# with loading environment settings from yaml, where the keys
+# may *always* be safely-loaded as strings.
 PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING = {
-    1: 1,  # Product 1 maps to catalog query 1
-    2: 2,
+    '1': 1,  # Product 1 maps to catalog query 1
+    '2': 2,
     # Add more mappings as needed
 }
 

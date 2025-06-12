@@ -77,5 +77,5 @@ KAFKA_TOPICS = [
 ################### End Kafka Related Settings ##############################
 
 PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING = {
-    1: 42,
+    '1': 42,
 }
