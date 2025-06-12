@@ -253,7 +253,7 @@ class GetCreateCatalogStep(AbstractWorkflowStep):
             return catalog_query_id_input
 
         # Need to get product_id from subscription plan input to infer catalog_query_id
-        product_id = workflow_input.create_subscription_plan_input.product_id
+        product_id = str(workflow_input.create_subscription_plan_input.product_id)
 
         if product_id and product_id in settings.PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING:
             return settings.PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING[product_id]
