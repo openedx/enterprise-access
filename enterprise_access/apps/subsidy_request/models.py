@@ -452,6 +452,51 @@ class LearnerCreditRequestActions(TimeStampedModel):
         return (f"<LearnerCreditRequestActions for request {self.learner_credit_request}"
                 f" with action {self.recent_action}>")
 
+    @classmethod
+    def create_action(
+        cls,
+        learner_credit_request,
+        recent_action,
+        status,
+        error_reason=None,
+        traceback=None,
+    ):
+        """
+        Utility method to create a new LearnerCreditRequestActions instance.
+
+        Args:
+            learner_credit_request (LearnerCreditRequest): The associated learner credit request.
+            recent_action (str): The type of action taken (must be a valid choice from
+                LearnerCreditRequestActionChoices).
+            status (str): The status message (must be a valid choice from LearnerCreditRequestUserMessages.CHOICES).
+            error_reason (str, optional): The error reason if applicable (must be a valid choice
+                from LearnerCreditRequestActionErrorReasons.CHOICES).
+            traceback (str, optional): Any traceback information for debugging.
+
+        Returns:
+            LearnerCreditRequestActions: The created instance.
+
+        Raises:
+            ValidationError: If any of the provided values are invalid.
+            ValueError: If required parameters are missing or invalid.
+        """
+        # Create the instance
+        try:
+            action = cls(
+                learner_credit_request=learner_credit_request,
+                recent_action=recent_action,
+                status=status,
+                error_reason=error_reason,
+                traceback=traceback,
+            )
+            action.full_clean()
+            action.save()
+            return action
+        except ValidationError as e:
+            raise ValidationError(f"Failed to create LearnerCreditRequestActions: {e}")
+        except Exception as e:
+            raise ValueError(f"Unexpected error creating LearnerCreditRequestActions: {e}")
+
 
 @receiver(models.signals.post_save, sender=CouponCodeRequest)
 @receiver(models.signals.post_save, sender=LicenseRequest)

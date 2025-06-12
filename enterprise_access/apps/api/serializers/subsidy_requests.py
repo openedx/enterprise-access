@@ -6,6 +6,7 @@ import logging
 from rest_framework import serializers
 
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
@@ -208,3 +209,61 @@ class LearnerCreditRequestActionsSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'learner_credit_request': {'write_only': True},
         }
+
+
+class LearnerCreditRequestDeclineSerializer(serializers.Serializer):
+    """
+    Serializer for declining a learner credit request.
+    """
+
+    subsidy_request_uuid = serializers.UUIDField(
+        required=True, help_text="UUID of the learner credit request to decline"
+    )
+    send_notification = serializers.BooleanField(
+        default=False, help_text="Whether to send decline notification email to the learner"
+    )
+    disassociate_from_org = serializers.BooleanField(
+        default=False, help_text="Whether to unlink the user from the enterprise organization"
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._learner_credit_request = None
+
+    def validate_subsidy_request_uuid(self, value):
+        """
+        Validate that the subsidy request exists and can be declined.
+        """
+        try:
+            learner_credit_request = LearnerCreditRequest.objects.get(uuid=value)
+        except LearnerCreditRequest.DoesNotExist as exc:
+            raise serializers.ValidationError(f"Learner Credit Request with UUID {value} not found.") from exc
+
+        if learner_credit_request.state not in [SubsidyRequestStates.REQUESTED]:
+            raise serializers.ValidationError(
+                f'Learner Credit Request with UUID {value} cannot be declined. '
+                f'Current state: {learner_credit_request.state}'
+            )
+
+        # Store the fetched object for later use
+        self._learner_credit_request = learner_credit_request
+
+        return value
+
+    def get_learner_credit_request(self):
+        """
+        Return the already-fetched LearnerCreditRequest object
+        """
+        return self._learner_credit_request
+
+    def create(self, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
+
+    def update(self, instance, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
