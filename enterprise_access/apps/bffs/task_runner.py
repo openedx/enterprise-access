@@ -79,7 +79,7 @@ class ConcurrentTaskRunner:
         """
         if not task_results:
             return
-            
+
         failed_tasks = [result for result in task_results if result['error'] is not None]
         for failed_task in failed_tasks:
             error_callback(failed_task['task_name'], str(failed_task['error']))

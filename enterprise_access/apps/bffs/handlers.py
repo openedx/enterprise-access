@@ -23,7 +23,7 @@ from enterprise_access.apps.bffs.task_runner import ConcurrentTaskRunner
 
 logger = logging.getLogger(__name__)
 
-MOCK_TASK_DELAY = 0
+MOCK_TASK_DELAY = 5
 
 
 class BaseHandler:
@@ -169,10 +169,24 @@ class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMix
             )
             return
 
-        # Run concurrent tasks
+        # Check if concurrent requests are enabled; if not, run tasks serially.
+        if not self.context.feature_enabled_for_enterprise_customer('enterprise_learner_bff_concurrent_requests'):
+            # Retrieve and process algolia api key
+            self.load_secured_algolia_api_key()
+
+            # Retrieve and process subscription licenses. Handles activation and auto-apply logic.
+            self.load_and_process_subsidies()
+
+            # Retrieve default enterprise courses and enroll in the redeemable ones
+            self.load_default_enterprise_enrollment_intentions()
+            self.enroll_in_redeemable_default_enterprise_enrollment_intentions()
+            return
+
+        # Otherwise, run concurrent tasks
         all_tasks_to_run = self._get_concurrent_tasks()
         with ConcurrentTaskRunner(task_definitions=all_tasks_to_run) as runner:
             task_results = runner.run_group(self.BASE_CONCURRENCY_GROUPS.DEFAULT)
+
             def handle_task_error(task_name, error_message):
                 logger.error(
                     "Error running concurrent task '%s' for request user %s and enterprise customer %s: %s",
@@ -783,6 +797,33 @@ class DashboardHandler(LearnerDashboardDataMixin, BaseLearnerPortalHandler):
         time.sleep(MOCK_TASK_DELAY)
         # raise Exception('Failed to load enterprise course enrollments?!')
         return super().load_enterprise_course_enrollments()
+
+    def load_and_process(self):
+        """
+        Loads and processes data for the learner dashboard route.
+
+        This method overrides the `load_and_process` method in `BaseLearnerPortalHandler`.
+        """
+        super().load_and_process()
+
+        # If concurrent requests are enabled, do not load enterprise course enrollments as they're requested
+        # within the concurrent task group returned by the _get_concurrent_tasks method.
+        if self.context.feature_enabled_for_enterprise_customer('enterprise_learner_bff_concurrent_requests'):
+            return
+
+        # Otherwise, load enterprise course enrollments serially.
+        try:
+            self.load_enterprise_course_enrollments()
+        except Exception as e:  # pylint: disable=broad-except
+            logger.exception(
+                "Error loading and/or processing dashboard data for user %s and enterprise customer %s",
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
+            self.add_error(
+                user_message="Could not load and/or processing the learner dashboard.",
+                developer_message=f"Failed to load and/or processing the learner dashboard data: {e}",
+            )
 
 
 class SearchHandler(BaseLearnerPortalHandler):

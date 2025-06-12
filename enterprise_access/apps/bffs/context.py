@@ -53,6 +53,7 @@ class HandlerContext:
         self._enterprise_customer_slug = None
         self._lms_user_id = getattr(self.user, 'lms_user_id', None)
         self._enterprise_features = {}
+        self._enterprise_features_by_customer = {}
         self.data = {}  # Stores processed data for the response
 
         # Initialize common context data
@@ -93,6 +94,10 @@ class HandlerContext:
     @property
     def enterprise_features(self):
         return self._enterprise_features
+
+    @property
+    def enterprise_features_by_customer(self):
+        return self._enterprise_features_by_customer
 
     @property
     def enterprise_customer(self):
@@ -217,6 +222,10 @@ class HandlerContext:
 
         # Set enterprise features from the response
         self._enterprise_features = enterprise_customer_users_data.get('enterprise_features', {})
+        self._enterprise_features_by_customer = enterprise_customer_users_data.get(
+            'enterprise_features_by_customer',
+            {},
+        )
 
         # Parse/transform the enterprise customer users data and update the context data
         transformed_data = {}
@@ -287,3 +296,19 @@ class HandlerContext:
         serializer = serializers.WarningSerializer(data=kwargs)
         serializer.is_valid(raise_exception=True)
         self.warnings.append(serializer.data)
+
+    def feature_enabled_for_enterprise_customer(self, feature_name):
+        """
+        Returns the feature for the enterprise customer.
+
+        Args:
+            feature_name (str): The name of the feature to retrieve.
+        """
+        if not self.enterprise_customer_uuid:
+            return False
+
+        enterprise_features_for_customer = self.enterprise_features_by_customer.get(
+            self.enterprise_customer_uuid,
+            {},
+        )
+        return enterprise_features_for_customer.get(feature_name, False)
