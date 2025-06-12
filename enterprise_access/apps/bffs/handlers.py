@@ -3,6 +3,8 @@ Handlers for bffs app.
 """
 import json
 import logging
+import time
+from enum import Enum, auto
 
 from enterprise_access.apps.api_client.constants import LicenseStatuses
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerUserApiClient
@@ -15,10 +17,13 @@ from enterprise_access.apps.bffs.api import (
     invalidate_subscription_licenses_cache
 )
 from enterprise_access.apps.bffs.context import HandlerContext
-from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin, LearnerDashboardDataMixin
+from enterprise_access.apps.bffs.mixins import AlgoliaDataMixin, BaseLearnerDataMixin, LearnerDashboardDataMixin
 from enterprise_access.apps.bffs.serializers import EnterpriseCustomerUserSubsidiesSerializer
+from enterprise_access.apps.bffs.task_runner import ConcurrentTaskRunner
 
 logger = logging.getLogger(__name__)
+
+MOCK_TASK_DELAY = 5
 
 
 class BaseHandler:
@@ -64,13 +69,19 @@ class BaseHandler:
         )
 
 
-class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
+class BaseLearnerPortalHandler(BaseHandler, AlgoliaDataMixin, BaseLearnerDataMixin):
     """
     A base handler class for learner-focused routes.
 
     The `BaseLearnerHandler` extends `BaseHandler` and provides shared core functionality
     across all learner-focused page routes, such as the learner dashboard, search, and course routes.
     """
+
+    class BASE_CONCURRENCY_GROUPS(Enum):
+        """
+        Group names for concurrent tasks.
+        """
+        DEFAULT = auto()
 
     def __init__(self, context):
         """
@@ -84,26 +95,69 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
         self.license_manager_user_api_client = LicenseManagerUserApiClient(self.context.request)
         self.lms_api_client = LmsApiClient()
 
+    def _get_concurrent_tasks(self):
+        """
+        Establishes the data structure for tasks and adds base tasks.
+        Subclasses may call this method via super() to extend the tasks
+        for any specific group.
+        """
+        # Initialize groups
+        tasks = {
+            self.BASE_CONCURRENCY_GROUPS.DEFAULT: [],
+        }
+
+        # Add tasks to default group
+        tasks[self.BASE_CONCURRENCY_GROUPS.DEFAULT].extend([
+            self.load_and_process_subsidies,
+            self.load_secured_algolia_api_key,
+            self.load_and_process_default_enrollment_intentions,
+        ])
+
+        return tasks
+
+    def load_secured_algolia_api_key(self):
+        """
+        Temporary override to add delay.
+        """
+        time.sleep(MOCK_TASK_DELAY)
+        super().load_secured_algolia_api_key()
+
+    def load_and_process_subsidies(self):
+        """
+        Load and process subsidies for learners
+        """
+        time.sleep(MOCK_TASK_DELAY)
+        empty_subsidies = {
+            'subscriptions': {
+                'customer_agreement': None,
+            },
+        }
+        self.context.data['enterprise_customer_user_subsidies'] =\
+            EnterpriseCustomerUserSubsidiesSerializer(empty_subsidies).data
+
+        # Retrieve and process subsidies
+        self.load_and_process_subscription_licenses()
+
+    def load_and_process_default_enrollment_intentions(self):
+        """
+        Helper method to encapsulate the two-step enrollment process
+        into a single unit of work for the concurrent runner.
+        """
+        time.sleep(MOCK_TASK_DELAY)
+        self.load_default_enterprise_enrollment_intentions()
+        self.enroll_in_redeemable_default_enterprise_enrollment_intentions()
+
     def load_and_process(self):
         """
         Loads and processes data. This is a basic implementation that can be overridden by subclasses.
-
-        The method in this class simply calls common learner logic to ensure the context is set up.
         """
         try:
-            # Verify enterprise customer attrs have learner portal enabled
+            # Verify enterprise customer exists and has learner portal enabled
             self.ensure_learner_portal_enabled()
 
             # Transform enterprise customer data
             self.transform_enterprise_customers()
-
-            # Retrieve and process subscription licenses. Handles activation and auto-apply logic.
-            self.load_and_process_subsidies()
-
-            # Retrieve default enterprise courses and enroll in the redeemable ones
-            self.load_default_enterprise_enrollment_intentions()
-            self.enroll_in_redeemable_default_enterprise_enrollment_intentions()
-        except Exception as exc:  # pylint: disable=broad-exception-caught
+        except Exception as exc:  # pylint: disable=broad-except
             logger.exception(
                 "Error loading/processing learner portal handler for request user %s and enterprise customer %s",
                 self.context.lms_user_id,
@@ -113,6 +167,41 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
                 user_message="Could not load and/or process common data",
                 developer_message=f"Unable to load and/or process common learner portal data: {exc}",
             )
+            return
+
+        # Check if concurrent requests are enabled; if not, run tasks serially.
+        if not self.context.feature_enabled_for_enterprise_customer('enterprise_learner_bff_concurrent_requests'):
+            # Retrieve and process algolia api key
+            self.load_secured_algolia_api_key()
+
+            # Retrieve and process subscription licenses. Handles activation and auto-apply logic.
+            self.load_and_process_subsidies()
+
+            # Retrieve default enterprise courses and enroll in the redeemable ones
+            self.load_default_enterprise_enrollment_intentions()
+            self.enroll_in_redeemable_default_enterprise_enrollment_intentions()
+            return
+
+        # Otherwise, run concurrent tasks
+        all_tasks_to_run = self._get_concurrent_tasks()
+        with ConcurrentTaskRunner(task_definitions=all_tasks_to_run) as runner:
+            task_results = runner.run_group(self.BASE_CONCURRENCY_GROUPS.DEFAULT)
+
+            def handle_task_error(task_name, error_message):
+                logger.error(
+                    "Error running concurrent task '%s' for request user %s and enterprise customer %s: %s",
+                    task_name,
+                    self.context.lms_user_id,
+                    self.context.enterprise_customer_uuid,
+                    error_message,
+                )
+                self.add_error(
+                    user_message="Could not load and/or process a concurrent task",
+                    developer_message=(
+                        f"Unable to load and/or process concurrent task '{task_name}': {error_message}"
+                    ),
+                )
+            runner.handle_failed_tasks(task_results, handle_task_error)
 
     def ensure_learner_portal_enabled(self):
         """
@@ -165,19 +254,6 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
             logger.warning(
                 f"No linked enterprise customer users found in the context for request user {self.context.lms_user_id}"
             )
-
-    def load_and_process_subsidies(self):
-        """
-        Load and process subsidies for learners
-        """
-        empty_subsidies = {
-            'subscriptions': {
-                'customer_agreement': None,
-            },
-        }
-        self.context.data['enterprise_customer_user_subsidies'] =\
-            EnterpriseCustomerUserSubsidiesSerializer(empty_subsidies).data
-        self.load_and_process_subscription_licenses()
 
     def transform_enterprise_customer_user(self, enterprise_customer_user):
         """
@@ -698,6 +774,30 @@ class DashboardHandler(LearnerDashboardDataMixin, BaseLearnerPortalHandler):
     of data specific to the learner dashboard.
     """
 
+    class DASHBOARD_CONCURRENCY_GROUPS(Enum):
+        """
+        Group names for concurrent tasks.
+        """
+        DEFAULT = auto()
+
+    def _get_concurrent_tasks(self):
+        """
+        Add additional concurrent tasks for the dashboard.
+        """
+        tasks = super()._get_concurrent_tasks()
+        tasks[self.BASE_CONCURRENCY_GROUPS.DEFAULT].extend([
+            self.load_enterprise_course_enrollments,
+        ])
+        return tasks
+
+    def load_enterprise_course_enrollments(self):
+        """
+        Temporary override to add delay.
+        """
+        time.sleep(MOCK_TASK_DELAY)
+        # raise Exception('Failed to load enterprise course enrollments?!')
+        return super().load_enterprise_course_enrollments()
+
     def load_and_process(self):
         """
         Loads and processes data for the learner dashboard route.
@@ -706,10 +806,15 @@ class DashboardHandler(LearnerDashboardDataMixin, BaseLearnerPortalHandler):
         """
         super().load_and_process()
 
+        # If concurrent requests are enabled, do not load enterprise course enrollments as they're requested
+        # within the concurrent task group returned by the _get_concurrent_tasks method.
+        if self.context.feature_enabled_for_enterprise_customer('enterprise_learner_bff_concurrent_requests'):
+            return
+
+        # Otherwise, load enterprise course enrollments serially.
         try:
-            # Load data specific to the dashboard route
             self.load_enterprise_course_enrollments()
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-except
             logger.exception(
                 "Error loading and/or processing dashboard data for user %s and enterprise customer %s",
                 self.context.lms_user_id,

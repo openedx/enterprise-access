@@ -2,16 +2,13 @@
 HandlerContext for bffs app.
 """
 import logging
-from urllib.error import HTTPError
 
 from rest_framework import status
 
 from enterprise_access.apps.bffs import serializers
 from enterprise_access.apps.bffs.api import (
     get_and_cache_enterprise_customer_users,
-    get_and_cache_secured_algolia_search_keys,
-    transform_enterprise_customer_users_data,
-    transform_secured_algolia_api_key_response
+    transform_enterprise_customer_users_data
 )
 
 logger = logging.getLogger(__name__)
@@ -56,10 +53,11 @@ class HandlerContext:
         self._enterprise_customer_slug = None
         self._lms_user_id = getattr(self.user, 'lms_user_id', None)
         self._enterprise_features = {}
+        self._enterprise_features_by_customer = {}
         self.data = {}  # Stores processed data for the response
 
         # Initialize common context data
-        self._initialize_common_context_data()
+        self.load_common_context_data()
 
     @property
     def request(self):
@@ -98,6 +96,10 @@ class HandlerContext:
         return self._enterprise_features
 
     @property
+    def enterprise_features_by_customer(self):
+        return self._enterprise_features_by_customer
+
+    @property
     def enterprise_customer(self):
         return self.data.get('enterprise_customer')
 
@@ -118,12 +120,13 @@ class HandlerContext:
         return self.data.get('should_update_active_enterprise_customer_user')
 
     @property
-    def secured_algolia_api_key(self):
-        return self.data.get('secured_algolia_api_key')
-
-    @property
     def catalog_uuids_to_catalog_query_uuids(self):
         return self.data.get('catalog_uuids_to_catalog_query_uuids')
+
+    @property
+    def secured_algolia_api_key(self):
+        """Get the secured Algolia API key."""
+        return self.data.get('secured_algolia_api_key')
 
     @property
     def is_request_user_linked_to_enterprise_customer(self):
@@ -147,7 +150,7 @@ class HandlerContext:
         """
         self._status_code = status_code
 
-    def _initialize_common_context_data(self):
+    def load_common_context_data(self):
         """
         Initializes common context data, like enterprise customer UUID and user ID.
         """
@@ -167,7 +170,7 @@ class HandlerContext:
 
         # Initialize the enterprise customer users metadata derived from the LMS
         try:
-            self._initialize_enterprise_customer_users()
+            self.load_enterprise_customer_users()
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception(
                 'Error initializing enterprise customer users for request user %s, '
@@ -208,55 +211,7 @@ class HandlerContext:
         if not self.enterprise_customer_uuid:
             self._enterprise_customer_uuid = self.enterprise_customer.get('uuid')
 
-        # Initialize the secured algolia api keys metadata derived from enterprise catalog
-        try:
-            self._initialize_secured_algolia_api_keys()
-        except HTTPError as exc:
-            exception_response = exc.response.json()
-            exception_response_user_message = exception_response.get('user_message')
-            exception_response_developer_message = exception_response.get('developer_message')
-            logger.exception(
-                'HTTP Error initializing the secured algolia api keys for request user %s, '
-                'enterprise customer uuid %s',
-                self.lms_user_id,
-                enterprise_customer_uuid,
-            )
-            self.add_error(
-                user_message=exception_response_user_message or 'HTTP Error initializing the secured algolia api keys',
-                developer_message=exception_response_developer_message or
-                f'Could not initialize the secured algolia api keys. Error: {exc}',
-            )
-        except Exception as exc:  # pylint: disable=broad-except
-            logger.exception(
-                'Error initializing the secured algolia api keys for request user %s, '
-                'enterprise customer uuid %s',
-                self.lms_user_id,
-                enterprise_customer_uuid,
-            )
-            self.add_error(
-                user_message='Error initializing the secured algolia api keys',
-                developer_message=f'Could not initialize the secured algolia api keys. Error: {exc}',
-            )
-
-        if not (self.secured_algolia_api_key and self.catalog_uuids_to_catalog_query_uuids):
-            logger.info(
-                'No secured algolia key found for request user %s, enterprise customer uuid %s, '
-                'and/or enterprise slug %s',
-                self.lms_user_id,
-                enterprise_customer_uuid,
-                enterprise_customer_slug,
-            )
-            self.add_error(
-                user_message='No secured algolia api key or catalog query mapping found',
-                developer_message=(
-                    f'No secured algolia api key or catalog query mapping found for request '
-                    f'user {self.lms_user_id} and enterprise uuid '
-                    f'{enterprise_customer_uuid}, and/or enterprise slug {enterprise_customer_slug}'
-                ),
-            )
-            return
-
-    def _initialize_enterprise_customer_users(self):
+    def load_enterprise_customer_users(self):
         """
         Initializes the enterprise customer users for the request user.
         """
@@ -267,6 +222,10 @@ class HandlerContext:
 
         # Set enterprise features from the response
         self._enterprise_features = enterprise_customer_users_data.get('enterprise_features', {})
+        self._enterprise_features_by_customer = enterprise_customer_users_data.get(
+            'enterprise_features_by_customer',
+            {},
+        )
 
         # Parse/transform the enterprise customer users data and update the context data
         transformed_data = {}
@@ -298,32 +257,17 @@ class HandlerContext:
             )
         })
 
-    def _initialize_secured_algolia_api_keys(self):
+    def update_algolia_keys(self, api_key, catalog_mapping):
         """
-        Initializes the secured algolia api key for the request user.
-        """
-        secured_algolia_api_key_data = get_and_cache_secured_algolia_search_keys(
-            self.request,
-            self._enterprise_customer_uuid,
-        )
+        Updates the Algolia API keys in the context.
 
-        secured_algolia_api_key = None
-        catalog_uuids_to_catalog_query_uuids = {}
-        try:
-            secured_algolia_api_key, catalog_uuids_to_catalog_query_uuids = transform_secured_algolia_api_key_response(
-                secured_algolia_api_key_data
-            )
-        except Exception:  # pylint: disable=broad-except
-            logger.exception(
-                'Error transforming secured algolia api key for request user %s,'
-                'enterprise customer uuid %s and/or slug %s',
-                self.lms_user_id,
-                self.enterprise_customer_uuid,
-                self.enterprise_customer_slug,
-            )
+        Args:
+            api_key: The secured Algolia API key
+            catalog_mapping: Dictionary mapping catalog UUIDs to query UUIDs
+        """
         self.data.update({
-            'secured_algolia_api_key': secured_algolia_api_key,
-            'catalog_uuids_to_catalog_query_uuids': catalog_uuids_to_catalog_query_uuids
+            'secured_algolia_api_key': api_key,
+            'catalog_uuids_to_catalog_query_uuids': catalog_mapping or {}
         })
 
     def add_error(self, status_code=None, **kwargs):
@@ -352,3 +296,19 @@ class HandlerContext:
         serializer = serializers.WarningSerializer(data=kwargs)
         serializer.is_valid(raise_exception=True)
         self.warnings.append(serializer.data)
+
+    def feature_enabled_for_enterprise_customer(self, feature_name):
+        """
+        Returns the feature for the enterprise customer.
+
+        Args:
+            feature_name (str): The name of the feature to retrieve.
+        """
+        if not self.enterprise_customer_uuid:
+            return False
+
+        enterprise_features_for_customer = self.enterprise_features_by_customer.get(
+            self.enterprise_customer_uuid,
+            {},
+        )
+        return enterprise_features_for_customer.get(feature_name, False)

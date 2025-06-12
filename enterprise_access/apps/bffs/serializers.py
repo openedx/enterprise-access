@@ -180,6 +180,7 @@ class BaseResponseSerializer(BaseBffSerializer):
     errors = ErrorSerializer(many=True, required=False, default=list)
     warnings = WarningSerializer(many=True, required=False, default=list)
     enterprise_features = serializers.DictField(required=False, default=dict)
+    enterprise_features_by_customer = serializers.DictField(required=False, default=dict)
 
 
 class CustomerAgreementSerializer(BaseBffSerializer):

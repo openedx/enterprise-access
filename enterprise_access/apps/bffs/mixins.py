@@ -3,8 +3,13 @@ Mixins for accessing `HandlerContext` data for bffs app
 """
 
 import logging
+from urllib.error import HTTPError
 
-from enterprise_access.apps.bffs.api import get_and_cache_enterprise_course_enrollments
+from enterprise_access.apps.bffs.api import (
+    get_and_cache_enterprise_course_enrollments,
+    get_and_cache_secured_algolia_search_keys,
+    transform_secured_algolia_api_key_response
+)
 from enterprise_access.apps.bffs.constants import COURSE_ENROLLMENT_STATUSES, UNENROLLABLE_COURSE_STATUSES
 
 logger = logging.getLogger(__name__)
@@ -276,7 +281,93 @@ class EnterpriseCourseEnrollmentsDataMixin(BaseLearnerDataMixin):
         )
 
 
-class LearnerDashboardDataMixin(EnterpriseCourseEnrollmentsDataMixin, BaseLearnerDataMixin):
+class AlgoliaDataMixin(BFFContextDataMixin):
+    """
+    Mixin to handle Algolia search functionality and API key management.
+    """
+
+    def load_secured_algolia_api_key(self):
+        """
+        Fetches and initializes the secured Algolia API keys for the request user.
+        Updates the context with the fetched keys.
+        """
+        try:
+            secured_algolia_api_key_data = get_and_cache_secured_algolia_search_keys(
+                self.context.request,
+                self.context.enterprise_customer_uuid,
+            )
+
+            secured_algolia_api_key = None
+            catalog_uuids_to_catalog_query_uuids = {}
+
+            try:
+                secured_algolia_api_key, catalog_uuids_to_catalog_query_uuids = (
+                    transform_secured_algolia_api_key_response(secured_algolia_api_key_data)
+                )
+            except Exception:  # pylint: disable=broad-except
+                logger.exception(
+                    'Error transforming secured algolia api key for request user %s,'
+                    'enterprise customer uuid %s and/or slug %s',
+                    self.context.lms_user_id,
+                    self.context.enterprise_customer_uuid,
+                    self.context.enterprise_customer_slug,
+                )
+
+            # Update context with the fetched data
+            self.context.update_algolia_keys(
+                secured_algolia_api_key,
+                catalog_uuids_to_catalog_query_uuids
+            )
+
+            # Log if no Algolia key or catalog mapping was found
+            if not (secured_algolia_api_key and catalog_uuids_to_catalog_query_uuids):
+                logger.info(
+                    'No secured algolia key found for request user %s, enterprise customer uuid %s, '
+                    'and/or enterprise slug %s',
+                    self.context.lms_user_id,
+                    self.context.enterprise_customer_uuid,
+                    self.context.enterprise_customer_slug,
+                )
+                self.context.add_error(
+                    user_message='No secured algolia api key or catalog query mapping found',
+                    developer_message=(
+                        f'No secured algolia api key or catalog query mapping found for request '
+                        f'user {self.context.lms_user_id} and enterprise uuid '
+                        f'{self.context.enterprise_customer_uuid}'
+                    ),
+                )
+
+        except HTTPError as exc:
+            exception_response = exc.response.json()
+            exception_response_user_message = exception_response.get('user_message')
+            exception_response_developer_message = exception_response.get('developer_message')
+
+            logger.exception(
+                'HTTP Error initializing the secured algolia api keys for request user %s, '
+                'enterprise customer uuid %s',
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
+            self.context.add_error(
+                user_message=exception_response_user_message or 'Error initializing search functionality',
+                developer_message=exception_response_developer_message or str(exc),
+                status_code=exc.response.status_code
+            )
+
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.exception(
+                'Error initializing the secured algolia api keys for request user %s, '
+                'enterprise customer uuid %s',
+                self.context.lms_user_id,
+                self.context.enterprise_customer_uuid,
+            )
+            self.context.add_error(
+                user_message='Error initializing search functionality',
+                developer_message=f'Could not initialize the secured algolia api keys. Error: {exc}'
+            )
+
+
+class LearnerDashboardDataMixin(EnterpriseCourseEnrollmentsDataMixin, AlgoliaDataMixin, BaseLearnerDataMixin):
     """
     Mixin to access learner dashboard data from the context.
     """
