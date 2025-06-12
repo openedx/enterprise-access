@@ -797,6 +797,94 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
 
         return super().create(request, *args, **kwargs)
 
+    @extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Decline learner credit requests.',
+    )
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    @action(detail=False, url_path='decline', methods=['post'])
+    def decline(self, *args, **kwargs):
+        """
+        Action of declining a Learner Credit Subsidy Request
+        """
+        # import pdb;pdb.set_trace()
+        enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
+        learner_credit_request_uuid = self.request.data.get('subsidy_request_uuid')
+        send_notification = self.request.data.get('send_notification', False)
+        disassociate_from_org = self.request.data.get('disassociate_from_org', False)
+
+        if not learner_credit_request_uuid:
+            error_msg = 'You must provide a subsidy request UUID to be declined.'
+            return Response(error_msg, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_uuid(learner_credit_request_uuid)
+        except ParseError:
+            error_msg = f'Subsidy Request UUID provided ({learner_credit_request_uuid}) is not a valid UUID'
+            return Response(error_msg, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            learner_credit_request = LearnerCreditRequest.objects.get(
+                uuid=learner_credit_request_uuid,
+                # enterprise_customer_uuid=enterprise_customer_uuid,
+            )
+        except LearnerCreditRequest.DoesNotExist:
+            error_msg = f'Learner Credit Request with UUID {learner_credit_request_uuid} not found.'
+            return Response(error_msg, status=status.HTTP_404_NOT_FOUND)
+
+        if learner_credit_request.state in [SubsidyRequestStates.APPROVED, SubsidyRequestStates.PENDING]:
+            error_msg = (
+                f'Learner Credit Request with UUID {learner_credit_request_uuid} is already '
+                f'{learner_credit_request.state}. Request could not be {SubsidyRequestStates.DECLINED}.'
+            )
+            return Response(error_msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        if learner_credit_request.state not in [SubsidyRequestStates.REQUESTED, SubsidyRequestStates.ERROR]:
+            error_msg = (
+                f'Learner Credit Request with UUID {learner_credit_request_uuid} cannot be declined. '
+                f'Current state: {learner_credit_request.state}'
+            )
+            return Response(error_msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        with transaction.atomic():
+            learner_credit_request.decline(self.lms_user_id)
+
+        serialized_learner_credit_request = serializers.LearnerCreditRequestSerializer(
+            learner_credit_request
+        ).data
+
+        # lms_user_id = serialized_learner_credit_request['lms_user_id']
+        lms_user_id = 3
+
+        if send_notification:
+            # TODO: Implement email sending functionality
+            # send_notification_email_for_request.delay(
+            #     learner_credit_request_uuid,
+            #     settings.BRAZE_DECLINE_NOTIFICATION_CAMPAIGN,
+            #     SubsidyTypeChoices.LEARNER_CREDIT,
+            #     {
+            #         'disassociated_from_org': disassociate_from_org
+            #     }
+            # )
+            logger.info(
+                f"TODO: Send decline notification email for learner credit request {learner_credit_request_uuid}"
+            )
+
+        if disassociate_from_org:
+            print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+            unlink_users_from_enterprise_task.delay(
+                enterprise_customer_uuid,
+                [lms_user_id]
+            )
+
+        return Response(
+            serialized_learner_credit_request,
+            status=status.HTTP_200_OK,
+        )
+
 
 @extend_schema_view(
     retrieve=extend_schema(
