@@ -259,7 +259,8 @@ class GetCreateCatalogStep(AbstractWorkflowStep):
             return settings.PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING[product_id]
         else:
             raise CreateCatalogStepException(
-                f"Cannot infer catalog_query_id: product_id {product_id} not found in mapping"
+                f"Cannot infer catalog_query_id: product_id {product_id} "
+                f"not found in mapping: {settings.PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING}"
             )
 
     def get_workflow_record(self):
