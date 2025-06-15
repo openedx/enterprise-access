@@ -132,3 +132,5 @@ GROUP_MEMBERS_WITH_AGGREGATES_DEFAULT_PAGE_SIZE = 10
 VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE = "You cannot make this change, as the sum of all budget \
 spend_limits for a given subsidy would exceed the sum of all deposits into that subsidy.  If you are trying to \
 re-balance policies, FIRST reduce the spend_limit of one, THEN increase the spend_limit of another."
+
+REASON_BNR_NOT_ENABLED = "This policy does not support BNR."

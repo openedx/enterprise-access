@@ -261,8 +261,15 @@ def get_allocated_quantity_for_configuration(assignment_configuration):
     return aggregate['total_quantity'] or 0
 
 
+# pylint: disable=too-many-statements
 def allocate_assignments(
-    assignment_configuration, learner_emails, content_key, content_price_cents, known_lms_user_ids=None,
+    assignment_configuration,
+    learner_emails,
+    content_key,
+    content_price_cents,
+    known_lms_user_ids=None,
+    link_enterprise_learner=True,
+    send_notification_email=True,
 ):
     """
     Creates or updates an allocated assignment record
@@ -283,6 +290,10 @@ def allocate_assignments(
       - ``known_lms_user_ids``: Optional list of known lms user ids corresponding to the provided emails.
         If present, it's assumed to be *all* lms user ids for the provided emails, and that no duplicate
         user emails are provided.
+      - ``link_enterprise_learner``: Set to True as default. If False, it will not link the learners
+        by creating PendingEnterpriseCustomerUser records.
+      - ``send_notification_email``: Set to True as default. If False, it will not send notification
+        emails to learners.
 
     Returns: A dictionary of updated, created, and unchanged assignment records. e.g.
       ```
@@ -420,9 +431,11 @@ def allocate_assignments(
     # Enqueue an asynchronous task to link assigned learners to the customer
     # This has to happen outside of the atomic block to avoid a race condition
     # when the celery task does its read of updated/created assignments.
-    for assignment in updated_assignments + created_assignments:
-        create_pending_enterprise_learner_for_assignment_task.delay(assignment.uuid)
-        send_email_for_new_assignment.delay(assignment.uuid)
+        for assignment in updated_assignments + created_assignments:
+            if link_enterprise_learner:
+                create_pending_enterprise_learner_for_assignment_task.delay(assignment.uuid)
+            if send_notification_email:
+                send_email_for_new_assignment.delay(assignment.uuid)
 
     # Make a list of all pre-existing assignments that were not updated.
     unchanged_assignments = list(set(existing_assignments) - set(updated_assignments))

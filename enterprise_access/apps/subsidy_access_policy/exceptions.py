@@ -11,6 +11,16 @@ class SubsidyAccessPolicyException(Exception):
     """
 
 
+class SubisidyAccessPolicyRequestApprovalError(Exception):
+    """
+    Raised when an error occurs while approving a Learner Credit Request.
+    """
+    def __init__(self, message, status_code=None):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+
+
 class UnredeemableContentException(SubsidyAccessPolicyException):
     """
     Raised from any exceptional state that causes content to not be redeemable.
