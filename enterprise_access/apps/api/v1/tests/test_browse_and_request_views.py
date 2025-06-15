@@ -3,6 +3,7 @@ Tests for Enterprise Access Browse and Request app API v1 views.
 """
 import random
 from unittest import mock
+from unittest.mock import patch
 from uuid import uuid4
 
 import ddt
@@ -10,13 +11,28 @@ from django.conf import settings
 from rest_framework import status
 from rest_framework.reverse import reverse
 
+from enterprise_access.apps.content_assignments.tests.factories import (
+    AssignmentConfigurationFactory,
+    LearnerContentAssignmentFactory
+)
 from enterprise_access.apps.core.constants import (
     ALL_ACCESS_CONTEXT,
     SYSTEM_ENTERPRISE_ADMIN_ROLE,
     SYSTEM_ENTERPRISE_LEARNER_ROLE,
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
-from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
+from enterprise_access.apps.subsidy_access_policy.constants import (
+    REASON_CONTENT_NOT_IN_CATALOG,
+    REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY,
+    REASON_POLICY_EXPIRED,
+    REASON_POLICY_SPEND_LIMIT_REACHED,
+    REASON_SUBSIDY_EXPIRED
+)
+from enterprise_access.apps.subsidy_access_policy.exceptions import SubsidyAccessPolicyLockAttemptFailed
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+from enterprise_access.apps.subsidy_access_policy.tests.factories import (
+    PerLearnerSpendCapLearnerCreditAccessPolicyFactory
+)
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
@@ -32,6 +48,7 @@ from enterprise_access.apps.subsidy_request.tests.factories import (
     LicenseRequestFactory,
     SubsidyRequestCustomerConfigurationFactory
 )
+from enterprise_access.apps.subsidy_request.utils import get_action_choice, get_user_message_choice
 from test_utils import APITestWithMocks
 
 from .utils import BaseEnterpriseAccessTestCase
@@ -1514,11 +1531,25 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
     def setUp(self):
         super().setUp()
 
-        # Setup test policy and config
+        # Setup a subsidy client
+        subsidy_client_patcher = patch.object(
+            SubsidyAccessPolicy, 'subsidy_client'
+        )
+        self.mock_subsidy_client = subsidy_client_patcher.start()
+
+        # Setup test policy and request config and assignment config
         self.learner_credit_config = LearnerCreditRequestConfigurationFactory(active=True)
-        self.policy = AssignedLearnerCreditAccessPolicyFactory(
+        self.assignment_config = AssignmentConfigurationFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+        )
+        self.policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             learner_credit_request_config=self.learner_credit_config,
-            enterprise_customer_uuid=self.enterprise_customer_uuid_1
+            assignment_configuration=self.assignment_config,
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            active=True,
+            retired=False,
+            per_learner_spend_limit=0,  # For B&R budget, limit should be set to 0.
+            spend_limit=4000,
         )
 
         # Setup test requests
@@ -1526,6 +1557,9 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
             user=self.user,
             learner_credit_request_config=self.learner_credit_config,
+            course_price=1000,
+            state=SubsidyRequestStates.REQUESTED,
+            assignment=None
         )
         self.user_request_2 = LearnerCreditRequestFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid_2,
@@ -1539,6 +1573,39 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
 
         # LearnerCreditrequest with no associations to the user and enterprise
         self.other_learner_credit_request = LearnerCreditRequestFactory()
+
+        # Set up existing assignments (approved requests)
+        self.assignment_1 = LearnerContentAssignmentFactory(
+            assignment_configuration=self.assignment_config,
+            content_quantity=-500,
+            state='allocated'
+        )
+        self.assignment_2 = LearnerContentAssignmentFactory(
+            assignment_configuration=self.assignment_config,
+            content_quantity=-500,
+            state='allocated'
+        )
+
+        # Set up existing transactions
+        self.mock_transaction_record_1 = {
+            'uuid': str(uuid4()),
+            'state': "committed",
+            'content_key': 'something',
+            'subsidy_access_policy_uuid': str(self.policy.uuid),
+            'quantity': -500,
+            'other': True,
+        }
+        self.mock_transaction_record_2 = {
+            'uuid': str(uuid4()),
+            'state': "committed",
+            'content_key': 'something',
+            'subsidy_access_policy_uuid': str(self.policy.uuid),
+            'quantity': -500,
+            'other': True,
+        }
+
+        # cleanups
+        self.addCleanup(subsidy_client_patcher.stop)
 
     def test_list_as_enterprise_learner(self):
         """
@@ -1644,7 +1711,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         Test that request creation fails when BNR is not active for the policy.
         """
         disabled_config = LearnerCreditRequestConfigurationFactory(active=False)
-        disabled_policy = AssignedLearnerCreditAccessPolicyFactory(
+        disabled_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             learner_credit_request_config=disabled_config,
             enterprise_customer_uuid=self.enterprise_customer_uuid_1
         )
@@ -1848,3 +1915,577 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
             str(self.enterprise_customer_uuid_1),
             [self.user_request_1.user.lms_user_id]
         )
+
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    @mock.patch(
+        'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
+        return_value=mock.MagicMock(),
+    )
+    def test_approve_happy_path(
+        self,
+        mock_get_and_cache_content_metadata,
+        mock_catalog_contains,
+        mock_content_metadata,
+        mock_get_enterprise_uuid
+    ):
+        """
+        Test successful approve of a learner credit request.
+        """
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+        mock_content_metadata.return_value = {
+            'content_key': 'some-content-key',
+            'content_price': 1000,
+        }
+        mock_catalog_contains.return_value = True
+
+        # Set up mock client and its methods
+        self.mock_subsidy_client.retrieve_subsidy.return_value = {
+            'uuid': str(uuid4()),
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': 3000,
+            'is_active': True,
+        }
+
+        total_quantity_transactions = (
+            self.mock_transaction_record_1['quantity'] +
+            self.mock_transaction_record_2['quantity']
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [
+                self.mock_transaction_record_1,
+                self.mock_transaction_record_2,
+            ],
+            'aggregates': {
+                'total_quantity': total_quantity_transactions,
+            }
+        }
+
+        mock_get_and_cache_content_metadata.return_value = {
+            'content_title': 'Demo Course',
+            'content_key': 'some-content-key',
+            'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+        }
+
+        # set up some approved requests with allocated assignments
+        LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            learner_credit_request_config=self.learner_credit_config,
+            course_price=500,
+            state=SubsidyRequestStates.APPROVED,
+            assignment=self.assignment_1,
+        )
+        LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            learner_credit_request_config=self.learner_credit_config,
+            course_price=500,
+            state=SubsidyRequestStates.APPROVED,
+            assignment=self.assignment_2,
+        )
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+        }
+        response = self.client.post(url, data)
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verify request was approved
+        self.user_request_1.refresh_from_db()
+        assert self.user_request_1.state == SubsidyRequestStates.APPROVED
+        assert self.user_request_1.reviewer == self.user
+        # Verify assignment was created with correct fields
+        assert self.user_request_1.assignment is not None
+        assert self.user_request_1.assignment.content_quantity == self.user_request_1.course_price * -1
+        assert self.user_request_1.assignment.assignment_configuration == self.assignment_config
+        assert self.user_request_1.assignment.state == 'allocated'
+        assert self.user_request_1.assignment.learner_email == self.user_request_1.user.email
+        assert self.user_request_1.assignment.content_key == self.user_request_1.course_id
+
+        # Verify RequestAction was created
+        self.assertIsNotNone(
+            self.user_request_1.actions.get(
+                learner_credit_request=self.user_request_1,
+                recent_action=get_action_choice(SubsidyRequestStates.APPROVED),
+                status=get_user_message_choice(
+                    SubsidyRequestStates.APPROVED
+                ),
+            )
+        )
+
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    def test_approve_policy_expired(self, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid):
+        """
+        Test approve when policy is expired/inactive (is_redemption_enabled = False).
+        """
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+        mock_content_metadata.return_value = {
+            'content_key': 'some-content-key',
+            'content_price': 1000,
+        }
+        mock_catalog_contains.return_value = True
+
+        # Set policy to inactive
+        self.policy.active = False
+        self.policy.save()
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+        }
+        response = self.client.post(url, data)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert REASON_POLICY_EXPIRED in response.data['detail'].lower()
+
+        # Verify request was not approved
+        self.user_request_1.refresh_from_db()
+        assert self.user_request_1.state == SubsidyRequestStates.REQUESTED
+        assert self.user_request_1.assignment is None
+
+        # Verify error action was tracked
+        actions = LearnerCreditRequestActions.objects.filter(
+            learner_credit_request=self.user_request_1
+        ).order_by('-created')
+        assert actions.exists()
+        latest_action = actions.first()
+        assert latest_action.status == get_user_message_choice(SubsidyRequestStates.REQUESTED)
+        assert latest_action.error_reason is not None
+
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    def test_approve_content_not_in_catalog(
+        self, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid
+    ):
+        """
+        Test approve when content is not in the policy's catalog.
+        """
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+        mock_content_metadata.return_value = {
+            'content_key': 'some-content-key',
+            'content_price': 1000,
+        }
+        mock_catalog_contains.return_value = False
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+        }
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert REASON_CONTENT_NOT_IN_CATALOG in response.data['detail'].lower()
+
+        # Verify request was not approved
+        self.user_request_1.refresh_from_db()
+        assert self.user_request_1.state == SubsidyRequestStates.REQUESTED
+        assert self.user_request_1.assignment is None
+
+        # Verify error action was tracked with proper details
+        actions = LearnerCreditRequestActions.objects.filter(
+            learner_credit_request=self.user_request_1
+        ).order_by('-created')
+        assert actions.exists()
+
+        latest_action = actions.first()
+        assert latest_action.status == get_user_message_choice(SubsidyRequestStates.REQUESTED)
+        assert latest_action.error_reason is not None
+        assert latest_action.traceback is not None
+        assert REASON_CONTENT_NOT_IN_CATALOG in latest_action.traceback.lower()
+
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    def test_approve_subsidy_inactive(self, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid):
+        """
+        Test approve when subsidy is inactive.
+        """
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+        mock_content_metadata.return_value = {
+            'content_key': 'some-content-key',
+            'content_price': 1000,
+        }
+        mock_catalog_contains.return_value = True
+
+        # Mock inactive subsidy
+        self.mock_subsidy_client.retrieve_subsidy.return_value = {
+            'uuid': str(uuid4()),
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': 3000,
+            'is_active': False,  # Inactive subsidy
+        }
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+        }
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert REASON_SUBSIDY_EXPIRED in response.data['detail'].lower()
+
+        # Verify request was not approved
+        self.user_request_1.refresh_from_db()
+        assert self.user_request_1.state == SubsidyRequestStates.REQUESTED
+        assert self.user_request_1.assignment is None
+
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    def test_approve_insufficient_subsidy_balance(
+        self, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid
+    ):
+        """
+        Test approve when subsidy has insufficient balance.
+        """
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+        mock_content_metadata.return_value = {
+            'content_key': 'some-content-key',
+            'content_price': 1000,
+        }
+        mock_catalog_contains.return_value = True
+
+        # Mock subsidy with insufficient balance
+        self.mock_subsidy_client.retrieve_subsidy.return_value = {
+            'uuid': str(uuid4()),
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': 1500,  # Insufficient balance (1000 needed, 1500 available)
+            'is_active': True,
+        }
+
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {
+                'total_quantity': 0,
+            }
+        }
+
+        # set up some approved requests with allocated assignments
+        LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            learner_credit_request_config=self.learner_credit_config,
+            course_price=500,
+            state=SubsidyRequestStates.APPROVED,
+            assignment=self.assignment_1,
+        )
+        LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            learner_credit_request_config=self.learner_credit_config,
+            course_price=500,
+            state=SubsidyRequestStates.APPROVED,
+            assignment=self.assignment_2,
+        )
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+        }
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY in response.data['detail'].lower()
+
+        # Verify request was not approved
+        self.user_request_1.refresh_from_db()
+        assert self.user_request_1.state == SubsidyRequestStates.REQUESTED
+        assert self.user_request_1.assignment is None
+
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    def test_approve_policy_spend_limit_exceeded(
+        self, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid
+    ):
+        """
+        Test approve when policy spend limit would be exceeded.
+        """
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+        mock_content_metadata.return_value = {
+            'content_key': 'some-content-key',
+            'content_price': 2500,  # Request price is 2500
+        }
+        mock_catalog_contains.return_value = True
+        self.mock_subsidy_client.retrieve_subsidy.return_value = {
+            'uuid': str(uuid4()),
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': 5000,
+            'is_active': True,
+        }
+
+        request_exceed_spend_limit = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            user=self.user,
+            learner_credit_request_config=self.learner_credit_config,
+            course_price=2500,  # balance=5000, spend_limit=4000, so this request would exceed the limit
+            state=SubsidyRequestStates.REQUESTED,
+            assignment=None
+        )
+
+        total_quantity_transactions = self.mock_transaction_record_1['quantity'] + \
+            self.mock_transaction_record_2['quantity']
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [
+                self.mock_transaction_record_1,
+                self.mock_transaction_record_2,
+            ],
+            'aggregates': {
+                'total_quantity': total_quantity_transactions,
+            }
+        }
+
+        # set up some approved requests with allocated assignments
+        LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            learner_credit_request_config=self.learner_credit_config,
+            course_price=500,
+            state=SubsidyRequestStates.APPROVED,
+            assignment=self.assignment_1,
+        )
+        LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            learner_credit_request_config=self.learner_credit_config,
+            course_price=500,
+            state=SubsidyRequestStates.APPROVED,
+            assignment=self.assignment_2,
+        )
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+            "learner_credit_request_uuid": str(request_exceed_spend_limit.uuid)
+        }
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert REASON_POLICY_SPEND_LIMIT_REACHED in response.data['detail'].lower()
+
+        # Verify request was not approved
+        request_exceed_spend_limit.refresh_from_db()
+        assert request_exceed_spend_limit.state == SubsidyRequestStates.REQUESTED
+        assert request_exceed_spend_limit.assignment is None
+
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    def test_approve_invalid_price_validation(
+        self, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid
+    ):
+        """
+        Test approve when content price validation fails.
+        """
+        course_canonical_price = 200
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+        mock_content_metadata.return_value = {
+            'content_key': 'some-content-key',
+            'content_price': course_canonical_price,  # request price way beyond canonical price range.
+        }
+        mock_catalog_contains.return_value = True
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+        }
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert f'outside of acceptable interval on canonical course price of {course_canonical_price}' \
+            in response.data['detail'].lower()
+
+        # Verify request was not approved
+        self.user_request_1.refresh_from_db()
+        assert self.user_request_1.state == SubsidyRequestStates.REQUESTED
+        assert self.user_request_1.assignment is None
+
+    def test_approve_nonexistent_policy(self):
+        """
+        Test approve with nonexistent policy UUID.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+        non_existent_policy_uuid = str(uuid4())
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": non_existent_policy_uuid,  # Nonexistent UUID
+            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+        }
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert f"policy with uuid {non_existent_policy_uuid} does not exist" in response.data['detail'].lower()
+
+    def test_approve_missing_required_fields(self):
+        """
+        Test approve with missing required fields.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+
+        # Test missing policy_uuid
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+        }
+        response = self.client.post(url, data)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "required" in response.data['policy_uuid'][0].lower()
+
+        # Test missing learner_credit_request_uuid
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+        }
+        response = self.client.post(url, data)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "required" in response.data['learner_credit_request_uuid'][0].lower()
+
+    def test_approve_unauthorized_access(self):
+        """
+        Test approve without proper admin permissions.
+        """
+        # Set learner role instead of admin
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+        }
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_approve_wrong_enterprise_context(self):
+        """
+        Test approve with admin permissions for wrong enterprise.
+        """
+        # Set admin role for different enterprise
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_2)  # Different enterprise
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+        }
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.lock')
+    def test_approve_policy_lock_failure(
+        self, mock_lock, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid
+    ):
+        """
+        Test approve when policy lock acquisition fails.
+        """
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+        mock_content_metadata.return_value = {
+            'content_key': 'some-content-key',
+            'content_price': 1000,
+        }
+        mock_catalog_contains.return_value = True
+
+        # Mock lock failure
+        mock_lock.side_effect = SubsidyAccessPolicyLockAttemptFailed("Lock failed")
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+        }
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert "failed to acquire lock" in response.data['detail'].lower()
+
+        # Verify request was not approved
+        self.user_request_1.refresh_from_db()
+        assert self.user_request_1.state == SubsidyRequestStates.REQUESTED
+        assert self.user_request_1.assignment is None

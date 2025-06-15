@@ -22,6 +22,7 @@ from enterprise_access.apps.content_assignments.models import AssignmentConfigur
 from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
 from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_BEYOND_ENROLLMENT_DEADLINE,
+    REASON_BNR_NOT_ENABLED,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_EXPIRED,
@@ -75,6 +76,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+
         cls.per_learner_enroll_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             uuid=ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID,
             per_learner_enrollment_limit=5,
@@ -102,6 +104,17 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             retired=True,
         )
 
+    def setUp(self):
+        super().setUp()
+        self.assignments_api_patcher = patch(
+            'enterprise_access.apps.subsidy_access_policy.models.assignments_api',
+            autospec=True,
+        )
+        self.mock_assignments_api = self.assignments_api_patcher.start()
+
+        # cleanups
+        self.addCleanup(self.assignments_api_patcher.stop)
+
     def tearDown(self):
         """
         Clears any cached data for the test policy instances between test runs.
@@ -114,7 +127,13 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         Verify that the assignment configuration is created when saving a PerLearnerCreditAccessPolicy
         with bnr_enabled=True.
         """
-        policy = self.per_learner_spend_policy
+        # let the assignments API actually create an assignment configuration
+        self.assignments_api_patcher.stop()
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            uuid=uuid4(),
+            per_learner_spend_limit=200,
+            spend_limit=5000
+        )
         with patch(
                 'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
                 new_callable=PropertyMock,
@@ -133,7 +152,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
 
     def test_save_per_learner_credit_policy_with_bnr_not_enabled(self):
         """
-        Verify that the assignment configuration is created when saving a PerLearnerCreditAccessPolicy
+        Verify that the assignment configuration is not created when saving a PerLearnerCreditAccessPolicy
         with bnr_enabled=False.
         """
         policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
@@ -965,6 +984,103 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
 
             mock_assigned_can_redeem.assert_not_called()
             mock_super_can_redeem.assert_called_once()
+
+    def test_per_learner_spend_policy_can_approve_bnr_disabled(self):
+        """
+        Test that PerLearnerSpendCreditAccessPolicy.can_approve returns False when bnr_enabled is False.
+        """
+        policy = self.per_learner_spend_policy
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=False
+        ), patch(
+            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_allocate'
+        ) as mock_can_allocate:
+            result, reason = policy.can_approve(self.course_id, 1000)
+            mock_can_allocate.assert_not_called()
+            self.assertFalse(result)
+            self.assertEqual(reason, REASON_BNR_NOT_ENABLED)
+
+    def test_per_learner_spend_policy_can_approve_bnr_enabled(self):
+        """
+        Test PerLearnerSpendCreditAccessPolicy.can_approve when bnr_enabled is True.
+        """
+        policy = self.per_learner_spend_policy
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=True
+        ), patch(
+            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_allocate'
+        ) as mock_can_allocate:
+            mock_can_allocate.return_value = (True, None)
+            result, reason = policy.can_approve(self.course_id, 1000)
+            mock_can_allocate.assert_called_once_with(1, self.course_id, 1000)
+            self.assertTrue(result)
+            self.assertEqual(reason, None)
+
+    def test_per_learner_spend_policy_can_approve_failure(self):
+        """
+        Test PerLearnerSpendCreditAccessPolicy.can_approve when can_allocate returns False.
+        """
+        policy = self.per_learner_spend_policy
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=True
+        ), patch(
+            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_allocate'
+        ) as mock_can_allocate:
+            mock_can_allocate.return_value = (False, REASON_CONTENT_NOT_IN_CATALOG)
+            result, reason = policy.can_approve(self.course_id, 1000)
+            mock_can_allocate.assert_called_once_with(1, self.course_id, 1000)
+            self.assertFalse(result)
+            # assert it returns the same reason as AssignedLearnerCreditAccessPolicy.can_approve
+            self.assertEqual(reason, REASON_CONTENT_NOT_IN_CATALOG)
+
+    def test_per_learner_spend_policy_approve_method_assignment_allocated(self):
+        """
+        Test PerLearnerSpendCreditAccessPolicy.approve method calls assignments_api.allocate_assignment_for_request()
+          with correct paramaters when a new assignment is created.
+        """
+        # set up assignment, configuration and allocate_assignment_for_request mock return value
+        assignment_configuration = AssignmentConfiguration.objects.create()
+        test_learner_email = 'test@email.com'
+        test_course_price = 1000
+        assignment = LearnerContentAssignmentFactory(
+            learner_email=test_learner_email,
+            content_key=self.course_id,
+            lms_user_id=self.lms_user_id,
+            state='allocated',
+            content_quantity=-test_course_price,
+            assignment_configuration=assignment_configuration,
+        )
+
+        self.mock_assignments_api.allocate_assignment_for_request.return_value = assignment
+
+        # link assignment_configuration to the policy
+        policy = self.per_learner_spend_policy
+        policy.assignment_configuration = assignment_configuration
+        policy.save()
+
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=True
+        ):
+            result = policy.approve(test_learner_email, self.course_id, test_course_price, self.lms_user_id)
+            # assert that the result is the created assignment
+            self.assertEqual(result, assignment)
+
+            # assert that the assignments_api.allocate_assignment_for_request was called with correct parameters
+            self.mock_assignments_api.allocate_assignment_for_request.assert_called_once_with(
+                assignment_configuration,
+                test_learner_email,
+                self.course_id,
+                test_course_price,
+                self.lms_user_id,
+            )
 
 
 @ddt.ddt
