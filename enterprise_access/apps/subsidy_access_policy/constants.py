@@ -133,3 +133,5 @@ VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE = "You cannot make this ch
 limits would exceed the funds available on the subsidy. Please double-check the subsidy’s initial value and any \
 adjustments, then ensure the budgets sum to an equal or lower amount. If you are trying to re-balance policies, \
 please reduce the value of one first, then proceed to increase the value of another"
+
+REASON_BNR_NOT_ENABLED = "This policy does not support BNR."

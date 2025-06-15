@@ -32,6 +32,7 @@ from .constants import (
     CREDIT_POLICY_TYPE_PRIORITY,
     FORCE_ENROLLMENT_KEYWORD,
     REASON_BEYOND_ENROLLMENT_DEADLINE,
+    REASON_BNR_NOT_ENABLED,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_EXPIRED,
@@ -724,6 +725,54 @@ class SubsidyAccessPolicy(TimeStampedModel):
         )
         logger.info(message, self.uuid, is_redeemable, reason, lms_user_id, content_key, extra)
 
+    def can_approve(self, content_key, content_price_cents):
+        """
+        Determines if a request with the given content_key and content_price_cents
+        can be approved under this policy.
+        
+        Returns a tuple of (bool, str):
+        - bool: True if the request can be approved, False otherwise.
+        - str: A reason code if the request cannot be approved, or an empty string if it can.
+        """
+        # Since we are treating assignments as approved requests, can_allocate would give us the same result. 
+        if not self.bnr_enabled:
+            return False, REASON_BNR_NOT_ENABLED
+        return self.assignment_request_can_allocate(content_key, content_price_cents)  
+
+    def approve(self, learner_email, content_key, content_price_cents, lms_user_id):
+        """
+        Approves a learner credit request for the given learner_email and content_key.
+        This method allocates an assignment for the learner to be linked with the request.
+        If the allocation fails, it logs an error and returns None.
+        If the allocation is successful, it returns the created or updated assignment.
+        
+        Params:
+          content_key: Course key of the requested content.
+          content_price_cents: A **non-negative** integer reflecting the current price of the content in USD cents.
+        """
+        # To approve a learner credit request, we need to allocate an assignment and link it to the request.
+        result = self.assignment_request_allocate(
+            learner_email,
+            content_key,
+            content_price_cents,
+            lms_user_id,
+        )
+        assignment =  result['created'][0] or result['updated'][0] or result['no_change'][0]
+        if not assignment:
+            error_msg = (
+                    f"Failed to create or update assignment for learner {learner_email} "
+                    f"and content {content_key}. Allocation result: {result}"
+                )
+            logger.error(f"[LC REQUEST APPROVAL] {error_msg}")
+            return None
+        
+        logger.info(
+            f"[LC REQUEST APPROVAL] Successfully approved request for policy: {self.uuid}, "
+            f"learner_email: {learner_email}, assignment_uuid: {assignment.uuid}, "
+            f"state: {assignment.state}"
+        )
+        return assignment
+    
     def can_redeem(
         self, lms_user_id, content_key,
         skip_customer_user_check=False, skip_enrollment_deadline_check=False,
@@ -1203,7 +1252,27 @@ class SubsidyAccessPolicyRequestAssignmentMixin:
     def assignment_request_redeem(self, lms_user_id, content_key, all_transactions, metadata=None, **kwargs):
         policy_instance = AssignedLearnerCreditAccessPolicy()
         return policy_instance.redeem(lms_user_id, content_key, all_transactions, metadata=metadata, **kwargs)
+    
+    def assignment_request_can_allocate(self, content_key, content_price_cents):
+        """
+        Wrapper method to make requests that fall under a PerLearnerSpendCreditAccessPolicy work with assignments.
+        """
+        policy_instance = AssignedLearnerCreditAccessPolicy()
+        return policy_instance.can_allocate(1, content_key, content_price_cents)
 
+    def assignment_request_allocate(self, learner_email, content_key, content_price_cents, lms_user_id):
+        """
+        Wrapper method to make requests that fall under a PerLearnerSpendCreditAccessPolicy work with assignments.
+        """
+        policy_instance = AssignedLearnerCreditAccessPolicy()
+        return policy_instance.allocate(
+            [learner_email],
+            content_key,
+            content_price_cents,
+            known_lms_user_ids=[lms_user_id],
+            link_enterprise_learner=False,  # The request already comes from a valid learner.
+            send_notification_email=False,  # Don't send allocation email for requests.
+        )
 
 class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
                                         SubsidyAccessPolicyRequestAssignmentMixin
@@ -1641,7 +1710,7 @@ class AssignedLearnerCreditAccessPolicy(AssignedCreditPolicyMixin, SubsidyAccess
 
         return (True, None)
 
-    def allocate(self, learner_emails, content_key, content_price_cents):
+    def allocate(self, learner_emails, content_key, content_price_cents, known_lms_user_ids=None, link_enterprise_learner=True, send_notification_email=True):
         """
         Creates allocated ``LearnerContentAssignment`` records.
 
@@ -1655,6 +1724,9 @@ class AssignedLearnerCreditAccessPolicy(AssignedCreditPolicyMixin, SubsidyAccess
             learner_emails,
             content_key,
             content_price_cents,
+            known_lms_user_ids=known_lms_user_ids,
+            link_enterprise_learner=link_enterprise_learner,
+            send_notification_email=send_notification_email,
         )
 
 

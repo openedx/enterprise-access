@@ -27,6 +27,8 @@ from enterprise_access.apps.api.filters import (
     SubsidyRequestFilterBackend
 )
 from enterprise_access.apps.api.mixins import UserDetailsFromJwtMixin
+from enterprise_access.apps.subsidy_access_policy.api import approve_learner_credit_request_via_policy
+from enterprise_access.apps.subsidy_access_policy.exceptions import SubisidyAccessPolicyRequestApprovalError
 from enterprise_access.apps.api.tasks import (
     assign_coupon_codes_task,
     assign_licenses_task,
@@ -45,10 +47,12 @@ from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClien
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
-from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
+from enterprise_access.apps.subsidy_request.constants import APPROVABLE_STATES, SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
+    LearnerCreditRequestActions, 
+    LearnerCreditRequestActionErrorReasons,
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
@@ -705,10 +709,14 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         tags=['Learner Credit Requests'],
         summary='Create a learner credit request.',
     ),
+    approve=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Approve a learner credit request.',
+    ),
     overview=extend_schema(
         tags=['Learner Credit Requests'],
         summary='Learner credit request overview.',
-    ),
+    )
 )
 class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
     """
@@ -796,8 +804,68 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         )
 
         return super().create(request, *args, **kwargs)
+    
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    def approve(self, request, *args, **kwargs):
+        """
+        Approve a learner credit request.
+        """
+        # Validate the request data
+        serializer = serializers.LearnerCreditRequestApproveRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        learner_credit_request_uuid = serializer.data['learner_credit_request_uuid']
+        policy_uuid = serializer.data['policy_uuid']
 
+        lc_request = LearnerCreditRequest.objects.filter(
+            uuid=learner_credit_request_uuid,
+        ).select_related('user').first()
 
+        learner_email = lc_request.user.email
+        content_key = lc_request.course_id
+        content_price_cents = lc_request.course_price
+
+        # Log "approve" as recent action in the Request Action model.
+        lc_request_action = LearnerCreditRequestActions.create_action(
+            learner_credit_request=lc_request,
+            recent_action=SubsidyRequestStates.APPROVED,
+            status=SubsidyRequestStates.APPROVED,
+        )
+
+        try:
+            with transaction.atomic():
+                # Validate the policy, once validated, approve the request by creating a content assignment.
+                learner_credit_request_assignment = approve_learner_credit_request_via_policy(
+                    policy_uuid,
+                    content_key,
+                    content_price_cents,
+                    learner_email,
+                    lc_request.user.id
+                )
+                # link allocated assignment to the request
+                lc_request.assignment = learner_credit_request_assignment
+                lc_request.save()
+                lc_request.approve(request.user)
+                # todo: Add logic to send approval email to the learner.
+            response_data = serializers.LicenseRequestSerializer(lc_request).data
+            return Response(
+                response_data,
+                status=status.HTTP_200_OK,
+            )
+        except SubisidyAccessPolicyRequestApprovalError as exc:
+            logger.exception(exc)
+            error_msg = (
+                f"Failed to approve learner credit request with UUID {learner_credit_request_uuid}."
+                f"Reason: {exc.message}."
+            )
+            # Update approve action with error reason.
+            lc_request_action.error_reason = LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL
+            lc_request_action.traceback = exc.message
+            lc_request_action.save()
+            return Response({"detail": error_msg}, exc.status_code)
+            
 @extend_schema_view(
     retrieve=extend_schema(
         tags=['Subsidy Request Configuration'],
