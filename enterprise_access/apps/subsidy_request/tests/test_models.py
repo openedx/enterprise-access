@@ -12,11 +12,21 @@ from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory
 )
-from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
-from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest, LearnerCreditRequestConfiguration
+from enterprise_access.apps.subsidy_request.constants import (
+    LearnerCreditAdditionalActionStates,
+    LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestUserMessages,
+    SubsidyRequestStates
+)
+from enterprise_access.apps.subsidy_request.models import (
+    LearnerCreditRequest,
+    LearnerCreditRequestActions,
+    LearnerCreditRequestConfiguration
+)
 from enterprise_access.apps.subsidy_request.tasks import update_course_info_for_subsidy_request_task
 from enterprise_access.apps.subsidy_request.tests.factories import (
     CouponCodeRequestFactory,
+    LearnerCreditRequestActionsFactory,
     LearnerCreditRequestFactory,
     LicenseRequestFactory
 )
@@ -268,3 +278,81 @@ class LearnerCreditRequestConfigurationTests(TestCase):
         self.subsidy_access_policy.learner_credit_request_config = None
         self.subsidy_access_policy.save()
         self.assertFalse(self.subsidy_access_policy.bnr_enabled)
+
+
+@ddt.ddt
+class LearnerCreditRequestActionsTests(TestCase):
+    """
+    Test cases for the LearnerCreditRequestActions model.
+    """
+
+    def setUp(self):
+        """
+        Set up test data for each test case.
+        """
+        self.user = UserFactory()
+        self.learner_credit_request = LearnerCreditRequestFactory(user=self.user)
+        self.action = LearnerCreditRequestActionsFactory(
+            learner_credit_request=self.learner_credit_request,
+            recent_action=SubsidyRequestStates.REQUESTED,
+            status=SubsidyRequestStates.REQUESTED,
+        )
+
+    def test_string_representation(self):
+        """
+        Test the string representation of the model.
+        """
+        expected_string = (
+            f"<LearnerCreditRequestActions for request {self.learner_credit_request}"
+            f" with action {self.action.recent_action}>"
+        )
+        self.assertEqual(str(self.action), expected_string)
+
+    def test_model_creation(self):
+        """
+        Test that a LearnerCreditRequestActions instance is created successfully.
+        """
+        self.assertIsNotNone(self.action.uuid)
+        self.assertEqual(self.action.recent_action, SubsidyRequestStates.REQUESTED)
+        self.assertEqual(self.action.status, SubsidyRequestStates.REQUESTED)
+        self.assertIsNone(self.action.error_reason)
+        self.assertIsNone(self.action.traceback)
+
+    def test_reminded_action(self):
+        """
+        Test creating an action with the REMINDED state.
+        """
+        reminded_action = LearnerCreditRequestActionsFactory(
+            learner_credit_request=self.learner_credit_request,
+            recent_action=LearnerCreditAdditionalActionStates.REMINDED,
+            status=LearnerCreditAdditionalActionStates.REMINDED,
+        )
+        self.assertEqual(reminded_action.recent_action, LearnerCreditAdditionalActionStates.REMINDED)
+        self.assertEqual(reminded_action.status, LearnerCreditAdditionalActionStates.REMINDED)
+
+    def test_error_action(self):
+        """
+        Test creating an action with an error.
+        """
+        error_action = LearnerCreditRequestActionsFactory(
+            learner_credit_request=self.learner_credit_request,
+            recent_action=SubsidyRequestStates.ERROR,
+            status=SubsidyRequestStates.ERROR,
+            error_reason=LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL,
+            traceback="An error occurred",
+        )
+        self.assertEqual(error_action.recent_action, SubsidyRequestStates.ERROR)
+        self.assertEqual(error_action.status, SubsidyRequestStates.ERROR)
+        self.assertEqual(error_action.error_reason, LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL)
+        self.assertEqual(error_action.traceback, "An error occurred")
+
+    def test_model_update(self):
+        """
+        Test updating a LearnerCreditRequestActions instance.
+        """
+        self.action.recent_action = SubsidyRequestStates.APPROVED
+        self.action.status = LearnerCreditRequestUserMessages.CHOICES[3][0]  # APPROVED choice
+        self.action.save()
+        updated_action = LearnerCreditRequestActions.objects.get(uuid=self.action.uuid)
+        self.assertEqual(updated_action.recent_action, SubsidyRequestStates.APPROVED)
+        self.assertEqual(updated_action.status, LearnerCreditRequestUserMessages.CHOICES[3][0])

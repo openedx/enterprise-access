@@ -43,6 +43,8 @@ waffle.Switch:
   ".. no_pii:": "This model has no PII"
 subsidy_request.HistoricalLicenseRequest:
   ".. no_pii:": "This model has no PII"
+subsidy_request.HistoricalLearnerCreditRequestActions:
+  ".. no_pii:": "This model has no PII"
 subsidy_request.HistoricalCouponCodeRequest:
   ".. no_pii:": "This model has no PII"
 subsidy_request.HistoricalLearnerCreditRequest:

@@ -19,6 +19,9 @@ from simple_history.utils import bulk_update_with_history
 
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
+    LearnerCreditRequestActionChoices,
+    LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestUserMessages,
     SubsidyRequestStates,
     SubsidyTypeChoices
 )
@@ -382,6 +385,72 @@ class LearnerCreditRequest(SubsidyRequest):
         self.decline_reason = reason
         self.reviewed_at = localized_utcnow()
         self.save()
+
+
+class LearnerCreditRequestActions(TimeStampedModel):
+    """
+    Stores information related to actions performed on a learner credit request.
+
+    .. no_pii: This model has no PII
+    """
+    uuid = models.UUIDField(
+        primary_key=True,
+        default=uuid4,
+        editable=False,
+        unique=True,
+    )
+
+    learner_credit_request = models.ForeignKey(
+        LearnerCreditRequest,
+        related_name="actions",
+        on_delete=models.CASCADE,
+        help_text="The learner credit request associated with this action."
+    )
+
+    recent_action = models.CharField(
+        max_length=25,
+        blank=False,
+        null=False,
+        db_index=True,
+        choices=LearnerCreditRequestActionChoices,
+        help_text="The type of action taken on the learner credit request.",
+    )
+
+    status = models.CharField(
+        max_length=25,
+        blank=False,
+        null=False,
+        db_index=True,
+        choices=LearnerCreditRequestUserMessages.CHOICES,
+        help_text="The message shown to the user about the request status.",
+    )
+
+    error_reason = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        db_index=True,
+        choices=LearnerCreditRequestActionErrorReasons.CHOICES,
+        help_text="The type of error that occurred during the action, if any.",
+    )
+
+    traceback = models.TextField(
+        blank=True,
+        null=True,
+        editable=False,
+        help_text="Any traceback we recorded when an error was encountered.",
+    )
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ['created']
+        verbose_name = "Learner Credit Request Action"
+        verbose_name_plural = "Learner Credit Request Actions"
+
+    def __str__(self):
+        return (f"<LearnerCreditRequestActions for request {self.learner_credit_request}"
+                f" with action {self.recent_action}>")
 
 
 @receiver(models.signals.post_save, sender=CouponCodeRequest)

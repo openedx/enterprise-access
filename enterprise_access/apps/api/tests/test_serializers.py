@@ -15,6 +15,7 @@ from enterprise_access.apps.api.serializers.subsidy_access_policy import (
     SubsidyAccessPolicyCreditsAvailableResponseSerializer,
     SubsidyAccessPolicyRedeemableResponseSerializer
 )
+from enterprise_access.apps.api.serializers.subsidy_requests import LearnerCreditRequestSerializer
 from enterprise_access.apps.content_assignments.tests.factories import (
     AssignmentConfigurationFactory,
     LearnerContentAssignmentFactory
@@ -22,6 +23,14 @@ from enterprise_access.apps.content_assignments.tests.factories import (
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory
+)
+from enterprise_access.apps.subsidy_request.constants import (
+    LearnerCreditRequestActionErrorReasons,
+    SubsidyRequestStates
+)
+from enterprise_access.apps.subsidy_request.tests.factories import (
+    LearnerCreditRequestActionsFactory,
+    LearnerCreditRequestFactory
 )
 
 
@@ -216,3 +225,64 @@ class TestSubsidyAccessPolicyCreditsAvailableResponseSerializer(TestCase):
         data = serializer.data
         self.assertIn('subsidy_expiration_date', data[0])
         self.assertEqual(data[0].get('subsidy_expiration_date'), subsidy_exp_date)
+
+
+class TestLearnerCreditRequestSerializer(TestCase):
+    """
+    Tests for the LearnerCreditRequestSerializer.
+    """
+
+    def test_latest_action(self):
+        """
+        Test that the latest_action field returns the most recent action.
+        """
+        learner_credit_request = LearnerCreditRequestFactory()
+
+        # Create multiple actions for the request with different timestamps
+        LearnerCreditRequestActionsFactory(
+            learner_credit_request=learner_credit_request,
+            recent_action=SubsidyRequestStates.REQUESTED,
+            status=SubsidyRequestStates.REQUESTED,
+            created=datetime.now(timezone.utc) - timedelta(days=3)
+        )
+
+        LearnerCreditRequestActionsFactory(
+            learner_credit_request=learner_credit_request,
+            recent_action=SubsidyRequestStates.APPROVED,
+            status=SubsidyRequestStates.APPROVED,
+            created=datetime.now(timezone.utc) - timedelta(days=2)
+        )
+
+        latest_action = LearnerCreditRequestActionsFactory(
+            learner_credit_request=learner_credit_request,
+            recent_action=SubsidyRequestStates.ACCEPTED,
+            status=SubsidyRequestStates.ACCEPTED,
+            error_reason=LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL,
+            created=datetime.now(timezone.utc) - timedelta(days=1)
+        )
+
+        serializer = LearnerCreditRequestSerializer(learner_credit_request)
+        data = serializer.data
+
+        # Check that the latest_action field exists and contains the correct data
+        self.assertIn('latest_action', data)
+        latest_action_data = data['latest_action']
+        self.assertIsNotNone(latest_action_data)
+
+        # Verify the content of the latest action
+        self.assertEqual(str(latest_action.uuid), latest_action_data['uuid'])
+        self.assertEqual(latest_action.recent_action, latest_action_data['recent_action'])
+        self.assertEqual(latest_action.status, latest_action_data['status'])
+        self.assertEqual(latest_action.error_reason, latest_action_data['error_reason'])
+
+    def test_no_actions(self):
+        """
+        Test that the latest_action field returns None when there are no actions.
+        """
+        learner_credit_request = LearnerCreditRequestFactory()
+
+        serializer = LearnerCreditRequestSerializer(learner_credit_request)
+        data = serializer.data
+
+        self.assertIn('latest_action', data)
+        self.assertIsNone(data['latest_action'])

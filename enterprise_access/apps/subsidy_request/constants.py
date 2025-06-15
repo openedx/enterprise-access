@@ -35,6 +35,19 @@ class SubsidyRequestStates:
     CHOICES = COMMON_STATES + LC_REQUEST_STATES
 
 
+class LearnerCreditAdditionalActionStates:
+    """ Additional states specifically for LearnerCreditRequestActions. """
+
+    REMINDED = 'reminded'
+    CHOICES = (
+        (REMINDED, "Reminded"),
+    )
+
+
+# Combined choices for LearnerCreditRequestAction model
+LearnerCreditRequestActionChoices = SubsidyRequestStates.CHOICES + LearnerCreditAdditionalActionStates.CHOICES
+
+
 # List of states where a learner cannot make a new request for a course
 # if they already have a request in one of these states.
 LC_NON_RE_REQUESTABLE_STATES = [
@@ -66,6 +79,39 @@ SUBSIDY_TYPE_CHANGE_DECLINATION = (
 )
 
 SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE = 100
+
+
+class LearnerCreditRequestUserMessages:
+    """
+    User-facing messages for LearnerCreditRequestActions status field.
+    Reusing the state keys from SubsidyRequestStates but with different display messages.
+    """
+    CHOICES = (
+        (SubsidyRequestStates.REQUESTED, "Requested"),
+        (LearnerCreditAdditionalActionStates.REMINDED, "Waiting For Learner"),
+        (SubsidyRequestStates.APPROVED, "Waiting For Learner"),
+        (SubsidyRequestStates.ACCEPTED, "Redeemed By Learner"),
+        (SubsidyRequestStates.DECLINED, "Declined"),
+        (SubsidyRequestStates.REVERSED, "Refunded"),
+        (SubsidyRequestStates.CANCELLED, "Cancelled"),
+        (SubsidyRequestStates.EXPIRED, "Expired"),
+    )
+
+
+class LearnerCreditRequestActionErrorReasons:
+    """
+    Error reasons for LearnerCreditRequestActions error_reason field.
+    """
+    FAILED_APPROVAL = 'failed_approval'
+    FAILED_DECLINE = 'failed_decline'
+    FAILED_CANCELLATION = 'failed_cancellation'
+
+    CHOICES = (
+        (FAILED_APPROVAL, "Failed: Approval"),
+        (FAILED_DECLINE, "Failed: Decline"),
+        (FAILED_CANCELLATION, "Failed: Cancellation"),
+    )
+
 
 # Segment events
 
