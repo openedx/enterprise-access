@@ -161,6 +161,12 @@ class EnterpriseCustomerUserSerializer(BaseBffSerializer):
     enterprise_customer = EnterpriseCustomerSerializer()
     active = serializers.BooleanField()
 
+class SecuredAlgoliaMetadataSerializer(BaseBffSerializer):
+    """
+    Serializer for the secured algolia key
+    """
+    secured_algolia_api_key = serializers.CharField(required=False, allow_null=True)
+    valid_until = serializers.DateTimeField(required=False, allow_null=True)
 
 class BaseResponseSerializer(BaseBffSerializer):
     """
@@ -177,6 +183,7 @@ class BaseResponseSerializer(BaseBffSerializer):
         child=serializers.UUIDField(),
         help_text='Mapping of catalog UUIDs to catalog query UUIDs.',
     )
+    algolia = SecuredAlgoliaMetadataSerializer(required=False, allow_null=True)
     errors = ErrorSerializer(many=True, required=False, default=list)
     warnings = WarningSerializer(many=True, required=False, default=list)
     enterprise_features = serializers.DictField(required=False, default=dict)
