@@ -76,7 +76,6 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         mock_stripe.checkout.Session.create.assert_called_once_with(
             mode='subscription',
             ui_mode='custom',
-            return_url="https://portal.edx.org/my-sluggy",
             line_items=[{
                 'price': 'price_ABC',
                 'quantity': 20,
