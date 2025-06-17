@@ -282,23 +282,31 @@ class LmsApiClient(BaseOAuthClient):
         Returns:
             List of dictionaries of pending admin users.
         """
-        response = self.client.get(
-            self.pending_enterprise_admin_endpoint + f'?enterprise_customer={enterprise_customer_uuid}',
-            timeout=settings.LMS_CLIENT_TIMEOUT,
-        )
         try:
-            response.raise_for_status()
-            logger.info(
-                'Fetched pending admin records for customer %s', enterprise_customer_uuid,
-            )
-            payload = response.json()
-            return payload.get('results', [])
-        except requests.exceptions.HTTPError:
+            url = self.pending_enterprise_admin_endpoint + f'?enterprise_customer={enterprise_customer_uuid}'
+            results = []
+
+            while url:
+                response = self.client.get(url, timeout=settings.LMS_CLIENT_TIMEOUT)
+                response.raise_for_status()
+                resp_json = response.json()
+                logger.info(
+                    'Fetched pending admin records for customer %s, %s',
+                    enterprise_customer_uuid, resp_json,
+                )
+                url = resp_json['next']
+                results.extend(resp_json['results'])
+        except requests.exceptions.HTTPError as exc:
+            content = getattr(exc.response, 'content', None)
+            if content:
+                content = content.decode()
             logger.exception(
                 'Failed to fetch pending admin record for customer %s: %s',
-                enterprise_customer_uuid, response.content.decode()
+                enterprise_customer_uuid, content,
             )
             raise
+
+        return results
 
     def create_enterprise_admin_user(self, enterprise_customer_uuid, user_email):
         """
