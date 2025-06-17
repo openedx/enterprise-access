@@ -63,6 +63,10 @@ class BaseResponseBuilder:
         )
         self.response_data['enterprise_features'] = self.context.enterprise_features
         self.response_data['secured_algolia_api_key'] = self.context.secured_algolia_api_key
+        self.response_data['algolia'] = {
+            'secured_algolia_api_key': self.context.secured_algolia_api_key,
+            'valid_until': self.context.valid_until
+        }
         self.response_data['catalog_uuids_to_catalog_query_uuids'] = self.context.catalog_uuids_to_catalog_query_uuids
 
     def add_errors_warnings_to_response(self):
