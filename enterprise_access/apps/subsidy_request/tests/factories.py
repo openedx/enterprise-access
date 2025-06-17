@@ -13,6 +13,7 @@ from enterprise_access.apps.subsidy_request.constants import SubsidyRequestState
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
+    LearnerCreditRequestActions,
     LearnerCreditRequestConfiguration,
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
@@ -94,3 +95,18 @@ class LearnerCreditRequestFactory(SubsidyRequestFactory):
 
     class Meta:
         model = LearnerCreditRequest
+
+
+class LearnerCreditRequestActionsFactory(factory.django.DjangoModelFactory):
+    """
+    Test factory for the `LearnerCreditRequestActions` model.
+    """
+    uuid = factory.LazyFunction(uuid4)
+    recent_action = SubsidyRequestStates.REQUESTED
+    status = SubsidyRequestStates.REQUESTED
+    learner_credit_request = factory.SubFactory(LearnerCreditRequestFactory)
+    error_reason = None
+    traceback = None
+
+    class Meta:
+        model = LearnerCreditRequestActions

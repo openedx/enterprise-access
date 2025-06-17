@@ -9,6 +9,7 @@ from enterprise_access.apps.content_assignments.models import LearnerContentAssi
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
+    LearnerCreditRequestActions,
     LearnerCreditRequestConfiguration,
     LicenseRequest,
     SubsidyRequest,
@@ -157,6 +158,7 @@ class LearnerCreditRequestSerializer(SubsidyRequestSerializer):
         allow_null=True,
         help_text="Cost of the content in USD Cents.",
     )
+    latest_action = serializers.SerializerMethodField()
 
     class Meta:
         model = LearnerCreditRequest
@@ -164,6 +166,45 @@ class LearnerCreditRequestSerializer(SubsidyRequestSerializer):
             "learner_credit_request_config",
             "assignment",
             "course_price",
+            "latest_action",
         ]
-        read_only_fields = SubsidyRequestSerializer.Meta.read_only_fields
+        read_only_fields = SubsidyRequestSerializer.Meta.read_only_fields + [
+            "latest_action",
+        ]
         extra_kwargs = SubsidyRequestSerializer.Meta.extra_kwargs
+
+    def get_latest_action(self, obj):
+        """
+        Returns the latest action for this learner credit request, if any exists.
+        """
+        latest_action = obj.actions.order_by('-created').first()
+        if latest_action:
+            return LearnerCreditRequestActionsSerializer(latest_action).data
+        return None
+
+
+class LearnerCreditRequestActionsSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the `LearnerCreditRequestActions` model.
+    """
+
+    class Meta:
+        model = LearnerCreditRequestActions
+        fields = [
+            'uuid',
+            'recent_action',
+            'status',
+            'error_reason',
+            'traceback',
+            'created',
+            'modified',
+            'learner_credit_request',
+        ]
+        read_only_fields = [
+            'uuid',
+            'created',
+            'modified',
+        ]
+        extra_kwargs = {
+            'learner_credit_request': {'write_only': True},
+        }
