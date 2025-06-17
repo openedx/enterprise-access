@@ -941,7 +941,10 @@ class SubsidyAccessPolicyRedeemViewset(UserDetailsFromJwtMixin, PermissionRequir
         # Get all active policies for this customer
         policies_for_customer = self.get_queryset()
         if not policies_for_customer:
-            raise NotFound(detail='No active policies for this customer')
+            return Response({
+                'can_request': False,
+                'reason': 'No active policies for this customer'
+            }, status=status.HTTP_200_OK)
 
         # 1. Find policies with BnR enabled
         bnr_enabled_policies = policies_for_customer.filter(
