@@ -59,11 +59,6 @@ LC_NON_RE_REQUESTABLE_STATES = [
     SubsidyRequestStates.DECLINED,
 ]
 
-# States which allow reallocation by an admin.
-APPROVABLE_STATES = [
-    SubsidyRequestStates.ERROR,
-    SubsidyRequestStates.REQUESTED
-]
 
 class SubsidyTypeChoices:
     """ Type of subsidies. """

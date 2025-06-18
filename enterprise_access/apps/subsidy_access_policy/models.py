@@ -1264,7 +1264,9 @@ class SubsidyAccessPolicyRequestAssignmentMixin:
         """
         Wrapper method to make requests that fall under a PerLearnerSpendCreditAccessPolicy work with assignments.
         """
-        policy_instance = AssignedLearnerCreditAccessPolicy()
+        policy_instance = AssignedLearnerCreditAccessPolicy(
+            assignment_configuration=self.assignment_configuration
+        )
         return policy_instance.allocate(
             [learner_email],
             content_key,
