@@ -307,7 +307,7 @@ class EnterpriseCourseEnrollmentSerializer(BaseBffSerializer):
     is_enrollment_active = serializers.BooleanField()
     is_revoked = serializers.BooleanField()
     link_to_course = serializers.URLField()
-    link_to_certificate = serializers.URLField(allow_null=True)
+    link_to_certificate = serializers.CharField(allow_null=True)
     micromasters_title = serializers.CharField(allow_null=True)
     mode = serializers.CharField()
     notifications = serializers.ListField(
