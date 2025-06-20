@@ -326,6 +326,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'is_late_redemption_allowed': False,
             'created': self.redeemable_policy.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
             'bnr_enabled': False,
+            'total_deposits_for_subsidy': 4,
+            'total_spend_limits_for_subsidy': 3,
         }, response.json())
 
     @ddt.data(
@@ -423,6 +425,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'is_late_redemption_allowed': False,
                 'created': self.non_redeemable_policy.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                 'bnr_enabled': False,
+                'total_deposits_for_subsidy': 4,
+                'total_spend_limits_for_subsidy': 0,
             },
             {
                 'access_method': 'direct',
@@ -456,6 +460,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
                 'is_late_redemption_allowed': False,
                 'created': self.redeemable_policy.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                 'bnr_enabled': False,
+                'total_deposits_for_subsidy': 4,
+                'total_spend_limits_for_subsidy': 3,
             },
         ]
 
@@ -559,6 +565,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'is_late_redemption_allowed': False,
             'created': self.redeemable_policy.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
             'bnr_enabled': False,
+            'total_deposits_for_subsidy': 4,
+            'total_spend_limits_for_subsidy': 0,
         }
         self.assertEqual(expected_response, response.json())
 
@@ -676,6 +684,8 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'is_late_redemption_allowed': False,
             'created': policy_for_edit.created.strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
             'bnr_enabled': False,
+            'total_deposits_for_subsidy': 4,
+            'total_spend_limits_for_subsidy': 0 if 'spend_limit' in request_payload else policy_for_edit.spend_limit,
         }
 
         if 'retired' in request_payload:
