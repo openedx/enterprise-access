@@ -8,13 +8,16 @@ from typing import TypedDict, Unpack, cast
 
 import stripe
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email, validate_slug
 from requests.exceptions import HTTPError
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.customer_billing.constants import CHECKOUT_SESSION_ERROR_CODES
+from enterprise_access.apps.customer_billing.models import EnterpriseSlugReservation
 
+User = get_user_model()
 stripe.api_key = settings.STRIPE_API_KEY
 logger = logging.getLogger(__name__)
 
@@ -23,6 +26,7 @@ class CheckoutSessionInputValidatorData(TypedDict, total=False):
     """
     `total=False` so that validation does not require all fields to be provided.
     """
+    user: User | None
     admin_email: str
     enterprise_slug: str
     quantity: int
@@ -30,6 +34,10 @@ class CheckoutSessionInputValidatorData(TypedDict, total=False):
 
 
 class CheckoutSessionInputData(TypedDict, total=True):
+    """
+    Input parameters for checkout session creation.
+    """
+    user: User | None
     admin_email: str
     enterprise_slug: str
     quantity: int
@@ -115,6 +123,7 @@ class CheckoutSessionInputValidator():
         """
         admin_email = input_data.get('admin_email')
         enterprise_slug = input_data.get('enterprise_slug')
+        user = input_data.get('user')
 
         # We need multiple form fields to validate enterprise_slug.
         if not all([admin_email, enterprise_slug]):
@@ -122,12 +131,18 @@ class CheckoutSessionInputValidator():
             logger.info(f'enterprise_slug invalid: {developer_message}')
             return {'error_code': error_code, 'developer_message': developer_message}
 
+        slug_error_codes = CHECKOUT_SESSION_ERROR_CODES['enterprise_slug']
         # Basic slug format validation inherited from django core.
         try:
             validate_slug(enterprise_slug)
         except ValidationError:
-            error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['enterprise_slug']['INVALID_FORMAT']
+            error_code, developer_message = slug_error_codes['INVALID_FORMAT']
             logger.info(f'enterprise_slug invalid: "{enterprise_slug}". {developer_message}')
+            return {'error_code': error_code, 'developer_message': developer_message}
+
+        # Check if slug is available (considering user's own reservation)
+        if not EnterpriseSlugReservation.is_slug_available(enterprise_slug, exclude_user=user):
+            error_code, developer_message = slug_error_codes['SLUG_RESERVED']
             return {'error_code': error_code, 'developer_message': developer_message}
 
         # Fetch any existing customers with the same slug, and make a distinction
@@ -216,11 +231,34 @@ class CheckoutSessionInputValidator():
 
         return {'error_code': None, 'developer_message': None}
 
+    def handle_user(self, input_data: CheckoutSessionInputValidatorData) -> FieldValidationResult:
+        """
+        Validates the User record for the Checkout Session.
+
+        Side effect: adds a User record to input_data['user'] if not already present
+          **and** the lms_user_id is known and present in the User table.
+        """
+        if not (user_record := input_data.get('user')):
+            lms_user_id = _get_lms_user_id(input_data.get('admin_email'))
+            user_record = User.objects.filter(lms_user_id=lms_user_id).first()
+            if not user_record:
+                error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['user']['IS_NULL']
+                return {'error_code': error_code, 'developer_message': developer_message}
+            else:
+                if lms_user_id.email.lower() != input_data.get('admin_email').lower():
+                    error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['user']['ADMIN_EMAIL_MISMATCH']
+                    return {'error_code': error_code, 'developer_message': developer_message}
+                else:
+                    input_data['user'] = user_record
+
+        return {'error_code': None, 'developer_message': None}
+
     validation_handlers = {
         'admin_email': handle_admin_email,
         'enterprise_slug': handle_enterprise_slug,
         'quantity': handle_quantity,
         'stripe_price_id': handle_stripe_price_id,
+        'user': handle_user,
     }
 
     def validate(self, input_data: CheckoutSessionInputValidatorData) -> Mapping[str, FieldValidationResult]:
@@ -259,6 +297,24 @@ class CreateCheckoutSessionValidationError(Exception):
         self.validation_errors_by_field = validation_errors_by_field
 
 
+def _try_reserve_slug(user, slug):
+    """
+    Helper to reserve the slug for the requesting user.
+    """
+    try:
+        return EnterpriseSlugReservation.reserve_slug(user=user, slug=slug)
+    except ValidationError as exc:
+        # Slug conflict during reservation attempt
+        raise CreateCheckoutSessionValidationError(
+            validation_errors_by_field={
+                'enterprise_slug': {
+                    'error_code': 'existing_enterprise_customer',
+                    'developer_message': str(exc)
+                }
+            },
+        ) from exc
+
+
 def create_free_trial_checkout_session(
     **input_data: Unpack[CheckoutSessionInputData],
 ) -> stripe.checkout.Session:
@@ -266,12 +322,16 @@ def create_free_trial_checkout_session(
     Create a Stripe "Checkout Session" for a free trial subscription plan.
     """
     validator = CheckoutSessionInputValidator()
-    validation_errors = validator.validate(input_data=cast(CheckoutSessionInputValidatorData, input_data))
+    validation_errors = validator.validate(
+        input_data=cast(CheckoutSessionInputValidatorData, input_data)
+    )
     if validation_errors:
         raise CreateCheckoutSessionValidationError(validation_errors_by_field=validation_errors)
 
-    lms_user_id = _get_lms_user_id(email=input_data['admin_email'])
+    user = input_data['user']
+    reservation = _try_reserve_slug(user, input_data['enterprise_slug'])
 
+    lms_user_id = user.lms_user_id
     create_kwargs: stripe.checkout.Session.CreateParams = {
         'mode': 'subscription',
         # Intended UI will be a custom react component.
@@ -318,4 +378,9 @@ def create_free_trial_checkout_session(
         create_kwargs['customer'] = found_stripe_customer_by_email['id']
 
     # Finally, call the stripe API endpoint to create a checkout session.
-    return stripe.checkout.Session.create(**create_kwargs)
+    checkout_session = stripe.checkout.Session.create(**create_kwargs)
+
+    reservation.update_stripe_session_id(checkout_session['id'])
+    logger.info(f'Updated reservation {reservation.id} with Stripe session {checkout_session["id"]}')
+
+    return checkout_session
