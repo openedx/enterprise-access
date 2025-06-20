@@ -49,5 +49,6 @@ from .subsidy_requests import (
     LearnerCreditRequestSerializer,
     LicenseRequestSerializer,
     SubsidyRequestCustomerConfigurationSerializer,
-    SubsidyRequestSerializer
+    SubsidyRequestSerializer,
+    LearnerCreditRequestCancelSerializer
 )

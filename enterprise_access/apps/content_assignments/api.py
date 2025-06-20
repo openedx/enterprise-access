@@ -694,7 +694,7 @@ def _create_new_assignments(
     )
 
 
-def cancel_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
+def cancel_assignments(assignments: Iterable[LearnerContentAssignment], send_cancel_email_to_learner=True) -> dict:
     """
     Bulk cancel assignments.
 
@@ -733,7 +733,8 @@ def cancel_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
 
     cancelled_assignments = _update_and_refresh_assignments(cancelable_assignments, ['state'])
     for cancelled_assignment in cancelled_assignments:
-        send_cancel_email_for_pending_assignment.delay(cancelled_assignment.uuid)
+        if send_cancel_email_to_learner:
+            send_cancel_email_for_pending_assignment.delay(cancelled_assignment.uuid)
 
     return {
         'cancelled': list(set(cancelled_assignments) | already_cancelled_assignments),

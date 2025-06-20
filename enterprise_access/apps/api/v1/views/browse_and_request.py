@@ -7,6 +7,8 @@ from celery import chain
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import DatabaseError, IntegrityError, transaction
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -44,6 +46,7 @@ from enterprise_access.apps.api.utils import (
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
+from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import (
     LearnerCreditRequestActionErrorReasons,
@@ -812,6 +815,76 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         )
 
         return super().create(request, *args, **kwargs)
+
+    @extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Learner credit request cancel endpoint.',
+    )
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    @action(
+        detail=False,
+        url_path='cancel',
+        methods=['post'],
+        serializer_class=serializers.LearnerCreditRequestCancelSerializer
+    )
+    def cancel(self, request, *args, **kwargs):
+        """
+        Cancel a learner credit request.
+        """
+        serializer = serializers.LearnerCreditRequestCancelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        request_uuid = serializer.data['request_uuid']
+
+        request = self.get_queryset().filter(uuid=request_uuid).first()
+
+        if not request:
+            return Response("Learner credit request not found.", status=status.HTTP_404_NOT_FOUND)
+
+        error_msg = None
+        lc_action = LearnerCreditRequestActions.create_action(
+            learner_credit_request=request,
+            recent_action=get_action_choice(SubsidyRequestStates.CANCELLED),
+            status=get_user_message_choice(SubsidyRequestStates.APPROVED),
+            error_reason=get_error_reason_choice(LearnerCreditRequestActionErrorReasons.FAILED_CANCELLATION),
+            traceback=error_msg,
+        )
+
+        if request.state != SubsidyRequestStates.APPROVED:
+            error_msg = "Learner credit request cannot be cancelled because it is not in an APPROVED state."
+            lc_action.traceback = error_msg
+            lc_action.save()
+            return Response(error_msg, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with transaction.atomic():
+                response = assignments_api.cancel_assignments([request.assignment], False)
+                if response.get('non_cancelable'):
+                    error_msg = (
+                        f"Failed to cancel the associated assignment with uuid: {request.assignment.uuid} "
+                        f"for request: {request_uuid}."
+                    )
+                    lc_action.traceback = error_msg
+                    lc_action.save()
+                    return Response(error_msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+                request.cancel()
+                # TODO: add logic to send cancellation email
+
+                lc_action.status = get_user_message_choice(SubsidyRequestStates.CANCELLED)
+                lc_action.error_reason = None
+                lc_action.traceback = None
+                lc_action.save()
+
+            return Response(status=status.HTTP_200_OK)
+        except (ValidationError, IntegrityError, DatabaseError) as exc:
+            error_msg = f"Error cancelling learner credit request with uuid: {request_uuid}: {str(exc)}"
+            logger.exception(error_msg)
+            lc_action.traceback = error_msg
+            lc_action.save()
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     @permission_required(
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
