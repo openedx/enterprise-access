@@ -46,6 +46,7 @@ from .subsidy_access_policy import (
 from .subsidy_requests import (
     CouponCodeRequestSerializer,
     LearnerCreditRequestApproveRequestSerializer,
+    LearnerCreditRequestCancelSerializer,
     LearnerCreditRequestDeclineSerializer,
     LearnerCreditRequestSerializer,
     LicenseRequestSerializer,

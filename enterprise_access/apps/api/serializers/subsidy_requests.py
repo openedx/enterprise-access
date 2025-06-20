@@ -334,3 +334,34 @@ class LearnerCreditRequestApproveRequestSerializer(serializers.Serializer):
         Not implemented - this serializer is for validation only
         """
         raise NotImplementedError("This serializer is for validation only")
+
+
+# pylint: disable=abstract-method
+class LearnerCreditRequestCancelSerializer(serializers.Serializer):
+    """
+    Request serializer to validate cancel endpoint query params.
+
+    For view: LearnerCreditRequestViewSet.cancel
+    """
+    request_uuid = serializers.UUIDField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._learner_credit_request = None
+
+    def validate_request_uuid(self, value):
+        """
+        Validate that the learner credit request exists and store it for later use.
+        """
+        try:
+            learner_credit_request = LearnerCreditRequest.objects.get(uuid=value)
+            self._learner_credit_request = learner_credit_request
+            return value
+        except LearnerCreditRequest.DoesNotExist as exc:
+            raise serializers.ValidationError(f"Learner credit request with uuid {value} not found.") from exc
+
+    def get_learner_credit_request(self):
+        """
+        Return the already-fetched learner credit request object.
+        """
+        return getattr(self, '_learner_credit_request', None)
