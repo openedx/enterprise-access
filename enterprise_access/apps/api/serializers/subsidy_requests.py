@@ -215,12 +215,10 @@ class LearnerCreditRequestApproveRequestSerializer(serializers.Serializer):
     """
     policy_uuid = serializers.UUIDField(
         required=True,
-        allow_empty=False,
         help_text='The UUID of the policy to which the request belongs.',
     )
     enterprise_customer_uuid = serializers.UUIDField(
         required=True,
-        allow_empty=False,
         help_text='The UUID of the Enterprise Customer.',
     )
     learner_credit_request_uuid = serializers.UUIDField(
