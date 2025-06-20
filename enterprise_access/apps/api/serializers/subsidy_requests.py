@@ -267,3 +267,12 @@ class LearnerCreditRequestDeclineSerializer(serializers.Serializer):
         Not implemented - this serializer is for validation only
         """
         raise NotImplementedError("This serializer is for validation only")
+
+ # pylint: disable=abstract-method
+class LearnerCreditRequestCancelSerializer(serializers.Serializer):
+    """
+    Request serializer to validate cancel endpoint query params.
+
+    For view: LearnerCreditRequestViewSet.cancel
+    """
+    request_uuid = serializers.UUIDField()
