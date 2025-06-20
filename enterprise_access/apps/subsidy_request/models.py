@@ -386,6 +386,10 @@ class LearnerCreditRequest(SubsidyRequest):
         self.reviewed_at = localized_utcnow()
         self.save()
 
+    def cancel(self):
+        self.state = SubsidyRequestStates.CANCELLED
+        self.save()
+
 
 class LearnerCreditRequestActions(TimeStampedModel):
     """
