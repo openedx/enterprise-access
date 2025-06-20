@@ -67,6 +67,18 @@ class BaseSubsidyRequestAdmin(DjangoQLSearchMixin):
 class LicenseRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
     """ Admin configuration for the LicenseRequest model. """
 
+    list_display = (
+        'uuid',
+        'user',
+        'enterprise_customer_uuid',
+        'course_id',
+        'course_title',
+        'state',
+        'subscription_plan_uuid',
+        'license_uuid',
+        'reviewer',
+        'reviewed_at',
+    )
     read_only_fields = (
         'subscription_plan_uuid',
         'license_uuid',
