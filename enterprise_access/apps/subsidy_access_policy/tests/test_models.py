@@ -109,6 +109,45 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         super().tearDown()
         request_cache(namespace=REQUEST_CACHE_NAMESPACE).clear()
 
+    def test_save_per_learner_credit_policy_with_bnr_enabled(self):
+        """
+        Verify that the assignment configuration is created when saving a PerLearnerCreditAccessPolicy
+        with bnr_enabled=True.
+        """
+        policy = self.per_learner_spend_policy
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=True
+        ):
+            policy.save()
+            policy.refresh_from_db()
+        self.assertIsNotNone(policy.assignment_configuration)
+        new_customer_uuid = uuid4()
+        policy.enterprise_customer_uuid = new_customer_uuid
+        policy.save()
+        self.assertEqual(
+            policy.assignment_configuration.enterprise_customer_uuid,
+            new_customer_uuid,
+        )
+
+    def test_save_per_learner_credit_policy_with_bnr_not_enabled(self):
+        """
+        Verify that the assignment configuration is created when saving a PerLearnerCreditAccessPolicy
+        with bnr_enabled=False.
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            per_learner_spend_limit=500,
+        )
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=False
+        ):
+            policy.save()
+            policy.refresh_from_db()
+        self.assertIsNone(policy.assignment_configuration)
+
     def test_can_not_create_parent_model_object(self, *args):
         """
         Verify that correct exception raised when we try to create object of SubsidyAccessPolicy
