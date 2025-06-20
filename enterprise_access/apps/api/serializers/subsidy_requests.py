@@ -182,7 +182,6 @@ class LearnerCreditRequestSerializer(SubsidyRequestSerializer):
             return LearnerCreditRequestActionsSerializer(latest_action).data
         return None
 
-
 class LearnerCreditRequestActionsSerializer(serializers.ModelSerializer):
     """
     Serializer for the `LearnerCreditRequestActions` model.
@@ -208,3 +207,21 @@ class LearnerCreditRequestActionsSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'learner_credit_request': {'write_only': True},
         }
+class LearnerCreditRequestApproveRequestSerializer(serializers.Serializer):
+    """
+    Request Serializer to validate subsidy-request ``approve`` endpoint POST data.
+
+    For view: LearnerCreditRequestViewSet.approve
+    """
+    policy_uuid = serializers.UUIDField(
+        required=True,
+        help_text='The UUID of the policy to which the request belongs.',
+    )
+    enterprise_customer_uuid = serializers.UUIDField(
+        required=True,
+        help_text='The UUID of the Enterprise Customer.',
+    )
+    learner_credit_request_uuid = serializers.UUIDField(
+        required=True,
+        help_text='The UUID of the LearnerCreditRequest to be approved.',
+    )

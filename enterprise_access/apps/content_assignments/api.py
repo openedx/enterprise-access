@@ -262,7 +262,13 @@ def get_allocated_quantity_for_configuration(assignment_configuration):
 
 
 def allocate_assignments(
-    assignment_configuration, learner_emails, content_key, content_price_cents, known_lms_user_ids=None,
+    assignment_configuration,
+    learner_emails,
+    content_key,
+    content_price_cents,
+    known_lms_user_ids=None,
+    link_enterprise_learner=True,
+    send_notification_email=True,
 ):
     """
     Creates or updates an allocated assignment record
@@ -420,9 +426,11 @@ def allocate_assignments(
     # Enqueue an asynchronous task to link assigned learners to the customer
     # This has to happen outside of the atomic block to avoid a race condition
     # when the celery task does its read of updated/created assignments.
-    for assignment in updated_assignments + created_assignments:
-        create_pending_enterprise_learner_for_assignment_task.delay(assignment.uuid)
-        send_email_for_new_assignment.delay(assignment.uuid)
+        for assignment in updated_assignments + created_assignments:
+            if link_enterprise_learner:
+                create_pending_enterprise_learner_for_assignment_task.delay(assignment.uuid)
+            if send_notification_email:
+                send_email_for_new_assignment.delay(assignment.uuid)
 
     # Make a list of all pre-existing assignments that were not updated.
     unchanged_assignments = list(set(existing_assignments) - set(updated_assignments))
