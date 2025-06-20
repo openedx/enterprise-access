@@ -164,7 +164,10 @@ class CustomerBillingViewSet(viewsets.ViewSet):
             f'stripe_price_id="{validated_data["stripe_price_id"]}"'
         )
         try:
-            session = create_free_trial_checkout_session(**serializer.validated_data)
+            session = create_free_trial_checkout_session(
+                request.user,
+                **serializer.validated_data,
+            )
         except CreateCheckoutSessionValidationError as exc:
             response_serializer = serializers.CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer(
                 data=exc.validation_errors_by_field,

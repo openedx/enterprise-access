@@ -10,6 +10,13 @@ CHECKOUT_SESSION_ERROR_CODES = {
         'INVALID_FORMAT': ('invalid_format', 'Invalid format for given email address.'),
         'NOT_REGISTERED': ('not_registered', 'Given email address does not correspond to an existing user.'),
     },
+    'user': {
+        'IS_NULL': ('is_null', 'The user object cannot be null'),
+        'ADMIN_EMAIL_MISMATCH': (
+            'admin_email_mismatch',
+            'The provided admin_email differs from an existing user making the request.'
+        ),
+    },
     'enterprise_slug': {
         'INVALID_FORMAT': ('invalid_format', 'Invalid format for given slug.'),
         'EXISTING_ENTERPRISE_CUSTOMER': (
@@ -22,6 +29,10 @@ CHECKOUT_SESSION_ERROR_CODES = {
             'existing_enterprise_customer',
             'The slug conflicts with an existing customer.',
         ),
+        'SLUG_RESERVED': (
+            'slug_reserved',
+            'The slug is currently reserved by another user.',
+        ),
     },
     'quantity': {
         'INVALID_FORMAT': ('invalid_format', 'Must be a positive integer.'),
@@ -32,3 +43,8 @@ CHECKOUT_SESSION_ERROR_CODES = {
         'DOES_NOT_EXIST': ('does_not_exist', 'This stripe_price_id has not been configured.'),
     },
 }
+
+# According to stripe's AI assistant: "When a Checkout Session is created,
+# Stripe automatically sets the expires_at timestamp to 24 hours in the future."
+# We want the slug duration to last at least as long as the checkout session expiry.
+SLUG_RESERVATION_DURATION_MINUTES = 24 * 60

@@ -86,6 +86,7 @@ PROJECT_APPS = (
     'enterprise_access.apps.enterprise_groups',
     'enterprise_access.apps.bffs',
     'enterprise_access.apps.provisioning',
+    'enterprise_access.apps.customer_billing',
 )
 
 INSTALLED_APPS += THIRD_PARTY_APPS
