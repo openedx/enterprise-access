@@ -5,8 +5,8 @@ import logging
 
 from celery import chain
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
-from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -45,12 +45,23 @@ from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClien
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
-from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
+from enterprise_access.apps.subsidy_request.constants import (
+    LearnerCreditRequestActionErrorReasons,
+    SegmentEvents,
+    SubsidyRequestStates,
+    SubsidyTypeChoices
+)
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
+    LearnerCreditRequestActions,
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
+)
+from enterprise_access.apps.subsidy_request.utils import (
+    get_action_choice,
+    get_error_reason_choice,
+    get_user_message_choice
 )
 from enterprise_access.apps.track.segment import track_event
 from enterprise_access.utils import get_subsidy_model
@@ -709,6 +720,11 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         tags=['Learner Credit Requests'],
         summary='Learner credit request overview.',
     ),
+    decline=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Decline a learner credit request.',
+        request=serializers.LearnerCreditRequestDeclineSerializer,
+    ),
 )
 class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
     """
@@ -796,6 +812,78 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         )
 
         return super().create(request, *args, **kwargs)
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    @action(detail=False, url_path="decline", methods=["post"])
+    def decline(self, *args, **kwargs):
+        """
+        Action of declining a Learner Credit Subsidy Request
+        """
+        # Validate input using serializer
+        serializer = serializers.LearnerCreditRequestDeclineSerializer(data=self.request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Extract validated data and the already-fetched object
+        validated_data = serializer.validated_data
+        learner_credit_request = serializer.get_learner_credit_request()  # No DB query!
+        learner_credit_request_uuid = validated_data["subsidy_request_uuid"]
+        send_notification = validated_data["send_notification"]
+        disassociate_from_org = validated_data["disassociate_from_org"]
+
+        enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
+
+        # Create the action instance before attempting the decline operation
+        action_instance = LearnerCreditRequestActions.create_action(
+            learner_credit_request=learner_credit_request,
+            recent_action=get_action_choice(SubsidyRequestStates.DECLINED),
+            status=get_user_message_choice(SubsidyRequestStates.DECLINED),
+        )
+
+        try:
+            with transaction.atomic():
+                learner_credit_request.decline(self.user)
+        except (ValidationError, IntegrityError, DatabaseError) as exc:
+            action_instance.status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
+            action_instance.error_reason = get_error_reason_choice(
+                LearnerCreditRequestActionErrorReasons.FAILED_DECLINE
+            )
+            action_instance.traceback = str(exc)
+            action_instance.save()
+
+            logger.exception(f"Error declining learner credit request {learner_credit_request_uuid}: {exc}")
+            return Response(
+                "An error occurred while declining the request. Please try again.",
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Handle post-decline operations
+        serialized_request = serializers.LearnerCreditRequestSerializer(learner_credit_request).data
+        lms_user_id = serialized_request["lms_user_id"]
+
+        if send_notification:
+            logger.info(
+                f"TODO: Send decline notification email for learner credit request {learner_credit_request_uuid}"
+            )
+        if disassociate_from_org:
+            try:
+                unlink_users_from_enterprise_task.delay(enterprise_customer_uuid, [lms_user_id])
+            except (ConnectionError, TimeoutError, OSError) as exc:
+                action_instance.status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
+                action_instance.error_reason = get_error_reason_choice(
+                    LearnerCreditRequestActionErrorReasons.FAILED_DECLINE
+                )
+                action_instance.traceback = str(exc)
+                action_instance.save()
+
+                logger.exception(
+                    f"Error unlinking user from enterprise for request {learner_credit_request_uuid}: {exc}"
+                )
+
+        return Response(serialized_request, status=status.HTTP_200_OK)
 
 
 @extend_schema_view(

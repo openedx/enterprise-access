@@ -1756,3 +1756,89 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         # Depending on implementation, this could be 400 or 403
         # Check that it's one of the expected status codes
         assert response.status_code in [status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN]
+
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    def test_decline_success(self, mock_get_enterprise_uuid):
+        """
+        Test successful decline of a learner credit request.
+        """
+        # Make sure the mock returns the UUID consistently
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-decline')
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'subsidy_request_uuid': str(self.user_request_1.uuid),
+            'send_notification': False,
+            'disassociate_from_org': False
+        }
+
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verify request was declined
+        self.user_request_1.refresh_from_db()
+        assert self.user_request_1.state == SubsidyRequestStates.DECLINED
+        assert self.user_request_1.reviewer == self.user
+
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    def test_decline_with_invalid_uuid(self, mock_get_enterprise_uuid):
+        """
+        Test decline with non-existent UUID returns 400.
+        """
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-decline')
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),  # Add this line
+            'subsidy_request_uuid': str(uuid4()),
+            'send_notification': False,
+            'disassociate_from_org': False
+        }
+
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'not found' in str(response.data)
+
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    @mock.patch(BNR_VIEW_PATH + '.unlink_users_from_enterprise_task.delay')
+    def test_decline_with_disassociate_from_org(self, mock_unlink_task, mock_get_enterprise_uuid):
+        """
+        Test decline with disassociate_from_org=True triggers unlinking task.
+        """
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-decline')
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'subsidy_request_uuid': str(self.user_request_1.uuid),
+            'send_notification': False,
+            'disassociate_from_org': True
+        }
+
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verify unlinking task was called
+        mock_unlink_task.assert_called_once_with(
+            str(self.enterprise_customer_uuid_1),
+            [self.user_request_1.user.lms_user_id]
+        )
