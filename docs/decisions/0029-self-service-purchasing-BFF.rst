@@ -1,0 +1,418 @@
+0029 Self-Service Purchasing BFF Endpoints
+******************************************
+
+Status
+======
+**In progress** (June 2025)
+
+Context
+=======
+
+The self-service purchasing feature will be comprised of primarily the Checkout
+MFE and a set of backend endpoints (some leveraging BFF framework). This ADR
+should help to define those backend endpoints.
+
+The checkout flow as depicted in this `design mockup
+<https://www.figma.com/board/DiZO3HwkQNdElBc5av5DG3/DR--Self-Service-Subscription-Flows?node-id=0-1&p=f&t=VkRFRxPmCAXyZ1bc-0>`_
+currently includes these main pages:
+
+1. Create your account
+
+   * Authentication:
+
+     * JWT Authentication on initial page load.
+
+     * Otherwise, either a login modal or registration modal is triggered on page submit.
+
+   * Fields captured:
+
+     * Full Name
+
+     * Work Email
+
+   * Registration modal, if displayed, will include `standard user registration fields <https://github.com/openedx/edx-platform/blob/033bcda9/openedx/core/djangoapps/user_authn/views/registration_form.py#L141>`_.
+
+   * Registration and Login modals will interact directly with edx-platform user_authn API endpoints to perform login or registration.
+
+2. Build your trial
+
+   * Only JWT authenticated users are authorized.
+
+   * Fields captured:
+
+     * Number of Licenses
+
+     * Company Name
+
+     * Enterprise Slug
+
+3. Start Trial
+
+   * Only JWT authenticated users are authorized.
+
+   * Fields captured:
+
+     * Combination of `Address Element <https://docs.stripe.com/elements/address-element>`_ and `Payment Element <https://docs.stripe.com/payments/payment-element>`_.
+
+Decision
+========
+
+We will implement a RESTful API contract with four primary endpoints following the proposed BFF (Backend-for-Frontend) pattern. The design emphasizes real-time validation, clear authentication boundaries, and stateless server operations with ephermeral form state handled entirely on the frontend.
+
+BFF Endpoints for Checkout Flow
+--------------------------------
+
+**1. Cross-Page Validation Endpoint**
+
+.. code-block::
+
+    POST /api/v1/bffs/checkout/context
+
+    Authentication: JWT
+    Authorization: Authenticated OR Unauthenticated.
+    Purpose: Supply any relevant admin context, and pricing options. Incorporate into Loaders.
+    Side-Effects: None
+
+    Request:
+    {}
+
+    Response (200 OK):
+    {
+        "existing_customers_for_authenticated_user": [
+            {
+                "customer_uuid": "",
+                "customer_name": "",
+                "admin_portal_url": ""
+            }
+        ],
+        "pricing": {
+            "stripe_price_id": "price_1MoBy5LkdIwHu7ixZhnattbh", 
+            "unit_price": {
+                "amount": 3996.0,
+                "currency": "USD"
+            }
+        }
+    }
+
+**2. Cross-Page Validation Endpoint**
+
+.. code-block::
+
+    POST /api/v1/bffs/checkout/validation
+
+    Authentication: None
+    Authorization: None
+    Purpose: Validate form fields across all form pages, leveraging LMS API calls to check user existence and slug conflicts
+    Optional Fields: full_name, work_email, company_name, enterprise_slug, stripe_price_id, quantity
+    Side-Effects: None
+    Frontend consumers: Build Trial page, Create Account page
+
+    Request:
+    {
+        "full_name": "John Doe",
+        "work_email": "admin@example.com",
+        "company_name": "Example Corporation",
+        "enterprise_slug": "example-corp",
+        "quantity": 10,
+        "stripe_price_id": "price_1MoBy5LkdIwHu7ixZhnattbh"
+    }
+
+    Response (200 OK - Valid):
+    {
+        "validation_decisions": {
+            "full_name": null,
+            "work_email": null,
+            "company_name": null,
+            "enterprise_slug": null,
+            "quantity": null,
+            "stripe_price_id": null
+        },
+        "user_exists": true,
+        "enterprise_slug_available": true,
+    }
+
+    Response (400 Bad Request - Validation Errors):
+    {
+        "validation_decisions": {
+            "work_email": {
+                "error_code": "invalid_format",
+                "developer_message": "Email format validation failed"
+            },
+            "enterprise_slug": {
+                "error_code": "existing_enterprise_customer",
+                "developer_message": "The slug conflicts with an existing customer."
+            },
+            "quantity": {
+                "error_code": "range_exceeded",
+                "developer_message": "Quantity 50 exceeds allowed range [5, 30] for stripe_price_id"
+            },
+            "company_name": {
+                "error_code": "required_field",
+                "developer_message": "Company name cannot be empty"
+            }
+        },
+        "user_exists": false,
+        "enterprise_slug_available": false,
+    }
+
+Customer Billing Endpoints
+---------------------------
+
+**3. Create Checkout Session**
+
+.. code-block::
+
+    POST /api/v1/customer-billing/create-checkout-session
+
+    Authentication: JWT (required)
+    Authorization: Any authenticated user
+    Purpose: Called on submit of the "Build Trial" page to prepare a new stripe checkout session for the subsequent "checkout" page
+    Side-Effects: "Reserve" the slug for as long as the checkout session lasts, Create the Stripe Checkout Session
+    Frontend consumer: Build Trial page
+
+    Request:
+    {
+        "admin_email": "admin@example.com",
+        "enterprise_slug": "example-corp",
+        "quantity": 10,
+        "stripe_price_id": "price_1MoBy5LkdIwHu7ixZhnattbh"
+    }
+
+    Response (201 Created):
+    {
+        "checkout_session_client_secret": "cs_test_1234567890abcdef"
+    }
+
+    Response (422 Unprocessable Entity - Validation Failed):
+    {
+        "admin_email": {
+            "error_code": "not_registered",
+            "developer_message": "The provided email has not yet been registered."
+        },
+        "enterprise_slug": {
+            "error_code": "existing_enterprise_customer",
+            "developer_message": "Slug conflicts with existing customer."
+        }
+    }
+
+**4. Create Portal Session**
+
+.. code-block::
+
+    POST /api/v1/customer-billing/<customer_uuid>/create-portal-session
+
+    Authentication: JWT (required)
+    Authorization: Only allow admins for the given customer_uuid
+    Purpose: URL for any "Billing Portal" button (placed anywhere in admin portal or emails)
+    Side-Effects: Create a new Stripe Billing Portal Session (consider rate limiting), 302 Redirect to Billing Portal URL
+
+    Response (302 Redirect):
+    Location: https://billing.stripe.com/session/bps_1234567890abcdef
+
+    Response (200 OK - Alternative JSON format):
+    {
+        "url": "https://billing.stripe.com/session/bps_1234567890abcdef",
+        "return_url": "https://portal.edx.org/example-corp"
+    }
+
+**5. Stripe Webhook Handler**
+
+.. code-block::
+
+    POST /api/v1/customer-billing/stripe-webhook
+
+    Authentication: Payload signature validation
+    Authorization: Only allow Stripe system user
+    Purpose: Receive specific Stripe events to trigger email communications with the admin as needed
+    Side-Effects: Permanent storage of event payload in DB, Possible triggering of Celery task
+
+    Supported webhook events:
+    - checkout.session.completed
+    - invoice.paid
+    - customer.subscription.trial_will_end
+    - customer.subscription.deleted
+    - payment_method.attached
+
+    Request (from Stripe):
+    {
+        "id": "evt_1MoBy5LkdIwHu7ixZhnattbh",
+        "object": "event",
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "id": "cs_test_1234567890abcdef",
+                "customer": "cus_test_customer123",
+                "subscription": "sub_test_subscription456"
+            }
+        }
+    }
+
+    Response (200 OK):
+    {
+        "received": true,
+        "event_id": "evt_1MoBy5LkdIwHu7ixZhnattbh"
+    }
+
+
+Form State Management
+---------------------
+
+Form state persistence is handled entirely on the frontend using in-memory
+state management.  Here is an example ``zustand`` state hook:
+
+.. code-block:: javascript
+
+    // Frontend state management strategy
+    import { create } from 'zustand';
+    
+    const useCheckoutFormStore = create<FormStore>(
+      (set) => ({
+        formData: {
+          account: {},  // page 1 state.
+          trial: {},    // page 2 state.
+        },
+        setFormData: (step, data) => set(
+          (store) => ({
+            formData: {
+              ...store.formData,
+              [step]: data,
+            },
+          }),
+        ),
+      }),
+    );
+    
+    export default useCheckoutFormStore;
+
+**In-Memory State Management Benefits:**
+
+- Simplified backend implementation.
+
+- Privacy-focused (no server-side storage of form data).
+
+- Automatic state clearing on tab close.
+
+Error Codes
+-----------
+
+**Common Error Codes:**
+
+- ``invalid_format``: Basic format validation failures.
+
+- ``incomplete_data``: Validation requires another field which was not included.
+
+**Quantity Error Codes:**
+
+- ``range_exceeded``: Numeric values outside allowed ranges.
+
+**Enterprise Slug Error Codes:**
+
+- ``existing_enterprise_customer``: Slug conflicts with existing customers.
+
+**Email Error Codes:**
+
+- ``not_registered``: Email not registered.
+
+**Stripe Price ID Error Codes:**
+
+- ``does_not_exist``: This stripe_price_id has not been configured.
+
+Rate Limiting
+-------------
+
+Rate limiting applied following existing enterprise-access patterns:
+
+.. code-block:: python
+
+    # BFF endpoints
+    @ratelimit(key='ip', rate='20/m', method='POST', block=False) # Context
+    @ratelimit(key='ip', rate='60/m', method='POST', block=False)  # Validation
+    
+    # Customer billing endpoints (existing patterns)
+    @ratelimit(key='user', rate='5/m', method='POST', block=False)  # Checkout session
+    @ratelimit(key='user', rate='10/m', method='POST', block=False)   # Portal session
+
+Integration Points
+------------------
+
+**edx-platform Integration:**
+
+- Frontend: Login and Registration modals in frontend directly call existing user_authn LMS endpoints:
+
+  - Login:
+
+    - ``POST <LMS>/api/user/v2/account/login_session/``
+
+    - Reference `loginRequest() logic <https://github.com/openedx/frontend-app-authn/blob/e9aaf70/src/login/LoginPage.jsx#L155-L161>`_ from frontend-app-authn.
+
+  - Registration (validation and account creation as separate endpoints):
+
+    - ``POST <LMS>/api/user/v1/validation/registration``
+
+    - ``POST <LMS>/api/user/v2/account/registration/``
+
+    - Reference `registerRequest() logic <https://github.com/openedx/frontend-app-authn/blob/1b5aa10/src/register/data/service.js#L5-L26>`_ from frontend-app-authn.
+
+- Backend validation endpoint:
+
+    - Leverages same registration validation endpoint to confirm email existence:
+
+      - ``POST <LMS>/api/user/v1/validation/registration``
+
+        Request::
+
+          { "email": "foobar@example.com" }
+
+        Response (email exists)::
+
+          { "validation_decisions": { "email": "This email is already associated with an existing account" } }
+ 
+        Response (email available)::
+
+          { "validation_decisions": { "email": "" } }
+
+
+**Stripe Integration:**
+
+- Flow creates a Stripe "Checkout Session" linked with composable stripe frontend components to build a custom checkout experience.
+
+
+**Salesforce Integration:**
+
+- No direct integration from backend endpoints (future consideration for lead generation).
+
+- Indirect integration: final provisioning handled via existing Stripe events → Salesforce → Provisioning API flow.
+
+Alternatives Considered
+=======================
+
+**1. Server-Side State Management vs. Frontend-Only State Persistence**
+
+*Alternative:* Store checkout progress and form data in server-side database or sessions.
+
+*Rejected because:*
+- Adds unnecessary complexity to backend state management
+- Requires database PII cleanup and expiration handling
+
+*Chosen approach:* Frontend-only state management using in-memory state for simplicity and security.
+
+**3. Separate Validation Endpoint Per Page vs. Bulk Validation Endpoint**
+
+*Alternative:* Individual validation BFF endpoints for each page (e.g., ``/api/v1/bffs/checkout/page1/validation``, ``/api/v1/bffs/checkout/page2/validation``, etc.).
+
+*Rejected because:*
+- Increases API surface area and maintenance burden
+- Harder to implement cross-field validation logic when fields are on different pages.
+
+*Chosen approach:* Single validation endpoint that accepts optional fields for flexible validation.
+
+Consequences
+============
+
+*Positive consequences:*
+
+- Stripe handles all payment data securely.
+
+- We would not need to implement Specially Designated Nationals (SDN) checks as it is automatically handled by Stripe.
+
+- We (Enterprise) would not need to implement handle "embargo" checks as it is automatically handled by LMS registration API endpoints.
