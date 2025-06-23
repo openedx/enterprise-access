@@ -50,6 +50,10 @@ class BaseSubsidyRequestAdmin(DjangoQLSearchMixin):
         'state',
     )
 
+    autocomplete_fields = [
+        'user',
+    ]
+
     @admin.display(
         description='Course partners'
     )
