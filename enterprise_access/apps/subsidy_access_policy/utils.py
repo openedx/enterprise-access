@@ -8,6 +8,8 @@ from django.conf import settings
 from edx_enterprise_subsidy_client import get_enterprise_subsidy_api_client
 from simple_history.models import HistoricalRecords, registered_models
 
+from enterprise_access.apps.subsidy_access_policy import constants
+
 LEDGERED_SUBSIDY_IDEMPOTENCY_KEY_PREFIX = 'ledger-for-subsidy'
 TRANSACTION_METADATA_KEYS = {
     'lms_user_id',
@@ -128,3 +130,13 @@ class ProxyAwareHistoricalRecords(HistoricalRecords):
         name = self.get_history_model_name(model)
         registered_models[opts.db_table] = model
         return type(str(name), (base_history,), attrs)
+
+
+def cents_to_usd_string(cents):
+    """
+    Helper to convert cents as an int to dollars as a
+    nicely formatted string.
+    """
+    if cents is None:
+        return None
+    return "${:,.2f}".format(float(cents) / constants.CENTS_PER_DOLLAR)
