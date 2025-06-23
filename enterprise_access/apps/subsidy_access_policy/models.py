@@ -1217,7 +1217,6 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
 
     # Policies of this type *must not* define a per-learner enrollment limit or an assignment configuration
     FIELD_CONSTRAINTS = {
-        'assignment_configuration': (is_none, 'must not relate to an AssignmentConfiguration.'),
         'per_learner_enrollment_limit': (is_none, 'must not define a per-learner enrollment limit.'),
     }
 
@@ -1226,6 +1225,26 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
         Metaclass for PerLearnerSpendCreditAccessPolicy.
         """
         proxy = True
+
+    def save(self, *args, **kwargs):
+        """
+        If Browse and Request is enabled and no ``assignment_configuration``
+        is present, create one and associate it with this record.
+        This step is necessary to make a PerLearnerSpendCreditAccessPolicy work with the
+        assignment-based workflow.
+
+        Lastly, ensure that the associated assignment_configuration has the
+        same ``enterprise_customer_uuid`` as this policy record.
+        """
+        if self.bnr_enabled and not self.assignment_configuration:
+            self.assignment_configuration = assignments_api.create_assignment_configuration(
+                self.enterprise_customer_uuid
+            )
+        elif (self.assignment_configuration and
+                self.enterprise_customer_uuid != self.assignment_configuration.enterprise_customer_uuid):
+            self.assignment_configuration.enterprise_customer_uuid = self.enterprise_customer_uuid
+            self.assignment_configuration.save()
+        super().save(*args, **kwargs)
 
     def can_redeem(
         self, lms_user_id, content_key, skip_customer_user_check=False, skip_enrollment_deadline_check=False,
