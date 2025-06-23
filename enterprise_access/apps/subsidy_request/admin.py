@@ -50,6 +50,10 @@ class BaseSubsidyRequestAdmin(DjangoQLSearchMixin):
         'state',
     )
 
+    autocomplete_fields = [
+        'user',
+    ]
+
     @admin.display(
         description='Course partners'
     )
@@ -67,6 +71,18 @@ class BaseSubsidyRequestAdmin(DjangoQLSearchMixin):
 class LicenseRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
     """ Admin configuration for the LicenseRequest model. """
 
+    list_display = (
+        'uuid',
+        'user',
+        'enterprise_customer_uuid',
+        'course_id',
+        'course_title',
+        'state',
+        'subscription_plan_uuid',
+        'license_uuid',
+        'reviewer',
+        'reviewed_at',
+    )
     read_only_fields = (
         'subscription_plan_uuid',
         'license_uuid',
@@ -239,3 +255,51 @@ class LearnerCreditRequestConfigurationAdmin(DjangoQLSearchMixin, admin.ModelAdm
         """
 
         model = models.LearnerCreditRequestConfiguration
+
+
+@admin.register(models.LearnerCreditRequestActions)
+class LearnerCreditRequestActionsAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
+    """ Admin configuration for the LearnerCreditRequestActions model. """
+
+    list_display = (
+        'uuid',
+        'learner_credit_request',
+        'recent_action',
+        'status',
+        'error_reason',
+        'created',
+        'modified',
+    )
+
+    search_fields = ('uuid', 'learner_credit_request__uuid')
+
+    list_filter = (
+        'recent_action',
+        'status',
+        'error_reason',
+    )
+
+    fields = (
+        'uuid',
+        'learner_credit_request',
+        'recent_action',
+        'status',
+        'error_reason',
+        'traceback',
+        'created',
+        'modified',
+    )
+
+    readonly_fields = (
+        'uuid',
+        'created',
+        'modified',
+        'traceback',
+    )
+
+    class Meta:
+        """
+        Meta class for ``LearnerCreditRequestActionsAdmin``.
+        """
+
+        model = models.LearnerCreditRequestActions

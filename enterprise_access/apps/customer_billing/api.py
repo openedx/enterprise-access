@@ -276,10 +276,8 @@ def create_free_trial_checkout_session(
         'mode': 'subscription',
         # Intended UI will be a custom react component.
         'ui_mode': 'custom',
-        # This normally wouldn't work because the customer doesn't exist yet --- I'd propose we modify the admin
-        # portal to support an empty state with a message like "turning cogs, check back later." if there's no
-        # Enterprise Customer but there is a Stripe Customer.
-        'return_url': f"https://portal.edx.org/{input_data['enterprise_slug']}",
+        # Specify the type and quantity of what is being purchased.  Units for `quantity` depends on
+        # the price specified, and the product associated with the price.
         'line_items': [{
             'price': input_data['stripe_price_id'],
             'quantity': input_data['quantity'],
@@ -289,7 +287,7 @@ def create_free_trial_checkout_session(
         'subscription_data': {
             'trial_period_days': settings.SSP_TRIAL_PERIOD_DAYS,
             'trial_settings': {
-                # Just in case the admin removes the paymet method via their stripe billing portal, cancel the trial
+                # Just in case the admin removes the payment method via their stripe billing portal, cancel the trial
                 # after it ends.
                 'end_behavior': {'missing_payment_method': 'cancel'},
             },
@@ -303,6 +301,10 @@ def create_free_trial_checkout_session(
         # Always collect payment method, not just when the amount is greater than zero.  This is influential for
         # creating a free trial plan because the amount is always zero.
         'payment_method_collection': 'always',
+
+        # `return_url` is not required because we won't use any "redirect-based" payment methods,
+        # including: iDEAL, Bancontact, SOFORT, Apple Pay, Google Pay, etc.. We only support the
+        # `card` payment method which is not redirect-based.
     }
     # Eagerly find an existing Stripe customer if one already exists with the same email, otherwise excluding it from
     # the request will cause Stripe to generate a new one.

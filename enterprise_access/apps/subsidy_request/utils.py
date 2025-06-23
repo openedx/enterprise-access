@@ -6,6 +6,11 @@ from django.conf import settings
 from edx_rest_framework_extensions.auth.jwt.decoder import configured_jwt_decode_handler
 
 from enterprise_access.apps.core.models import User
+from enterprise_access.apps.subsidy_request.constants import (
+    LearnerCreditRequestActionChoices,
+    LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestUserMessages
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,3 +67,51 @@ def get_data_from_jwt_payload(request, keys):
 
     return_dict = {key: value for key, value in jwt_dict.items() if key in keys}
     return return_dict
+
+
+def get_action_choice(action_key):
+    """
+    Get the action choice value from LearnerCreditRequestActionChoices.
+
+    Args:
+        action_key (str): The key to look for (e.g., 'declined', 'approved')
+
+    Returns:
+        str: The action choice value, or None if not found
+    """
+    for choice_value, _ in LearnerCreditRequestActionChoices:
+        if choice_value == action_key:
+            return choice_value
+    return None
+
+
+def get_user_message_choice(message_key):
+    """
+    Get the user message choice value from LearnerCreditRequestUserMessages.
+
+    Args:
+        message_key (str): The key to look for
+
+    Returns:
+        str: The message choice value, or None if not found
+    """
+    for choice_value, _ in LearnerCreditRequestUserMessages.CHOICES:
+        if choice_value == message_key:
+            return choice_value
+    return None
+
+
+def get_error_reason_choice(error_key):
+    """
+    Get the error reason choice value from LearnerCreditRequestActionErrorReasons.
+
+    Args:
+        error_key (str): The key to look for
+
+    Returns:
+        str: The error reason choice value, or None if not found
+    """
+    for choice_value, _ in LearnerCreditRequestActionErrorReasons.CHOICES:
+        if choice_value == error_key:
+            return choice_value
+    return None

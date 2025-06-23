@@ -6,9 +6,11 @@ import logging
 from rest_framework import serializers
 
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
+    LearnerCreditRequestActions,
     LearnerCreditRequestConfiguration,
     LicenseRequest,
     SubsidyRequest,
@@ -157,6 +159,7 @@ class LearnerCreditRequestSerializer(SubsidyRequestSerializer):
         allow_null=True,
         help_text="Cost of the content in USD Cents.",
     )
+    latest_action = serializers.SerializerMethodField()
 
     class Meta:
         model = LearnerCreditRequest
@@ -164,6 +167,103 @@ class LearnerCreditRequestSerializer(SubsidyRequestSerializer):
             "learner_credit_request_config",
             "assignment",
             "course_price",
+            "latest_action",
         ]
-        read_only_fields = SubsidyRequestSerializer.Meta.read_only_fields
+        read_only_fields = SubsidyRequestSerializer.Meta.read_only_fields + [
+            "latest_action",
+        ]
         extra_kwargs = SubsidyRequestSerializer.Meta.extra_kwargs
+
+    def get_latest_action(self, obj):
+        """
+        Returns the latest action for this learner credit request, if any exists.
+        """
+        latest_action = obj.actions.order_by('-created').first()
+        if latest_action:
+            return LearnerCreditRequestActionsSerializer(latest_action).data
+        return None
+
+
+class LearnerCreditRequestActionsSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the `LearnerCreditRequestActions` model.
+    """
+
+    class Meta:
+        model = LearnerCreditRequestActions
+        fields = [
+            'uuid',
+            'recent_action',
+            'status',
+            'error_reason',
+            'traceback',
+            'created',
+            'modified',
+            'learner_credit_request',
+        ]
+        read_only_fields = [
+            'uuid',
+            'created',
+            'modified',
+        ]
+        extra_kwargs = {
+            'learner_credit_request': {'write_only': True},
+        }
+
+
+class LearnerCreditRequestDeclineSerializer(serializers.Serializer):
+    """
+    Serializer for declining a learner credit request.
+    """
+
+    subsidy_request_uuid = serializers.UUIDField(
+        required=True, help_text="UUID of the learner credit request to decline"
+    )
+    send_notification = serializers.BooleanField(
+        default=False, help_text="Whether to send decline notification email to the learner"
+    )
+    disassociate_from_org = serializers.BooleanField(
+        default=False, help_text="Whether to unlink the user from the enterprise organization"
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._learner_credit_request = None
+
+    def validate_subsidy_request_uuid(self, value):
+        """
+        Validate that the subsidy request exists and can be declined.
+        """
+        try:
+            learner_credit_request = LearnerCreditRequest.objects.get(uuid=value)
+        except LearnerCreditRequest.DoesNotExist as exc:
+            raise serializers.ValidationError(f"Learner Credit Request with UUID {value} not found.") from exc
+
+        if learner_credit_request.state not in [SubsidyRequestStates.REQUESTED]:
+            raise serializers.ValidationError(
+                f'Learner Credit Request with UUID {value} cannot be declined. '
+                f'Current state: {learner_credit_request.state}'
+            )
+
+        # Store the fetched object for later use
+        self._learner_credit_request = learner_credit_request
+
+        return value
+
+    def get_learner_credit_request(self):
+        """
+        Return the already-fetched LearnerCreditRequest object
+        """
+        return self._learner_credit_request
+
+    def create(self, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
+
+    def update(self, instance, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")

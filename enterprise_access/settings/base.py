@@ -175,6 +175,9 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'PAGE_SIZE': 100,
     'TEST_REQUEST_DEFAULT_FORMAT': 'json',
+    'DEFAULT_THROTTLE_RATES': {
+        'bff_unauthenticated': '100/hour',
+    },
 }
 
 # DRF Spectacular settings
@@ -533,6 +536,7 @@ ENTERPRISE_COURSE_ENROLLMENTS_CACHE_TIMEOUT = 0  # 0 seconds (no caching, as enr
 SUBSIDY_RECORD_CACHE_TIMEOUT = DEFAULT_CACHE_TIMEOUT
 DEFAULT_ENTERPRISE_ENROLLMENT_INTENTIONS_CACHE_TIMEOUT = DEFAULT_CACHE_TIMEOUT
 ALL_ENTERPRISE_GROUP_MEMBERS_CACHE_TIMEOUT = DEFAULT_CACHE_TIMEOUT
+SECURED_ALGOLIA_API_KEY_CACHE_TIMEOUT = 60 * 30  # 30 minutes
 
 BRAZE_GROUP_EMAIL_FORCE_REMIND_ALL_PENDING_LEARNERS = False
 BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_5_CAMPAIGN = ''
@@ -577,9 +581,13 @@ PROVISIONING_DEFAULTS = {
 }
 
 # Add a mapping from product_id to catalog_query_id
+# we type the keys as strings instead of ints and have related
+# code look up by str(the_value) to avoid any complications
+# with loading environment settings from yaml, where the keys
+# may *always* be safely-loaded as strings.
 PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING = {
-    1: 1,  # Product 1 maps to catalog query 1
-    2: 2,
+    '1': 1,  # Product 1 maps to catalog query 1
+    '2': 2,
     # Add more mappings as needed
 }
 

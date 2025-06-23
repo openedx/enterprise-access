@@ -71,7 +71,12 @@ from .subsidy_api import (
     get_tiered_cache_subsidy_record,
     set_tiered_cache_subsidy_record
 )
-from .utils import ProxyAwareHistoricalRecords, create_idempotency_key_for_transaction, get_versioned_subsidy_client
+from .utils import (
+    ProxyAwareHistoricalRecords,
+    cents_to_usd_string,
+    create_idempotency_key_for_transaction,
+    get_versioned_subsidy_client
+)
 
 # Magic key that is used transaction metadata hint to the subsidy service and all downstream services that the
 # enrollment should be allowed even if the enrollment deadline has passed.
@@ -328,17 +333,26 @@ class SubsidyAccessPolicy(TimeStampedModel):
         return None
 
     @property
-    def total_spend_limit_for_all_policies_associated_to_subsidy(self):
+    def total_spend_limits_for_subsidy(self):
         """
-        Sums the policies spend_limit excluding the db's instance of this policy
+        Sum of spend_limit for all policies associated with this policy's subsidy.
+
+        Calculation is based on what the sum would be if this instance was saved to the DB.
         """
-        spend_limit = self.spend_limit if self.active and self.spend_limit else 0
         sibling_policies_sum = SubsidyAccessPolicy.objects.filter(
             enterprise_customer_uuid=self.enterprise_customer_uuid,
             subsidy_uuid=self.subsidy_uuid,
-            active=True
-        ).exclude(uuid=self.uuid).aggregate(models.Sum("spend_limit", default=0))["spend_limit__sum"]
-        return spend_limit + sibling_policies_sum
+            active=True,
+        ).exclude(
+            # Exclude self from the DB query because that value might be outdated.
+            uuid=self.uuid,
+        ).aggregate(
+            models.Sum("spend_limit", default=0),
+        )["spend_limit__sum"]
+
+        # Re-add self.spend_limit which likely is more up-to-date compared to the DB value.
+        self_spend_limit = self.spend_limit if self.active and self.spend_limit else 0
+        return self_spend_limit + sibling_policies_sum
 
     @property
     def is_spend_limit_updated(self):
@@ -394,17 +408,38 @@ class SubsidyAccessPolicy(TimeStampedModel):
             learner_credit_request_config__active=True
         ).exists()
 
+    def clean_spend_limit(self):
+        if self.active and (self.is_active_updated or self.is_spend_limit_updated):
+            if self.total_spend_limits_for_subsidy > self.total_deposits_for_subsidy:
+                sum_of_spend_limits_str = cents_to_usd_string(
+                    self.total_spend_limits_for_subsidy
+                )
+                sum_of_deposits_str = cents_to_usd_string(self.total_deposits_for_subsidy)
+                raise ValidationError(
+                    f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE} '
+                    f'Error: {sum_of_spend_limits_str} is greater than {sum_of_deposits_str}'
+                )
+
     def clean(self):
         """
         Used to help validate field values before saving this model instance.
         """
-        if self.active and (self.is_active_updated or self.is_spend_limit_updated):
-            if self.total_spend_limit_for_all_policies_associated_to_subsidy > self.subsidy_total_deposits():
-                raise ValidationError(f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE}')
+        validation_errors = {}
+
+        # Validate the spend_limit field.
+        try:
+            self.clean_spend_limit()
+        except ValidationError as exc:
+            validation_errors['spend_limit'] = str(exc)
+
+        # Perform basic field constraint checks.
         for field_name, (constraint_function, error_message) in self.FIELD_CONSTRAINTS.items():
             field = getattr(self, field_name)
             if not constraint_function(field):
-                raise ValidationError(f'{self} {error_message}')
+                validation_errors[field_name] = f'{self} {error_message}'
+
+        if validation_errors:
+            raise ValidationError(validation_errors)
 
     def save(self, *args, **kwargs):
         """
@@ -500,9 +535,10 @@ class SubsidyAccessPolicy(TimeStampedModel):
         current_balance = self.subsidy_record().get('current_balance') or 0
         return int(current_balance)
 
-    def subsidy_total_deposits(self):
+    @property
+    def total_deposits_for_subsidy(self):
         """
-        Returns total remaining balance for the associated subsidy ledger.
+        Returns total amount deposited into the associated subsidy ledger.
         """
         total_deposits = self.subsidy_record().get('total_deposits') or 0
         return int(total_deposits)
@@ -1217,7 +1253,6 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
 
     # Policies of this type *must not* define a per-learner enrollment limit or an assignment configuration
     FIELD_CONSTRAINTS = {
-        'assignment_configuration': (is_none, 'must not relate to an AssignmentConfiguration.'),
         'per_learner_enrollment_limit': (is_none, 'must not define a per-learner enrollment limit.'),
     }
 
@@ -1226,6 +1261,26 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
         Metaclass for PerLearnerSpendCreditAccessPolicy.
         """
         proxy = True
+
+    def save(self, *args, **kwargs):
+        """
+        If Browse and Request is enabled and no ``assignment_configuration``
+        is present, create one and associate it with this record.
+        This step is necessary to make a PerLearnerSpendCreditAccessPolicy work with the
+        assignment-based workflow.
+
+        Lastly, ensure that the associated assignment_configuration has the
+        same ``enterprise_customer_uuid`` as this policy record.
+        """
+        if self.bnr_enabled and not self.assignment_configuration:
+            self.assignment_configuration = assignments_api.create_assignment_configuration(
+                self.enterprise_customer_uuid
+            )
+        elif (self.assignment_configuration and
+                self.enterprise_customer_uuid != self.assignment_configuration.enterprise_customer_uuid):
+            self.assignment_configuration.enterprise_customer_uuid = self.enterprise_customer_uuid
+            self.assignment_configuration.save()
+        super().save(*args, **kwargs)
 
     def can_redeem(
         self, lms_user_id, content_key, skip_customer_user_check=False, skip_enrollment_deadline_check=False,

@@ -9,6 +9,7 @@ from django.core.cache import cache as django_cache
 from pytest_dictsdiff import check_objects
 from rest_framework import status
 from rest_framework.reverse import reverse
+from rest_framework.test import APIClient
 
 from enterprise_access.apps.api_client.tests.test_utils import MockLicenseManagerMetadataMixin
 from enterprise_access.apps.bffs.constants import COURSE_ENROLLMENT_STATUSES
@@ -1056,3 +1057,40 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         self.assertEqual(
             response_data.get('has_bnr_enabled_policy'), expected_response_data.get('has_bnr_enabled_policy')
         )
+
+
+@ddt.ddt
+class TestUnauthenticatedPingBFFViewSet(TestHandlerContextMixin, APITest):
+    """
+    Test the base, unauthenticated BFF ping endpoint
+    """
+    def setUp(self):
+        """
+        Set up test client and any necessary test data.
+        """
+        super().setUp()
+        self.client = APIClient()
+        # Explicitly ensure no authentication
+        self.client.force_authenticate(user=None)
+
+    def test_ping_endpoint_unauthenticated_request(self):
+        """
+        Test that the ping endpoint can be accessed without authentication
+        and returns the expected response structure.
+        """
+        url = reverse('api:v1:bff-health-ping')
+
+        response = self.client.get(url)
+
+        # Should succeed without authentication
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify response structure and content
+        expected_response = {
+            'message': 'pong',
+            'timestamp': mock.ANY,
+            'status': 'healthy',
+            'service': 'enterprise-access-bff',
+        }
+
+        self.assertEqual(response.json(), expected_response)

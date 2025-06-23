@@ -517,16 +517,30 @@ class TestLmsApiClient(TestCase):
         """
         customer_uuid = str(uuid4())
 
-        mock_response_payload_results = [{
+        mock_response_payload_results_pg_1 = [{
             'id': 1,
             'enterprise_customer': customer_uuid,
             'user_email': 'test-existing-admin@example.com',
         }]
-        mock_response_payload = {
-            'count': 1,
-            'results': mock_response_payload_results,
+        mock_response_payload_results_pg_2 = [{
+            'id': 2,
+            'enterprise_customer': customer_uuid,
+            'user_email': 'test-existing-admin2@example.com',
+        }]
+        mock_response_payload_1 = {
+            'count': 2,
+            'next': 'the_second_url',
+            'results': mock_response_payload_results_pg_1,
         }
-        mock_json.return_value = mock_response_payload
+        mock_response_payload_2 = {
+            'count': 2,
+            'next': None,
+            'results': mock_response_payload_results_pg_2,
+        }
+        mock_json.side_effect = [
+            mock_response_payload_1,
+            mock_response_payload_2,
+        ]
 
         mock_get = mock_oauth_client.return_value.get
 
@@ -536,15 +550,33 @@ class TestLmsApiClient(TestCase):
         client = LmsApiClient()
         response_payload = client.get_enterprise_pending_admin_users(customer_uuid)
 
-        self.assertEqual(response_payload, mock_response_payload_results)
-        expected_url = (
+        expected_results = [
+            {
+                'id': 1,
+                'enterprise_customer': customer_uuid,
+                'user_email': 'test-existing-admin@example.com',
+            },
+            {
+                'id': 2,
+                'enterprise_customer': customer_uuid,
+                'user_email': 'test-existing-admin2@example.com',
+            },
+        ]
+        self.assertEqual(response_payload, expected_results)
+        expected_url_1 = (
             'http://edx-platform.example.com/enterprise/api/v1/pending-enterprise-admin/'
             f'?enterprise_customer={customer_uuid}'
         )
-        mock_get.assert_called_once_with(
-            expected_url,
-            timeout=settings.LMS_CLIENT_TIMEOUT,
-        )
+        mock_get.assert_has_calls([
+            mock.call(
+                expected_url_1,
+                timeout=settings.LMS_CLIENT_TIMEOUT,
+            ),
+            mock.call(
+                'the_second_url',
+                timeout=settings.LMS_CLIENT_TIMEOUT,
+            ),
+        ])
 
     @mock.patch('requests.Response.json')
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')

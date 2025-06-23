@@ -99,6 +99,17 @@ class BaseResponseBuilder:
             return self.serializer_class(self.response_data).data, self.status_code
 
 
+class UnauthenticatedBaseResponseBuilder(BaseResponseBuilder):
+    """
+    A ResponseBuilder class for unauthenticated requests, where we don't
+    expect customer or user inputs or outputs to exist.
+    """
+    def build(self):
+        """
+        Does no enterprise- or user- specific action by default.
+        """
+
+
 class BaseLearnerResponseBuilder(BaseResponseBuilder, BaseLearnerDataMixin):
     """
     A base response builder class for learner-focused routes.

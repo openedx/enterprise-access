@@ -10,7 +10,6 @@ from enterprise_access.apps.api_client import EnterpriseCatalogUserV1ApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerUserApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient, LmsUserApiClient
 from enterprise_access.cache_utils import request_cache, versioned_cache_key
-from enterprise_access.utils import determine_timeout_offset
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +104,7 @@ def get_and_cache_enterprise_customer(
 def get_and_cache_secured_algolia_search_keys(
     request,
     enterprise_customer_uuid,
-    timeout=settings.DEFAULT_CACHE_TIMEOUT,
+    timeout=settings.SECURED_ALGOLIA_API_KEY_CACHE_TIMEOUT,
 ):
     """
     Retrieves and caches secured algolia api key for a learner.
@@ -131,11 +130,6 @@ def get_and_cache_secured_algolia_search_keys(
     response_payload = client.get_secured_algolia_api_key(
         enterprise_customer_uuid=enterprise_customer_uuid,
     )
-
-    # Cache timeout based on calculated API response field 'valid_until' - epsilon_seconds
-    algolia_response = response_payload.get('algolia', {})
-    if valid_until_date := algolia_response.get('valid_until'):
-        timeout = determine_timeout_offset(valid_until_date)
 
     TieredCache.set_all_tiers(cache_key, response_payload, timeout)
     return response_payload

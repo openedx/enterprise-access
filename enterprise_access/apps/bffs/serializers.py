@@ -170,7 +170,15 @@ class SecuredAlgoliaMetadataSerializer(BaseBffSerializer):
     valid_until = serializers.DateTimeField(required=False, allow_null=True)
 
 
-class BaseResponseSerializer(BaseBffSerializer):
+class MinimalBffResponseSerializer(BaseBffSerializer):
+    """
+    Every response serializer should come with errors and warnings.
+    """
+    errors = ErrorSerializer(many=True, required=False, default=list)
+    warnings = WarningSerializer(many=True, required=False, default=list)
+
+
+class BaseResponseSerializer(MinimalBffResponseSerializer):
     """
     Serializer for base response.
     """
@@ -186,8 +194,6 @@ class BaseResponseSerializer(BaseBffSerializer):
         help_text='Mapping of catalog UUIDs to catalog query UUIDs.',
     )
     algolia = SecuredAlgoliaMetadataSerializer(required=False, allow_null=True)
-    errors = ErrorSerializer(many=True, required=False, default=list)
-    warnings = WarningSerializer(many=True, required=False, default=list)
     enterprise_features = serializers.DictField(required=False, default=dict)
 
 
@@ -310,7 +316,7 @@ class EnterpriseCourseEnrollmentSerializer(BaseBffSerializer):
     is_enrollment_active = serializers.BooleanField()
     is_revoked = serializers.BooleanField()
     link_to_course = serializers.URLField()
-    link_to_certificate = serializers.URLField(allow_null=True)
+    link_to_certificate = serializers.CharField(allow_null=True)
     micromasters_title = serializers.CharField(allow_null=True)
     mode = serializers.CharField()
     notifications = serializers.ListField(
