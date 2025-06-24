@@ -162,6 +162,14 @@ class EnterpriseCustomerUserSerializer(BaseBffSerializer):
     active = serializers.BooleanField()
 
 
+class SecuredAlgoliaMetadataSerializer(BaseBffSerializer):
+    """
+    Serializer for the secured algolia key
+    """
+    secured_algolia_api_key = serializers.CharField(required=False, allow_null=True)
+    valid_until = serializers.DateTimeField(required=False, allow_null=True)
+
+
 class MinimalBffResponseSerializer(BaseBffSerializer):
     """
     Every response serializer should come with errors and warnings.
@@ -185,6 +193,7 @@ class BaseResponseSerializer(MinimalBffResponseSerializer):
         child=serializers.UUIDField(),
         help_text='Mapping of catalog UUIDs to catalog query UUIDs.',
     )
+    algolia = SecuredAlgoliaMetadataSerializer(required=False, allow_null=True)
     enterprise_features = serializers.DictField(required=False, default=dict)
 
 

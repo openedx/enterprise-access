@@ -40,6 +40,8 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
             'active_enterprise_customer': self.mock_active_enterprise_customer,
             'secured_algolia_api_key': self.mock_secured_algolia_api_key,
             'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
+            'valid_until': self.mock_valid_until,
+            'algolia': self.mock_algolia_object,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
         }
         mock_handler_context.return_value = self.get_mock_handler_context(
@@ -57,6 +59,7 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
             'active_enterprise_customer': self.mock_active_enterprise_customer,
             'secured_algolia_api_key': self.mock_secured_algolia_api_key,
             'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
+            'algolia': self.mock_algolia_object,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
             'errors': [],
             'warnings': [],
@@ -92,6 +95,8 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
             'active_enterprise_customer': self.mock_active_enterprise_customer,
             'secured_algolia_api_key': self.mock_secured_algolia_api_key,
             'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
+            'valid_until': self.mock_valid_until,
+            'algolia': self.mock_algolia_object,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
         }
         mock_handler_context.return_value = self.get_mock_handler_context(
@@ -107,6 +112,7 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
             'active_enterprise_customer': self.mock_active_enterprise_customer,
             'secured_algolia_api_key': self.mock_secured_algolia_api_key,
             'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
+            'algolia': self.mock_algolia_object,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
             'errors': [],
             'warnings': [],
@@ -121,7 +127,6 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
         base_response_builder.add_errors_warnings_to_response()
         base_response_builder.build()
         response_data, _ = base_response_builder.serialize()
-
         assert check_objects(response_data, expected_output)
 
     # TODO Revisit this function in ENT-9633 to determine if 200 is ok for a nested errored response
@@ -179,6 +184,8 @@ class TestBaseLearnerResponseBuilder(TestBaseResponseBuilder, MockLicenseManager
             'active_enterprise_customer': self.mock_active_enterprise_customer,
             'secured_algolia_api_key': self.mock_secured_algolia_api_key,
             'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
+            'valid_until': self.mock_valid_until,
+            'algolia': self.mock_algolia_object,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
         }
         mock_handler_context.return_value = self.get_mock_handler_context(
@@ -221,6 +228,7 @@ class TestBaseLearnerResponseBuilder(TestBaseResponseBuilder, MockLicenseManager
             'all_linked_enterprise_customer_users': self.mock_all_linked_enterprise_customer_users,
             'secured_algolia_api_key': self.mock_secured_algolia_api_key,
             'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
+            'algolia': self.mock_algolia_object,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
             'errors': [],
             'warnings': [],

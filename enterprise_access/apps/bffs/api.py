@@ -432,5 +432,6 @@ def transform_secured_algolia_api_key_response(secured_algolia_api_key_response)
     )
     if algolia := secured_algolia_api_key_response.get('algolia', {}):
         secured_algolia_api_key = algolia.get('secured_api_key')
-        return secured_algolia_api_key, catalog_uuids_to_catalog_query_uuids
-    return None, catalog_uuids_to_catalog_query_uuids
+        valid_until = algolia.get('valid_until')
+        return secured_algolia_api_key, catalog_uuids_to_catalog_query_uuids, valid_until
+    return None, catalog_uuids_to_catalog_query_uuids, None

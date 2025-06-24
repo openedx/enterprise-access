@@ -52,6 +52,8 @@ class TestHandlerContext(TestHandlerContextMixin):
                 'staff_enterprise_customer': None,
                 'secured_algolia_api_key': self.mock_secured_algolia_api_key,
                 'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
+                'valid_until': self.mock_valid_until,
+                'algolia': self.mock_algolia_object,
                 'all_linked_enterprise_customer_users': [
                     {
                         **self.mock_enterprise_learner_response_data['results'][0],
@@ -144,6 +146,8 @@ class TestHandlerContext(TestHandlerContextMixin):
             'staff_enterprise_customer': self.mock_enterprise_customer,
             'secured_algolia_api_key': self.mock_secured_algolia_api_key,
             'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
+            'valid_until': self.mock_valid_until,
+            'algolia': self.mock_algolia_object,
             'all_linked_enterprise_customer_users': [],
             'should_update_active_enterprise_customer_user': False,
         }

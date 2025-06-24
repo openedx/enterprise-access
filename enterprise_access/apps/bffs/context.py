@@ -182,6 +182,14 @@ class HandlerContext(BaseHandlerContext):
         return self.data.get('secured_algolia_api_key')
 
     @property
+    def valid_until(self):
+        return self.data.get('valid_until')
+
+    @property
+    def algolia(self):
+        return self.data.get('algolia')
+
+    @property
     def catalog_uuids_to_catalog_query_uuids(self):
         return self.data.get('catalog_uuids_to_catalog_query_uuids')
 
@@ -292,7 +300,7 @@ class HandlerContext(BaseHandlerContext):
                 developer_message=f'Could not initialize the secured algolia api keys. Error: {exc}',
             )
 
-        if not (self.secured_algolia_api_key and self.catalog_uuids_to_catalog_query_uuids):
+        if not (self.secured_algolia_api_key and self.catalog_uuids_to_catalog_query_uuids and self.valid_until):
             logger.info(
                 'No secured algolia key found for request user %s, enterprise customer uuid %s, '
                 'and/or enterprise slug %s',
@@ -362,9 +370,14 @@ class HandlerContext(BaseHandlerContext):
         )
 
         secured_algolia_api_key = None
+        valid_until = None
         catalog_uuids_to_catalog_query_uuids = {}
         try:
-            secured_algolia_api_key, catalog_uuids_to_catalog_query_uuids = transform_secured_algolia_api_key_response(
+            (
+                secured_algolia_api_key,
+                catalog_uuids_to_catalog_query_uuids,
+                valid_until,
+            ) = transform_secured_algolia_api_key_response(
                 secured_algolia_api_key_data
             )
         except Exception:  # pylint: disable=broad-except
@@ -377,5 +390,10 @@ class HandlerContext(BaseHandlerContext):
             )
         self.data.update({
             'secured_algolia_api_key': secured_algolia_api_key,
-            'catalog_uuids_to_catalog_query_uuids': catalog_uuids_to_catalog_query_uuids
+            'catalog_uuids_to_catalog_query_uuids': catalog_uuids_to_catalog_query_uuids,
+            'valid_until': valid_until,
+            'algolia': {
+                'secured_algolia_api_key': secured_algolia_api_key,
+                'valid_until': valid_until
+            }
         })
