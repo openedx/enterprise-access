@@ -1668,6 +1668,17 @@ class PolicyGroupAssociation(TimeStampedModel):
         help_text='The uuid that uniquely identifies the associated group.',
     )
 
+    @classmethod
+    def cascade_delete_for_group_uuid(cls, group_uuid):
+        """
+        Delete all associations for a remote EnterpriseGroup.
+
+        Called by the domain signal `handle_enterprise_group_deleted`.
+        """
+        return cls.objects.filter(
+            enterprise_group_uuid=group_uuid
+        ).delete()
+
 
 class ForcedPolicyRedemption(TimeStampedModel):
     """
