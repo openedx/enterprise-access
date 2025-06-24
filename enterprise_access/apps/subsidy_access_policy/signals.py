@@ -1,5 +1,5 @@
 """
-Signal handlers for content_assignments app.
+Signal handlers for subsidy_access_policy app.
 """
 import logging
 
