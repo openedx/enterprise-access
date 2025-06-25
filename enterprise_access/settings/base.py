@@ -622,4 +622,7 @@ SSP_PRODUCTS = {
 ENABLE_CUSTOMER_BILLING_API = False
 STRIPE_API_KEY = None
 
+# How long we consider Stripe prices valid for
+STRIPE_PRICE_DATA_CACHE_TIMEOUT = 300
+
 ################# End Self-Service Purchasing (SSP) settings #################
