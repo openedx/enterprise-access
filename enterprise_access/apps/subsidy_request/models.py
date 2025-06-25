@@ -135,9 +135,9 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
 
     class Meta:
         abstract = True
-        index_together = [
-            ['uuid', 'state'],
-            ['user', 'enterprise_customer_uuid', 'state', 'course_id']
+        indexes = [
+            models.Index(fields=['uuid', 'state']),
+            models.Index(fields=['user', 'enterprise_customer_uuid', 'state', 'course_id']),
         ]
 
 
