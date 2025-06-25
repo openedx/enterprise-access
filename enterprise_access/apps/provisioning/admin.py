@@ -50,6 +50,9 @@ class ProvisionNewCustomerWorkflowAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
         description='Create Customer Step'
     )
     def create_customer_step_link(self, obj):
+        """
+        Returns a link to the customer creation step admin page for this workflow.
+        """
         step_record = obj.get_create_customer_step()
         if not step_record:
             return None
@@ -62,6 +65,9 @@ class ProvisionNewCustomerWorkflowAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
         description='Create Admin Users Step'
     )
     def create_admin_users_step_link(self, obj):
+        """
+        Returns a link to the admin users creation step admin page for this workflow.
+        """
         step_record = obj.get_create_enterprise_admin_users_step()
         if not step_record:
             return None
@@ -74,6 +80,9 @@ class ProvisionNewCustomerWorkflowAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
         description='Create Catalog Step'
     )
     def create_catalog_step_link(self, obj):
+        """
+        Returns a link to the catalog creation step admin page for this workflow.
+        """
         step_record = obj.get_create_catalog_step()
         if not step_record:
             return None
@@ -86,6 +95,9 @@ class ProvisionNewCustomerWorkflowAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
         description='Create Customer Agreement Step'
     )
     def create_customer_agreement_step_link(self, obj):
+        """
+        Returns a link to the customer agreement creation step admin page for this workflow.
+        """
         step_record = obj.get_create_customer_agreement_step()
         if not step_record:
             return None
@@ -98,6 +110,9 @@ class ProvisionNewCustomerWorkflowAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
         description='Create Subscription Plan Step'
     )
     def create_subscription_plan_step_link(self, obj):
+        """
+        Returns a link to the subscription plan creation step admin page for this workflow.
+        """
         step_record = obj.get_create_subscription_plan_step()
         if not step_record:
             return None
@@ -157,6 +172,9 @@ class ProvisionWorkflowStepAdminBase(admin.ModelAdmin):
         description='Workflow Record'
     )
     def workflow_record_link(self, obj):
+        """
+        Returns a link to the associated workflow record admin page.
+        """
         workflow_record = obj.get_workflow_record()
         if not workflow_record:
             return None
@@ -185,6 +203,9 @@ class GetCreateEnterpriseAdminUsersStepAdmin(DjangoQLSearchMixin, ProvisionWorkf
         description='Preceding customer creation step'
     )
     def preceding_step_link(self, obj):
+        """
+        Returns a link to the preceding customer creation step for this admin users step.
+        """
         step_record = obj.get_preceding_step_record()
         if not step_record:
             return None
@@ -206,6 +227,9 @@ class GetCreateCatalogStepAdmin(DjangoQLSearchMixin, ProvisionWorkflowStepAdminB
         description='Preceding admin users creation step'
     )
     def preceding_step_link(self, obj):
+        """
+        Returns a link to the preceding admin users step for this catalog step.
+        """
         step_record = obj.get_preceding_step_record()
         if not step_record:
             return None
@@ -227,6 +251,9 @@ class GetCreateCustomerAgreementStepAdmin(DjangoQLSearchMixin, ProvisionWorkflow
         description='Preceding catalog creation step'
     )
     def preceding_step_link(self, obj):
+        """
+        Returns a link to the preceding catalog step for this customer agreement step.
+        """
         step_record = obj.get_preceding_step_record()
         if not step_record:
             return None
@@ -248,6 +275,9 @@ class GetCreateSubscriptionPlanStepAdmin(DjangoQLSearchMixin, ProvisionWorkflowS
         description='Preceding customer agreement creation step'
     )
     def preceding_step_link(self, obj):
+        """
+        Returns a link to the preceding customer agreement step for this subscription plan step.
+        """
         step_record = obj.get_preceding_step_record()
         if not step_record:
             return None
