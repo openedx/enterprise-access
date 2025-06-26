@@ -6,7 +6,12 @@ import logging
 from rest_framework import serializers
 
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
-from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
+from enterprise_access.apps.subsidy_request.constants import (
+    LearnerCreditRequestActionChoices,
+    LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestUserMessages,
+    SubsidyRequestStates
+)
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
@@ -188,6 +193,9 @@ class LearnerCreditRequestActionsSerializer(serializers.ModelSerializer):
     """
     Serializer for the `LearnerCreditRequestActions` model.
     """
+    recent_action = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    error_reason = serializers.SerializerMethodField()
 
     class Meta:
         model = LearnerCreditRequestActions
@@ -209,6 +217,33 @@ class LearnerCreditRequestActionsSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'learner_credit_request': {'write_only': True},
         }
+
+    def get_recent_action(self, obj):
+        """
+        Get the display value for recent_action field.
+        """
+        if obj.recent_action:
+            choices_dict = dict(LearnerCreditRequestActionChoices)
+            return choices_dict.get(obj.recent_action, obj.recent_action)
+        return obj.recent_action
+
+    def get_status(self, obj):
+        """
+        Get the display value for status field.
+        """
+        if obj.status:
+            choices_dict = dict(LearnerCreditRequestUserMessages.CHOICES)
+            return choices_dict.get(obj.status, obj.status)
+        return obj.status
+
+    def get_error_reason(self, obj):
+        """
+        Get the display value for error_reason field.
+        """
+        if obj.error_reason:
+            choices_dict = dict(LearnerCreditRequestActionErrorReasons.CHOICES)
+            return choices_dict.get(obj.error_reason, obj.error_reason)
+        return obj.error_reason
 
 
 class LearnerCreditRequestDeclineSerializer(serializers.Serializer):

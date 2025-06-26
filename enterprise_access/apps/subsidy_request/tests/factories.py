@@ -18,6 +18,7 @@ from enterprise_access.apps.subsidy_request.models import (
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
+from enterprise_access.apps.subsidy_request.utils import get_action_choice, get_user_message_choice
 
 FAKER = Faker()
 
@@ -102,8 +103,8 @@ class LearnerCreditRequestActionsFactory(factory.django.DjangoModelFactory):
     Test factory for the `LearnerCreditRequestActions` model.
     """
     uuid = factory.LazyFunction(uuid4)
-    recent_action = SubsidyRequestStates.REQUESTED
-    status = SubsidyRequestStates.REQUESTED
+    recent_action = get_action_choice(SubsidyRequestStates.REQUESTED)
+    status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
     learner_credit_request = factory.SubFactory(LearnerCreditRequestFactory)
     error_reason = None
     traceback = None
