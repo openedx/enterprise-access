@@ -17,10 +17,12 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_OPERATOR_ROLE
 )
 from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
+from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
 from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
+    LearnerCreditRequestActions,
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
@@ -45,6 +47,7 @@ COUPON_CODE_REQUESTS_DECLINE_ENDPOINT = reverse('api:v1:coupon-code-requests-dec
 CUSTOMER_CONFIGURATIONS_LIST_ENDPOINT = reverse('api:v1:customer-configurations-list')
 LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT = reverse('api:v1:learner-credit-requests-list')
 LEARNER_CREDIT_REQUESTS_OVERVIEW_ENDPOINT = reverse('api:v1:learner-credit-requests-overview')
+LEARNER_CREDIT_REQUESTS_CANCEL_ENDPOINT = reverse('api:v1:learner-credit-requests-cancel')
 
 # shorthand constant for the path to the browse_and_request views module.
 BNR_VIEW_PATH = 'enterprise_access.apps.api.v1.views.browse_and_request'
@@ -1536,6 +1539,11 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
             learner_credit_request_config=self.learner_credit_config,
         )
 
+        # Create assignments for the test requests
+        self.assignment_1 = LearnerContentAssignmentFactory()
+        self.user_request_1.assignment = self.assignment_1
+        self.user_request_1.save()
+
         # LearnerCreditrequest with no associations to the user and enterprise
         self.other_learner_credit_request = LearnerCreditRequestFactory()
 
@@ -1842,3 +1850,143 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
             str(self.enterprise_customer_uuid_1),
             [self.user_request_1.user.lms_user_id]
         )
+
+    def test_cancel_invalid_request_uuid(self):
+        """
+        Test cancel with invalid UUID format returns 400.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'request_uuid': 'invalid-uuid-format'
+        }
+
+        response = self.client.post(LEARNER_CREDIT_REQUESTS_CANCEL_ENDPOINT, data)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_cancel_nonexistent_request(self):
+        """
+        Test cancel with non-existent request UUID returns 404.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'request_uuid': str(uuid4())
+        }
+
+        response = self.client.post(LEARNER_CREDIT_REQUESTS_CANCEL_ENDPOINT, data)
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data == "Learner credit request not found."
+
+    def test_cancel_request_not_approved(self):
+        """
+        Test cancel fails when request is not in APPROVED state.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        # Leave request in REQUESTED state (default)
+        assert self.user_request_1.state == SubsidyRequestStates.REQUESTED
+
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'request_uuid': str(self.user_request_1.uuid)
+        }
+
+        response = self.client.post(LEARNER_CREDIT_REQUESTS_CANCEL_ENDPOINT, data)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "cannot be cancelled because it is not in an APPROVED state" in response.data
+
+        # Verify error action record was created with traceback
+        action = LearnerCreditRequestActions.objects.filter(
+            learner_credit_request=self.user_request_1
+        ).order_by('-created').first()
+        assert action is not None
+        assert action.traceback is not None
+        assert "cannot be cancelled because it is not in an APPROVED state" in action.traceback
+
+    @mock.patch('enterprise_access.apps.content_assignments.api.cancel_assignments')
+    def test_cancel_success(self, mock_cancel_assignments):
+        """
+        Test successful cancellation of an APPROVED request with cancelable assignment.
+        """
+        # Mock successful assignment cancellation
+        mock_cancel_assignments.return_value = {'non_cancelable': []}
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        self.user_request_1.state = SubsidyRequestStates.APPROVED
+        self.user_request_1.save()
+
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'request_uuid': str(self.user_request_1.uuid)
+        }
+
+        response = self.client.post(LEARNER_CREDIT_REQUESTS_CANCEL_ENDPOINT, data)
+        assert response.status_code == status.HTTP_200_OK
+
+        self.user_request_1.refresh_from_db()
+        assert self.user_request_1.state == SubsidyRequestStates.CANCELLED
+        assert self.user_request_1.reviewer == self.user
+
+        mock_cancel_assignments.assert_called_once_with([self.user_request_1.assignment], False)
+
+        action = LearnerCreditRequestActions.objects.filter(
+            learner_credit_request=self.user_request_1
+        ).order_by('-created').first()
+        assert action is not None
+        assert action.error_reason is None
+        assert action.traceback is None
+
+    @mock.patch('enterprise_access.apps.content_assignments.api.cancel_assignments')
+    def test_cancel_failed_assignment_cancellation(self, mock_cancel_assignments):
+        """
+        Test cancellation failure when assignment is non-cancelable.
+        """
+        # Mock assignment API returning non-cancelable assignment
+        mock_cancel_assignments.return_value = {
+            'non_cancelable': [self.user_request_1.assignment.uuid]
+        }
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        self.user_request_1.state = SubsidyRequestStates.APPROVED
+        self.user_request_1.save()
+
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'request_uuid': str(self.user_request_1.uuid)
+        }
+
+        response = self.client.post(LEARNER_CREDIT_REQUESTS_CANCEL_ENDPOINT, data)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+        self.user_request_1.refresh_from_db()
+        assert self.user_request_1.state == SubsidyRequestStates.APPROVED
+
+        mock_cancel_assignments.assert_called_once_with([self.user_request_1.assignment], False)
+
+        action = LearnerCreditRequestActions.objects.filter(
+            learner_credit_request=self.user_request_1
+        ).order_by('-created').first()
+        assert action is not None
+        assert action.traceback is not None
+        assert ("Failed to cancel the associated assignment with uuid: "
+            f"{self.user_request_1.assignment.uuid}") in action.traceback
