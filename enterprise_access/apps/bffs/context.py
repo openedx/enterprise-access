@@ -179,11 +179,15 @@ class HandlerContext(BaseHandlerContext):
 
     @property
     def secured_algolia_api_key(self):
-        return self.data.get('secured_algolia_api_key')
+        if algolia := self.data.get('algolia', {}):
+            return algolia.get('secured_algolia_api_key')
+        return None
 
     @property
     def valid_until(self):
-        return self.data.get('valid_until')
+        if algolia := self.data.get('algolia', {}):
+            return algolia.get('valid_until')
+        return None
 
     @property
     def algolia(self):
@@ -389,9 +393,7 @@ class HandlerContext(BaseHandlerContext):
                 self.enterprise_customer_slug,
             )
         self.data.update({
-            'secured_algolia_api_key': secured_algolia_api_key,
             'catalog_uuids_to_catalog_query_uuids': catalog_uuids_to_catalog_query_uuids,
-            'valid_until': valid_until,
             'algolia': {
                 'secured_algolia_api_key': secured_algolia_api_key,
                 'valid_until': valid_until

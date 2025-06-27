@@ -62,7 +62,6 @@ class BaseResponseBuilder:
             self.context.should_update_active_enterprise_customer_user
         )
         self.response_data['enterprise_features'] = self.context.enterprise_features
-        self.response_data['secured_algolia_api_key'] = self.context.secured_algolia_api_key
         self.response_data['algolia'] = self.context.algolia
         self.response_data['catalog_uuids_to_catalog_query_uuids'] = self.context.catalog_uuids_to_catalog_query_uuids
 

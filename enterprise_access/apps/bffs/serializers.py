@@ -188,7 +188,6 @@ class BaseResponseSerializer(MinimalBffResponseSerializer):
     active_enterprise_customer = EnterpriseCustomerSerializer(required=False, allow_null=True)
     staff_enterprise_customer = EnterpriseCustomerSerializer(required=False, allow_null=True)
     should_update_active_enterprise_customer_user = serializers.BooleanField()
-    secured_algolia_api_key = serializers.CharField(required=False, allow_null=True)
     catalog_uuids_to_catalog_query_uuids = serializers.DictField(
         child=serializers.UUIDField(),
         help_text='Mapping of catalog UUIDs to catalog query UUIDs.',
