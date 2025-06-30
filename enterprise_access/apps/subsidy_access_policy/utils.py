@@ -156,6 +156,8 @@ def validate_retired_budget_deactivation(policy_instance):
     The error is attached to the field(s) being changed: 'active', 'retired', or both.
     Uses original values from the database to detect changes.
     """
+    # If the instance has a primary key, we're performing an update (existing object)
+    # and should determine its original values from the database; otherwise, it's a create (new object).
     if policy_instance.pk:
         try:
             original = type(policy_instance).objects.get(pk=policy_instance.pk)
@@ -171,11 +173,14 @@ def validate_retired_budget_deactivation(policy_instance):
     active_will_change = policy_instance.active != original_active
     retired_will_change = policy_instance.retired != original_retired
 
-    will_be_retired_and_inactive = (
-        (original_retired and not policy_instance.active and active_will_change and not retired_will_change) or
-        (policy_instance.retired and not policy_instance.active and retired_will_change)
+    would_make_retired_policy_inactive = (
+        original_retired and not policy_instance.active and active_will_change and not retired_will_change
     )
-    if not will_be_retired_and_inactive:
+    would_make_inactive_policy_retired = (
+        policy_instance.retired and not policy_instance.active and retired_will_change
+    )
+
+    if not (would_make_retired_policy_inactive or would_make_inactive_policy_retired):
         return
 
     if active_will_change and retired_will_change:
