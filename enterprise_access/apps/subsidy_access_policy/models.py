@@ -23,6 +23,13 @@ from simple_history.models import HistoricalRecords
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.subsidy_request.constants import (
+    LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestUserMessages,
+    SubsidyRequestStates
+)
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequestActions
+from enterprise_access.apps.subsidy_request.utils import get_action_choice, get_user_message_choice
 from enterprise_access.cache_utils import request_cache, versioned_cache_key
 from enterprise_access.utils import format_traceback, is_none, is_not_none, localized_utcnow
 
@@ -1228,17 +1235,85 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
 
 class SubsidyAccessPolicyRequestAssignmentMixin:
 
+    def copy_context_to(self, policy_class):
+        """
+        Creates a new instance of the specified policy class and copies
+        essential context from this policy to the new instance.
+
+        Args:
+            policy_class: The policy class to instantiate
+
+        Returns:
+            An instance of policy_class with context copied from self
+        """
+        # Create new instance
+        new_policy = policy_class()
+        new_policy.policy_type = 'AssignedLearnerCreditAccessPolicy'
+
+        # Copy essential context attributes
+        for attr in ['uuid', 'enterprise_customer_uuid', 'catalog_uuid',
+                     'subsidy_uuid', 'active', 'retired', 'spend_limit',
+                     'assignment_configuration', 'late_redemption_allowed_until']:
+            if hasattr(self, attr):
+                setattr(new_policy, attr, getattr(self, attr))
+            new_policy.retired_at = getattr(self, 'retired_at', None)
+
+        return new_policy
+
     def assignment_request_can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False,
                                       skip_enrollment_deadline_check=False, **kwargs
                                       ):
-        policy_instance = AssignedLearnerCreditAccessPolicy()
+        policy_instance = self.copy_context_to(AssignedLearnerCreditAccessPolicy)
         return policy_instance.can_redeem(lms_user_id, content_key, skip_customer_user_check,
                                           skip_enrollment_deadline_check, **kwargs
                                           )
 
     def assignment_request_redeem(self, lms_user_id, content_key, all_transactions, metadata=None, **kwargs):
-        policy_instance = AssignedLearnerCreditAccessPolicy()
-        return policy_instance.redeem(lms_user_id, content_key, all_transactions, metadata=metadata, **kwargs)
+
+        learner_credit_request = kwargs.get('learner_credit_request')
+        logger.info(
+            "LearnerCreditRequestActions redeem record creation requested."
+            "lms_user_id=%s, content_key=%s",
+            lms_user_id,
+            content_key
+        )
+        if self.bnr_enabled and learner_credit_request:
+            logger.info(
+                "Creating LearnerCreditRequestActions record for redemption attempt. "
+                "learner_credit_request_uuid=%s, lms_user_id=%s, content_key=%s",
+                learner_credit_request.uuid,
+                lms_user_id,
+                content_key
+            )
+            action = LearnerCreditRequestActions.create_action(
+                learner_credit_request=learner_credit_request,
+                recent_action=get_action_choice(SubsidyRequestStates.ACCEPTED),
+                status=get_user_message_choice(SubsidyRequestStates.ACCEPTED),
+            )
+            try:
+                policy_instance = self.copy_context_to(AssignedLearnerCreditAccessPolicy)
+                result = policy_instance.redeem(lms_user_id, content_key, all_transactions, metadata=metadata, **kwargs)
+                logger.info(
+                    "Successfully redeemed content through assignment_request_redeem. "
+                    "lms_user_id=%s, content_key=%s, transaction_uuid=%s",
+                    lms_user_id,
+                    content_key,
+                    result.get('uuid', 'unknown')
+                )
+                return result
+            except Exception as exc:
+                logger.exception(
+                    "Error redeeming content through assignment_request_redeem. "
+                    "learner_credit_request_uuid=%s, lms_user_id=%s, content_key=%s",
+                    learner_credit_request.uuid if learner_credit_request else None,
+                    lms_user_id,
+                    content_key
+                )
+                action.status = get_action_choice(SubsidyRequestStates.APPROVED)
+                action.error_reason = LearnerCreditRequestActionErrorReasons.FAILED_REDEMPTION
+                action.traceback = format_traceback(exc)
+                action.save()
+                raise
 
 
 class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
