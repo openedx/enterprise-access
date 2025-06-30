@@ -21,6 +21,7 @@ from enterprise_access.apps.subsidy_request.constants import SegmentEvents, Subs
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
+    LearnerCreditRequestActions,
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
@@ -1703,12 +1704,17 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
 
         # Verify the request was created with correct fields
         request = LearnerCreditRequest.objects.get(uuid=response.data['uuid'])
+        action = LearnerCreditRequestActions.objects.filter(
+            learner_credit_request=request,
+            recent_action='requested'
+        ).first()
         assert request.user == self.user
         assert request.enterprise_customer_uuid == self.enterprise_customer_uuid_1
         assert request.course_id == 'course-v1:edX+DemoX+Demo_Course'
         assert request.state == SubsidyRequestStates.REQUESTED
         assert request.learner_credit_request_config == self.learner_credit_config
         assert request.course_price == 1000
+        assert action is not None
 
     def test_overview_happy_path(self):
         """
