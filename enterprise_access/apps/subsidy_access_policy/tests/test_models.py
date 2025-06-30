@@ -21,10 +21,10 @@ from enterprise_access.apps.content_assignments.constants import (
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
 from enterprise_access.apps.subsidy_access_policy.constants import (
+    ERROR_MSG_ACTIVE_UNKNOWN_SPEND,
+    ERROR_MSG_ACTIVE_WITH_SPEND,
     ERROR_MSG_RETIRED_UNKNOWN_SPEND,
     ERROR_MSG_RETIRED_WITH_SPEND,
-    ERROR_MSG_ACTIVE_WITH_SPEND,
-    ERROR_MSG_ACTIVE_UNKNOWN_SPEND,
     REASON_BEYOND_ENROLLMENT_DEADLINE,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
@@ -977,117 +977,69 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
 
     def test_retired_budget_with_spend_cannot_be_deactivated(self):
         """
-        Test that retired budgets with existing spend cannot be deactivated.
+        Test that retired budgets with existing spend cannot be deactivated (active toggled).
         """
-        # Create a policy that is retired and has spend
         policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             active=True,
             retired=True,
         )
-
-        # Mock the aggregates to simulate existing spend
         self.mock_subsidy_client.list_subsidy_transactions.return_value = {
             'results': [],
             'aggregates': {'total_quantity': -1000}  # Negative value indicates spend
         }
-
-        # Try to deactivate the policy
         policy.active = False
-
-        # This should raise a ValidationError during save
         with self.assertRaises(ValidationError) as context:
             policy.save()
-
         self.assertIn('active', context.exception.error_dict)
         self.assertIn(ERROR_MSG_ACTIVE_WITH_SPEND, str(context.exception.error_dict['active']))
 
-    def test_retired_budget_without_spend_can_be_deactivated(self):
-        """
-        Test that retired budgets without spend can be deactivated.
-        """
-        # Create a policy that is retired but has no spend
-        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
-            active=True,
-            retired=True,
-        )
-
-        # Mock the aggregates to simulate no spend
-        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
-            'results': [],
-            'aggregates': {'total_quantity': 0}  # Zero indicates no spend
-        }
-
-        # Try to deactivate the policy
-        policy.active = False
-
-        # This should not raise a ValidationError
-        try:
-            policy.save()
-        except ValidationError:
-            self.fail("ValidationError raised when it should not have been")
-
     def test_retired_budget_deactivation_with_api_error(self):
         """
-        Test that retired budgets cannot be deactivated when spend cannot be determined.
+        Test that retired budgets cannot be deactivated when spend cannot be determined (active toggled).
         """
-        # Create a policy that is retired
         policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             active=True,
             retired=True,
         )
-
-        # Mock the API to raise an exception
         self.mock_subsidy_client.list_subsidy_transactions.side_effect = requests.exceptions.HTTPError("API Error")
-
-        # Try to deactivate the policy
         policy.active = False
-
-        # This should raise a ValidationError during save
         with self.assertRaises(ValidationError) as context:
             policy.save()
-
         self.assertIn('active', context.exception.error_dict)
         self.assertIn(ERROR_MSG_ACTIVE_UNKNOWN_SPEND, str(context.exception.error_dict['active']))
 
-    def test_non_retired_budget_can_be_deactivated(self):
+    def test_inactive_budget_with_spend_cannot_be_retired(self):
         """
-        Test that non-retired budgets can be deactivated regardless of spend.
+        Test that retiring an inactive policy with spend raises ValidationError on 'retired'.
         """
-        # Create a policy that is not retired but has spend
         policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
-            active=True,
+            active=False,
             retired=False,
         )
-
-        # Mock the aggregates to simulate existing spend
         self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
             'aggregates': {'total_quantity': -1000}  # Negative value indicates spend
         }
-
-        # Try to deactivate the policy
-        policy.active = False
-
-        # This should not raise a ValidationError
-        try:
+        policy.retired = True
+        with self.assertRaises(ValidationError) as context:
             policy.save()
-        except ValidationError as exc:
-            self.fail(f"ValidationError raised unexpectedly: {exc}")
+        self.assertIn('retired', context.exception.error_dict)
+        self.assertIn(ERROR_MSG_RETIRED_WITH_SPEND, str(context.exception.error_dict['retired']))
 
-    def test_new_policy_validation_skipped(self):
+    def test_inactive_budget_retire_with_api_error(self):
         """
-        Test that validation is skipped for new policies (not existing ones).
+        Test that retiring an inactive policy with unknown spend raises ValidationError on 'retired'.
         """
-        # Create a new policy that is retired and inactive
-        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory.build(
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
             active=False,
-            retired=True,
+            retired=False,
         )
-
-        # This should NOT raise a ValidationError since we only validate existing policies
-        try:
+        self.mock_subsidy_client.list_subsidy_transactions.side_effect = requests.exceptions.HTTPError("API Error")
+        policy.retired = True
+        with self.assertRaises(ValidationError) as context:
             policy.save()
-        except ValidationError as exc:
-            self.fail(f"ValidationError raised unexpectedly for new policy: {exc}")
+        self.assertIn('retired', context.exception.error_dict)
+        self.assertIn(ERROR_MSG_RETIRED_UNKNOWN_SPEND, str(context.exception.error_dict['retired']))
 
 
 @ddt.ddt

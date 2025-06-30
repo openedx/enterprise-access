@@ -5,7 +5,7 @@ import hashlib
 
 from django.apps import apps
 from django.conf import settings
-from django.core.exceptions import ValidationError, ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from edx_enterprise_subsidy_client import get_enterprise_subsidy_api_client
 from simple_history.models import HistoricalRecords, registered_models
 
