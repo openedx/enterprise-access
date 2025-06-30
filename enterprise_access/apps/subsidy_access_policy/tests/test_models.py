@@ -923,30 +923,25 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
     def test_per_learner_spend_policy_redeem_with_bnr_enabled(self):
         """
         Test that PerLearnerSpendCreditAccessPolicy.redeem correctly delegates
-        to a new instance of AssignedLearnerCreditAccessPolicy when bnr_enabled is True.
+        to assignment_request_redeem when bnr_enabled is True.
         """
         policy = self.per_learner_spend_policy
         mock_return_value = {'uuid': 'test-transaction-uuid'}
         all_transactions = [{'uuid': 'some-other-uuid'}]
         metadata = {'source': 'bnr_test'}
 
-        mock_assigned_policy_instance = MagicMock()
-        mock_assigned_policy_instance.redeem.return_value = mock_return_value
-
         with patch(
                 'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
                 new_callable=PropertyMock,
                 return_value=True
-        ), patch(
-            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy',
-            return_value=mock_assigned_policy_instance
-        ) as mock_assigned_class:
+        ), patch.object(
+                policy, 'assignment_request_redeem', return_value=mock_return_value
+        ) as mock_assignment_request_redeem:
             result = policy.redeem(self.lms_user_id, self.course_id, all_transactions, metadata=metadata)
 
             self.assertEqual(result, mock_return_value)
-            mock_assigned_class.assert_called_once_with()
-            mock_assigned_policy_instance.redeem.assert_called_once_with(
-                self.lms_user_id, self.course_id, all_transactions, metadata=metadata, **{}
+            mock_assignment_request_redeem.assert_called_once_with(
+                self.lms_user_id, self.course_id, all_transactions, metadata=metadata
             )
 
     def test_per_learner_spend_policy_can_redeem_with_bnr_disabled(self):
