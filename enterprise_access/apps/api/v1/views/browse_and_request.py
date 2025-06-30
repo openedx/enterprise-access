@@ -811,7 +811,23 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
             }
         )
 
-        return super().create(request, *args, **kwargs)
+        response = super().create(request, *args, **kwargs)
+
+        # --- Record the creation action ---
+        if response.status_code in (status.HTTP_201_CREATED, status.HTTP_200_OK):
+            lcr_uuid = response.data.get("uuid")
+            if lcr_uuid:
+                try:
+                    lcr = LearnerCreditRequest.objects.get(uuid=lcr_uuid)
+                    LearnerCreditRequestActions.create_action(
+                        learner_credit_request=lcr,
+                        recent_action=get_action_choice(SubsidyRequestStates.REQUESTED),
+                        status=get_user_message_choice(SubsidyRequestStates.REQUESTED),
+                    )
+                except LearnerCreditRequest.DoesNotExist:
+                    logger.warning(f"LearnerCreditRequest {lcr_uuid} not found for action creation.")
+
+        return response
 
     @permission_required(
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
