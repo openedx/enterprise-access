@@ -21,6 +21,10 @@ from enterprise_access.apps.content_assignments.constants import (
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
 from enterprise_access.apps.subsidy_access_policy.constants import (
+    ERROR_MSG_RETIRED_UNKNOWN_SPEND,
+    ERROR_MSG_RETIRED_WITH_SPEND,
+    ERROR_MSG_ACTIVE_WITH_SPEND,
+    ERROR_MSG_ACTIVE_UNKNOWN_SPEND,
     REASON_BEYOND_ENROLLMENT_DEADLINE,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
@@ -971,6 +975,120 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             mock_assigned_can_redeem.assert_not_called()
             mock_super_can_redeem.assert_called_once()
 
+    def test_retired_budget_with_spend_cannot_be_deactivated(self):
+        """
+        Test that retired budgets with existing spend cannot be deactivated.
+        """
+        # Create a policy that is retired and has spend
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=True,
+        )
+
+        # Mock the aggregates to simulate existing spend
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': -1000}  # Negative value indicates spend
+        }
+
+        # Try to deactivate the policy
+        policy.active = False
+
+        # This should raise a ValidationError during save
+        with self.assertRaises(ValidationError) as context:
+            policy.save()
+
+        self.assertIn('active', context.exception.error_dict)
+        self.assertIn(ERROR_MSG_ACTIVE_WITH_SPEND, str(context.exception.error_dict['active']))
+
+    def test_retired_budget_without_spend_can_be_deactivated(self):
+        """
+        Test that retired budgets without spend can be deactivated.
+        """
+        # Create a policy that is retired but has no spend
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=True,
+        )
+
+        # Mock the aggregates to simulate no spend
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': 0}  # Zero indicates no spend
+        }
+
+        # Try to deactivate the policy
+        policy.active = False
+
+        # This should not raise a ValidationError
+        try:
+            policy.save()
+        except ValidationError:
+            self.fail("ValidationError raised when it should not have been")
+
+    def test_retired_budget_deactivation_with_api_error(self):
+        """
+        Test that retired budgets cannot be deactivated when spend cannot be determined.
+        """
+        # Create a policy that is retired
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=True,
+        )
+
+        # Mock the API to raise an exception
+        self.mock_subsidy_client.list_subsidy_transactions.side_effect = requests.exceptions.HTTPError("API Error")
+
+        # Try to deactivate the policy
+        policy.active = False
+
+        # This should raise a ValidationError during save
+        with self.assertRaises(ValidationError) as context:
+            policy.save()
+
+        self.assertIn('active', context.exception.error_dict)
+        self.assertIn(ERROR_MSG_ACTIVE_UNKNOWN_SPEND, str(context.exception.error_dict['active']))
+
+    def test_non_retired_budget_can_be_deactivated(self):
+        """
+        Test that non-retired budgets can be deactivated regardless of spend.
+        """
+        # Create a policy that is not retired but has spend
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=False,
+        )
+
+        # Mock the aggregates to simulate existing spend
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'aggregates': {'total_quantity': -1000}  # Negative value indicates spend
+        }
+
+        # Try to deactivate the policy
+        policy.active = False
+
+        # This should not raise a ValidationError
+        try:
+            policy.save()
+        except ValidationError as exc:
+            self.fail(f"ValidationError raised unexpectedly: {exc}")
+
+    def test_new_policy_validation_skipped(self):
+        """
+        Test that validation is skipped for new policies (not existing ones).
+        """
+        # Create a new policy that is retired and inactive
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory.build(
+            active=False,
+            retired=True,
+        )
+
+        # This should NOT raise a ValidationError since we only validate existing policies
+        try:
+            policy.save()
+        except ValidationError as exc:
+            self.fail(f"ValidationError raised unexpectedly for new policy: {exc}")
+
 
 @ddt.ddt
 class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
@@ -1023,31 +1141,31 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         super().tearDown()
         request_cache(namespace=REQUEST_CACHE_NAMESPACE).clear()
 
-    def test_clean(self):
+    def test_validation_rules_on_save(self):
         """
-        Tests the model-level validation of this policy type.
+        Tests the model-level validation rules of this policy type.
         """
         with self.assertRaisesRegex(ValidationError, 'must define a spend_limit'):
             policy = AssignedLearnerCreditAccessPolicyFactory(
                 spend_limit=None,
                 assignment_configuration=self.assignment_configuration,
             )
-            policy.clean()
+            policy.save()
         with self.assertRaisesRegex(ValidationError, 'must not define a per-learner spend limit'):
             policy = AssignedLearnerCreditAccessPolicyFactory(
                 assignment_configuration=self.assignment_configuration,
                 per_learner_spend_limit=1,
             )
-            policy.clean()
+            policy.save()
         with self.assertRaisesRegex(ValidationError, 'must not define a per-learner enrollment limit'):
             policy = AssignedLearnerCreditAccessPolicyFactory(
                 spend_limit=1,
                 assignment_configuration=self.assignment_configuration,
                 per_learner_enrollment_limit=1,
             )
-            policy.clean()
+            policy.save()
 
-    def test_save(self):
+    def test_save_access_method_and_assignment_configuration(self):
         """
         These types of policies should always get saved with an
         access_method of 'assigned' and an ``assignment_configuration`` record.

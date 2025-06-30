@@ -129,6 +129,21 @@ SORT_BY_ENROLLMENT_COUNT = 'enrollment_count'
 GROUP_MEMBERS_WITH_AGGREGATES_DEFAULT_PAGE_SIZE = 10
 
 # Exceeding the spend_limit validation error
-VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE = "You cannot make this change, as the sum of all budget \
-spend_limits for a given subsidy would exceed the sum of all deposits into that subsidy.  If you are trying to \
-re-balance policies, FIRST reduce the spend_limit of one, THEN increase the spend_limit of another."
+VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE = (
+    "You cannot make this change, as the sum of all budget spend_limits for a given subsidy would exceed "
+    "the sum of all deposits into that subsidy. If you are trying to re-balance policies, FIRST reduce the "
+    "spend_limit of one, THEN increase the spend_limit of another."
+)
+
+ERROR_MSG_ACTIVE_WITH_SPEND = (
+    "Cannot deactivate this policy while it is retired and has existing spend."
+)
+ERROR_MSG_ACTIVE_UNKNOWN_SPEND = (
+    "Cannot deactivate this policy while it is retired because spend could not be determined."
+)
+ERROR_MSG_RETIRED_WITH_SPEND = (
+    "Cannot retire this policy while it is inactive and has existing spend."
+)
+ERROR_MSG_RETIRED_UNKNOWN_SPEND = (
+    "Cannot retire this policy while it is inactive because spend could not be determined."
+)

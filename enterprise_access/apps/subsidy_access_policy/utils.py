@@ -5,10 +5,18 @@ import hashlib
 
 from django.apps import apps
 from django.conf import settings
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from edx_enterprise_subsidy_client import get_enterprise_subsidy_api_client
 from simple_history.models import HistoricalRecords, registered_models
 
 from enterprise_access.apps.subsidy_access_policy import constants
+
+from .constants import (
+    ERROR_MSG_ACTIVE_UNKNOWN_SPEND,
+    ERROR_MSG_ACTIVE_WITH_SPEND,
+    ERROR_MSG_RETIRED_UNKNOWN_SPEND,
+    ERROR_MSG_RETIRED_WITH_SPEND
+)
 
 LEDGERED_SUBSIDY_IDEMPOTENCY_KEY_PREFIX = 'ledger-for-subsidy'
 TRANSACTION_METADATA_KEYS = {
@@ -140,3 +148,56 @@ def cents_to_usd_string(cents):
     if cents is None:
         return None
     return "${:,.2f}".format(float(cents) / constants.CENTS_PER_DOLLAR)
+
+
+def validate_retired_budget_deactivation(policy_instance):
+    """
+    Raise a ValidationError if a policy would become both retired and inactive while having existing spend.
+    The error is attached to the field(s) being changed: 'active', 'retired', or both.
+    Uses original values from the database to detect changes.
+    """
+    if policy_instance.pk:
+        try:
+            original = type(policy_instance).objects.get(pk=policy_instance.pk)
+            original_active = original.active
+            original_retired = original.retired
+        except ObjectDoesNotExist:
+            original_active = policy_instance.active
+            original_retired = policy_instance.retired
+    else:
+        original_active = policy_instance.active
+        original_retired = policy_instance.retired
+
+    active_will_change = policy_instance.active != original_active
+    retired_will_change = policy_instance.retired != original_retired
+
+    will_be_retired_and_inactive = (
+        (original_retired and not policy_instance.active and active_will_change and not retired_will_change) or
+        (policy_instance.retired and not policy_instance.active and retired_will_change)
+    )
+    if not will_be_retired_and_inactive:
+        return
+
+    if active_will_change and retired_will_change:
+        error_fields = ['active', 'retired']
+    elif active_will_change:
+        error_fields = ['active']
+    else:
+        error_fields = ['retired']
+
+    error_msgs_with_spend = {
+        'active': ERROR_MSG_ACTIVE_WITH_SPEND,
+        'retired': ERROR_MSG_RETIRED_WITH_SPEND,
+    }
+    error_msgs_unknown_spend = {
+        'active': ERROR_MSG_ACTIVE_UNKNOWN_SPEND,
+        'retired': ERROR_MSG_RETIRED_UNKNOWN_SPEND,
+    }
+
+    try:
+        total_redeemed = policy_instance.total_redeemed
+    except Exception as exc:
+        raise ValidationError({field: error_msgs_unknown_spend[field] for field in error_fields}) from exc
+
+    if total_redeemed < 0:  # total_redeemed is negative
+        raise ValidationError({field: error_msgs_with_spend[field] for field in error_fields})
