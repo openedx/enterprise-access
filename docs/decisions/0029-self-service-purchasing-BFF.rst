@@ -12,9 +12,15 @@ The self-service purchasing feature will be comprised of primarily the Checkout
 MFE and a set of backend endpoints (some leveraging BFF framework). This ADR
 should help to define those backend endpoints.
 
-The checkout flow as depicted in this `design mockup
+The checkout flow is visualized via the following design mockups:
+
+1. `design mockup (old)
 <https://www.figma.com/board/DiZO3HwkQNdElBc5av5DG3/DR--Self-Service-Subscription-Flows?node-id=0-1&p=f&t=VkRFRxPmCAXyZ1bc-0>`_
-currently includes these main pages:
+
+2. `design mockup (new)
+<https://www.figma.com/board/xWaO5vDxrxSLVB5lDhhEFm/Self-Service-designs?node-id=27-8568&t=XidhCb0byCfFzn8G-0>`_
+
+The above design mockups broadly depict these main pages:
 
 1. Create your account
 
@@ -30,9 +36,31 @@ currently includes these main pages:
 
      * Work Email
 
+     * Company Name
+
+     * Country
+
    * Registration modal, if displayed, will include `standard user registration fields <https://github.com/openedx/edx-platform/blob/033bcda9/openedx/core/djangoapps/user_authn/views/registration_form.py#L141>`_.
 
-   * Registration and Login modals will interact directly with edx-platform user_authn API endpoints to perform login or registration.
+     * Modal Fields captured:
+
+       * Full Name (inactive, copied from form)
+
+       * Email (inactive, copied from form)
+
+       * Username
+
+       * Password
+
+       * Country (inactive, copied from form)
+
+   * Login modal, if displayed, will include basic login fields:
+
+       * Username
+
+       * Password
+
+   * Note: Registration and Login modals will interact directly with edx-platform user_authn API endpoints to perform login or registration.
 
 2. Build your trial
 
@@ -42,7 +70,7 @@ currently includes these main pages:
 
      * Number of Licenses
 
-     * Company Name
+     * Company Name (inactive)
 
      * Enterprise Slug
 
@@ -57,7 +85,7 @@ currently includes these main pages:
 Decision
 ========
 
-We will implement a RESTful API contract with four primary endpoints following the proposed BFF (Backend-for-Frontend) pattern. The design emphasizes real-time validation, clear authentication boundaries, and stateless server operations with ephermeral form state handled entirely on the frontend.
+We will implement a RESTful API contract with four primary endpoints following the proposed BFF (Backend-for-Frontend) pattern. The design emphasizes real-time validation, clear authentication boundaries, and stateless server operations with ephemeral form state handled entirely on the frontend.
 
 BFF Endpoints for Checkout Flow
 --------------------------------
@@ -82,11 +110,14 @@ BFF Endpoints for Checkout Flow
             {
                 "customer_uuid": "",
                 "customer_name": "",
+                "customer_slug": "",
+                "stripe_customer_id": "",
+                "is_self_service": False,
                 "admin_portal_url": ""
             }
         ],
         "pricing": {
-            "stripe_price_id": "price_1MoBy5LkdIwHu7ixZhnattbh", 
+            "stripe_price_id": "price_1MoBy5LkdIwHu7ixZhnattbh",
             "unit_price": {
                 "amount": 3996.0,
                 "currency": "USD"
@@ -127,8 +158,7 @@ BFF Endpoints for Checkout Flow
             "quantity": null,
             "stripe_price_id": null
         },
-        "user_exists": true,
-        "enterprise_slug_available": true,
+        "user_exists_for_email": true,
     }
 
     Response (400 Bad Request - Validation Errors):
@@ -151,8 +181,7 @@ BFF Endpoints for Checkout Flow
                 "developer_message": "Company name cannot be empty"
             }
         },
-        "user_exists": false,
-        "enterprise_slug_available": false,
+        "user_exists_for_email": false,
     }
 
 Customer Billing Endpoints
@@ -167,7 +196,7 @@ Customer Billing Endpoints
     Authentication: JWT (required)
     Authorization: Any authenticated user
     Purpose: Called on submit of the "Build Trial" page to prepare a new stripe checkout session for the subsequent "checkout" page
-    Side-Effects: "Reserve" the slug for as long as the checkout session lasts, Create the Stripe Checkout Session
+    Side-Effects: "Reserve" the slug for as long as the checkout session lasts, Create the Stripe Checkout Session.
     Frontend consumer: Build Trial page
 
     Request:
@@ -180,7 +209,10 @@ Customer Billing Endpoints
 
     Response (201 Created):
     {
-        "checkout_session_client_secret": "cs_test_1234567890abcdef"
+        "checkout_session": {
+            "client_secret": "cs_test_1234567890abcdef",
+            "expires_at": "1751323210"
+        }
     }
 
     Response (422 Unprocessable Entity - Validation Failed):
@@ -199,21 +231,15 @@ Customer Billing Endpoints
 
 .. code-block::
 
-    POST /api/v1/customer-billing/<customer_uuid>/create-portal-session
+    GET /api/v1/customer-billing/<customer_uuid>/portal-session
 
     Authentication: JWT (required)
     Authorization: Only allow admins for the given customer_uuid
-    Purpose: URL for any "Billing Portal" button (placed anywhere in admin portal or emails)
-    Side-Effects: Create a new Stripe Billing Portal Session (consider rate limiting), 302 Redirect to Billing Portal URL
+    Purpose: URL for any "Billing Portal" button (placed anywhere in admin portal or emails). 302 Redirect to Billing Portal URL.
+    Side-Effects: Create a new Stripe Billing Portal Session (consider rate limiting and caching).
 
     Response (302 Redirect):
     Location: https://billing.stripe.com/session/bps_1234567890abcdef
-
-    Response (200 OK - Alternative JSON format):
-    {
-        "url": "https://billing.stripe.com/session/bps_1234567890abcdef",
-        "return_url": "https://portal.edx.org/example-corp"
-    }
 
 **5. Stripe Webhook Handler**
 
@@ -264,7 +290,7 @@ state management.  Here is an example ``zustand`` state hook:
 
     // Frontend state management strategy
     import { create } from 'zustand';
-    
+
     const useCheckoutFormStore = create<FormStore>(
       (set) => ({
         formData: {
@@ -281,7 +307,7 @@ state management.  Here is an example ``zustand`` state hook:
         ),
       }),
     );
-    
+
     export default useCheckoutFormStore;
 
 **In-Memory State Management Benefits:**
@@ -327,7 +353,7 @@ Rate limiting applied following existing enterprise-access patterns:
     # BFF endpoints
     @ratelimit(key='ip', rate='20/m', method='POST', block=False) # Context
     @ratelimit(key='ip', rate='60/m', method='POST', block=False)  # Validation
-    
+
     # Customer billing endpoints (existing patterns)
     @ratelimit(key='user', rate='5/m', method='POST', block=False)  # Checkout session
     @ratelimit(key='user', rate='10/m', method='POST', block=False)   # Portal session
@@ -366,7 +392,7 @@ Integration Points
         Response (email exists)::
 
           { "validation_decisions": { "email": "This email is already associated with an existing account" } }
- 
+
         Response (email available)::
 
           { "validation_decisions": { "email": "" } }
@@ -374,8 +400,9 @@ Integration Points
 
 **Stripe Integration:**
 
-- Flow creates a Stripe "Checkout Session" linked with composable stripe frontend components to build a custom checkout experience.
+- Submit button on Build Your Trial page calls create-checkout-session endpoint which calls  Stripe APIs to create a Stripe "Checkout Session".
 
+- "Customer Billing" buttons hooked up to get-customer-billing endpoint which calls Stripe APIs to create a Stripe "Billing Portal".
 
 **Salesforce Integration:**
 
