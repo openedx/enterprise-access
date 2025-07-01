@@ -23,8 +23,6 @@ from enterprise_access.apps.content_assignments.tests.factories import LearnerCo
 from enterprise_access.apps.subsidy_access_policy.constants import (
     ERROR_MSG_ACTIVE_UNKNOWN_SPEND,
     ERROR_MSG_ACTIVE_WITH_SPEND,
-    ERROR_MSG_RETIRED_UNKNOWN_SPEND,
-    ERROR_MSG_RETIRED_WITH_SPEND,
     REASON_BEYOND_ENROLLMENT_DEADLINE,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
@@ -1008,38 +1006,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         self.assertIn('active', context.exception.error_dict)
         self.assertIn(ERROR_MSG_ACTIVE_UNKNOWN_SPEND, str(context.exception.error_dict['active']))
 
-    def test_inactive_budget_with_spend_cannot_be_retired(self):
-        """
-        Test that retiring an inactive policy with spend raises ValidationError on 'retired'.
-        """
-        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
-            active=False,
-            retired=False,
-        )
-        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
-            'results': [],
-            'aggregates': {'total_quantity': -1000}  # Negative value indicates spend
-        }
-        policy.retired = True
-        with self.assertRaises(ValidationError) as context:
-            policy.save()
-        self.assertIn('retired', context.exception.error_dict)
-        self.assertIn(ERROR_MSG_RETIRED_WITH_SPEND, str(context.exception.error_dict['retired']))
 
-    def test_inactive_budget_retire_with_api_error(self):
-        """
-        Test that retiring an inactive policy with unknown spend raises ValidationError on 'retired'.
-        """
-        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
-            active=False,
-            retired=False,
-        )
-        self.mock_subsidy_client.list_subsidy_transactions.side_effect = requests.exceptions.HTTPError("API Error")
-        policy.retired = True
-        with self.assertRaises(ValidationError) as context:
-            policy.save()
-        self.assertIn('retired', context.exception.error_dict)
-        self.assertIn(ERROR_MSG_RETIRED_UNKNOWN_SPEND, str(context.exception.error_dict['retired']))
 
 
 @ddt.ddt

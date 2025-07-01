@@ -141,9 +141,3 @@ ERROR_MSG_ACTIVE_WITH_SPEND = (
 ERROR_MSG_ACTIVE_UNKNOWN_SPEND = (
     "Cannot deactivate this policy while it is retired because spend could not be determined."
 )
-ERROR_MSG_RETIRED_WITH_SPEND = (
-    "Cannot retire this policy while it is inactive and has existing spend."
-)
-ERROR_MSG_RETIRED_UNKNOWN_SPEND = (
-    "Cannot retire this policy while it is inactive because spend could not be determined."
-)

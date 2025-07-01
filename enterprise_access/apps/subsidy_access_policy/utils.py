@@ -14,8 +14,6 @@ from enterprise_access.apps.subsidy_access_policy import constants
 from .constants import (
     ERROR_MSG_ACTIVE_UNKNOWN_SPEND,
     ERROR_MSG_ACTIVE_WITH_SPEND,
-    ERROR_MSG_RETIRED_UNKNOWN_SPEND,
-    ERROR_MSG_RETIRED_WITH_SPEND
 )
 
 LEDGERED_SUBSIDY_IDEMPOTENCY_KEY_PREFIX = 'ledger-for-subsidy'
@@ -171,38 +169,18 @@ def validate_retired_budget_deactivation(policy_instance):
         original_retired = policy_instance.retired
 
     active_will_change = policy_instance.active != original_active
-    retired_will_change = policy_instance.retired != original_retired
 
     would_make_retired_policy_inactive = (
-        original_retired and not policy_instance.active and active_will_change and not retired_will_change
-    )
-    would_make_inactive_policy_retired = (
-        policy_instance.retired and not policy_instance.active and retired_will_change
+        original_retired and not policy_instance.active and active_will_change
     )
 
-    if not (would_make_retired_policy_inactive or would_make_inactive_policy_retired):
+    if not would_make_retired_policy_inactive:
         return
-
-    if active_will_change and retired_will_change:
-        error_fields = ['active', 'retired']
-    elif active_will_change:
-        error_fields = ['active']
-    else:
-        error_fields = ['retired']
-
-    error_msgs_with_spend = {
-        'active': ERROR_MSG_ACTIVE_WITH_SPEND,
-        'retired': ERROR_MSG_RETIRED_WITH_SPEND,
-    }
-    error_msgs_unknown_spend = {
-        'active': ERROR_MSG_ACTIVE_UNKNOWN_SPEND,
-        'retired': ERROR_MSG_RETIRED_UNKNOWN_SPEND,
-    }
 
     try:
         total_redeemed = policy_instance.total_redeemed
     except Exception as exc:
-        raise ValidationError({field: error_msgs_unknown_spend[field] for field in error_fields}) from exc
+        raise ValidationError({'active': ERROR_MSG_ACTIVE_UNKNOWN_SPEND}) from exc
 
     if total_redeemed < 0:  # total_redeemed is negative
-        raise ValidationError({field: error_msgs_with_spend[field] for field in error_fields})
+        raise ValidationError({'active': ERROR_MSG_ACTIVE_WITH_SPEND})
