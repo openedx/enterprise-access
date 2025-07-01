@@ -1007,8 +1007,6 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         self.assertIn(ERROR_MSG_ACTIVE_UNKNOWN_SPEND, str(context.exception.error_dict['active']))
 
 
-
-
 @ddt.ddt
 class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
     """ Tests specific to the assigned learner credit type of access policy. """

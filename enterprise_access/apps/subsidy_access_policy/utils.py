@@ -11,10 +11,7 @@ from simple_history.models import HistoricalRecords, registered_models
 
 from enterprise_access.apps.subsidy_access_policy import constants
 
-from .constants import (
-    ERROR_MSG_ACTIVE_UNKNOWN_SPEND,
-    ERROR_MSG_ACTIVE_WITH_SPEND,
-)
+from .constants import ERROR_MSG_ACTIVE_UNKNOWN_SPEND, ERROR_MSG_ACTIVE_WITH_SPEND
 
 LEDGERED_SUBSIDY_IDEMPOTENCY_KEY_PREFIX = 'ledger-for-subsidy'
 TRANSACTION_METADATA_KEYS = {
