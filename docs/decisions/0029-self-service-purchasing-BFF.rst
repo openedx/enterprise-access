@@ -90,7 +90,7 @@ We will implement a RESTful API contract with four primary endpoints following t
 BFF Endpoints for Checkout Flow
 --------------------------------
 
-**1. Cross-Page Validation Endpoint**
+**1. Cross-Page Context Endpoint**
 
 .. code-block::
 
@@ -117,13 +117,36 @@ BFF Endpoints for Checkout Flow
             }
         ],
         "pricing": {
-            "stripe_price_id": "price_1MoBy5LkdIwHu7ixZhnattbh",
-            "unit_price": {
-                "amount": 3996.0,
-                "currency": "USD"
-            }
+            "default_by_lookup_key": "b2b_enterprise_self_service_yearly",
+            "stripe_prices": [
+                "id": "price_1MoBy5LkdIwHu7ixZhnattbh",
+                "product": "prod_NZKdYqrwEYx6iK",
+                "lookup_key": "b2b_enterprise_self_service_yearly",
+                "recurring": {
+                  "interval": "month",
+                  "interval_count": 12,
+                  "trial_period_days": 14,
+                },
+                "currency": "usd",
+                "unit_amount": 1000,
+                "unit_amount_decimal": "1000"
+            ]
         }
     }
+
+As an implementation note for the ``stripe_pricing`` list, pre-filter the
+Stripe API response to just the Price objects which are supported by the
+checkout flow. I.e. filter prices on the following fields:
+
+- ``active`` = ``true`` (exclude outdated prices)
+
+- ``billing_scheme`` = "per_unit" (exclude Tiered schemes)
+
+- ``livemode`` = ``false`` (exclude test-only prices)
+
+- ``type`` = "recurring" (exclude non-recurring prices)
+
+- ``recurring.usage_type`` =  "licensed" (exlude metered pricing)
 
 **2. Cross-Page Validation Endpoint**
 
@@ -131,8 +154,8 @@ BFF Endpoints for Checkout Flow
 
     POST /api/v1/bffs/checkout/validation
 
-    Authentication: None
-    Authorization: None
+    Authentication: JWT
+    Authorization: Authenticated OR Unauthenticated.
     Purpose: Validate form fields across all form pages, leveraging LMS API calls to check user existence and slug conflicts
     Optional Fields: full_name, work_email, company_name, enterprise_slug, stripe_price_id, quantity
     Side-Effects: None
@@ -183,6 +206,10 @@ BFF Endpoints for Checkout Flow
         },
         "user_exists_for_email": false,
     }
+
+If possible, make ``enterprise_slug`` validation require the call to be
+authenticated. This should help mitigate unauthenticated bots from inducing
+many indirect API calls from enterprise-access to the LMS.
 
 Customer Billing Endpoints
 ---------------------------
