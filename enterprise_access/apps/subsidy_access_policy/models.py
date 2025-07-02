@@ -29,7 +29,11 @@ from enterprise_access.apps.subsidy_request.constants import (
     SubsidyRequestStates
 )
 from enterprise_access.apps.subsidy_request.models import LearnerCreditRequestActions
-from enterprise_access.apps.subsidy_request.utils import get_action_choice, get_user_message_choice
+from enterprise_access.apps.subsidy_request.utils import (
+    get_action_choice,
+    get_error_reason_choice,
+    get_user_message_choice
+)
 from enterprise_access.cache_utils import request_cache, versioned_cache_key
 from enterprise_access.utils import format_traceback, is_none, is_not_none, localized_utcnow
 
@@ -1310,7 +1314,7 @@ class SubsidyAccessPolicyRequestAssignmentMixin:
                     content_key
                 )
                 action.status = get_action_choice(SubsidyRequestStates.APPROVED)
-                action.error_reason = LearnerCreditRequestActionErrorReasons.FAILED_REDEMPTION
+                action.error_reason = get_error_reason_choice(LearnerCreditRequestActionErrorReasons.FAILED_REDEMPTION)
                 action.traceback = format_traceback(exc)
                 action.save()
                 raise
