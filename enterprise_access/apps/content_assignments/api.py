@@ -435,6 +435,61 @@ def allocate_assignments(
     }
 
 
+def allocate_assignment_for_request(
+    assignment_configuration,
+    learner_email,
+    content_key,
+    content_price_cents,
+    lms_user_id,
+):
+    """
+    Creates an allocated assignment record for the given ``content_key`` in the given ``assignment_configuration``,
+      and the provided ``learner_email``.
+
+    Params:
+      - ``assignment_configuration``: The AssignmentConfiguration record under which assignments should be allocated.
+      - ``learner_email``: The email address of the learner to whom the assignment should be allocated.
+      - ``content_key``: Either a course or course run key, representing the content to be allocated.
+      - ``content_price_cents``: The cost of redeeming the content, in USD cents, at the time of allocation. Should
+        always be an integer >= 0.
+      - ``lms_user_id``: lms user id of the user.
+
+    Returns: A LearnerContentAssignment record that was created or None.
+    """
+    # Set a batch ID to track assignments updated and/or created together.
+    allocation_batch_id = uuid4()
+
+    message = (
+        'Allocating assignments: assignment_configuration=%s, batch_id=%s, '
+        'learner_email=%s, content_key=%s, content_price_cents=%s'
+    )
+    logger.info(
+        message, assignment_configuration.uuid, allocation_batch_id,
+        learner_email, content_key, content_price_cents
+    )
+
+    if content_price_cents < 0:
+        raise AllocationException('Allocation price must be >= 0')
+
+    # We store the allocated quantity as a (future) debit
+    # against a store of value, so we negate the provided non-negative
+    # content_price_cents, and then persist that in the assignment records.
+    content_quantity = content_price_cents * -1
+    lms_user_ids_by_email = {learner_email.lower(): lms_user_id}
+    assignment = _create_new_assignments(
+        assignment_configuration,
+        [learner_email],
+        content_key,
+        content_quantity,
+        lms_user_ids_by_email,
+        allocation_batch_id,
+    )
+    # If the assignment was created, it will be a list with one item.
+    if assignment:
+        return assignment[0]
+    return None
+
+
 def _deduplicate_learner_emails_to_allocate(learner_emails):
     """
     Helper to deduplicate learner emails to allocate before any

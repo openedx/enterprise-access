@@ -302,3 +302,35 @@ class LearnerCreditRequestDeclineSerializer(serializers.Serializer):
         Not implemented - this serializer is for validation only
         """
         raise NotImplementedError("This serializer is for validation only")
+
+
+class LearnerCreditRequestApproveRequestSerializer(serializers.Serializer):
+    """
+    Request Serializer to validate subsidy-request ``approve`` endpoint POST data.
+
+    For view: LearnerCreditRequestViewSet.approve
+    """
+    policy_uuid = serializers.UUIDField(
+        required=True,
+        help_text='The UUID of the policy to which the request belongs.',
+    )
+    enterprise_customer_uuid = serializers.UUIDField(
+        required=True,
+        help_text='The UUID of the Enterprise Customer.',
+    )
+    learner_credit_request_uuid = serializers.UUIDField(
+        required=True,
+        help_text='The UUID of the LearnerCreditRequest to be approved.',
+    )
+
+    def create(self, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
+
+    def update(self, instance, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")

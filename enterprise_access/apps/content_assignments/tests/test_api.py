@@ -13,6 +13,7 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import Assigne
 
 from ..api import (
     AllocationException,
+    allocate_assignment_for_request,
     allocate_assignments,
     cancel_assignments,
     expire_assignment,
@@ -329,6 +330,25 @@ class TestContentAssignmentApi(TestCase):
             actual_amount = get_allocated_quantity_for_configuration(other_config)
             self.assertEqual(actual_amount, 0)
 
+    def test_allocate_assignment_for_request_negative_quantity(self):
+        """
+        Tests the allocation of new assignment for a price < 0
+        raises an exception.
+        """
+        content_key = 'edX+demoX'
+        content_price_cents = -1
+        learners_to_assign = 'test@email.com'
+        lms_user_id = 12345
+
+        with self.assertRaisesRegex(AllocationException, 'price must be >= 0'):
+            allocate_assignment_for_request(
+                self.assignment_configuration,
+                learners_to_assign,
+                content_key,
+                content_price_cents,
+                lms_user_id
+            )
+
     def test_allocate_assignments_negative_quantity(self):
         """
         Tests the allocation of new assignments for a price < 0
@@ -633,6 +653,48 @@ class TestContentAssignmentApi(TestCase):
                 created_assignment,
             )
         ], any_order=True)
+
+    @mock.patch(
+        'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
+        return_value=mock.MagicMock(),
+    )
+    @ddt.unpack
+    def test_allocate_assignment_for_request_happy_path(
+        self,
+        mock_get_and_cache_content_metadata,
+    ):
+        """
+        Tests allocate_assignment_for_request retuns a newly created assignment.
+        """
+        course_key = 'edX+DemoX'
+        course_run_key = 'course-v1:edX+DemoX+2T2023'
+        content_title = 'Test Demo Course'
+        content_price_cents = 100
+
+        mock_get_and_cache_content_metadata.return_value = {
+            'content_title': content_title,
+            'content_key': course_key,
+            'course_run_key': course_run_key,
+        }
+
+        learner_to_assign = 'test@email.com'
+        lms_user_id = 12345
+
+        created_assignment = allocate_assignment_for_request(
+            self.assignment_configuration,
+            learner_to_assign,
+            course_key,
+            content_price_cents,
+            lms_user_id
+        )
+        self.assertEqual(created_assignment.assignment_configuration, self.assignment_configuration)
+        self.assertEqual(created_assignment.learner_email, learner_to_assign)
+        self.assertEqual(created_assignment.lms_user_id, lms_user_id)
+        self.assertEqual(created_assignment.content_key, course_key)
+        self.assertEqual(created_assignment.preferred_course_run_key, course_run_key)
+        self.assertEqual(created_assignment.content_title, content_title)
+        self.assertEqual(created_assignment.content_quantity, -1 * content_price_cents)
+        self.assertEqual(created_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
 
     @mock.patch('enterprise_access.apps.content_assignments.tasks.send_cancel_email_for_pending_assignment')
     def test_cancel_assignments_happy_path(self, mock_notify):
