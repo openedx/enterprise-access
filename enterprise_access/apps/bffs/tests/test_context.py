@@ -64,8 +64,6 @@ class TestHandlerContext(TestHandlerContextMixin):
                 ],
                 'should_update_active_enterprise_customer_user': False,
             }
-        print(context.data)
-        print(expected_data)
         self.assertEqual(context.data, expected_data)
         if raises_exception:
             self.assertEqual(context.enterprise_features, {})
