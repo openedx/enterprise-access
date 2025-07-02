@@ -19,7 +19,10 @@ from enterprise_access.apps.content_assignments.constants import (
     LearnerContentAssignmentStateChoices
 )
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
-from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
+from enterprise_access.apps.content_assignments.tests.factories import (
+    AssignmentConfigurationFactory,
+    LearnerContentAssignmentFactory
+)
 from enterprise_access.apps.subsidy_access_policy.constants import (
     ERROR_MSG_ACTIVE_UNKNOWN_SPEND,
     ERROR_MSG_ACTIVE_WITH_SPEND,
@@ -56,6 +59,7 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PolicyGroupAssociationFactory
 )
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
+from enterprise_access.apps.subsidy_request.tests.factories import LearnerCreditRequestConfigurationFactory
 from enterprise_access.cache_utils import request_cache
 from enterprise_access.utils import localized_utcnow
 from test_utils import TEST_ENTERPRISE_GROUP_UUID, TEST_USER_RECORD, TEST_USER_RECORD_NO_GROUPS
@@ -1741,6 +1745,125 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         }
         with self.assertRaisesRegex(PriceValidationError, 'outside of acceptable interval'):
             self.active_policy.can_allocate(1, self.course_key, requested_price)
+
+
+class PerLearnerSpendCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
+    """ Tests specific to the per-learner spend credit type of access policy. """
+
+    lms_user_id = 12345
+    course_id = 'DemoX+flossing'
+
+    MOCK_ALLOCATED_QUANTITY = -3000
+    MOCK_PARENT_SPEND_AVAILABLE = 5000
+    MOCK_TOTAL_ALLOCATED = -2000
+
+    BNR_ENABLED_PATCH_PATH = (
+        'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled'
+    )
+    PARENT_SPEND_AVAILABLE_PATCH_PATH = (
+        'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.spend_available'
+    )
+    TOTAL_ALLOCATED_PATCH_PATH = (
+        'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.total_allocated'
+    )
+
+    def setUp(self):
+        """
+        Mocks out dependencies on other services, as well as dependencies
+        on the Assignments API module.
+        """
+        super().setUp()
+
+        self.enterprise_customer_uuid_1 = uuid4()
+
+        self.assignments_api_patcher = patch(
+            'enterprise_access.apps.subsidy_access_policy.models.assignments_api',
+            autospec=True,
+        )
+        self.mock_assignments_api = self.assignments_api_patcher.start()
+
+        self.addCleanup(self.assignments_api_patcher.stop)
+
+        self.learner_credit_config = LearnerCreditRequestConfigurationFactory(active=True)
+        self.assignment_config = AssignmentConfigurationFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+        )
+        self.per_learner_spend_policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            learner_credit_request_config=self.learner_credit_config,
+            assignment_configuration=self.assignment_config,
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            active=True,
+            retired=False,
+            spend_limit=4000,
+        )
+
+    def _patch_bnr_enabled(self, enabled=True):
+        """Helper method to patch bnr_enabled property."""
+        return patch(self.BNR_ENABLED_PATCH_PATH, new_callable=PropertyMock, return_value=enabled)
+
+    def _patch_parent_spend_available(self, amount=MOCK_PARENT_SPEND_AVAILABLE):
+        """Helper method to patch parent spend_available property."""
+        return patch(self.PARENT_SPEND_AVAILABLE_PATCH_PATH, new_callable=PropertyMock, return_value=amount)
+
+    def _patch_total_allocated(self, amount=MOCK_TOTAL_ALLOCATED):
+        """Helper method to patch total_allocated property."""
+        return patch(self.TOTAL_ALLOCATED_PATCH_PATH, new_callable=PropertyMock, return_value=amount)
+
+    def test_total_allocated_with_bnr_enabled(self):
+        """
+        Test that total_allocated property calls assignments_api when BNR is enabled.
+        """
+        with self._patch_bnr_enabled(), \
+             patch.object(self.mock_assignments_api, 'get_allocated_quantity_for_configuration',
+                          return_value=self.MOCK_ALLOCATED_QUANTITY) as mock_get_allocated:
+
+            result = self.per_learner_spend_policy.total_allocated
+
+            self.assertEqual(result, self.MOCK_ALLOCATED_QUANTITY)
+            mock_get_allocated.assert_called_once_with(self.assignment_config)
+
+    def test_total_allocated_with_bnr_disabled(self):
+        """
+        Test that total_allocated property returns parent class value when BNR is disabled.
+        """
+        with self._patch_bnr_enabled(enabled=False), \
+             patch.object(self.mock_assignments_api, 'get_allocated_quantity_for_configuration') as mock_get_allocated:
+
+            result = self.per_learner_spend_policy.total_allocated
+
+            # Should return parent class value (0 for SubsidyAccessPolicy)
+            self.assertEqual(result, 0)
+            # Should not call assignments API when BNR is disabled
+            mock_get_allocated.assert_not_called()
+
+    def test_spend_available_with_bnr_enabled(self):
+        """
+        Test that spend_available property uses assignment-based calculation when BNR is enabled.
+        """
+        with self._patch_bnr_enabled(), \
+             self._patch_parent_spend_available() as mock_parent_spend_available, \
+             self._patch_total_allocated() as mock_total_allocated:
+
+            result = self.per_learner_spend_policy.spend_available
+
+            # Should calculate: max(0, super().spend_available + self.total_allocated)
+            expected_result = max(0, self.MOCK_PARENT_SPEND_AVAILABLE + self.MOCK_TOTAL_ALLOCATED)
+            self.assertEqual(result, expected_result)
+            mock_parent_spend_available.assert_called_once()
+            mock_total_allocated.assert_called_once()
+
+    def test_spend_available_with_bnr_disabled(self):
+        """
+        Test that spend_available property returns parent class value when BNR is disabled.
+        """
+        with self._patch_bnr_enabled(enabled=False), \
+             self._patch_parent_spend_available(amount=self.MOCK_PARENT_SPEND_AVAILABLE) as mock_parent_spend_available:
+
+            result = self.per_learner_spend_policy.spend_available
+
+            # Should return parent class value directly
+            self.assertEqual(result, self.MOCK_PARENT_SPEND_AVAILABLE)
+            mock_parent_spend_available.assert_called_once()
 
 
 @ddt.ddt

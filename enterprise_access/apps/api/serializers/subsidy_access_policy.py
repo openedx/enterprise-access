@@ -74,13 +74,14 @@ class SubsidyAccessPolicyAggregatesSerializer(serializers.Serializer):
     )
     amount_allocated_usd_cents = serializers.SerializerMethodField(
         help_text=(
-            f"Total amount allocated for policies of type {PolicyTypes.ASSIGNED_LEARNER_CREDIT} (0 otherwise), in "
-            "positive USD cents."
+            f"Total amount allocated for policies of type {PolicyTypes.ASSIGNED_LEARNER_CREDIT} or "
+            "{PolicyTypes.PER_LEARNER_SPEND_CREDIT} (0 otherwise), in positive USD cents."
         ),
     )
     amount_allocated_usd = serializers.SerializerMethodField(
         help_text=(
-            f"Total amount allocated for policies of type {PolicyTypes.ASSIGNED_LEARNER_CREDIT} (0 otherwise), in USD.",
+            f"Total amount allocated for policies of type {PolicyTypes.ASSIGNED_LEARNER_CREDIT} or ",
+            "{PolicyTypes.PER_LEARNER_SPEND_CREDIT} (0 otherwise), in USD."
         ),
     )
     spend_available_usd_cents = serializers.SerializerMethodField(
