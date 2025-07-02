@@ -1327,21 +1327,29 @@ class SubsidyAccessPolicyRequestAssignmentMixin:
             lms_user_id,
             content_key
         )
-        if self.bnr_enabled and learner_credit_request:
-            logger.info(
-                "Creating LearnerCreditRequestActions record for redemption attempt. "
-                "learner_credit_request_uuid=%s, lms_user_id=%s, content_key=%s",
-                learner_credit_request.uuid,
-                lms_user_id,
-                content_key
-            )
-            action = LearnerCreditRequestActions.create_action(
-                learner_credit_request=learner_credit_request,
-                recent_action=get_action_choice(SubsidyRequestStates.ACCEPTED),
-                status=get_user_message_choice(SubsidyRequestStates.ACCEPTED),
-            )
+        if self.bnr_enabled:
             try:
                 policy_instance = self.copy_context_to(AssignedLearnerCreditAccessPolicy)
+                found_assignment = policy_instance.get_assignment(lms_user_id, content_key)
+                logger.info(
+                    "Assignment lookup for redemption attempt: found=%s, lms_user_id=%s, content_key=%s",
+                    bool(found_assignment),
+                    lms_user_id,
+                    content_key
+                )
+                learner_credit_request = found_assignment.credit_request if found_assignment else None
+                logger.info(
+                    "Creating LearnerCreditRequestActions record for redemption attempt. "
+                    "learner_credit_request_uuid=%s, lms_user_id=%s, content_key=%s",
+                    learner_credit_request.uuid,
+                    lms_user_id,
+                    content_key
+                )
+                action = LearnerCreditRequestActions.create_action(
+                    learner_credit_request=learner_credit_request,
+                    recent_action=get_action_choice(SubsidyRequestStates.ACCEPTED),
+                    status=get_user_message_choice(SubsidyRequestStates.ACCEPTED),
+                )
                 result = policy_instance.redeem(lms_user_id, content_key, all_transactions, metadata=metadata, **kwargs)
                 logger.info(
                     "Successfully redeemed content through assignment_request_redeem. "
