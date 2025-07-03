@@ -2038,6 +2038,23 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         }
         mock_catalog_contains.return_value = True
 
+        # Set up mock subsidy client to return proper values
+        self.mock_subsidy_client.retrieve_subsidy.return_value = {
+            'uuid': str(uuid4()),
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': 3000,
+            'is_active': True,
+        }
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {
+                'total_quantity': 0,
+            }
+        }
+
         # Set policy to inactive
         self.policy.active = False
         self.policy.save()

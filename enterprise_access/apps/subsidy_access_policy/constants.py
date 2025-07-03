@@ -104,6 +104,11 @@ class MissingSubsidyAccessReasonUserMessages:
         "You can't enroll right now right now because your administrator canceled your course assignment."
 
 
+# NOTE: This constant appears to be intended as a MissingSubsidyAccessReasonUserMessages, as
+# the convention is to use the `REASON_*` prefix for the programmatic key to identity a reason
+# type, but not the reason's user-facing message itself.
+REASON_BNR_NOT_ENABLED = "This policy does not support BNR."
+
 REASON_POLICY_EXPIRED = "policy_expired"
 REASON_SUBSIDY_EXPIRED = "subsidy_expired"
 REASON_CONTENT_NOT_IN_CATALOG = "content_not_in_catalog"
@@ -129,8 +134,15 @@ SORT_BY_ENROLLMENT_COUNT = 'enrollment_count'
 GROUP_MEMBERS_WITH_AGGREGATES_DEFAULT_PAGE_SIZE = 10
 
 # Exceeding the spend_limit validation error
-VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE = "You cannot make this change, as the sum of all budget \
-spend_limits for a given subsidy would exceed the sum of all deposits into that subsidy.  If you are trying to \
-re-balance policies, FIRST reduce the spend_limit of one, THEN increase the spend_limit of another."
+VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE = (
+    "You cannot make this change, as the sum of all budget spend_limits for a given subsidy would exceed "
+    "the sum of all deposits into that subsidy. If you are trying to re-balance policies, FIRST reduce the "
+    "spend_limit of one, THEN increase the spend_limit of another."
+)
 
-REASON_BNR_NOT_ENABLED = "This policy does not support BNR."
+ERROR_MSG_ACTIVE_WITH_SPEND = (
+    "Cannot deactivate this policy while it has existing spend."
+)
+ERROR_MSG_ACTIVE_UNKNOWN_SPEND = (
+    "Cannot deactivate this policy because spend could not be determined."
+)
