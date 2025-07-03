@@ -136,8 +136,8 @@ VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE = (
 )
 
 ERROR_MSG_ACTIVE_WITH_SPEND = (
-    "Cannot deactivate this policy while it is retired and has existing spend."
+    "Cannot deactivate this policy while it has existing spend."
 )
 ERROR_MSG_ACTIVE_UNKNOWN_SPEND = (
-    "Cannot deactivate this policy while it is retired because spend could not be determined."
+    "Cannot deactivate this policy because spend could not be determined."
 )

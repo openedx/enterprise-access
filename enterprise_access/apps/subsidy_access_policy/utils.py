@@ -145,34 +145,30 @@ def cents_to_usd_string(cents):
     return "${:,.2f}".format(float(cents) / constants.CENTS_PER_DOLLAR)
 
 
-def validate_retired_budget_deactivation(policy_instance):
+def validate_budget_deactivation_with_spend(policy_instance):
     """
-    Raise a ValidationError if a policy would become both retired and inactive while having existing spend.
+    Raise a ValidationError if a policy would become inactive while having existing spend.
     The error is attached to the field(s) being changed: 'active', 'retired', or both.
     Uses original values from the database to detect changes.
+
+    A Django setting ALLOW_BUDGET_DEACTIVATION_WITH_SPEND can be set to True
+    to temporarily bypass this validation.
     """
-    # If the instance has a primary key, we're performing an update (existing object)
-    # and should determine its original values from the database; otherwise, it's a create (new object).
-    if policy_instance.pk:
-        try:
-            original = type(policy_instance).objects.get(pk=policy_instance.pk)
-            original_active = original.active
-            original_retired = original.retired
-        except ObjectDoesNotExist:
-            original_active = policy_instance.active
-            original_retired = policy_instance.retired
-    else:
-        original_active = policy_instance.active
-        original_retired = policy_instance.retired
-
-    active_will_change = policy_instance.active != original_active
-
-    would_make_retired_policy_inactive = (
-        original_retired and not policy_instance.active and active_will_change
-    )
-
-    if not would_make_retired_policy_inactive:
+    # Check if the Django setting allows bypassing this validation (for temporary use only)
+    if getattr(settings, 'ALLOW_BUDGET_DEACTIVATION_WITH_SPEND', False):
         return
+
+    # Only validate on updates (not creates) and only when deactivating
+    if not policy_instance.pk or policy_instance.active:
+        return
+
+    # For updates, check if we're actually changing from active to inactive
+    try:
+        original = type(policy_instance).objects.get(pk=policy_instance.pk)
+        if original.active == policy_instance.active:
+            return  # No change to active status
+    except ObjectDoesNotExist:
+        return  # Can't determine original state, skip validation
 
     try:
         total_redeemed = policy_instance.total_redeemed

@@ -973,6 +973,24 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             mock_assigned_can_redeem.assert_not_called()
             mock_super_can_redeem.assert_called_once()
 
+    def test_budget_with_spend_cannot_be_deactivated(self):
+        """
+        Test that any budget with existing spend cannot be deactivated (active toggled).
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=False,  # Not retired, but still should be prevented from deactivation
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': -1000}  # Negative value indicates spend
+        }
+        policy.active = False
+        with self.assertRaises(ValidationError) as context:
+            policy.save()
+        self.assertIn('active', context.exception.error_dict)
+        self.assertIn(ERROR_MSG_ACTIVE_WITH_SPEND, str(context.exception.error_dict['active']))
+
     def test_retired_budget_with_spend_cannot_be_deactivated(self):
         """
         Test that retired budgets with existing spend cannot be deactivated (active toggled).
@@ -991,6 +1009,21 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         self.assertIn('active', context.exception.error_dict)
         self.assertIn(ERROR_MSG_ACTIVE_WITH_SPEND, str(context.exception.error_dict['active']))
 
+    def test_budget_deactivation_with_api_error(self):
+        """
+        Test that budgets cannot be deactivated when spend cannot be determined (active toggled).
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=False,  # Not retired, but still should be prevented from deactivation
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.side_effect = requests.exceptions.HTTPError("API Error")
+        policy.active = False
+        with self.assertRaises(ValidationError) as context:
+            policy.save()
+        self.assertIn('active', context.exception.error_dict)
+        self.assertIn(ERROR_MSG_ACTIVE_UNKNOWN_SPEND, str(context.exception.error_dict['active']))
+
     def test_retired_budget_deactivation_with_api_error(self):
         """
         Test that retired budgets cannot be deactivated when spend cannot be determined (active toggled).
@@ -1005,6 +1038,69 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             policy.save()
         self.assertIn('active', context.exception.error_dict)
         self.assertIn(ERROR_MSG_ACTIVE_UNKNOWN_SPEND, str(context.exception.error_dict['active']))
+
+    def test_budget_deactivation_allowed_with_setting(self):
+        """
+        Test that budget deactivation is allowed when ALLOW_BUDGET_DEACTIVATION_WITH_SPEND is True.
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=False,
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': -1000}  # Negative value indicates spend
+        }
+        policy.active = False
+
+        with self.settings(ALLOW_BUDGET_DEACTIVATION_WITH_SPEND=True):
+            # Should not raise an exception
+            policy.save()
+
+        # Verify the policy was actually deactivated
+        policy.refresh_from_db()
+        self.assertFalse(policy.active)
+
+    def test_budget_deactivation_not_allowed_without_setting(self):
+        """
+        Test that budget deactivation is not allowed when ALLOW_BUDGET_DEACTIVATION_WITH_SPEND is False or not set.
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=False,
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': -1000}  # Negative value indicates spend
+        }
+        policy.active = False
+
+        with self.settings(ALLOW_BUDGET_DEACTIVATION_WITH_SPEND=False):
+            with self.assertRaises(ValidationError) as context:
+                policy.save()
+            self.assertIn('active', context.exception.error_dict)
+            self.assertIn(ERROR_MSG_ACTIVE_WITH_SPEND, str(context.exception.error_dict['active']))
+
+    def test_budget_without_spend_can_be_deactivated(self):
+        """
+        Test that budgets without spend can be deactivated normally.
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=False,
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': 0}  # No spend
+        }
+        policy.active = False
+
+        # Should not raise an exception
+        policy.save()
+
+        # Verify the policy was actually deactivated
+        policy.refresh_from_db()
+        self.assertFalse(policy.active)
 
 
 @ddt.ddt

@@ -76,7 +76,7 @@ from .utils import (
     cents_to_usd_string,
     create_idempotency_key_for_transaction,
     get_versioned_subsidy_client,
-    validate_retired_budget_deactivation
+    validate_budget_deactivation_with_spend
 )
 
 # Magic key that is used transaction metadata hint to the subsidy service and all downstream services that the
@@ -433,9 +433,9 @@ class SubsidyAccessPolicy(TimeStampedModel):
         except ValidationError as exc:
             validation_errors['spend_limit'] = str(exc)
 
-        # Validate that retired budgets with spend cannot be deactivated
+        # Validate that budgets with spend cannot be deactivated
         if not self._state.adding:
-            validate_retired_budget_deactivation(self)
+            validate_budget_deactivation_with_spend(self)
 
         # Perform basic field constraint checks.
         for field_name, (constraint_function, error_message) in self.FIELD_CONSTRAINTS.items():
