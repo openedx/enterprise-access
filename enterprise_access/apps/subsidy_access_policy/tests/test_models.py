@@ -53,6 +53,7 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
     PolicyGroupAssociationFactory
 )
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.cache_utils import request_cache
 from enterprise_access.utils import localized_utcnow
 from test_utils import TEST_ENTERPRISE_GROUP_UUID, TEST_USER_RECORD, TEST_USER_RECORD_NO_GROUPS
@@ -942,9 +943,12 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
     def test_per_learner_spend_policy_redeem_with_bnr_enabled(self):
         """
         Test that PerLearnerSpendCreditAccessPolicy.redeem correctly delegates
-        to assignment_request_redeem when bnr_enabled is True.
+        to assignment_request_redeem when bnr_enabled is True and updates the credit request state.
         """
         policy = self.per_learner_spend_policy
+        mock_credit_request = MagicMock()
+        mock_assignment = MagicMock()
+        mock_assignment.credit_request = mock_credit_request
         mock_return_value = {'uuid': 'test-transaction-uuid'}
         all_transactions = [{'uuid': 'some-other-uuid'}]
         metadata = {'source': 'bnr_test'}
@@ -953,8 +957,16 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
                 'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
                 new_callable=PropertyMock,
                 return_value=True
+        ), patch(
+                'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.get_assignment',
+                return_value=mock_assignment
+        ), patch(
+                'enterprise_access.apps.subsidy_access_policy.models.LearnerCreditRequestActions.create_action'
+        ), patch(
+                'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.redeem',
+                return_value=mock_return_value
         ), patch.object(
-                policy, 'assignment_request_redeem', return_value=mock_return_value
+                policy, 'assignment_request_redeem', side_effect=policy.assignment_request_redeem
         ) as mock_assignment_request_redeem:
             result = policy.redeem(self.lms_user_id, self.course_id, all_transactions, metadata=metadata)
 
@@ -962,6 +974,10 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             mock_assignment_request_redeem.assert_called_once_with(
                 self.lms_user_id, self.course_id, all_transactions, metadata=metadata
             )
+
+            # Verify that the state was updated to ACCEPTED and save was called
+            self.assertEqual(mock_credit_request.state, SubsidyRequestStates.ACCEPTED)
+            mock_credit_request.save.assert_called_once()
 
     def test_per_learner_spend_policy_can_redeem_with_bnr_disabled(self):
         """

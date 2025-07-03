@@ -1338,6 +1338,8 @@ class SubsidyAccessPolicyRequestAssignmentMixin:
                     content_key
                 )
                 learner_credit_request = found_assignment.credit_request if found_assignment else None
+                learner_credit_request.state = SubsidyRequestStates.ACCEPTED
+                learner_credit_request.save()
                 logger.info(
                     "Creating LearnerCreditRequestActions record for redemption attempt. "
                     "learner_credit_request_uuid=%s, lms_user_id=%s, content_key=%s",
