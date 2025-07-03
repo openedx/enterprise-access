@@ -105,11 +105,15 @@ class LearnerCreditRequestActionErrorReasons:
     FAILED_APPROVAL = 'failed_approval'
     FAILED_DECLINE = 'failed_decline'
     FAILED_CANCELLATION = 'failed_cancellation'
+    FAILED_REDEMPTION = 'failed_redemption'
+    FAILED_REVERSAL = 'failed_reversal'
 
     CHOICES = (
         (FAILED_APPROVAL, "Failed: Approval"),
         (FAILED_DECLINE, "Failed: Decline"),
         (FAILED_CANCELLATION, "Failed: Cancellation"),
+        (FAILED_REDEMPTION, "Failed: Redemption"),
+        (FAILED_REVERSAL, "Failed: Reversal"),
     )
 
 

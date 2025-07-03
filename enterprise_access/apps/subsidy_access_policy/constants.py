@@ -104,6 +104,11 @@ class MissingSubsidyAccessReasonUserMessages:
         "You can't enroll right now right now because your administrator canceled your course assignment."
 
 
+# NOTE: This constant appears to be intended as a MissingSubsidyAccessReasonUserMessages, as
+# the convention is to use the `REASON_*` prefix for the programmatic key to identity a reason
+# type, but not the reason's user-facing message itself.
+REASON_BNR_NOT_ENABLED = "This policy does not support BNR."
+
 REASON_POLICY_EXPIRED = "policy_expired"
 REASON_SUBSIDY_EXPIRED = "subsidy_expired"
 REASON_CONTENT_NOT_IN_CATALOG = "content_not_in_catalog"
