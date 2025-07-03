@@ -1131,6 +1131,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         # Verify the policy was actually deactivated
         policy.refresh_from_db()
         self.assertFalse(policy.active)
+
     def test_per_learner_spend_policy_can_approve_bnr_disabled(self):
         """
         Test that PerLearnerSpendCreditAccessPolicy.can_approve returns False when bnr_enabled is False.
