@@ -43,6 +43,7 @@ from enterprise_access.apps.api.utils import (
 )
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
+from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.core import constants
 from enterprise_access.apps.subsidy_access_policy.api import approve_learner_credit_request_via_policy
 from enterprise_access.apps.subsidy_access_policy.exceptions import SubisidyAccessPolicyRequestApprovalError
@@ -732,6 +733,10 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         summary='Decline a learner credit request.',
         request=serializers.LearnerCreditRequestDeclineSerializer,
     ),
+    cancel=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Learner credit request cancel endpoint.',
+    )
 )
 class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
     """
@@ -901,6 +906,66 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
             lc_request_action.traceback = format_traceback(exc)
             lc_request_action.save()
             return Response({"detail": error_msg}, exc.status_code)
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    @action(
+        detail=False,
+        url_path='cancel',
+        methods=['post'],
+        serializer_class=serializers.LearnerCreditRequestCancelSerializer
+    )
+    def cancel(self, request, *args, **kwargs):
+        """
+        Cancel a learner credit request.
+        """
+        serializer = serializers.LearnerCreditRequestCancelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        learner_credit_request = serializer.get_learner_credit_request()
+
+        error_msg = None
+        lc_action = LearnerCreditRequestActions.create_action(
+            learner_credit_request=learner_credit_request,
+            recent_action=get_action_choice(SubsidyRequestStates.CANCELLED),
+            status=get_user_message_choice(SubsidyRequestStates.CANCELLED),
+        )
+
+        try:
+            with transaction.atomic():
+                response = assignments_api.cancel_assignments([learner_credit_request.assignment], False)
+                if response.get('non_cancelable'):
+                    error_msg = (
+                        f"Failed to cancel associated assignment with uuid: {learner_credit_request.assignment.uuid}"
+                        f" for request: {learner_credit_request.uuid}."
+                    )
+                    lc_action.error_reason = get_error_reason_choice(
+                        LearnerCreditRequestActionErrorReasons.FAILED_CANCELLATION
+                    )
+                    lc_action.status = get_user_message_choice(SubsidyRequestStates.APPROVED)
+                    lc_action.traceback = error_msg
+                    lc_action.save()
+                    return Response(error_msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+                learner_credit_request.cancel(self.user)
+                lc_action.save()
+
+                # TODO: add logic to send cancellation email
+
+            serialized_request = serializers.LearnerCreditRequestSerializer(learner_credit_request).data
+            return Response(serialized_request, status=status.HTTP_200_OK)
+        except (ValidationError, IntegrityError, DatabaseError) as exc:
+            error_msg = format_traceback(exc)
+            logger.exception(error_msg)
+            lc_action.error_reason = get_error_reason_choice(
+                LearnerCreditRequestActionErrorReasons.FAILED_CANCELLATION
+            )
+            lc_action.status = get_user_message_choice(SubsidyRequestStates.APPROVED)
+            lc_action.traceback = error_msg
+            lc_action.save()
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     @permission_required(
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,

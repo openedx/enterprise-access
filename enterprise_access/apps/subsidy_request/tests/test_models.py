@@ -184,6 +184,16 @@ class LearnerCreditRequestTests(TestCase):
         self.assertEqual(self.learner_credit_request.decline_reason, decline_reason)
         self.assertIsNotNone(self.learner_credit_request.reviewed_at)
 
+    def test_cancel_success(self):
+        """
+        Verify that canceling a request updates the state and sets the reviewed timestamp.
+        """
+        reviewer = UserFactory()
+        self.learner_credit_request.cancel(reviewer)
+        self.assertEqual(self.learner_credit_request.state, SubsidyRequestStates.CANCELLED)
+        self.assertEqual(self.learner_credit_request.reviewer, reviewer)
+        self.assertIsNotNone(self.learner_credit_request.reviewed_at)
+
     def test_clean_invalid_without_review_data(self):
         """
         Ensure validation fails if a reviewed request lacks a reviewer and timestamp.
