@@ -522,6 +522,12 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
         Test that the destroy view performs a soft-delete and returns an appropriate response with 200 status code and
         the expected results of serialization.
         """
+        # Override the mock to return no spend for this test
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            "results": [],
+            "aggregates": {"total_quantity": 0},
+        }
+
         # Set the JWT-based auth to an operator.
         self.set_jwt_cookie([
             {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}
@@ -552,12 +558,12 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
             'subsidy_expiration_datetime': self.tomorrow.isoformat(),
             'is_subsidy_active': True,
             'aggregates': {
-                'amount_redeemed_usd_cents': 1,
-                'amount_redeemed_usd': 0.01,
+                'amount_redeemed_usd_cents': 0,
+                'amount_redeemed_usd': 0.00,
                 'amount_allocated_usd_cents': 0,
                 'amount_allocated_usd': 0.00,
-                'spend_available_usd_cents': 2,
-                'spend_available_usd': 0.02,
+                'spend_available_usd_cents': 3,
+                'spend_available_usd': 0.03,
             },
             'assignment_configuration': None,
             'group_associations': [],
@@ -699,8 +705,9 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
 
     def test_update_views_with_exceeding_spend_limit(self):
         """
-        Test that the update and partial_update views can modify certain
-        fields of a policy record.
+        Test that policies cannot be updated when the sum of spend limits would exceed total deposits.
+        This tests the validation that prevents the sum of all policy spend_limits from exceeding
+        the subsidy's total_deposits value.
         """
         # Set the JWT-based auth to an operator.
         self.set_jwt_cookie([
@@ -734,9 +741,16 @@ class TestAuthenticatedPolicyCRUDViews(CRUDViewTestMixin, APITestWithMocks):
 
     def test_update_views_with_exceeding_spend_limit_for_inactive_policies(self):
         """
-        Test that the update and partial_update views can modify certain
-        fields of a policy record.
+        Test that inactive policies can be updated even when the sum of spend limits would exceed total deposits.
+        This tests that the spend limit validation is only applied to active policies, allowing
+        inactive policies to be modified regardless of spend limit constraints.
         """
+        # Override the mock to return no spend for this test
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            "results": [],
+            "aggregates": {"total_quantity": 0},
+        }
+
         # Set the JWT-based auth to an operator.
         self.set_jwt_cookie([
             {'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE, 'context': str(TEST_ENTERPRISE_UUID)}

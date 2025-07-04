@@ -161,7 +161,6 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     },
                 },
             ],
-            'secured_algolia_api_key': self.mock_secured_algolia_api_key,
             'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
             'algolia': self.mock_algolia_object,
             'active_enterprise_customer': self.expected_enterprise_customer,

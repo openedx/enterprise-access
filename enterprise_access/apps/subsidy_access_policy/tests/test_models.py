@@ -21,7 +21,10 @@ from enterprise_access.apps.content_assignments.constants import (
 from enterprise_access.apps.content_assignments.models import AssignmentConfiguration
 from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
 from enterprise_access.apps.subsidy_access_policy.constants import (
+    ERROR_MSG_ACTIVE_UNKNOWN_SPEND,
+    ERROR_MSG_ACTIVE_WITH_SPEND,
     REASON_BEYOND_ENROLLMENT_DEADLINE,
+    REASON_BNR_NOT_ENABLED,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_EXPIRED,
@@ -52,6 +55,7 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory,
     PolicyGroupAssociationFactory
 )
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.cache_utils import request_cache
 from enterprise_access.utils import localized_utcnow
 from test_utils import TEST_ENTERPRISE_GROUP_UUID, TEST_USER_RECORD, TEST_USER_RECORD_NO_GROUPS
@@ -75,6 +79,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+
         cls.per_learner_enroll_policy = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
             uuid=ACTIVE_LEARNER_ENROLL_CAP_POLICY_UUID,
             per_learner_enrollment_limit=5,
@@ -102,6 +107,17 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             retired=True,
         )
 
+    def setUp(self):
+        super().setUp()
+        self.assignments_api_patcher = patch(
+            'enterprise_access.apps.subsidy_access_policy.models.assignments_api',
+            autospec=True,
+        )
+        self.mock_assignments_api = self.assignments_api_patcher.start()
+
+        # cleanups
+        self.addCleanup(self.assignments_api_patcher.stop)
+
     def tearDown(self):
         """
         Clears any cached data for the test policy instances between test runs.
@@ -114,7 +130,13 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
         Verify that the assignment configuration is created when saving a PerLearnerCreditAccessPolicy
         with bnr_enabled=True.
         """
-        policy = self.per_learner_spend_policy
+        # let the assignments API actually create an assignment configuration
+        self.assignments_api_patcher.stop()
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            uuid=uuid4(),
+            per_learner_spend_limit=200,
+            spend_limit=5000
+        )
         with patch(
                 'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
                 new_callable=PropertyMock,
@@ -133,7 +155,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
 
     def test_save_per_learner_credit_policy_with_bnr_not_enabled(self):
         """
-        Verify that the assignment configuration is created when saving a PerLearnerCreditAccessPolicy
+        Verify that the assignment configuration is not created when saving a PerLearnerCreditAccessPolicy
         with bnr_enabled=False.
         """
         policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
@@ -923,31 +945,41 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
     def test_per_learner_spend_policy_redeem_with_bnr_enabled(self):
         """
         Test that PerLearnerSpendCreditAccessPolicy.redeem correctly delegates
-        to a new instance of AssignedLearnerCreditAccessPolicy when bnr_enabled is True.
+        to assignment_request_redeem when bnr_enabled is True and updates the credit request state.
         """
         policy = self.per_learner_spend_policy
+        mock_credit_request = MagicMock()
+        mock_assignment = MagicMock()
+        mock_assignment.credit_request = mock_credit_request
         mock_return_value = {'uuid': 'test-transaction-uuid'}
         all_transactions = [{'uuid': 'some-other-uuid'}]
         metadata = {'source': 'bnr_test'}
-
-        mock_assigned_policy_instance = MagicMock()
-        mock_assigned_policy_instance.redeem.return_value = mock_return_value
 
         with patch(
                 'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
                 new_callable=PropertyMock,
                 return_value=True
         ), patch(
-            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy',
-            return_value=mock_assigned_policy_instance
-        ) as mock_assigned_class:
+                'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.get_assignment',
+                return_value=mock_assignment
+        ), patch(
+                'enterprise_access.apps.subsidy_access_policy.models.LearnerCreditRequestActions.create_action'
+        ), patch(
+                'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.redeem',
+                return_value=mock_return_value
+        ), patch.object(
+                policy, 'assignment_request_redeem', side_effect=policy.assignment_request_redeem
+        ) as mock_assignment_request_redeem:
             result = policy.redeem(self.lms_user_id, self.course_id, all_transactions, metadata=metadata)
 
             self.assertEqual(result, mock_return_value)
-            mock_assigned_class.assert_called_once_with()
-            mock_assigned_policy_instance.redeem.assert_called_once_with(
-                self.lms_user_id, self.course_id, all_transactions, metadata=metadata, **{}
+            mock_assignment_request_redeem.assert_called_once_with(
+                self.lms_user_id, self.course_id, all_transactions, metadata=metadata
             )
+
+            # Verify that the state was updated to ACCEPTED and save was called
+            self.assertEqual(mock_credit_request.state, SubsidyRequestStates.ACCEPTED)
+            mock_credit_request.save.assert_called_once()
 
     def test_per_learner_spend_policy_can_redeem_with_bnr_disabled(self):
         """
@@ -970,6 +1002,232 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
 
             mock_assigned_can_redeem.assert_not_called()
             mock_super_can_redeem.assert_called_once()
+
+    def test_budget_with_spend_cannot_be_deactivated(self):
+        """
+        Test that any budget with existing spend cannot be deactivated (active toggled).
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=False,  # Not retired, but still should be prevented from deactivation
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': -1000}  # Negative value indicates spend
+        }
+        policy.active = False
+        with self.assertRaises(ValidationError) as context:
+            policy.save()
+        self.assertIn('active', context.exception.error_dict)
+        self.assertIn(ERROR_MSG_ACTIVE_WITH_SPEND, str(context.exception.error_dict['active']))
+
+    def test_retired_budget_with_spend_cannot_be_deactivated(self):
+        """
+        Test that retired budgets with existing spend cannot be deactivated (active toggled).
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=True,
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': -1000}  # Negative value indicates spend
+        }
+        policy.active = False
+        with self.assertRaises(ValidationError) as context:
+            policy.save()
+        self.assertIn('active', context.exception.error_dict)
+        self.assertIn(ERROR_MSG_ACTIVE_WITH_SPEND, str(context.exception.error_dict['active']))
+
+    def test_budget_deactivation_with_api_error(self):
+        """
+        Test that budgets cannot be deactivated when spend cannot be determined (active toggled).
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=False,  # Not retired, but still should be prevented from deactivation
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.side_effect = requests.exceptions.HTTPError("API Error")
+        policy.active = False
+        with self.assertRaises(ValidationError) as context:
+            policy.save()
+        self.assertIn('active', context.exception.error_dict)
+        self.assertIn(ERROR_MSG_ACTIVE_UNKNOWN_SPEND, str(context.exception.error_dict['active']))
+
+    def test_retired_budget_deactivation_with_api_error(self):
+        """
+        Test that retired budgets cannot be deactivated when spend cannot be determined (active toggled).
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=True,
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.side_effect = requests.exceptions.HTTPError("API Error")
+        policy.active = False
+        with self.assertRaises(ValidationError) as context:
+            policy.save()
+        self.assertIn('active', context.exception.error_dict)
+        self.assertIn(ERROR_MSG_ACTIVE_UNKNOWN_SPEND, str(context.exception.error_dict['active']))
+
+    def test_budget_deactivation_allowed_with_setting(self):
+        """
+        Test that budget deactivation is allowed when ALLOW_BUDGET_DEACTIVATION_WITH_SPEND is True.
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=False,
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': -1000}  # Negative value indicates spend
+        }
+        policy.active = False
+
+        with self.settings(ALLOW_BUDGET_DEACTIVATION_WITH_SPEND=True):
+            # Should not raise an exception
+            policy.save()
+
+        # Verify the policy was actually deactivated
+        policy.refresh_from_db()
+        self.assertFalse(policy.active)
+
+    def test_budget_deactivation_not_allowed_without_setting(self):
+        """
+        Test that budget deactivation is not allowed when ALLOW_BUDGET_DEACTIVATION_WITH_SPEND is False or not set.
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=False,
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': -1000}  # Negative value indicates spend
+        }
+        policy.active = False
+
+        with self.settings(ALLOW_BUDGET_DEACTIVATION_WITH_SPEND=False):
+            with self.assertRaises(ValidationError) as context:
+                policy.save()
+            self.assertIn('active', context.exception.error_dict)
+            self.assertIn(ERROR_MSG_ACTIVE_WITH_SPEND, str(context.exception.error_dict['active']))
+
+    def test_budget_without_spend_can_be_deactivated(self):
+        """
+        Test that budgets without spend can be deactivated normally.
+        """
+        policy = PerLearnerSpendCapLearnerCreditAccessPolicyFactory(
+            active=True,
+            retired=False,
+        )
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {'total_quantity': 0}  # No spend
+        }
+        policy.active = False
+
+        # Should not raise an exception
+        policy.save()
+
+        # Verify the policy was actually deactivated
+        policy.refresh_from_db()
+        self.assertFalse(policy.active)
+
+    def test_per_learner_spend_policy_can_approve_bnr_disabled(self):
+        """
+        Test that PerLearnerSpendCreditAccessPolicy.can_approve returns False when bnr_enabled is False.
+        """
+        policy = self.per_learner_spend_policy
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=False
+        ), patch(
+            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_allocate'
+        ) as mock_can_allocate:
+            result, reason = policy.can_approve(self.course_id, 1000)
+            mock_can_allocate.assert_not_called()
+            self.assertFalse(result)
+            self.assertEqual(reason, REASON_BNR_NOT_ENABLED)
+
+    def test_per_learner_spend_policy_can_approve_bnr_enabled(self):
+        """
+        Test PerLearnerSpendCreditAccessPolicy.can_approve when bnr_enabled is True.
+        """
+        policy = self.per_learner_spend_policy
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=True
+        ), patch(
+            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_allocate'
+        ) as mock_can_allocate:
+            mock_can_allocate.return_value = (True, None)
+            result, reason = policy.can_approve(self.course_id, 1000)
+            mock_can_allocate.assert_called_once_with(1, self.course_id, 1000)
+            self.assertTrue(result)
+            self.assertEqual(reason, None)
+
+    def test_per_learner_spend_policy_can_approve_failure(self):
+        """
+        Test PerLearnerSpendCreditAccessPolicy.can_approve when can_allocate returns False.
+        """
+        policy = self.per_learner_spend_policy
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=True
+        ), patch(
+            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_allocate'
+        ) as mock_can_allocate:
+            mock_can_allocate.return_value = (False, REASON_CONTENT_NOT_IN_CATALOG)
+            result, reason = policy.can_approve(self.course_id, 1000)
+            mock_can_allocate.assert_called_once_with(1, self.course_id, 1000)
+            self.assertFalse(result)
+            # assert it returns the same reason as AssignedLearnerCreditAccessPolicy.can_approve
+            self.assertEqual(reason, REASON_CONTENT_NOT_IN_CATALOG)
+
+    def test_per_learner_spend_policy_approve_method_assignment_allocated(self):
+        """
+        Test PerLearnerSpendCreditAccessPolicy.approve method calls assignments_api.allocate_assignment_for_request()
+          with correct paramaters when a new assignment is created.
+        """
+        # set up assignment, configuration and allocate_assignment_for_request mock return value
+        assignment_configuration = AssignmentConfiguration.objects.create()
+        test_learner_email = 'test@email.com'
+        test_course_price = 1000
+        assignment = LearnerContentAssignmentFactory(
+            learner_email=test_learner_email,
+            content_key=self.course_id,
+            lms_user_id=self.lms_user_id,
+            state='allocated',
+            content_quantity=-test_course_price,
+            assignment_configuration=assignment_configuration,
+        )
+
+        self.mock_assignments_api.allocate_assignment_for_request.return_value = assignment
+
+        # link assignment_configuration to the policy
+        policy = self.per_learner_spend_policy
+        policy.assignment_configuration = assignment_configuration
+        policy.save()
+
+        with patch(
+                'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
+                new_callable=PropertyMock,
+                return_value=True
+        ):
+            result = policy.approve(test_learner_email, self.course_id, test_course_price, self.lms_user_id)
+            # assert that the result is the created assignment
+            self.assertEqual(result, assignment)
+
+            # assert that the assignments_api.allocate_assignment_for_request was called with correct parameters
+            self.mock_assignments_api.allocate_assignment_for_request.assert_called_once_with(
+                assignment_configuration,
+                test_learner_email,
+                self.course_id,
+                test_course_price,
+                self.lms_user_id,
+            )
 
 
 @ddt.ddt
@@ -1023,31 +1281,31 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         super().tearDown()
         request_cache(namespace=REQUEST_CACHE_NAMESPACE).clear()
 
-    def test_clean(self):
+    def test_validation_rules_on_save(self):
         """
-        Tests the model-level validation of this policy type.
+        Tests the model-level validation rules of this policy type.
         """
         with self.assertRaisesRegex(ValidationError, 'must define a spend_limit'):
             policy = AssignedLearnerCreditAccessPolicyFactory(
                 spend_limit=None,
                 assignment_configuration=self.assignment_configuration,
             )
-            policy.clean()
+            policy.save()
         with self.assertRaisesRegex(ValidationError, 'must not define a per-learner spend limit'):
             policy = AssignedLearnerCreditAccessPolicyFactory(
                 assignment_configuration=self.assignment_configuration,
                 per_learner_spend_limit=1,
             )
-            policy.clean()
+            policy.save()
         with self.assertRaisesRegex(ValidationError, 'must not define a per-learner enrollment limit'):
             policy = AssignedLearnerCreditAccessPolicyFactory(
                 spend_limit=1,
                 assignment_configuration=self.assignment_configuration,
                 per_learner_enrollment_limit=1,
             )
-            policy.clean()
+            policy.save()
 
-    def test_save(self):
+    def test_save_access_method_and_assignment_configuration(self):
         """
         These types of policies should always get saved with an
         access_method of 'assigned' and an ``assignment_configuration`` record.
