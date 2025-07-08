@@ -1429,6 +1429,38 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
             self.assignment_configuration.save()
         super().save(*args, **kwargs)
 
+    @property
+    def total_allocated(self):
+        """
+        Total amount of assignments currently allocated via this policy. The assignments have direct
+        1-1 mapping to the requests, so in this case total_allocated represents total approved requests.
+
+        Returns:
+            int: Negative USD cents representing the total amount of currently
+            allocated assignments / approved requests.
+        """
+        if not self.bnr_enabled:
+            return super().total_allocated
+
+        return assignments_api.get_allocated_quantity_for_configuration(
+            self.assignment_configuration,
+        )
+
+    @property
+    def spend_available(self):
+        """
+        Policy-wide spend available.  This sub-class definition additionally takes approved requests into account.
+
+        Returns:
+            int: quantity >= 0 of USD Cents representing the policy-wide spend available.
+        """
+        if not self.bnr_enabled:
+            return super().spend_available
+
+        # super().spend_available is POSITIVE USD Cents representing available spend ignoring assignments.
+        # self.total_allocated is NEGATIVE USD Cents representing currently allocated assignments / approved requests.
+        return max(0, super().spend_available + self.total_allocated)
+
     def can_redeem(
         self, lms_user_id, content_key, skip_customer_user_check=False, skip_enrollment_deadline_check=False,
             **kwargs
