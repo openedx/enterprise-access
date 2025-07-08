@@ -61,6 +61,7 @@ from enterprise_access.apps.subsidy_request.models import (
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
+from enterprise_access.apps.subsidy_request.tasks import send_learner_credit_admins_email_with_new_requests_task
 from enterprise_access.apps.subsidy_request.utils import (
     get_action_choice,
     get_error_reason_choice,
@@ -835,6 +836,13 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
                         learner_credit_request=lcr,
                         recent_action=get_action_choice(SubsidyRequestStates.REQUESTED),
                         status=get_user_message_choice(SubsidyRequestStates.REQUESTED),
+                    )
+
+                    # Trigger admin email notification with the latest request
+                    send_learner_credit_admins_email_with_new_requests_task.delay(
+                        str(policy.uuid),
+                        str(policy.learner_credit_request_config.uuid),
+                        str(lcr.enterprise_customer_uuid)
                     )
                 except LearnerCreditRequest.DoesNotExist:
                     logger.warning(f"LearnerCreditRequest {lcr_uuid} not found for action creation.")

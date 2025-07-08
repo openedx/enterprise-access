@@ -1765,7 +1765,9 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
             f"under policy UUID: {self.policy.uuid}."
         }
 
-    def test_create_success(self):
+    @mock.patch('enterprise_access.apps.subsidy_request.tasks.'
+                'send_learner_credit_admins_email_with_new_requests_task.delay')
+    def test_create_success(self, mock_send_email_task):
         """
         Test successful request creation.
         """
@@ -1788,6 +1790,13 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         assert request.enterprise_customer_uuid == self.enterprise_customer_uuid_1
         assert request.course_id == 'course-v1:edX+DemoX+Demo_Course'
         assert request.state == SubsidyRequestStates.REQUESTED
+
+        # Verify the email task was called with correct parameters
+        mock_send_email_task.assert_called_once_with(
+            str(self.policy.uuid),
+            str(self.learner_credit_config.uuid),
+            str(self.enterprise_customer_uuid_1)
+        )
         assert request.learner_credit_request_config == self.learner_credit_config
         assert request.course_price == 1000
         assert action is not None
