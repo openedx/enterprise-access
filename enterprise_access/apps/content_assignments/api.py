@@ -23,6 +23,7 @@ from enterprise_access.apps.content_assignments.tasks import (
 )
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.utils import (
     chunks,
     get_automatic_expiration_date_and_reason,
@@ -996,7 +997,16 @@ def expire_assignment(
         if automatic_expiration_reason == AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED:
             assignment.clear_pii()
 
+        credit_request = getattr(assignment, 'credit_request', None)
+
+        if credit_request:
+            logger.info('Modifying credit request %s to expired', credit_request.uuid)
+            credit_request.state = SubsidyRequestStates.EXPIRED
+            credit_request.save()
+
         assignment.save()
-        send_assignment_automatically_expired_email.delay(assignment.uuid)
+
+        if not credit_request:
+            send_assignment_automatically_expired_email.delay(assignment.uuid)
 
     return automatic_expiration_reason
