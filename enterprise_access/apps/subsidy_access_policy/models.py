@@ -1535,6 +1535,10 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
 
         # Validate whether learner has enough remaining balance (spend) for this policy.
         remaining_balance_per_user = self.remaining_balance_per_user(lms_user_id)
+
+        if self.bnr_enabled and remaining_balance_per_user == 0:
+            return True
+
         return (remaining_balance_per_user is not None) and remaining_balance_per_user > 0
 
     def remaining_balance_per_user(self, lms_user_id=None):
