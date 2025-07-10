@@ -144,3 +144,97 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
 
     customer_config.last_remind_date = datetime.now()
     customer_config.save()
+
+
+@shared_task(base=LoggedTaskWithRetry)
+def send_learner_credit_admins_email_with_new_requests_task(
+        policy_uuid, lc_request_config_uuid, enterprise_customer_uuid
+):
+    """
+    Task to send new learner credit request emails to admins.
+
+    This task can be manually triggered from browse_and_request when a new
+    LearnerCreditRequest is created. It will send the latest 6 requests in
+    REQUESTED state to enterprise admins.
+
+    Args:
+        policy_uuid (str): subsidy access policy uuid identifier
+        lc_request_config_uuid (str): learner credit request config uuid identifier
+        enterprise_customer_uuid (str): enterprise customer uuid identifier
+    Raises:
+        HTTPError if Braze client call fails with an HTTPError
+    """
+
+    # Get only the latest 10 LearnerCreditRequest objects in REQUESTED state for this customer
+    subsidy_model = apps.get_model('subsidy_request.LearnerCreditRequest')
+    subsidy_requests = subsidy_model.objects.filter(
+        enterprise_customer_uuid=enterprise_customer_uuid,
+        learner_credit_request_config__uuid=lc_request_config_uuid,
+        state=SubsidyRequestStates.REQUESTED,
+    ).order_by("-created")[:10]
+
+    if not subsidy_requests:
+        logger.info(
+            'No learner credit requests in REQUESTED state. Not sending new requests '
+            f'email to admins for enterprise {enterprise_customer_uuid}.'
+        )
+        return
+
+    lms_client = LmsApiClient()
+    enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
+    enterprise_slug = enterprise_customer_data.get('slug')
+
+    manage_requests_url = (f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}'
+                           f'/admin/learner-credit/{policy_uuid}/requests')
+
+    # Get admin users who should receive the emails
+    admin_users = enterprise_customer_data['admin_users']
+
+    if not admin_users:
+        logger.info(
+            f'No admin users found for enterprise {enterprise_customer_uuid}. '
+            'Not sending new requests email.'
+        )
+        return
+
+    # Create recipients list for Braze
+    braze_client = BrazeApiClient()
+    recipients = [
+        braze_client.create_recipient(
+            user_email=admin_user['email'],
+            lms_user_id=admin_user['lms_user_id']
+        )
+        for admin_user in admin_users
+    ]
+
+    # Prepare trigger properties for all requests in a single email
+    braze_trigger_properties = {
+        'manage_requests_url': manage_requests_url,
+        'requests': [],
+        'total_requests': len(subsidy_requests),
+    }
+
+    # Add each request to the trigger properties
+    for subsidy_request in subsidy_requests:
+        braze_trigger_properties['requests'].append({
+            'user_email': subsidy_request.user.email,
+            'course_title': subsidy_request.course_title,
+        })
+
+    logger.info(
+        f'Sending learner credit requests email to admins for enterprise {enterprise_customer_uuid}. '
+        f'This includes {len(subsidy_requests)} requests. '
+        f'Sending to: {admin_users}'
+    )
+
+    try:
+        braze_client.send_campaign_message(
+            settings.BRAZE_LC_NEW_REQUESTS_NOTIFICATION_CAMPAIGN,
+            recipients=recipients,
+            trigger_properties=braze_trigger_properties,
+        )
+    except Exception:
+        logger.exception(
+            f'Exception sending Braze campaign email for enterprise {enterprise_customer_uuid}.'
+        )
+        raise
