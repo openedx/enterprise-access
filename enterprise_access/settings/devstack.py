@@ -1,5 +1,7 @@
 from enterprise_access.settings.local import *
 
+ALLOWED_HOSTS = ['*']
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
