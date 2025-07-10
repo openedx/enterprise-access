@@ -10,7 +10,7 @@ amqp==5.3.1
     #   kombu
 analytics-python==1.4.post1
     # via -r requirements/validation.txt
-asgiref==3.8.1
+asgiref==3.9.0
     # via
     #   -r requirements/validation.txt
     #   django
@@ -122,13 +122,13 @@ coreschema==0.0.4
     # via
     #   -r requirements/validation.txt
     #   coreapi
-coverage[toml]==7.9.1
+coverage[toml]==7.9.2
     # via
     #   -r requirements/validation.txt
     #   pytest-cov
 crispy-bootstrap5==2025.6
     # via -r requirements/validation.txt
-cryptography==45.0.4
+cryptography==45.0.5
     # via
     #   -r requirements/validation.txt
     #   pyjwt
@@ -381,7 +381,7 @@ jinja2==3.1.6
     #   code-annotations
     #   coreschema
     #   diff-cover
-jsonfield==3.1.0
+jsonfield==3.2.0
     # via
     #   -r requirements/validation.txt
     #   edx-celeryutils
@@ -449,7 +449,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/validation.txt
     #   django-rest-swagger
-openedx-events==10.2.1
+openedx-events==10.3.0
     # via
     #   -r requirements/validation.txt
     #   edx-event-bus-kafka
@@ -639,7 +639,7 @@ rich==14.0.0
     # via
     #   -r requirements/validation.txt
     #   twine
-rpds-py==0.25.1
+rpds-py==0.26.0
     # via
     #   -r requirements/validation.txt
     #   jsonschema
@@ -692,7 +692,7 @@ stevedore==5.4.1
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
-stripe==12.2.0
+stripe==12.3.0
     # via -r requirements/validation.txt
 text-unidecode==1.3
     # via
@@ -706,7 +706,7 @@ tox==4.27.0
     # via -r requirements/validation.txt
 twine==6.1.0
     # via -r requirements/validation.txt
-typing-extensions==4.14.0
+typing-extensions==4.14.1
     # via
     #   -r requirements/validation.txt
     #   cattrs

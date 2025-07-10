@@ -8,7 +8,7 @@ amqp==5.3.1
     # via kombu
 analytics-python==1.4.post1
     # via -r requirements/base.in
-asgiref==3.8.1
+asgiref==3.9.0
     # via
     #   django
     #   django-cors-headers
@@ -68,7 +68,7 @@ coreschema==0.0.4
     # via coreapi
 crispy-bootstrap5==2025.6
     # via -r requirements/base.in
-cryptography==45.0.4
+cryptography==45.0.5
     # via
     #   pyjwt
     #   social-auth-core
@@ -231,7 +231,7 @@ jinja2==3.1.6
     # via
     #   code-annotations
     #   coreschema
-jsonfield==3.1.0
+jsonfield==3.2.0
     # via edx-celeryutils
 jsonfield2==4.0.0.post0
     # via -r requirements/base.in
@@ -253,7 +253,7 @@ oauthlib==3.3.1
     #   social-auth-core
 openapi-codec==1.3.2
     # via django-rest-swagger
-openedx-events==10.2.1
+openedx-events==10.3.0
     # via
     #   -r requirements/base.in
     #   edx-event-bus-kafka
@@ -322,7 +322,7 @@ requests==2.32.4
     #   stripe
 requests-oauthlib==2.0.0
     # via social-auth-core
-rpds-py==0.25.1
+rpds-py==0.26.0
     # via
     #   jsonschema
     #   referencing
@@ -353,11 +353,11 @@ stevedore==5.4.1
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
-stripe==12.2.0
+stripe==12.3.0
     # via -r requirements/base.in
 text-unidecode==1.3
     # via python-slugify
-typing-extensions==4.14.0
+typing-extensions==4.14.1
     # via
     #   cattrs
     #   django-countries
