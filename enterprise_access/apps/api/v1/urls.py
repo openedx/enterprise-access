@@ -39,6 +39,8 @@ if settings.ENABLE_CUSTOMER_BILLING_API:
 # BFFs
 router.register('bffs/learner', views.LearnerPortalBFFViewSet, 'learner-portal-bff')
 router.register('bffs/health', views.PingViewSet, 'bff-health')
+if settings.ENABLE_CUSTOMER_BILLING_API:
+    router.register('bffs/checkout', views.CheckoutBFFViewSet, 'checkout-bff')
 
 # Other endpoints
 urlpatterns = [
