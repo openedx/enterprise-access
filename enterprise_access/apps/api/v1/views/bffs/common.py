@@ -3,14 +3,13 @@ Base classes for BFF views.
 """
 import logging
 from collections import OrderedDict
-from datetime import datetime
 
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.viewsets import ViewSet
@@ -213,8 +212,8 @@ class BaseUnauthenticatedBFFViewSet(BaseBFFViewSetMixin, ViewSet):
     Uses BaseHandlerContext which doesn't store customer or user data.
     """
 
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [JwtAuthentication]
+    permission_classes = [IsAuthenticated | AllowAny]
     throttle_classes = [BFFAnonRateThrottle]
 
     def load_route_data_and_build_response(self, request, handler_class, response_builder_class):
