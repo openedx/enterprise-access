@@ -99,6 +99,41 @@ services:
       CELERY_BROKER_PASSWORD: password
       DJANGO_SETTINGS_MODULE: enterprise_access.settings.devstack
 
+  consume_enterprise_group_events:
+    image: edxops/enterprise-access-dev
+    container_name: enterprise_access.consume_enterprise_group_events
+    volumes:
+      - .:/edx/app/enterprise-access/
+      - ../src:/edx/src
+    command: >
+      bash -c '
+        make requirements &&
+        pip install edx-event-bus-kafka &&
+        pip install -e /edx/src/openedx-events &&
+        pip install "confluent-kafka[avro,schema-registry]" &&
+        while true; do python /edx/app/enterprise-access/manage.py consume_events -t enterprise-core -g enterprise_access_dev; sleep 2; done
+      '
+    ports:
+      - "18973:18973"
+    depends_on:
+      - mysql80
+      - memcache
+    networks:
+      - devstack_default
+    stdin_open: true
+    tty: true
+    environment:
+      CELERY_ALWAYS_EAGER: 'false'
+      CELERY_BROKER_TRANSPORT: redis
+      CELERY_BROKER_HOSTNAME: edx.devstack.redis:6379
+      CELERY_BROKER_VHOST: 0
+      CELERY_BROKER_PASSWORD: password
+      EVENT_BUS_KAFKA_SCHEMA_REGISTRY_URL: 'http://edx.devstack.schema-registry:8081'
+      EVENT_BUS_KAFKA_BOOTSTRAP_SERVERS: 'edx.devstack.kafka:29092'
+      EVENT_BUS_PRODUCER: 'edx_event_bus_kafka.create_producer'
+      EVENT_BUS_CONSUMER: 'edx_event_bus_kafka.KafkaEventConsumer'
+      EVENT_BUS_TOPIC_PREFIX: 'dev'
+
 networks:
   devstack_default:
     external: true
