@@ -365,3 +365,49 @@ class LearnerCreditRequestCancelSerializer(serializers.Serializer):
         Return the already-fetched learner credit request object.
         """
         return getattr(self, '_learner_credit_request', None)
+
+
+class LearnerCreditRequestRemindSerializer(serializers.Serializer):
+    """
+    Request serializer to validate remind endpoint for a LearnerCreditRequest.
+
+    For view: LearnerCreditRequestViewSet.remind
+    """
+    learner_credit_request_uuid = serializers.UUIDField(
+        required=True,
+        help_text="The UUID of the LearnerCreditRequest to be reminded."
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._learner_credit_request = None
+
+    def validate_learner_credit_request_uuid(self, value):
+        """
+        Validate that the learner credit request exists, has an associated assignment,
+        and is in a state where a reminder is appropriate.
+        """
+        try:
+            learner_credit_request = LearnerCreditRequest.objects.select_related('assignment').get(uuid=value)
+        except LearnerCreditRequest.DoesNotExist as exc:
+            raise serializers.ValidationError(f"Learner credit request with uuid {value} not found.") from exc
+
+        if learner_credit_request.state != SubsidyRequestStates.APPROVED:
+            raise serializers.ValidationError(
+                f"Cannot send a reminder for a request in the '{learner_credit_request.state}' state. "
+                "Reminders can only be sent for 'APPROVED' requests."
+            )
+
+        if not learner_credit_request.assignment:
+            raise serializers.ValidationError(
+                f"The learner credit request with uuid {value} does not have an associated assignment."
+            )
+
+        self._learner_credit_request = learner_credit_request
+        return value
+
+    def get_learner_credit_request(self):
+        """
+        Return the already-fetched learner credit request object.
+        """
+        return getattr(self, '_learner_credit_request', None)

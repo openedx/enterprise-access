@@ -971,6 +971,34 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
         fn=get_enterprise_uuid_from_request_data,
     )
+    @action(detail=False, url_path="remind", methods=["post"])
+    def remind(self, request, *args, **kwargs):
+        """
+        Remind a Learner that their LearnerCreditRequest is Approved and waiting for their action.
+        """
+        serializer = serializers.LearnerCreditRequestRemindSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        learner_credit_request = serializer.get_learner_credit_request()
+
+        assignment = learner_credit_request.assignment
+
+        try:
+            response = assignments_api.remind_assignments([assignment])
+            if response.get('non_remindable_assignments'):
+                error_msg = (
+                    f"The assignment {assignment.uuid} associated with request "
+                    f"{learner_credit_request.uuid} is not in a remindable state."
+                )
+                return Response({"detail": error_msg}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_200_OK)
+        except Exception:  # pylint: disable=broad-except
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
     @action(detail=False, url_path="decline", methods=["post"])
     def decline(self, *args, **kwargs):
         """
