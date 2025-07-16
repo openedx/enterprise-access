@@ -620,7 +620,8 @@ SSP_PRODUCTS = {
 
 # Enable the customer billing API endpoints under /api/v1/customer-billing/*
 ENABLE_CUSTOMER_BILLING_API = False
-STRIPE_API_KEY = None
+
+DEFAULT_SSP_PRICE_LOOKUP_KEY = 'subscription_licenses_yearly'
 
 # How long we consider Stripe prices valid for
 STRIPE_PRICE_DATA_CACHE_TIMEOUT = 300

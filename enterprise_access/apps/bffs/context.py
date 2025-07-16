@@ -48,6 +48,10 @@ class BaseHandlerContext:
         return self._request
 
     @property
+    def user(self):
+        return self._request.user
+
+    @property
     def status_code(self):
         return self._status_code
 
@@ -136,10 +140,6 @@ class HandlerContext(BaseHandlerContext):
 
         # Initialize common context data
         self._initialize_common_context_data()
-
-    @property
-    def user(self):
-        return self._request.user
 
     @property
     def enterprise_customer_uuid(self):
