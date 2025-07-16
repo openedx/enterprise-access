@@ -1,5 +1,5 @@
 """
-Serializers for the Checkout BFF endpoints.
+Serializers for the checkout bff.
 """
 from rest_framework import serializers
 
@@ -12,7 +12,7 @@ class EnterpriseCustomerSerializer(serializers.Serializer):
     customer_uuid = serializers.CharField()
     customer_name = serializers.CharField()
     customer_slug = serializers.CharField()
-    stripe_customer_id = serializers.CharField()
+    stripe_customer_id = serializers.CharField(required=False, allow_blank=True)
     is_self_service = serializers.BooleanField(default=False)
     admin_portal_url = serializers.CharField()
 
@@ -29,7 +29,11 @@ class PriceSerializer(serializers.Serializer):
     )
     currency = serializers.CharField(help_text="Currency code (e.g. 'usd')")
     unit_amount = serializers.IntegerField(help_text="Price amount in cents")
-    unit_amount_decimal = serializers.CharField(help_text="Price amount as decimal string")
+    unit_amount_decimal = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        help_text="Price amount as decimal",
+    )
 
 
 class PricingDataSerializer(serializers.Serializer):

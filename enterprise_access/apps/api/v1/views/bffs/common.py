@@ -217,12 +217,12 @@ class BaseUnauthenticatedBFFViewSet(BaseBFFViewSetMixin, ViewSet):
     permission_classes = []
     throttle_classes = [BFFAnonRateThrottle]
 
-    def load_route_data_and_build_response(self, request, handler_class, response_builder_class):
+    def load_route_data_and_build_response(self, request, handler_class, response_builder_class, context_class=None):
         """
         Handles the route and builds the response using BaseHandlerContext for unauthenticated requests.
         """
         return super().load_route_data_and_build_response(
-            request, handler_class, response_builder_class, BaseHandlerContext
+            request, handler_class, response_builder_class, context_class or BaseHandlerContext
         )
 
 

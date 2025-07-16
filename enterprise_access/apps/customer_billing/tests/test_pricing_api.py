@@ -77,6 +77,7 @@ class TestStripePricingAPI(TestCase):
         result = pricing_api.get_stripe_price_data('price_123')
 
         expected = {
+            'id': 'price_123',
             'unit_amount_decimal': Decimal(100.0),
             'unit_amount': 10000,
             'currency': 'usd',

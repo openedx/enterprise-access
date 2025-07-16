@@ -9,9 +9,11 @@ from rest_framework.decorators import action
 from rest_framework.permissions import OR, AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from enterprise_access.apps.api.serializers.checkout_bff import CheckoutContextResponseSerializer
 from enterprise_access.apps.api.v1.views.bffs.common import BaseUnauthenticatedBFFViewSet
-from enterprise_access.apps.bffs.context import BaseHandlerContext
+from enterprise_access.apps.bffs.checkout.context import CheckoutContext
+from enterprise_access.apps.bffs.checkout.handlers import CheckoutContextHandler
+from enterprise_access.apps.bffs.checkout.response_builder import CheckoutContextResponseBuilder
+from enterprise_access.apps.bffs.checkout.serializers import CheckoutContextResponseSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -57,28 +59,13 @@ class CheckoutBFFViewSet(BaseUnauthenticatedBFFViewSet):
         This includes pricing options for self-service subscription plans and,
         for authenticated users, information about associated enterprise customers.
         """
-        # We'll eventually replace this with proper handler loading
-        # For now, let's return a skeleton response
-        context_data = {
-            # TODO: user_id is just here for testing purposes related to self.get_permissions(),
-            # remove once this view actually utilizes request.user
-            "user_id": request.user.id if request.user.is_authenticated else None,
-            "existing_customers_for_authenticated_user": [],
-            "pricing": {
-                "default_by_lookup_key": "b2b_enterprise_self_service_yearly",
-                "prices": []
-            },
-            "field_constraints": {
-                "quantity": {"min": 5, "max": 30},
-                "enterprise_slug": {"min_length": 3, "max_length": 30, "pattern": "^[a-z0-9-]+$"}
-            }
-        }
+        # Import handlers here to avoid circular imports
 
-        # Eventually we'll use the BFF pattern to load and process data
-        # context_data, status_code = self.load_route_data_and_build_response(
-        #     request,
-        #     CheckoutContextHandler,
-        #     CheckoutContextResponseBuilder
-        # )
+        response_data, status_code = self.load_route_data_and_build_response(
+            request,
+            CheckoutContextHandler,
+            CheckoutContextResponseBuilder,
+            CheckoutContext,
+        )
 
-        return Response(context_data)
+        return Response(response_data, status=status_code)
