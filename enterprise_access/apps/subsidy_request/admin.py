@@ -210,6 +210,7 @@ class LearnerCreditRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
     autocomplete_fields = [
         'user',
         'assignment',
+        'reviewer',
     ]
 
     class Meta:
