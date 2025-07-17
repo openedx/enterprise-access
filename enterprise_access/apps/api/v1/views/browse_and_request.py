@@ -61,6 +61,7 @@ from enterprise_access.apps.subsidy_request.models import (
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
+from enterprise_access.apps.subsidy_request.tasks import send_learner_credit_bnr_request_approve_task
 from enterprise_access.apps.subsidy_request.utils import (
     get_action_choice,
     get_error_reason_choice,
@@ -885,7 +886,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
                 lc_request.assignment = learner_credit_request_assignment
                 lc_request.save()
                 lc_request.approve(request.user)
-            # todo: Add logic to send approval email to the learner.
+                send_learner_credit_bnr_request_approve_task.delay(learner_credit_request_assignment.uuid)
             response_data = serializers.LearnerCreditRequestSerializer(lc_request).data
             return Response(
                 response_data,
