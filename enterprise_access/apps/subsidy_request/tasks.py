@@ -271,21 +271,18 @@ def send_reminder_email_for_pending_learner_credit_request(assignment_uuid):
     """
     Send email via braze for reminding users of their pending learner credit request
     Args:
-        assignment_uuid: (string) the subsidy request uuid
+        assignment_uuid (str): The UUID of the LearnerContentAssignment associated with the LCR.
     """
     assignment = _get_assignment_or_raise(assignment_uuid)
 
-    campaign_sender = OriginalBrazeCampaignSender(assignment)
+    campaign_sender = BrazeCampaignSender(assignment)
     braze_trigger_properties = campaign_sender.get_properties(
         'contact_admin_link',
         'organization',
         'course_title',
-        'enrollment_deadline',
         'start_date',
         'course_partner',
         'course_card_image',
-        'learner_portal_link',
-        'action_required_by_timestamp'
     )
     campaign_uuid = settings.BRAZE_LEARNER_CREDIT_BNR_REMIND_NOTIFICATION_CAMPAIGN
     campaign_sender.send_campaign_message(
