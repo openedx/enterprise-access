@@ -207,6 +207,11 @@ class LearnerCreditRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
         'course_price',
     )
 
+    autocomplete_fields = [
+        'user',
+        'assignment',
+    ]
+
     class Meta:
         """
         Meta class for ``LearnerCreditRequestAdmin``.
