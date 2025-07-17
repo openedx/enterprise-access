@@ -149,6 +149,33 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
 
 
 @shared_task(base=LoggedTaskWithRetry)
+def send_learner_credit_bnr_request_approve_task(approved_assignment_uuid):
+    """
+    Send email via braze for approving bnr learner credit request.
+
+    Args:
+        approved_assignment_uuid: (string) the approved assignment uuid
+    """
+    assignment = _get_assignment_or_raise(approved_assignment_uuid)
+    campaign_sender = OriginalBrazeCampaignSender(assignment)
+
+    braze_trigger_properties = campaign_sender.get_properties(
+        'contact_admin_link',
+        'organization',
+        'course_title',
+        'start_date',
+        'course_partner',
+        'course_card_image'
+    )
+    campaign_uuid = settings.BRAZE_LEARNER_CREDIT_BNR_APPROVED_NOTIFICATION_CAMPAIGN
+    campaign_sender.send_campaign_message(
+        braze_trigger_properties,
+        campaign_uuid,
+    )
+    logger.info(f'Sent braze campaign approved uuid={campaign_uuid} message for assignment {assignment}')
+
+
+@shared_task(base=LoggedTaskWithRetry)
 def send_reminder_email_for_pending_learner_credit_request(assignment_uuid):
     """
     Send email via braze for reminding users of their pending learner credit request
@@ -169,7 +196,7 @@ def send_reminder_email_for_pending_learner_credit_request(assignment_uuid):
         'learner_portal_link',
         'action_required_by_timestamp'
     )
-    campaign_uuid = settings.BRAZE_LEARNER_CREDIT_REQUEST_REMINDER_NOTIFICATION_CAMPAIGN
+    campaign_uuid = settings.BRAZE_LEARNER_CREDIT_BNR_REMIND_NOTIFICATION_CAMPAIGN
     campaign_sender.send_campaign_message(
         braze_trigger_properties,
         campaign_uuid,
