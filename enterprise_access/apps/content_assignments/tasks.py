@@ -468,16 +468,9 @@ def send_reminder_email_for_pending_assignment(assignment_uuid):
         'learner_portal_link',
         'action_required_by_timestamp'
     )
-
-    # Determine which Braze campaign to use based on the assignment's context.
-    if getattr(assignment, 'credit_request', None):
-        # This assignment originated from a Learner Credit Request.
-        # TODO: Set the appropriate campaign_uuid for Learner Credit Request Reminder Email.
+    campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN
+    if assignment.lms_user_id is not None:
         campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_POST_LOGISTRATION_NOTIFICATION_CAMPAIGN
-    elif assignment.lms_user_id is not None:
-        campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_POST_LOGISTRATION_NOTIFICATION_CAMPAIGN
-    else:
-        campaign_uuid = settings.BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN
 
     campaign_sender.send_campaign_message(
         braze_trigger_properties,

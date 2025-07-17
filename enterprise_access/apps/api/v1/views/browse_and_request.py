@@ -49,6 +49,7 @@ from enterprise_access.apps.subsidy_access_policy.api import approve_learner_cre
 from enterprise_access.apps.subsidy_access_policy.exceptions import SubisidyAccessPolicyRequestApprovalError
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import (
+    LearnerCreditAdditionalActionStates,
     LearnerCreditRequestActionErrorReasons,
     SegmentEvents,
     SubsidyRequestStates,
@@ -61,6 +62,7 @@ from enterprise_access.apps.subsidy_request.models import (
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
+from enterprise_access.apps.subsidy_request.tasks import send_reminder_email_for_pending_learner_credit_request
 from enterprise_access.apps.subsidy_request.utils import (
     get_action_choice,
     get_error_reason_choice,
@@ -978,21 +980,23 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         """
         serializer = serializers.LearnerCreditRequestRemindSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         learner_credit_request = serializer.get_learner_credit_request()
-
         assignment = learner_credit_request.assignment
 
+        action_instance = LearnerCreditRequestActions.create_action(
+            learner_credit_request=learner_credit_request,
+            recent_action=get_action_choice(LearnerCreditAdditionalActionStates.REMINDED),
+            status=get_user_message_choice(LearnerCreditAdditionalActionStates.REMINDED),
+        )
+
         try:
-            response = assignments_api.remind_assignments([assignment])
-            if response.get('non_remindable_assignments'):
-                error_msg = (
-                    f"The assignment {assignment.uuid} associated with request "
-                    f"{learner_credit_request.uuid} is not in a remindable state."
-                )
-                return Response({"detail": error_msg}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            send_reminder_email_for_pending_learner_credit_request.delay(assignment.uuid)
             return Response(status=status.HTTP_200_OK)
-        except Exception:  # pylint: disable=broad-except
+        except Exception as exc:  # pylint: disable=broad-except
+            # Optionally log an errored action here if the task couldn't be queued
+            action_instance.status = get_user_message_choice(LearnerCreditRequestActionErrorReasons.EMAIL_ERROR)
+            action_instance.error_reason = str(exc)
+            action_instance.save()
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     @permission_required(

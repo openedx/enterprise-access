@@ -12,6 +12,8 @@ from django.conf import settings
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
+from enterprise_access.apps.content_assignments.tasks import BrazeCampaignSender as OriginalBrazeCampaignSender
+from enterprise_access.apps.content_assignments.tasks import _get_assignment_or_raise
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.tasks import LoggedTaskWithRetry
 from enterprise_access.utils import get_subsidy_model
@@ -144,3 +146,32 @@ def send_admins_email_with_new_requests_task(enterprise_customer_uuid):
 
     customer_config.last_remind_date = datetime.now()
     customer_config.save()
+
+
+@shared_task(base=LoggedTaskWithRetry)
+def send_reminder_email_for_pending_learner_credit_request(assignment_uuid):
+    """
+    Send email via braze for reminding users of their pending learner credit request
+    Args:
+        assignment_uuid: (string) the subsidy request uuid
+    """
+    assignment = _get_assignment_or_raise(assignment_uuid)
+
+    campaign_sender = OriginalBrazeCampaignSender(assignment)
+    braze_trigger_properties = campaign_sender.get_properties(
+        'contact_admin_link',
+        'organization',
+        'course_title',
+        'enrollment_deadline',
+        'start_date',
+        'course_partner',
+        'course_card_image',
+        'learner_portal_link',
+        'action_required_by_timestamp'
+    )
+    campaign_uuid = settings.BRAZE_LEARNER_CREDIT_REQUEST_REMINDER_NOTIFICATION_CAMPAIGN
+    campaign_sender.send_campaign_message(
+        braze_trigger_properties,
+        campaign_uuid,
+    )
+    logger.info(f'Sent braze campaign reminder uuid={campaign_uuid} message for assignment {assignment}')
