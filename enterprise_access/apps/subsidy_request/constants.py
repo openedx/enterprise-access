@@ -105,6 +105,7 @@ class LearnerCreditRequestActionErrorReasons:
     FAILED_CANCELLATION = 'failed_cancellation'
     FAILED_REDEMPTION = 'failed_redemption'
     FAILED_REVERSAL = 'failed_reversal'
+    EMAIL_ERROR = 'email_error'
 
     CHOICES = (
         (FAILED_APPROVAL, "Failed: Approval"),
@@ -112,6 +113,7 @@ class LearnerCreditRequestActionErrorReasons:
         (FAILED_CANCELLATION, "Failed: Cancellation"),
         (FAILED_REDEMPTION, "Failed: Redemption"),
         (FAILED_REVERSAL, "Failed: Reversal"),
+        (EMAIL_ERROR, 'Email error'),
     )
 
 
