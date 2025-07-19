@@ -57,6 +57,12 @@ LC_NON_RE_REQUESTABLE_STATES = [
     SubsidyRequestStates.ERROR,
 ]
 
+REUSABLE_REQUEST_STATES = [
+    SubsidyRequestStates.CANCELLED,
+    SubsidyRequestStates.EXPIRED,
+    SubsidyRequestStates.REVERSED,
+]
+
 
 class SubsidyTypeChoices:
     """ Type of subsidies. """

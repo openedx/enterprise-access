@@ -11,6 +11,8 @@ from django.conf import settings
 from rest_framework import status
 from rest_framework.reverse import reverse
 
+from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
 from enterprise_access.apps.content_assignments.tests.factories import (
     AssignmentConfigurationFactory,
     LearnerContentAssignmentFactory
@@ -1563,6 +1565,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
 
         # Setup test requests
         self.user_request_1 = LearnerCreditRequestFactory(
+            course_id='edx-demo',
             enterprise_customer_uuid=self.enterprise_customer_uuid_1,
             user=self.user,
             learner_credit_request_config=self.learner_credit_config,
@@ -1792,6 +1795,99 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         assert request.course_price == 1000
         assert action is not None
 
+    @ddt.data(
+        SubsidyRequestStates.CANCELLED,
+        SubsidyRequestStates.EXPIRED,
+        SubsidyRequestStates.REVERSED,
+    )
+    @mock.patch(BNR_VIEW_PATH + '.send_learner_credit_bnr_admins_email_with_new_requests_task.delay')
+    def test_create_reuse_existing_request_success(self, reusable_state, mock_email_task):
+        """
+        Test that an existing request in reusable states (CANCELLED, EXPIRED, REVERSED)
+        gets reused instead of creating a new one.
+        """
+        course_id = 'course-v1:edX+DemoX+Demo_Course'
+        original_price = 1000
+        new_price = 1500
+
+        # Create an existing assignment for the request
+        existing_assignment = LearnerContentAssignmentFactory(
+            assignment_configuration=self.assignment_config,
+            content_key=course_id,
+            learner_email=self.user.email,
+            lms_user_id=self.user.lms_user_id,
+            state='allocated',
+            content_quantity=-original_price
+        )
+
+        # Create an existing request in reusable state with assignment
+        existing_request = LearnerCreditRequestFactory(
+            user=self.user,
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            course_id=course_id,
+            course_price=original_price,
+            state=reusable_state,
+            learner_credit_request_config=self.learner_credit_config,
+            assignment=existing_assignment,
+            reviewer=self.user,  # Set reviewer to verify it gets cleared
+        )
+
+        # Set reviewed_at to verify it gets cleared
+        existing_request.reviewed_at = '2023-01-01T00:00:00Z'
+        existing_request.save()
+
+        payload = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'course_id': course_id,
+            'policy_uuid': self.policy.uuid,
+            'course_price': new_price
+        }
+
+        # Should have only one request before the API call
+        initial_count = LearnerCreditRequest.objects.filter(
+            user=self.user,
+            course_id=course_id,
+            learner_credit_request_config=self.learner_credit_config
+        ).count()
+        assert initial_count == 1
+
+        response = self.client.post(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, payload)
+
+        # Should return 200 OK for reuse instead of 201 CREATED
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data['uuid'] == str(existing_request.uuid)
+
+        # Should still have only one request (reused, not created new)
+        final_count = LearnerCreditRequest.objects.filter(
+            user=self.user,
+            course_id=course_id,
+            learner_credit_request_config=self.learner_credit_config
+        ).count()
+        assert final_count == 1
+
+        # Verify the existing request was properly reset
+        existing_request.refresh_from_db()
+        assert existing_request.state == SubsidyRequestStates.REQUESTED
+        assert existing_request.assignment is None  # Assignment should be cleared
+        assert existing_request.course_price == new_price  # Price should be updated
+        assert existing_request.reviewer is None  # Reviewer should be cleared
+        assert existing_request.reviewed_at is None  # Reviewed_at should be cleared
+
+        # Verify action was created for the reused request
+        action = LearnerCreditRequestActions.objects.filter(
+            learner_credit_request=existing_request,
+            recent_action=get_action_choice(SubsidyRequestStates.REQUESTED)
+        ).first()
+        assert action is not None
+        assert action.status == get_user_message_choice(SubsidyRequestStates.REQUESTED)
+
+        # Verify email notification task was called
+        mock_email_task.assert_called_once_with(
+            str(self.policy.uuid),
+            str(self.policy.learner_credit_request_config.uuid),
+            str(existing_request.enterprise_customer_uuid)
+        )
+
     def test_overview_happy_path(self):
         """
         Test the overview endpoint returns correct state counts.
@@ -2020,6 +2116,130 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         assert self.user_request_1.assignment.assignment_configuration == self.assignment_config
         assert self.user_request_1.assignment.state == 'allocated'
         assert self.user_request_1.assignment.learner_email == self.user_request_1.user.email
+        assert self.user_request_1.assignment.content_key == self.user_request_1.course_id
+
+        # Verify RequestAction was created
+        self.assertIsNotNone(
+            self.user_request_1.actions.get(
+                learner_credit_request=self.user_request_1,
+                recent_action=get_action_choice(SubsidyRequestStates.APPROVED),
+                status=get_user_message_choice(
+                    SubsidyRequestStates.APPROVED
+                ),
+            )
+        )
+
+    @ddt.data(
+        LearnerContentAssignmentStateChoices.CANCELLED,
+        LearnerContentAssignmentStateChoices.EXPIRED,
+        LearnerContentAssignmentStateChoices.REVERSED,
+    )
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    @mock.patch(
+        'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
+        return_value=mock.MagicMock(),
+    )
+    def test_approve_reallocate_assignment(
+        self,
+        reallocate_state,
+        mock_get_and_cache_content_metadata,
+        mock_catalog_contains,
+        mock_content_metadata,
+        mock_get_enterprise_uuid
+    ):
+        """
+        Test that an existing assignment in reusable states (CANCELLED, EXPIRED, REVERSED)
+        gets reallocated instead of creating a new one.
+        """
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+        mock_content_metadata.return_value = {
+            'content_key': self.user_request_1.course_id,
+            'content_price': self.user_request_1.course_price,
+        }
+        mock_catalog_contains.return_value = True
+
+        # Set up mock client and its methods
+        self.mock_subsidy_client.retrieve_subsidy.return_value = {
+            'uuid': str(uuid4()),
+            'title': 'Test Subsidy',
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'expiration_datetime': '2030-01-01 12:00:00Z',
+            'active_datetime': '2020-01-01 12:00:00Z',
+            'current_balance': 3000,
+            'is_active': True,
+        }
+
+        self.mock_subsidy_client.list_subsidy_transactions.return_value = {
+            'results': [],
+            'aggregates': {
+                'total_quantity': 0,
+            }
+        }
+
+        mock_get_and_cache_content_metadata.return_value = {
+            'content_title': 'Demo Course',
+            'content_key': self.user_request_1.course_id,
+            'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+        }
+
+        # set up a content assignment in REALLOCATE state
+        existing_assignment = LearnerContentAssignmentFactory(
+            learner_email=self.user_request_1.user.email,
+            lms_user_id=self.user_request_1.user.lms_user_id,
+            content_key=self.user_request_1.course_id,
+            assignment_configuration=self.assignment_config,
+            content_quantity=-998,
+            state=reallocate_state,
+        )
+
+        # Should have only one assignment before the API call
+        initial_count = LearnerContentAssignment.objects.filter(
+            learner_email=self.user_request_1.user.email,
+            lms_user_id=self.user_request_1.user.lms_user_id,
+            content_key=self.user_request_1.course_id,
+            assignment_configuration=self.assignment_config,
+        ).count()
+        assert initial_count == 1
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-approve')
+        data = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+        }
+        response = self.client.post(url, data)
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verify request was approved
+        self.user_request_1.refresh_from_db()
+        existing_assignment.refresh_from_db()
+        assert self.user_request_1.state == SubsidyRequestStates.APPROVED
+        assert self.user_request_1.reviewer == self.user
+
+        # Verify count
+        final_count = LearnerContentAssignment.objects.filter(
+            learner_email=self.user_request_1.user.email,
+            lms_user_id=self.user_request_1.user.lms_user_id,
+            content_key=self.user_request_1.course_id,
+            assignment_configuration=self.assignment_config,
+        ).count()
+        assert final_count == 1  # Should still be one assignment after reallocation
+
+        # Verify assignment was reallocated with correct fields
+        assert self.user_request_1.assignment is not None
+        assert self.user_request_1.assignment.uuid == existing_assignment.uuid
+        assert self.user_request_1.assignment.content_quantity == self.user_request_1.course_price * -1
+        assert self.user_request_1.assignment.assignment_configuration == self.assignment_config
+        assert self.user_request_1.assignment.state == LearnerContentAssignmentStateChoices.ALLOCATED
+        assert self.user_request_1.assignment.learner_email == self.user_request_1.user.email
+        assert self.user_request_1.assignment.lms_user_id == self.user_request_1.user.lms_user_id
         assert self.user_request_1.assignment.content_key == self.user_request_1.course_id
 
         # Verify RequestAction was created
