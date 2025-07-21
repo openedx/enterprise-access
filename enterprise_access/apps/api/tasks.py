@@ -116,8 +116,13 @@ def send_notification_email_for_request(
         enterprise_slug,
         subsidy_request.course_id
     )
+    enterprise_dashboard_url = '{}/{}'.format(
+        settings.ENTERPRISE_LEARNER_PORTAL_URL,
+        enterprise_slug
+    )
     braze_trigger_properties['course_about_page_url'] = course_about_page_url
     braze_trigger_properties['course_title'] = subsidy_request.course_title
+    braze_trigger_properties['enterprise_dashboard_url'] = enterprise_dashboard_url
 
     logger.info(f'Sending braze campaign message for subsidy request {subsidy_request}')
     braze_client_instance.send_campaign_message(

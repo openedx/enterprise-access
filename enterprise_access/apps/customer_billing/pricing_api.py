@@ -365,6 +365,7 @@ def _serialize_basic_format(stripe_price: stripe.Price) -> SerializedPriceData:
 
     # Start with the typed base structure
     base_data: SerializedPriceData = {
+        'id': stripe_price.id,
         'currency': currency,
         'unit_amount': unit_amount,
         'unit_amount_decimal': unit_amount_decimal,

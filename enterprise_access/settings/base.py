@@ -497,6 +497,8 @@ SUBSIDY_CLIENT_TIMEOUT = os.environ.get('SUBSIDY_CLIENT_TIMEOUT', 45)
 # Braze campaigns for learner credit browse and request(apps.subsidy_request)
 BRAZE_LEARNER_CREDIT_BNR_APPROVED_NOTIFICATION_CAMPAIGN = ''
 BRAZE_LEARNER_CREDIT_BNR_REMIND_NOTIFICATION_CAMPAIGN = ''
+BRAZE_LEARNER_CREDIT_BNR_DECLINE_NOTIFICATION_CAMPAIGN = ''
+BRAZE_LEARNER_CREDIT_BNR_CANCEL_NOTIFICATION_CAMPAIGN = ''
 BRAZE_LEARNER_CREDIT_BNR_NEW_REQUESTS_NOTIFICATION_CAMPAIGN = ''
 
 # Braze campaigns for browse and request (apps.subsidy_request)
@@ -625,7 +627,8 @@ SSP_PRODUCTS = {
 
 # Enable the customer billing API endpoints under /api/v1/customer-billing/*
 ENABLE_CUSTOMER_BILLING_API = False
-STRIPE_API_KEY = None
+
+DEFAULT_SSP_PRICE_LOOKUP_KEY = 'subscription_licenses_yearly'
 
 # How long we consider Stripe prices valid for
 STRIPE_PRICE_DATA_CACHE_TIMEOUT = 300

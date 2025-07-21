@@ -55,8 +55,6 @@ LC_NON_RE_REQUESTABLE_STATES = [
     SubsidyRequestStates.APPROVED,
     SubsidyRequestStates.ACCEPTED,
     SubsidyRequestStates.ERROR,
-    SubsidyRequestStates.CANCELLED,
-    SubsidyRequestStates.DECLINED,
 ]
 
 
