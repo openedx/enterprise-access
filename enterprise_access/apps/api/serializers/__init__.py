@@ -48,6 +48,7 @@ from .subsidy_requests import (
     LearnerCreditRequestApproveRequestSerializer,
     LearnerCreditRequestCancelSerializer,
     LearnerCreditRequestDeclineSerializer,
+    LearnerCreditRequestRemindSerializer,
     LearnerCreditRequestSerializer,
     LicenseRequestSerializer,
     SubsidyRequestCustomerConfigurationSerializer,
