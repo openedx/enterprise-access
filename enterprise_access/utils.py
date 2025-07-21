@@ -41,6 +41,8 @@ def get_subsidy_model(subsidy_type):
         subsidy_model = apps.get_model('subsidy_request.CouponCodeRequest')
     if subsidy_type == SubsidyTypeChoices.LICENSE:
         subsidy_model = apps.get_model('subsidy_request.LicenseRequest')
+    if subsidy_type == SubsidyTypeChoices.LEARNER_CREDIT:
+        subsidy_model = apps.get_model('subsidy_request.LearnerCreditRequest')
     return subsidy_model
 
 
