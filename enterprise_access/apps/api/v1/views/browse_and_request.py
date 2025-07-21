@@ -49,6 +49,7 @@ from enterprise_access.apps.subsidy_access_policy.api import approve_learner_cre
 from enterprise_access.apps.subsidy_access_policy.exceptions import SubisidyAccessPolicyRequestApprovalError
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import (
+    REUSABLE_REQUEST_STATES,
     LearnerCreditAdditionalActionStates,
     LearnerCreditRequestActionErrorReasons,
     SegmentEvents,
@@ -756,6 +757,25 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
 
     search_fields = ['user__email', 'course_title']
 
+    def _reuse_existing_request(self, request, course_price):
+        """
+        Reuse an existing learner credit request by resetting its state and attributes.
+        """
+        logger.info(
+            "Reusing existing learner credit request: %s for user: %s course: %s",
+            request.uuid,
+            request.user.lms_user_id,
+            request.course_id
+        )
+        request.state = SubsidyRequestStates.REQUESTED
+        request.assignment = None
+        request.course_price = course_price  # price may change by the time learner re-requests
+        request.reviewer = None
+        request.reviewed_at = None
+        request.decline_reason = None
+        request.save()  # this will handle updating course_title and partner info
+        return request
+
     def _validate_subsidy_request(self):
         """
         Validate request creation:
@@ -819,9 +839,49 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
             return Response({"detail": exc.message}, status=exc.http_status_code)
 
         policy = self.request.validated_policy
+        course_id = self.request.data.get("course_id")
+        course_price = self.request.data.get("course_price")
+
+        # Check if learner is re-requesting the same course under the same policy.
+        existing_request = LearnerCreditRequest.objects.filter(
+            user__lms_user_id=request.user.lms_user_id,
+            learner_credit_request_config=policy.learner_credit_request_config,
+            course_id=course_id,
+        ).first()
+
+        # If an existing request is found in CANCELLED, EXPIRED or REVERSED state we
+        # reuse it instead of creating a new one.
+        if existing_request and existing_request.state in REUSABLE_REQUEST_STATES:
+            try:
+                self._reuse_existing_request(existing_request, course_price)
+                LearnerCreditRequestActions.create_action(
+                    learner_credit_request=existing_request,
+                    recent_action=get_action_choice(SubsidyRequestStates.REQUESTED),
+                    status=get_user_message_choice(SubsidyRequestStates.REQUESTED),
+                )
+                # Trigger admin email notification with the latest request
+                send_learner_credit_bnr_admins_email_with_new_requests_task.delay(
+                    str(policy.uuid),
+                    str(policy.learner_credit_request_config.uuid),
+                    str(existing_request.enterprise_customer_uuid)
+                )
+                response_data = serializers.LearnerCreditRequestSerializer(existing_request).data
+                return Response(response_data, status=status.HTTP_200_OK)
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.exception(
+                    "Error reusing existing learner credit request: %s Reason: %s",
+                    existing_request.uuid,
+                    exc
+                )
+                return Response(
+                    {"detail": "Failed to submit a request. Please try again."},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+
+        # Create a new learner credit request
         request.data.update(
             {
-                "user": request.user.id,
+                "user": request.user.lms_user_id,
                 "enterprise_customer_uuid": str(policy.enterprise_customer_uuid),
                 "learner_credit_request_config": str(
                     policy.learner_credit_request_config.uuid

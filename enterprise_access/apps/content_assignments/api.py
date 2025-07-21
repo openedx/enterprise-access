@@ -444,7 +444,7 @@ def allocate_assignment_for_request(
     lms_user_id,
 ):
     """
-    Creates an allocated assignment record for the given ``content_key`` in the given ``assignment_configuration``,
+    Creates or reallocates an assignment record for the given ``content_key`` in the given ``assignment_configuration``,
       and the provided ``learner_email``.
 
     Params:
@@ -477,6 +477,31 @@ def allocate_assignment_for_request(
     # content_price_cents, and then persist that in the assignment records.
     content_quantity = content_price_cents * -1
     lms_user_ids_by_email = {learner_email.lower(): lms_user_id}
+    existing_assignments = _get_existing_assignments_for_allocation(
+        assignment_configuration,
+        [learner_email],
+        content_key,
+        lms_user_ids_by_email,
+    )
+
+    # Re-allocate existing assignment
+    if len(existing_assignments) > 0:
+        assignment = next(iter(existing_assignments), None)
+        if assignment and assignment.state in LearnerContentAssignmentStateChoices.REALLOCATE_STATES:
+            preferred_course_run_key = _get_preferred_course_run_key(assignment_configuration, content_key)
+            parent_content_key = _get_parent_content_key(assignment_configuration, content_key)
+            is_assigned_course_run = bool(parent_content_key)
+            _reallocate_assignment(
+                assignment,
+                content_quantity,
+                allocation_batch_id,
+                preferred_course_run_key,
+                parent_content_key,
+                is_assigned_course_run,
+            )
+            assignment.save()
+            return assignment
+
     assignment = _create_new_assignments(
         assignment_configuration,
         [learner_email],
