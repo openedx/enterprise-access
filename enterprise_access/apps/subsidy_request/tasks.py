@@ -187,7 +187,6 @@ def send_learner_credit_bnr_admins_email_with_new_requests_task(
 
     manage_requests_url = (f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}'
                            f'/admin/learner-credit/{policy_uuid}/requests')
-    print("manage_requests_url", manage_requests_url)
     admin_users = enterprise_customer_data['admin_users']
 
     if not admin_users:
@@ -210,9 +209,6 @@ def send_learner_credit_bnr_admins_email_with_new_requests_task(
         'requests': [],
         'total_requests': len(subsidy_requests),
     }
-    for subsidy_request in latest_subsidy_requests:
-        print("subsidy_request.user.email", subsidy_request.user.email)
-        print("subsidy_request.course_title", subsidy_request.course_title)
 
     for subsidy_request in latest_subsidy_requests:
         braze_trigger_properties['requests'].append({

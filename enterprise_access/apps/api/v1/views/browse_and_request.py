@@ -962,8 +962,14 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
 
                 learner_credit_request.cancel(self.user)
                 lc_action.save()
-
-                # TODO: add logic to send cancellation email
+            send_notification_email_for_request.delay(
+                str(learner_credit_request.uuid),
+                settings.BRAZE_LEARNER_CREDIT_BNR_CANCEL_NOTIFICATION_CAMPAIGN,
+                SubsidyTypeChoices.LEARNER_CREDIT,
+            )
+            logger.info(
+                f"Sent cancel notification email for learner credit request {learner_credit_request.uuid}"
+            )
 
             serialized_request = serializers.LearnerCreditRequestSerializer(learner_credit_request).data
             return Response(serialized_request, status=status.HTTP_200_OK)
@@ -1030,8 +1036,13 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         lms_user_id = serialized_request["lms_user_id"]
 
         if send_notification:
+            send_notification_email_for_request.delay(
+                learner_credit_request_uuid,
+                settings.BRAZE_LEARNER_CREDIT_BNR_DECLINE_NOTIFICATION_CAMPAIGN,
+                SubsidyTypeChoices.LEARNER_CREDIT,
+            )
             logger.info(
-                f"TODO: Send decline notification email for learner credit request {learner_credit_request_uuid}"
+                f"Sent decline notification email for learner credit request {learner_credit_request_uuid}"
             )
         if disassociate_from_org:
             try:
