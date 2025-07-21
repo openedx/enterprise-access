@@ -99,9 +99,9 @@ services:
       CELERY_BROKER_PASSWORD: password
       DJANGO_SETTINGS_MODULE: enterprise_access.settings.devstack
 
-  consume_enterprise_group_events:
+  consume_enterprise_groups_lifecycle:
     image: edxops/enterprise-access-dev
-    container_name: enterprise_access.consume_enterprise_group_events
+    container_name: enterprise_access.consume_enterprise_groups_lifecycle
     volumes:
       - .:/edx/app/enterprise-access/
       - ../src:/edx/src
@@ -111,10 +111,10 @@ services:
         pip install edx-event-bus-kafka &&
         pip install -e /edx/src/openedx-events &&
         pip install "confluent-kafka[avro,schema-registry]" &&
-        while true; do python /edx/app/enterprise-access/manage.py consume_events -t enterprise-core -g enterprise_access_dev; sleep 2; done
+        while true; do python /edx/app/enterprise-access/manage.py consume_events -t enterprise-groups-lifecycle -g enterprise_access_dev; sleep 2; done
       '
     ports:
-      - "18973:18973"
+      - "18273:18273"
     depends_on:
       - mysql80
       - memcache
