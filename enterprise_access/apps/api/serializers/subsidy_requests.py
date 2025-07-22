@@ -6,10 +6,7 @@ import logging
 from rest_framework import serializers
 
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
-from enterprise_access.apps.subsidy_request.constants import (
-    LearnerCreditRequestActionErrorReasons,
-    SubsidyRequestStates
-)
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
@@ -230,11 +227,8 @@ class LearnerCreditRequestActionsSerializer(serializers.ModelSerializer):
 
     def get_error_reason(self, obj):
         """
-        Get the display value for error_reason field.
+        Get the key value for error_reason field.
         """
-        if obj.error_reason:
-            choices_dict = dict(LearnerCreditRequestActionErrorReasons.CHOICES)
-            return choices_dict.get(obj.error_reason, obj.error_reason)
         return obj.error_reason
 
 

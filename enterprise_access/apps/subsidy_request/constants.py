@@ -92,14 +92,16 @@ class LearnerCreditRequestUserMessages:
     """
     CHOICES = (
         (SubsidyRequestStates.REQUESTED, "Requested"),
-        (LearnerCreditAdditionalActionStates.REMINDED, "Waiting For Learner"),
-        (SubsidyRequestStates.APPROVED, "Waiting For Learner"),
-        (SubsidyRequestStates.ACCEPTED, "Redeemed By Learner"),
+        (LearnerCreditAdditionalActionStates.REMINDED, "Reminded"),
+        (SubsidyRequestStates.APPROVED, "Approved"),
+        (SubsidyRequestStates.ACCEPTED, "Accepted"),
         (SubsidyRequestStates.DECLINED, "Declined"),
         (SubsidyRequestStates.REVERSED, "Refunded"),
         (SubsidyRequestStates.CANCELLED, "Cancelled"),
         (SubsidyRequestStates.EXPIRED, "Expired"),
     )
+
+
 
 
 class LearnerCreditRequestActionErrorReasons:
