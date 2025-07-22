@@ -42,7 +42,7 @@ celery==5.5.3
     #   -r requirements/base.txt
     #   django-celery-results
     #   edx-celeryutils
-certifi==2025.7.9
+certifi==2025.7.14
     # via
     #   -r requirements/base.txt
     #   requests
@@ -228,7 +228,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.6
+edx-enterprise-subsidy-client==2.0.10
     # via -r requirements/base.txt
 edx-event-bus-kafka==6.1.0
     # via -r requirements/base.txt
@@ -284,7 +284,7 @@ jsonfield==3.2.0
     #   edx-celeryutils
 jsonfield2==4.0.0.post0
     # via -r requirements/base.txt
-jsonschema==4.24.0
+jsonschema==4.25.0
     # via
     #   -r requirements/base.txt
     #   drf-spectacular
@@ -497,7 +497,7 @@ wcwidth==0.2.13
     # via
     #   -r requirements/base.txt
     #   prompt-toolkit
-zope-event==5.1
+zope-event==5.1.1
     # via gevent
 zope-interface==7.2
     # via gevent

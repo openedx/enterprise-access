@@ -51,7 +51,7 @@ celery==5.5.3
     #   -r requirements/test.txt
     #   django-celery-results
     #   edx-celeryutils
-certifi==2025.7.9
+certifi==2025.7.14
     # via
     #   -r requirements/test.txt
     #   requests
@@ -144,7 +144,7 @@ dill==0.4.0
     # via
     #   -r requirements/test.txt
     #   pylint
-distlib==0.3.9
+distlib==0.4.0
     # via
     #   -r requirements/test.txt
     #   virtualenv
@@ -280,7 +280,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.6
+edx-enterprise-subsidy-client==2.0.10
     # via -r requirements/test.txt
 edx-event-bus-kafka==6.1.0
     # via -r requirements/test.txt
@@ -307,7 +307,7 @@ edx-toggles==5.3.0
     #   edx-event-bus-kafka
 factory-boy==3.3.3
     # via -r requirements/test.txt
-faker==37.4.0
+faker==37.4.2
     # via
     #   -r requirements/test.txt
     #   factory-boy
@@ -368,7 +368,7 @@ jsonfield==3.2.0
     #   edx-celeryutils
 jsonfield2==4.0.0.post0
     # via -r requirements/test.txt
-jsonschema==4.24.0
+jsonschema==4.25.0
     # via
     #   -r requirements/test.txt
     #   drf-spectacular
@@ -404,7 +404,7 @@ more-itertools==10.7.0
     #   jaraco-functools
 mysqlclient==2.2.7
     # via -r requirements/test.txt
-nh3==0.2.21
+nh3==0.3.0
     # via readme-renderer
 oauthlib==3.3.1
     # via
@@ -639,7 +639,7 @@ tomlkit==0.13.3
     # via
     #   -r requirements/test.txt
     #   pylint
-tox==4.27.0
+tox==4.28.0
     # via -r requirements/test.txt
 twine==6.1.0
     # via -r requirements/quality.in
@@ -674,7 +674,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.31.2
+virtualenv==20.32.0
     # via
     #   -r requirements/test.txt
     #   tox
