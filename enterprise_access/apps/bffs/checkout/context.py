@@ -23,3 +23,20 @@ class CheckoutContext(BaseHandlerContext):
         self.existing_customers_for_authenticated_user = []
         self.pricing = {}
         self.field_constraints = {}
+
+
+class CheckoutValidationContext(BaseHandlerContext):
+    """
+    Context class for checkout validation BFF endpoint.
+    """
+
+    def __init__(self, request):
+        """
+        Initialize the checkout validaiton context with a request.
+
+        Args:
+            request: The HTTP request
+        """
+        super().__init__(request)
+        self.validation_decisions = {}
+        self.user_authn = {}

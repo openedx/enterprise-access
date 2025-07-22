@@ -56,7 +56,7 @@ class LmsApiClient(BaseOAuthClient):
     pending_enterprise_admin_endpoint = enterprise_api_v1_base_url + 'pending-enterprise-admin/'
     enterprise_flex_membership_endpoint = enterprise_api_v1_base_url + 'enterprise-group-membership/'
     enterprise_course_enrollment_admin_endpoint = enterprise_api_v1_base_url + 'enterprise-course-enrollment-admin/'
-    user_accounts_endpoint = '/api/user/v1/accounts'
+    user_accounts_endpoint = settings.LMS_URL + '/api/user/v1/accounts'
 
     def get_course_enrollments_for_learner_profile(self, enterprise_uuid, lms_user_id):
         """
@@ -152,7 +152,9 @@ class LmsApiClient(BaseOAuthClient):
             "enroll_learners_in_courses/",
         )
 
-    def get_enterprise_customer_data(self, enterprise_customer_uuid=None, enterprise_customer_slug=None):
+    def get_enterprise_customer_data(
+        self, enterprise_customer_uuid=None, enterprise_customer_slug=None, enterprise_customer_name=None,
+    ):
         """
         Gets the data for an EnterpriseCustomer for the given uuid or slug.
 
@@ -168,8 +170,10 @@ class LmsApiClient(BaseOAuthClient):
         elif enterprise_customer_slug:
             # Returns a list of dicts
             endpoint = f'{self.enterprise_customer_endpoint}?slug={enterprise_customer_slug}'
+        elif enterprise_customer_name:
+            endpoint = f'{self.enterprise_customer_endpoint}?name={enterprise_customer_name}'
         else:
-            raise ValueError('Either enterprise_customer_uuid or enterprise_customer_slug is required.')
+            raise ValueError('One of the customer uuid, slug, or name is required.')
 
         try:
             response = self.client.get(endpoint, timeout=settings.LMS_CLIENT_TIMEOUT)

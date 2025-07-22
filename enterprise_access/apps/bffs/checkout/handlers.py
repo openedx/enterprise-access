@@ -13,6 +13,7 @@ from enterprise_access.apps.bffs.api import (
     transform_enterprise_customer_users_data
 )
 from enterprise_access.apps.bffs.handlers import BaseHandler
+from enterprise_access.apps.customer_billing.api import validate_free_trial_checkout_session
 from enterprise_access.apps.customer_billing.pricing_api import get_ssp_product_pricing
 
 logger = logging.getLogger(__name__)
@@ -172,3 +173,61 @@ class CheckoutContextHandler(BaseHandler):
                 'pattern': '^[a-z0-9-]+$'
             }
         }
+
+
+class CheckoutValidationHandler(BaseHandler):
+    """
+    Handler for validating checkout form fields.
+    """
+    def __init__(self, context):
+        self.context = context
+        self.user = getattr(context.request, 'user', None)
+        self.authenticated_user = self.user if self.user.is_authenticated else None
+
+    def load_and_process(self):
+        """
+        Process the validation request.
+        """
+        request_data = self.context.request.data
+
+        # Check if admin_email is provided to check user existence
+        # We intentionally initialize this to None,
+        # which has the semantics of "we don't know if this user exists or not"
+        user_exists_for_email = None
+        if (admin_email := request_data.get('admin_email')):
+            user_exists_for_email = self._check_user_existence(admin_email)
+
+        validation_data = {k: v for k, v in request_data.items()}
+        validation_decisions = {}
+
+        # Only validate enterprise_slug if authenticated
+        if not self.authenticated_user and 'enterprise_slug' in request_data:
+            validation_decisions['enterprise_slug'] = {
+                'error_code': 'authentication_required',
+                'developer_message': 'Authentication required to validate enterprise slugs.'
+            }
+            validation_data.pop('enterprise_slug')
+
+        if validation_data:
+            validation_results = validate_free_trial_checkout_session(
+                user=self.authenticated_user,
+                **validation_data
+            )
+            validation_decisions.update(validation_results)
+
+        self.context.validation_decisions = validation_decisions
+        self.context.user_authn = {
+            'user_exists_for_email': user_exists_for_email
+        }
+
+    def _check_user_existence(self, email):
+        """
+        Check if a user exists for the given email.
+        """
+        try:
+            lms_client = LmsApiClient()
+            user_data = lms_client.get_lms_user_account(email=email)
+            return bool(user_data)
+        except Exception:  # pylint: disable=broad-except
+            # In case of error, we don't know if the user exists
+            return None

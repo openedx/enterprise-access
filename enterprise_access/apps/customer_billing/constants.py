@@ -17,6 +17,16 @@ CHECKOUT_SESSION_ERROR_CODES = {
             'The provided admin_email differs from an existing user making the request.'
         ),
     },
+    'full_name': {
+        'IS_NULL': ('is_null', 'The user object cannot be null'),
+    },
+    'company_name': {
+        'IS_NULL': ('is_null', 'Company name cannot be empty.'),
+        'EXISTING_ENTERPRISE_CUSTOMER': (
+            'existing_enterprise_customer',
+            'An enterprise customer with this name already exists.'
+        ),
+    },
     'enterprise_slug': {
         'INVALID_FORMAT': ('invalid_format', 'Invalid format for given slug.'),
         'EXISTING_ENTERPRISE_CUSTOMER': (

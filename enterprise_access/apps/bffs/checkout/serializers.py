@@ -84,3 +84,47 @@ class CheckoutContextResponseSerializer(serializers.Serializer):
     )
     pricing = PricingDataSerializer(help_text="Available pricing options")
     field_constraints = FieldConstraintsSerializer(help_text="Constraints for form fields")
+
+
+# BFF Validation Serializers #
+
+
+class ValidationDecisionSerializer(serializers.Serializer):
+    """
+    Serializer for individual validation decisions.
+    """
+    error_code = serializers.CharField(help_text="Error code for the validation failure")
+    developer_message = serializers.CharField(help_text="Technical message describing the validation failure")
+
+
+class CheckoutValidationRequestSerializer(serializers.Serializer):
+    """
+    Request serializer for the checkout validation endpoint.
+    """
+    full_name = serializers.CharField(required=False, allow_blank=True, help_text="User's full name")
+    admin_email = serializers.EmailField(required=False, allow_blank=True, help_text="User's work email")
+    company_name = serializers.CharField(required=False, allow_blank=True, help_text="Company name")
+    enterprise_slug = serializers.SlugField(required=False, allow_blank=True, help_text="Desired enterprise slug")
+    quantity = serializers.IntegerField(required=False, allow_null=True, help_text="Number of licenses")
+    stripe_price_id = serializers.CharField(required=False, allow_blank=True, help_text="Stripe price ID")
+
+
+class UserAuthInfoSerializer(serializers.Serializer):
+    """
+    Serializer for user authentication status info.
+    """
+    user_exists_for_email = serializers.BooleanField(
+        allow_null=True,
+        help_text="Whether a user exists for the provided email"
+    )
+
+
+class CheckoutValidationResponseSerializer(serializers.Serializer):
+    """
+    Response serializer for the checkout validation endpoint.
+    """
+    validation_decisions = serializers.DictField(
+        child=ValidationDecisionSerializer(allow_null=True),
+        help_text="Validation results for each field"
+    )
+    user_authn = UserAuthInfoSerializer(help_text="User authentication status information")
