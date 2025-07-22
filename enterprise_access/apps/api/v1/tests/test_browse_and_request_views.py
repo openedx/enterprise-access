@@ -50,6 +50,7 @@ from enterprise_access.apps.subsidy_request.models import (
 )
 from enterprise_access.apps.subsidy_request.tests.factories import (
     CouponCodeRequestFactory,
+    LearnerCreditRequestActionsFactory,
     LearnerCreditRequestConfigurationFactory,
     LearnerCreditRequestFactory,
     LicenseRequestFactory,
@@ -1705,6 +1706,165 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
             ).order_by('uuid')
         ])
         assert request_uuids == expected_uuids
+
+    @ddt.data(
+        # Test comma-separated states (critical path)
+        (f'{SubsidyRequestStates.REQUESTED},{SubsidyRequestStates.DECLINED},{SubsidyRequestStates.CANCELLED}',
+         [SubsidyRequestStates.REQUESTED, SubsidyRequestStates.DECLINED, SubsidyRequestStates.CANCELLED]),
+        # Test with spaces and trailing commas
+        (f', {SubsidyRequestStates.REQUESTED} , {SubsidyRequestStates.DECLINED} ,',
+         [SubsidyRequestStates.REQUESTED, SubsidyRequestStates.DECLINED]),
+        # Test error state (mapped from 'errored')
+        ('errored', ['error']),
+        # Test mixed comma and multiple params (ensure no conflicts)
+        (f'{SubsidyRequestStates.REQUESTED},{SubsidyRequestStates.DECLINED}',
+         [SubsidyRequestStates.REQUESTED, SubsidyRequestStates.DECLINED]),
+    )
+    @ddt.unpack
+    def test_state_filtering_no_conflicts(self, states, expected_states):
+        """
+        Test that state filtering works without backend conflicts.
+        This test ensures SubsidyRequestFilterBackend handles state filtering
+        and LearnerCreditRequestFilter doesn't interfere.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        # Create requests in various states including expected ones
+        created_requests = []
+        for state in expected_states:
+            request = LearnerCreditRequestFactory(
+                enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+                user=self.user,
+                state=state,
+                learner_credit_request_config=self.learner_credit_config
+            )
+            created_requests.append(request)
+
+        # Create some requests in other states (should not appear in results)
+        LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            user=self.user,
+            state=SubsidyRequestStates.PENDING,
+            learner_credit_request_config=self.learner_credit_config
+        )
+
+        query_params = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'state': states
+        }
+        response = self.client.get(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, query_params)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response_json = self.load_json(response.content)
+        returned_states = {result['state'] for result in response_json['results']}
+
+        # Verify only expected states are returned
+        self.assertEqual(returned_states, set(expected_states))
+
+        # Verify expected requests are returned
+        returned_uuids = {result['uuid'] for result in response_json['results']}
+        expected_uuids = {str(req.uuid) for req in created_requests}
+        self.assertTrue(expected_uuids.issubset(returned_uuids))
+
+    def test_nested_action_filtering_works(self):
+        """
+        Test that nested action filtering works via LearnerCreditRequestFilter.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        # Create request with approved action
+        request_with_approved = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            user=self.user,
+            learner_credit_request_config=self.learner_credit_config
+        )
+        LearnerCreditRequestActionsFactory(
+            learner_credit_request=request_with_approved,
+            status='approved'
+        )
+
+        # Create request with declined action
+        request_with_declined = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            user=self.user,
+            learner_credit_request_config=self.learner_credit_config
+        )
+        LearnerCreditRequestActionsFactory(
+            learner_credit_request=request_with_declined,
+            status='declined'
+        )
+
+        # Test filtering by action status
+        query_params = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'action_status': 'approved'
+        }
+        response = self.client.get(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, query_params)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response_json = self.load_json(response.content)
+
+        # Should only return request with approved action
+        returned_uuids = {result['uuid'] for result in response_json['results']}
+        self.assertIn(str(request_with_approved.uuid), returned_uuids)
+        self.assertNotIn(str(request_with_declined.uuid), returned_uuids)
+
+    def test_combined_state_and_nested_filtering(self):
+        """
+        Test that state filtering (SubsidyRequestFilterBackend) and nested filtering
+        (LearnerCreditRequestFilter) work together without conflicts.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        # Create requested request with approved action (should match both filters)
+        matching_request = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            user=self.user,
+            state=SubsidyRequestStates.REQUESTED,
+            learner_credit_request_config=self.learner_credit_config
+        )
+        LearnerCreditRequestActionsFactory(
+            learner_credit_request=matching_request,
+            status='approved'
+        )
+
+        # Create requested request with declined action (matches state, not action)
+        non_matching_request = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            user=self.user,
+            state=SubsidyRequestStates.REQUESTED,
+            learner_credit_request_config=self.learner_credit_config
+        )
+        LearnerCreditRequestActionsFactory(
+            learner_credit_request=non_matching_request,
+            status='declined'
+        )
+
+        # Test combined filtering
+        query_params = {
+            'enterprise_customer_uuid': self.enterprise_customer_uuid_1,
+            'state': SubsidyRequestStates.REQUESTED,
+            'action_status': 'approved'
+        }
+        response = self.client.get(LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT, query_params)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response_json = self.load_json(response.content)
+
+        # Should only return the matching request
+        returned_uuids = {result['uuid'] for result in response_json['results']}
+        self.assertEqual(len(returned_uuids), 1)
+        self.assertIn(str(matching_request.uuid), returned_uuids)
+        self.assertNotIn(str(non_matching_request.uuid), returned_uuids)
 
     def test_create_missing_policy_uuid(self):
         """

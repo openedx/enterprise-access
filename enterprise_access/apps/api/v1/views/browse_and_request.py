@@ -23,6 +23,8 @@ from enterprise_access.apps.api import serializers
 from enterprise_access.apps.api.constants import LICENSE_UNASSIGNED_STATUS
 from enterprise_access.apps.api.exceptions import SubsidyRequestCreationError, SubsidyRequestError
 from enterprise_access.apps.api.filters import (
+    LearnerCreditRequestFilter,
+    LearnerCreditRequestOrderingFilter,
     SubsidyRequestCustomerConfigurationFilterBackend,
     SubsidyRequestFilterBackend
 )
@@ -756,6 +758,30 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
     subsidy_type = SubsidyTypeChoices.LEARNER_CREDIT
 
     search_fields = ['user__email', 'course_title']
+
+    # Optimized filter backends with proper execution order
+    filter_backends = (
+        SubsidyRequestFilterBackend,         # 1. Security & state filtering first
+        DjangoFilterBackend,                 # 2. Nested & field filtering second
+        LearnerCreditRequestOrderingFilter,  # 3. Ordering third
+        filters.SearchFilter                 # 4. Search last
+    )
+
+    # Use enhanced filterset with mixin-based nested filtering
+    filterset_class = LearnerCreditRequestFilter
+
+    # Enhanced ordering fields including nested action fields
+    ordering_fields = [
+        'created',
+        'modified',
+        'course_title',
+        'user__email',
+        'state',
+        'latest_action__status',
+        'latest_action__recent_action',
+        'latest_action__created',
+        'latest_action__error_reason',
+    ]
 
     def _reuse_existing_request(self, request, course_price):
         """
