@@ -10,10 +10,17 @@ from rest_framework.permissions import OR, AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from enterprise_access.apps.api.v1.views.bffs.common import BaseUnauthenticatedBFFViewSet
-from enterprise_access.apps.bffs.checkout.context import CheckoutContext
-from enterprise_access.apps.bffs.checkout.handlers import CheckoutContextHandler
-from enterprise_access.apps.bffs.checkout.response_builder import CheckoutContextResponseBuilder
-from enterprise_access.apps.bffs.checkout.serializers import CheckoutContextResponseSerializer
+from enterprise_access.apps.bffs.checkout.context import CheckoutContext, CheckoutValidationContext
+from enterprise_access.apps.bffs.checkout.handlers import CheckoutContextHandler, CheckoutValidationHandler
+from enterprise_access.apps.bffs.checkout.response_builder import (
+    CheckoutContextResponseBuilder,
+    CheckoutValidationResponseBuilder
+)
+from enterprise_access.apps.bffs.checkout.serializers import (
+    CheckoutContextResponseSerializer,
+    CheckoutValidationRequestSerializer,
+    CheckoutValidationResponseSerializer
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,3 +76,27 @@ class CheckoutBFFViewSet(BaseUnauthenticatedBFFViewSet):
         )
 
         return Response(response_data, status=status_code)
+
+    @extend_schema(
+        operation_id="checkout_validate_fields",
+        summary="Validate checkout form fields",
+        description="Validates multiple checkout form fields and returns detailed validation results",
+        request=CheckoutValidationRequestSerializer,
+        responses={200: CheckoutValidationResponseSerializer},
+        tags=["Checkout BFF"],
+    )
+    @action(detail=False, methods=['post'], url_path='validation')
+    def validate(self, request):
+        """
+        Validate checkout form fields.
+
+        This endpoint supports both authenticated and unauthenticated requests,
+        but enterprise_slug validation requires authentication.
+        """
+        data, status_code = self.load_route_data_and_build_response(
+            request,
+            CheckoutValidationHandler,
+            CheckoutValidationResponseBuilder,
+            CheckoutValidationContext,
+        )
+        return Response(data, status=status_code)

@@ -28,6 +28,7 @@ class CheckoutSessionInputValidatorData(TypedDict, total=False):
     """
     user: User | None
     admin_email: str
+    full_name: str
     enterprise_slug: str
     quantity: int
     stripe_price_id: str
@@ -141,6 +142,7 @@ class CheckoutSessionInputValidator():
             return {'error_code': error_code, 'developer_message': developer_message}
 
         # Check if slug is available (considering user's own reservation)
+        # TODO: switch to CheckoutIntent model once implemented
         if not EnterpriseSlugReservation.is_slug_available(enterprise_slug, exclude_user=user):
             error_code, developer_message = slug_error_codes['SLUG_RESERVED']
             return {'error_code': error_code, 'developer_message': developer_message}
@@ -245,7 +247,7 @@ class CheckoutSessionInputValidator():
                 error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['user']['IS_NULL']
                 return {'error_code': error_code, 'developer_message': developer_message}
             else:
-                if lms_user_id.email.lower() != input_data.get('admin_email').lower():
+                if user_record.email.lower() != input_data.get('admin_email').lower():
                     error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['user']['ADMIN_EMAIL_MISMATCH']
                     return {'error_code': error_code, 'developer_message': developer_message}
                 else:
@@ -253,8 +255,56 @@ class CheckoutSessionInputValidator():
 
         return {'error_code': None, 'developer_message': None}
 
+    def handle_full_name(self, input_data: CheckoutSessionInputValidatorData) -> FieldValidationResult:
+        """
+        Validates the provided full name of the proposed admin user.
+        """
+        if not input_data['full_name']:
+            error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['full_name']['IS_NULL']
+            return {'error_code': error_code, 'developer_message': developer_message}
+        return {'error_code': None, 'developer_message': None}
+
+    def handle_company_name(self, input_data: CheckoutSessionInputValidatorData) -> FieldValidationResult:
+        """
+        Validates the company name to ensure it's not null/empty and doesn't conflict
+        with existing enterprise customers.
+
+        TODO: when we implement the CheckoutIntent model in the future, we'll
+        also want to check for any reserved customer names that match the provided company name.
+        """
+        company_name = input_data.get('company_name')
+
+        # Check if company_name is provided
+        if not company_name:
+            error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['company_name']['IS_NULL']
+            logger.info(f'company_name invalid. {developer_message}')
+            return {'error_code': error_code, 'developer_message': developer_message}
+
+        # Check for existing customers with the same name
+        lms_client = LmsApiClient()
+        try:
+            existing_customer = lms_client.get_enterprise_customer_data(
+                enterprise_customer_name=company_name,
+            )
+        except HTTPError as exc:
+            if exc.response.status_code == 404:
+                existing_customer = None
+            else:
+                # If we get an unexpected error, let's fail safely
+                error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['common']['API_ERROR']
+                logger.error(f'Error checking company name: {exc}')
+                return {'error_code': error_code, 'developer_message': developer_message}
+
+        if existing_customer:
+            error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['company_name']['EXISTING_ENTERPRISE_CUSTOMER']
+            return {'error_code': error_code, 'developer_message': developer_message}
+
+        return {'error_code': None, 'developer_message': None}
+
     validation_handlers = {
         'admin_email': handle_admin_email,
+        'full_name': handle_full_name,
+        'company_name': handle_company_name,
         'enterprise_slug': handle_enterprise_slug,
         'quantity': handle_quantity,
         'stripe_price_id': handle_stripe_price_id,

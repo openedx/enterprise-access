@@ -7,13 +7,16 @@ from unittest import mock
 
 import ddt
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 
-from enterprise_access.apps.bffs.checkout.context import CheckoutContext
-from enterprise_access.apps.bffs.checkout.handlers import CheckoutContextHandler
+from enterprise_access.apps.bffs.checkout.context import CheckoutContext, CheckoutValidationContext
+from enterprise_access.apps.bffs.checkout.handlers import CheckoutContextHandler, CheckoutValidationHandler
 from enterprise_access.apps.core.tests.factories import UserFactory
 from test_utils import APITest
+
+User = get_user_model()
 
 
 @ddt.ddt
@@ -214,3 +217,234 @@ class TestCheckoutContextHandler(APITest):
         # Error should be related to pricing
         error_messages = [error.get('developer_message', '') for error in context.errors]
         self.assertTrue(any('pricing' in msg.lower() for msg in error_messages))
+
+
+class TestCheckoutValidationHandler(APITest):
+    """
+    Tests for the CheckoutValidationHandler.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.request_factory = RequestFactory()
+        self.request = self.request_factory.post('/api/v1/bffs/checkout/validation')
+        self.request.user = self.user
+
+        # Create a context for testing
+        self.context = CheckoutValidationContext(self.request)
+
+        # Create an anonymous request/context for unauthenticated testing
+        self.anon_request = self.request_factory.post('/api/v1/bffs/checkout/validation')
+        self.anon_request.user = mock.MagicMock(is_authenticated=False)
+        self.anon_context = CheckoutValidationContext(self.anon_request)
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.validate_free_trial_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.LmsApiClient')
+    def test_load_and_process_authenticated(self, mock_lms_client_class, mock_validate):
+        """
+        Test load_and_process with an authenticated user.
+        """
+        # Setup mock responses
+        mock_validate.return_value = {}
+
+        # Setup request data
+        self.request.data = {
+            'admin_email': 'test@example.com',
+            'full_name': 'Test User',
+            'company_name': 'Test Company',
+            'enterprise_slug': 'test-slug',
+            'quantity': 10,
+            'stripe_price_id': 'price_123'
+        }
+
+        # Create and process handler
+        handler = CheckoutValidationHandler(self.context)
+        handler.load_and_process()
+
+        # Verify validate was called with all fields including enterprise_slug
+        mock_validate.assert_called_once_with(
+            user=self.user,
+            admin_email='test@example.com',
+            full_name='Test User',
+            company_name='Test Company',
+            enterprise_slug='test-slug',
+            quantity=10,
+            stripe_price_id='price_123'
+        )
+
+        # Check context was updated
+        self.assertEqual(self.context.validation_decisions, {})
+        self.assertIn('user_exists_for_email', self.context.user_authn)
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.validate_free_trial_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.LmsApiClient')
+    def test_load_and_process_unauthenticated(self, mock_lms_client_class, mock_validate):
+        """
+        Test load_and_process with an unauthenticated user.
+        """
+        # Setup mock responses
+        mock_validate.return_value = {}
+
+        # Setup request data
+        self.anon_request.data = {
+            'admin_email': 'test@example.com',
+            'full_name': 'Test User',
+            'company_name': 'Test Company',
+            'enterprise_slug': 'test-slug',  # This should be excluded for unauthenticated users
+            'quantity': 10,
+            'stripe_price_id': 'price_123'
+        }
+
+        # Create and process handler
+        handler = CheckoutValidationHandler(self.anon_context)
+        handler.load_and_process()
+
+        # Verify validate was called without enterprise_slug
+        mock_validate.assert_called_once_with(
+            user=None,
+            admin_email='test@example.com',
+            full_name='Test User',
+            company_name='Test Company',
+            quantity=10,
+            stripe_price_id='price_123'
+        )
+
+        # Check context was updated with authentication_required error for enterprise_slug
+        self.assertIn('enterprise_slug', self.anon_context.validation_decisions)
+        self.assertEqual(
+            self.anon_context.validation_decisions['enterprise_slug']['error_code'],
+            'authentication_required'
+        )
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.validate_free_trial_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.LmsApiClient')
+    def test_user_existence_check_success(self, mock_lms_client_class, mock_validate):
+        """
+        Test user existence check when user exists.
+        """
+        # Setup mock responses
+        mock_validate.return_value = {}
+        mock_lms_client = mock_lms_client_class.return_value
+        mock_lms_client.get_lms_user_account.return_value = [{'id': 123}]
+
+        # Setup request data
+        self.request.data = {
+            'admin_email': 'existing@example.com',
+        }
+
+        # Create and process handler
+        handler = CheckoutValidationHandler(self.context)
+        handler.load_and_process()
+
+        # Verify user existence check was made
+        mock_lms_client.get_lms_user_account.assert_called_once_with(email='existing@example.com')
+
+        # Check context was updated
+        self.assertTrue(self.context.user_authn['user_exists_for_email'])
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.validate_free_trial_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.LmsApiClient')
+    def test_user_existence_check_not_found(self, mock_lms_client_class, mock_validate):
+        """
+        Test user existence check when user doesn't exist.
+        """
+        # Setup mock responses
+        mock_validate.return_value = {}
+        mock_lms_client = mock_lms_client_class.return_value
+        mock_lms_client.get_lms_user_account.return_value = []  # Empty list means no user
+
+        # Setup request data
+        self.request.data = {
+            'admin_email': 'nonexistent@example.com',
+        }
+
+        # Create and process handler
+        handler = CheckoutValidationHandler(self.context)
+        handler.load_and_process()
+
+        # Verify user existence check was made
+        mock_lms_client.get_lms_user_account.assert_called_once_with(email='nonexistent@example.com')
+
+        # Check context was updated
+        self.assertFalse(self.context.user_authn['user_exists_for_email'])
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.validate_free_trial_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.LmsApiClient')
+    def test_user_existence_check_error(self, mock_lms_client_class, mock_validate):
+        """
+        Test user existence check when API call fails.
+        """
+        # Setup mock responses
+        mock_validate.return_value = {}
+        mock_lms_client = mock_lms_client_class.return_value
+        mock_lms_client.get_lms_user_account.side_effect = Exception('API Error')
+
+        # Setup request data
+        self.request.data = {
+            'admin_email': 'error@example.com',
+        }
+
+        # Create and process handler
+        handler = CheckoutValidationHandler(self.context)
+        handler.load_and_process()
+
+        # Verify user existence check was attempted
+        mock_lms_client.get_lms_user_account.assert_called_once_with(email='error@example.com')
+
+        # Check context was updated with None (we don't know if user exists)
+        self.assertIsNone(self.context.user_authn['user_exists_for_email'])
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.validate_free_trial_checkout_session')
+    def test_validation_errors_propagated(self, mock_validate):
+        """
+        Test that validation errors are correctly propagated to the context.
+        """
+        # Setup mock responses
+        mock_validate.return_value = {
+            'company_name': {
+                'error_code': 'existing_enterprise_customer',
+                'developer_message': 'An enterprise customer with this name already exists.'
+            },
+            'quantity': {
+                'error_code': 'range_exceeded',
+                'developer_message': 'Quantity 50 exceeds allowed range [5, 30]'
+            }
+        }
+
+        # Setup request data
+        self.request.data = {
+            'company_name': 'Existing Company',
+            'quantity': 50,
+        }
+
+        # Create and process handler
+        handler = CheckoutValidationHandler(self.context)
+        handler.load_and_process()
+
+        # Verify validation errors were passed to context
+        self.assertEqual(len(self.context.validation_decisions), 2)
+        self.assertEqual(
+            self.context.validation_decisions['company_name']['error_code'],
+            'existing_enterprise_customer'
+        )
+        self.assertEqual(
+            self.context.validation_decisions['quantity']['error_code'],
+            'range_exceeded'
+        )
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.validate_free_trial_checkout_session')
+    def test_no_admin_email(self, mock_validate):
+        """
+        Test handling when no admin_email is provided.
+        """
+        # Setup request data without admin_email
+        self.request.data = {
+            'full_name': 'Test User',
+        }
+
+        # Create and process handler
+        handler = CheckoutValidationHandler(self.context)
+        handler.load_and_process()
+
+        # Check that user_exists_for_email is None
+        self.assertIsNone(self.context.user_authn['user_exists_for_email'])
