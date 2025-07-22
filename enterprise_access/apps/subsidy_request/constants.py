@@ -92,8 +92,8 @@ class LearnerCreditRequestUserMessages:
     """
     CHOICES = (
         (SubsidyRequestStates.REQUESTED, "Requested"),
-        (LearnerCreditAdditionalActionStates.REMINDED, "Waiting For Learner"),
-        (SubsidyRequestStates.APPROVED, "Waiting For Learner"),
+        (LearnerCreditAdditionalActionStates.REMINDED, "Reminded"),
+        (SubsidyRequestStates.APPROVED, "Approved"),
         (SubsidyRequestStates.ACCEPTED, "Redeemed By Learner"),
         (SubsidyRequestStates.DECLINED, "Declined"),
         (SubsidyRequestStates.REVERSED, "Refunded"),
