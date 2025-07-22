@@ -23,6 +23,7 @@ from enterprise_access.apps.api import serializers
 from enterprise_access.apps.api.constants import LICENSE_UNASSIGNED_STATUS
 from enterprise_access.apps.api.exceptions import SubsidyRequestCreationError, SubsidyRequestError
 from enterprise_access.apps.api.filters import (
+    LearnerCreditRequestFilterSet,
     SubsidyRequestCustomerConfigurationFilterBackend,
     SubsidyRequestFilterBackend
 )
@@ -746,6 +747,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
 
     queryset = LearnerCreditRequest.objects.order_by("-created")
     serializer_class = serializers.LearnerCreditRequestSerializer
+    filterset_class = LearnerCreditRequestFilterSet
 
     subsidy_type = SubsidyTypeChoices.LEARNER_CREDIT
 
