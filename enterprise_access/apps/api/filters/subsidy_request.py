@@ -3,10 +3,12 @@ Filter backends for Enterprise Access API.
 """
 
 from django.db.models import Q
+from django_filters import rest_framework as drf_filters
 from edx_rbac import utils
 from rest_framework import filters
 
 from enterprise_access.apps.core import constants
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
 
 
 class SubsidyRequestFilterBackend(filters.BaseFilterBackend):
@@ -89,3 +91,15 @@ class SubsidyRequestCustomerConfigurationFilterBackend(filters.BaseFilterBackend
         return queryset.filter(
             Q(enterprise_customer_uuid__in=accessible_enterprises_as_admin.union(accessible_enterprises_as_learner))
         )
+
+
+class LearnerCreditRequestFilterSet(drf_filters.FilterSet):
+    """
+    Custom FilterSet for LearnerCreditRequest to allow filtering by policy_uuid.
+    """
+
+    policy_uuid = drf_filters.UUIDFilter(field_name='learner_credit_request_config__learner_credit_config__uuid')
+
+    class Meta:
+        model = LearnerCreditRequest
+        fields = ['uuid', 'user__email', 'course_id', 'enterprise_customer_uuid', 'policy_uuid']
