@@ -26,9 +26,7 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory
 )
 from enterprise_access.apps.subsidy_request.constants import (
-    LearnerCreditRequestActionChoices,
     LearnerCreditRequestActionErrorReasons,
-    LearnerCreditRequestUserMessages,
     SubsidyRequestStates
 )
 from enterprise_access.apps.subsidy_request.tests.factories import (
@@ -420,24 +418,12 @@ class TestLearnerCreditRequestSerializer(TestCase):
         # Verify the content of the latest action
         self.assertEqual(str(latest_action.uuid), latest_action_data["uuid"])
 
-        # Get the expected display values (what the serializer should return)
-        expected_recent_action = dict(LearnerCreditRequestActionChoices).get(
-            latest_action.recent_action, latest_action.recent_action
-        )
-        expected_status = dict(LearnerCreditRequestUserMessages.CHOICES).get(
-            latest_action.status, latest_action.status
-        )
-        expected_error_reason = dict(
-            LearnerCreditRequestActionErrorReasons.CHOICES
-        ).get(latest_action.error_reason, latest_action.error_reason)
-
-        # Compare with the display values returned by the serializer
         self.assertEqual(
-            expected_recent_action, latest_action_data["recent_action"]
+            latest_action.recent_action, latest_action_data["recent_action"]
         )
-        self.assertEqual(expected_status, latest_action_data["status"])
+        self.assertEqual(latest_action.status, latest_action_data["status"])
         self.assertEqual(
-            expected_error_reason, latest_action_data["error_reason"]
+            latest_action.error_reason, latest_action_data["error_reason"]
         )
 
     def test_no_actions(self):
