@@ -79,6 +79,7 @@ CORS_ORIGIN_WHITELIST = [
     'http://localhost:1991',  # frontend-app-admin-portal
     'http://localhost:8734',  # frontend-app-learner-portal-enterprise
     'http://localhost:18450',  # frontend-app-support-tools
+    'http://localhost:1989',  # frontend-app-enterprise-checkout
 ]
 # END CORS
 
@@ -87,6 +88,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:1991',  # frontend-app-admin-portal
     'http://localhost:8734',  # frontend-app-learner-portal-enterprise
     'http://localhost:18450',  # frontend-app-support-tools
+    'http://localhost:1989',  # frontend-app-enterprise-checkout
 ]
 # END CSRF CONFIG
 
