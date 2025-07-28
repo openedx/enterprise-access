@@ -751,13 +751,23 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
     Viewset for learner credit requests.
     """
 
-    queryset = LearnerCreditRequest.objects.order_by("-created")
     serializer_class = serializers.LearnerCreditRequestSerializer
     filterset_class = LearnerCreditRequestFilterSet
 
     subsidy_type = SubsidyTypeChoices.LEARNER_CREDIT
 
     search_fields = ['user__email', 'course_title']
+
+    def get_queryset(self):
+        """
+        Returns a queryset of LearnerCreditRequest objects with a guaranteed
+        default sort order: 'REQUESTED' items appear first, followed by all
+        others, with each group sorted by most recently created.
+        """
+        queryset = LearnerCreditRequest.objects.all()
+        queryset = LearnerCreditRequest.annotate_dynamic_fields_onto_queryset(queryset)
+
+        return queryset.order_by('request_state_sort_order', '-created')
 
     def _reuse_existing_request(self, request, course_price):
         """
