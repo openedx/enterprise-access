@@ -58,3 +58,16 @@ CHECKOUT_SESSION_ERROR_CODES = {
 # Stripe automatically sets the expires_at timestamp to 24 hours in the future."
 # We want the slug duration to last at least as long as the checkout session expiry.
 SLUG_RESERVATION_DURATION_MINUTES = 24 * 60
+INTENT_RESERVATION_DURATION_MINUTES = 24 * 60
+
+
+class CheckoutIntentState:
+    """
+    Namespace for CheckoutIntent state values
+    """
+    CREATED = 'created'
+    PAID = 'paid'
+    FULFILLED = 'fulfilled'
+    ERRORED_STRIPE_CHECKOUT = 'errored_stripe_checkout'
+    ERRORED_PROVISIONING = 'errored_provisioning'
+    EXPIRED = 'expired'
