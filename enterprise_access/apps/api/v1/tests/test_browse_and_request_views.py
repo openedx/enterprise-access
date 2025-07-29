@@ -2,6 +2,7 @@
 Tests for Enterprise Access Browse and Request app API v1 views.
 """
 import random
+import time
 from unittest import mock
 from unittest.mock import patch
 from uuid import uuid4
@@ -2885,3 +2886,237 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         ).first()
         assert error_action is not None
         assert error_action.traceback == expected_error
+
+    @ddt.data(
+        'latest_action_status',
+        '-latest_action_status',
+    )
+    def test_list_ordering_latest_action_status(self, ordering_key):
+        """
+        Test that the list view returns objects in the correct order when latest_action_status is the ordering key.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        # Create actions with different statuses
+        LearnerCreditRequestActions.create_action(
+            learner_credit_request=self.user_request_1,
+            recent_action=SubsidyRequestStates.APPROVED,
+            status=SubsidyRequestStates.APPROVED,
+        )
+        LearnerCreditRequestActions.create_action(
+            learner_credit_request=self.user_request_2,
+            recent_action=SubsidyRequestStates.REQUESTED,
+            status=SubsidyRequestStates.REQUESTED,
+        )
+
+        # Test ordering
+        response = self.client.get(
+            reverse('api:v1:learner-credit-requests-list'),
+            {'ordering': ordering_key}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.json()['results']
+
+        # Find test requests and verify ordering
+        first_learner_credit_request_result = next(
+            (r for r in results if r['uuid'] == str(self.user_request_1.uuid)), None
+        )
+        second_learner_credit_request_result = next(
+            (r for r in results if r['uuid'] == str(self.user_request_2.uuid)), None
+        )
+
+        self.assertIsNotNone(first_learner_credit_request_result)
+        self.assertIsNotNone(second_learner_credit_request_result)
+
+        first_learner_credit_request_position = results.index(first_learner_credit_request_result)
+        second_learner_credit_request_position = results.index(second_learner_credit_request_result)
+
+        if ordering_key == 'latest_action_status':
+            self.assertLess(first_learner_credit_request_position, second_learner_credit_request_position)
+        else:
+            self.assertGreater(first_learner_credit_request_position, second_learner_credit_request_position)
+
+    @ddt.data(
+        [SubsidyRequestStates.APPROVED, SubsidyRequestStates.REQUESTED],
+        [SubsidyRequestStates.APPROVED],
+    )
+    def test_latest_action_status_query_param_filter(self, statuses_to_query):
+        """
+        Test that the list view supports filtering by latest_action_status.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        # Create test actions
+        LearnerCreditRequestActions.create_action(
+            learner_credit_request=self.user_request_1,
+            recent_action=SubsidyRequestStates.APPROVED,
+            status=SubsidyRequestStates.APPROVED,
+        )
+        LearnerCreditRequestActions.create_action(
+            learner_credit_request=self.user_request_2,
+            recent_action=SubsidyRequestStates.REQUESTED,
+            status=SubsidyRequestStates.REQUESTED,
+        )
+
+        # Test filtering
+        response = self.client.get(
+            reverse('api:v1:learner-credit-requests-list'),
+            {'latest_action_status__in': ",".join(statuses_to_query)}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify filtered results
+        for result in response.json()['results']:
+            latest_action = result.get('latest_action')
+            if latest_action:
+                self.assertIn(latest_action['status'], statuses_to_query)
+
+    def test_latest_action_status_exact_filter(self):
+        """
+        Test that the list view supports exact filtering by latest_action_status.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        # Create test actions
+        LearnerCreditRequestActions.create_action(
+            learner_credit_request=self.user_request_1,
+            recent_action=SubsidyRequestStates.APPROVED,
+            status=SubsidyRequestStates.APPROVED,
+        )
+        LearnerCreditRequestActions.create_action(
+            learner_credit_request=self.user_request_2,
+            recent_action=SubsidyRequestStates.REQUESTED,
+            status=SubsidyRequestStates.REQUESTED,
+        )
+
+        # Test exact filtering
+        response = self.client.get(
+            reverse('api:v1:learner-credit-requests-list'),
+            {'latest_action_status': SubsidyRequestStates.APPROVED}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify only approved results
+        for result in response.json()['results']:
+            latest_action = result.get('latest_action')
+            if latest_action:
+                self.assertEqual(latest_action['status'], SubsidyRequestStates.APPROVED)
+
+    @ddt.data(
+        'latest_action_time',
+        '-latest_action_time',
+    )
+    def test_list_ordering_latest_action_time(self, ordering_key):
+        """
+        Test that the list view returns objects in the correct order when latest_action_time is the ordering key.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        # Create actions with time difference
+        LearnerCreditRequestActions.create_action(
+            learner_credit_request=self.user_request_1,
+            recent_action=SubsidyRequestStates.REQUESTED,
+            status=SubsidyRequestStates.REQUESTED,
+        )
+        time.sleep(0.001)
+        LearnerCreditRequestActions.create_action(
+            learner_credit_request=self.user_request_2,
+            recent_action=SubsidyRequestStates.APPROVED,
+            status=SubsidyRequestStates.APPROVED,
+        )
+
+        # Test ordering
+        response = self.client.get(
+            reverse('api:v1:learner-credit-requests-list'),
+            {'ordering': ordering_key}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.json()['results']
+
+        # Find test requests and verify ordering
+        first_learner_credit_request_result = next(
+            (r for r in results if r['uuid'] == str(self.user_request_1.uuid)), None
+        )
+        second_learner_credit_request_result = next(
+            (r for r in results if r['uuid'] == str(self.user_request_2.uuid)), None
+        )
+
+        self.assertIsNotNone(first_learner_credit_request_result)
+        self.assertIsNotNone(second_learner_credit_request_result)
+
+        first_learner_credit_request_position = results.index(first_learner_credit_request_result)
+        second_learner_credit_request_position = results.index(second_learner_credit_request_result)
+        if ordering_key == 'latest_action_time':
+            self.assertLess(first_learner_credit_request_position, second_learner_credit_request_position)
+        else:
+            self.assertGreater(first_learner_credit_request_position, second_learner_credit_request_position)
+
+    @ddt.data(
+        'latest_action_type',
+        '-latest_action_type',
+    )
+    def test_list_ordering_latest_action_type(self, ordering_key):
+        """
+        Test that the list view returns objects in the correct order when latest_action_type is the ordering key.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        LearnerCreditRequestActions.create_action(
+            learner_credit_request=self.user_request_1,
+            recent_action=SubsidyRequestStates.APPROVED,
+            status=SubsidyRequestStates.APPROVED,
+        )
+
+        LearnerCreditRequestActions.create_action(
+            learner_credit_request=self.user_request_2,
+            recent_action=SubsidyRequestStates.REQUESTED,
+            status=SubsidyRequestStates.REQUESTED,
+        )
+
+        query_params = {'ordering': ordering_key}
+        response = self.client.get(reverse('api:v1:learner-credit-requests-list'), data=query_params)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.json()['results']
+        self.assertGreaterEqual(len(results), 2)
+
+        # Find our test requests in results
+        first_learner_credit_request_result = next(
+            (r for r in results if r['uuid'] == str(self.user_request_1.uuid)), None
+        )
+        second_learner_credit_request_result = next(
+            (r for r in results if r['uuid'] == str(self.user_request_2.uuid)), None
+        )
+
+        self.assertIsNotNone(first_learner_credit_request_result, "Request 1 should be in results")
+        self.assertIsNotNone(second_learner_credit_request_result, "Request 2 should be in results")
+
+        # Get positions in results to verify ordering
+        first_learner_credit_request_position = results.index(first_learner_credit_request_result)
+        second_learner_credit_request_position = results.index(second_learner_credit_request_result)
+
+        if ordering_key == 'latest_action_type':
+            self.assertLess(first_learner_credit_request_position, second_learner_credit_request_position,
+                            "'approved' action type should sort before 'requested' in ascending order")
+        else:
+            self.assertGreater(first_learner_credit_request_position, second_learner_credit_request_position,
+                               "'approved' action type should sort after 'requested' in descending order")
