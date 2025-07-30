@@ -15,7 +15,7 @@ from requests.exceptions import HTTPError
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.customer_billing.constants import CHECKOUT_SESSION_ERROR_CODES
-from enterprise_access.apps.customer_billing.models import EnterpriseSlugReservation
+from enterprise_access.apps.customer_billing.models import CheckoutIntent
 
 User = get_user_model()
 stripe.api_key = settings.STRIPE_API_KEY
@@ -41,6 +41,7 @@ class CheckoutSessionInputData(TypedDict, total=True):
     user: User | None
     admin_email: str
     enterprise_slug: str
+    company_name: str
     quantity: int
     stripe_price_id: str
 
@@ -142,8 +143,7 @@ class CheckoutSessionInputValidator():
             return {'error_code': error_code, 'developer_message': developer_message}
 
         # Check if slug is available (considering user's own reservation)
-        # TODO: switch to CheckoutIntent model once implemented
-        if not EnterpriseSlugReservation.is_slug_available(enterprise_slug, exclude_user=user):
+        if not CheckoutIntent.can_reserve(slug=enterprise_slug, exclude_user=user):
             error_code, developer_message = slug_error_codes['SLUG_RESERVED']
             return {'error_code': error_code, 'developer_message': developer_message}
 
@@ -273,11 +273,17 @@ class CheckoutSessionInputValidator():
         also want to check for any reserved customer names that match the provided company name.
         """
         company_name = input_data.get('company_name')
+        user = input_data.get('user')
 
         # Check if company_name is provided
         if not company_name:
             error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['company_name']['IS_NULL']
             logger.info(f'company_name invalid. {developer_message}')
+            return {'error_code': error_code, 'developer_message': developer_message}
+
+        # Check if this name is already reserved
+        if not CheckoutIntent.can_reserve(name=company_name, exclude_user=user):
+            error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['company_name']['EXISTING_ENTERPRISE_CUSTOMER']
             return {'error_code': error_code, 'developer_message': developer_message}
 
         # Check for existing customers with the same name
@@ -347,24 +353,6 @@ class CreateCheckoutSessionValidationError(Exception):
         self.validation_errors_by_field = validation_errors_by_field
 
 
-def _try_reserve_slug(user, slug):
-    """
-    Helper to reserve the slug for the requesting user.
-    """
-    try:
-        return EnterpriseSlugReservation.reserve_slug(user=user, slug=slug)
-    except ValidationError as exc:
-        # Slug conflict during reservation attempt
-        raise CreateCheckoutSessionValidationError(
-            validation_errors_by_field={
-                'enterprise_slug': {
-                    'error_code': 'existing_enterprise_customer',
-                    'developer_message': str(exc)
-                }
-            },
-        ) from exc
-
-
 def create_free_trial_checkout_session(
     **input_data: Unpack[CheckoutSessionInputData],
 ) -> stripe.checkout.Session:
@@ -379,7 +367,24 @@ def create_free_trial_checkout_session(
         raise CreateCheckoutSessionValidationError(validation_errors_by_field=validation_errors)
 
     user = input_data['user']
-    reservation = _try_reserve_slug(user, input_data['enterprise_slug'])
+
+    # Create checkout intent instead of just reserving a slug
+    try:
+        intent = CheckoutIntent.create_intent(
+            user=user,
+            slug=input_data.get('enterprise_slug'),
+            name=input_data.get('company_name'),
+            quantity=input_data.get('quantity'),
+        )
+    except ValidationError as exc:
+        raise CreateCheckoutSessionValidationError(
+            validation_errors_by_field={
+                'enterprise_slug': {
+                    'error_code': 'checkout_intent_conflict',
+                    'developer_message': str(exc)
+                }
+            },
+        ) from exc
 
     lms_user_id = user.lms_user_id
     create_kwargs: stripe.checkout.Session.CreateParams = {
@@ -430,7 +435,7 @@ def create_free_trial_checkout_session(
     # Finally, call the stripe API endpoint to create a checkout session.
     checkout_session = stripe.checkout.Session.create(**create_kwargs)
 
-    reservation.update_stripe_session_id(checkout_session['id'])
-    logger.info(f'Updated reservation {reservation.id} with Stripe session {checkout_session["id"]}')
+    intent.update_stripe_session_id(checkout_session['id'])
+    logger.info(f'Updated checkout intent {intent.id} with Stripe session {checkout_session["id"]}')
 
     return checkout_session
