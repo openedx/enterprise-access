@@ -1,6 +1,7 @@
 """
 Constants for customer_billing app.
 """
+from enum import StrEnum
 
 CHECKOUT_SESSION_ERROR_CODES = {
     'common': {
@@ -61,7 +62,7 @@ SLUG_RESERVATION_DURATION_MINUTES = 24 * 60
 INTENT_RESERVATION_DURATION_MINUTES = 24 * 60
 
 
-class CheckoutIntentState:
+class CheckoutIntentState(StrEnum):
     """
     Namespace for CheckoutIntent state values
     """

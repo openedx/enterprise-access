@@ -6,6 +6,7 @@ from rest_framework import status
 
 from enterprise_access.apps.bffs.checkout.serializers import (
     CheckoutContextResponseSerializer,
+    CheckoutIntentModelSerializer,
     CheckoutValidationResponseSerializer
 )
 from enterprise_access.apps.bffs.response_builder import BaseResponseBuilder
@@ -22,22 +23,15 @@ class CheckoutContextResponseBuilder(BaseResponseBuilder):
         Build the response data from the context. This specifically does *not*
         call super().build().
         """
-        # Create the response structure
+        checkout_intent_data = None
+        if self.context.checkout_intent:
+            checkout_intent_data = CheckoutIntentModelSerializer(self.context.checkout_intent).data
+
         response_data = {
-            'existing_customers_for_authenticated_user':
-                getattr(self.context, 'existing_customers_for_authenticated_user', []),
-            'pricing': getattr(self.context, 'pricing', {
-                'default_by_lookup_key': settings.DEFAULT_SSP_PRICE_LOOKUP_KEY,
-                'prices': []
-            }),
-            'field_constraints': getattr(self.context, 'field_constraints', {
-                'quantity': {'min': 5, 'max': 30},
-                'enterprise_slug': {
-                    'min_length': 3,
-                    'max_length': 30,
-                    'pattern': '^[a-z0-9-]+$'
-                }
-            })
+            'existing_customers_for_authenticated_user': self.context.existing_customers_for_authenticated_user,
+            'pricing': self.context.pricing,
+            'field_constraints': self.context.field_constraints,
+            'checkout_intent': checkout_intent_data,
         }
 
         # Update the data with the serialized data

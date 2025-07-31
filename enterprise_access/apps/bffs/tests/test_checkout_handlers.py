@@ -218,6 +218,91 @@ class TestCheckoutContextHandler(APITest):
         error_messages = [error.get('developer_message', '') for error in context.errors]
         self.assertTrue(any('pricing' in msg.lower() for msg in error_messages))
 
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_ssp_product_pricing')
+    @mock.patch('enterprise_access.apps.customer_billing.models.CheckoutIntent.objects.filter')
+    def test_load_checkout_intent_for_authenticated_user(self, mock_filter, mock_get_pricing):
+        """
+        Test that load_and_process correctly adds checkout intent for authenticated users.
+        """
+        # Setup
+        mock_get_pricing.return_value = {}
+        mock_intent = mock.MagicMock()
+        mock_intent.state = 'created'
+        mock_intent.enterprise_name = 'Test Enterprise'
+        mock_intent.enterprise_slug = 'test-slug'
+        mock_intent.admin_portal_url = 'https://portal.edx.org/test-slug'
+        mock_filter.return_value.first.return_value = mock_intent
+
+        context = self._create_context()
+        handler = CheckoutContextHandler(context)
+
+        # Execute
+        handler.load_and_process()
+
+        # Assert
+        self.assertEqual(context.checkout_intent, mock_intent)
+        mock_filter.assert_called_once_with(user=self.user)
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_ssp_product_pricing')
+    @mock.patch('enterprise_access.apps.customer_billing.models.CheckoutIntent.objects.filter')
+    def test_load_checkout_intent_no_intent_exists(self, mock_filter, mock_get_pricing):
+        """
+        Test that load_and_process handles case where authenticated user has no checkout intent.
+        """
+        # Setup
+        mock_get_pricing.return_value = {}
+        mock_filter.return_value.first.return_value = None
+
+        context = self._create_context()
+        handler = CheckoutContextHandler(context)
+
+        # Execute
+        handler.load_and_process()
+
+        # Assert
+        self.assertIsNone(context.checkout_intent)
+        mock_filter.assert_called_once_with(user=self.user)
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_ssp_product_pricing')
+    @mock.patch('enterprise_access.apps.customer_billing.models.CheckoutIntent.objects.filter')
+    def test_load_checkout_intent_for_unauthenticated_user(self, mock_filter, mock_get_pricing):
+        """
+        Test that load_and_process doesn't look for checkout intent for unauthenticated users.
+        """
+        # Setup
+        mock_get_pricing.return_value = {}
+        context = self._create_context(user=AnonymousUser())
+        handler = CheckoutContextHandler(context)
+
+        # Execute
+        handler.load_and_process()
+
+        # Assert
+        self.assertIsNone(context.checkout_intent)
+        mock_filter.assert_not_called()
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_ssp_product_pricing')
+    @mock.patch('enterprise_access.apps.customer_billing.models.CheckoutIntent.objects.filter')
+    def test_load_checkout_intent_error_handling(self, mock_filter, mock_get_pricing):
+        """
+        Test that load_and_process handles exceptions when fetching checkout intent.
+        """
+        # Setup
+        mock_get_pricing.return_value = {}
+        mock_filter.side_effect = Exception("Database error")
+
+        context = self._create_context()
+        handler = CheckoutContextHandler(context)
+
+        # Execute
+        handler.load_and_process()
+
+        # Assert
+        self.assertIsNone(context.checkout_intent)
+        self.assertEqual(len(context.errors), 1)
+        error_messages = [error.get('developer_message', '') for error in context.errors]
+        self.assertTrue(any('database error' in msg.lower() for msg in error_messages))
+
 
 class TestCheckoutValidationHandler(APITest):
     """

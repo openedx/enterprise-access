@@ -1,12 +1,13 @@
 """
 Tests for Checkout BFF response builders.
 """
-
+from datetime import timedelta
 from decimal import Decimal
 from unittest import mock
 
 import ddt
 from django.test import RequestFactory
+from django.utils import timezone
 from rest_framework import status
 
 from enterprise_access.apps.bffs.checkout.context import CheckoutContext, CheckoutValidationContext
@@ -28,6 +29,18 @@ class TestCheckoutContextResponseBuilder(APITest):
         self.request_factory = RequestFactory()
         self.request = self.request_factory.post('/api/v1/bffs/checkout/context')
         self.request.user = self.user
+
+        self.mock_checkout_intent = mock.MagicMock()
+        self.mock_checkout_intent.id = 123
+        self.mock_checkout_intent.state = 'created'
+        self.mock_checkout_intent.enterprise_name = 'Test Enterprise'
+        self.mock_checkout_intent.enterprise_slug = 'test-enterprise'
+        self.mock_checkout_intent.expires_at = timezone.now() + timedelta(hours=24)
+        self.mock_checkout_intent.stripe_checkout_session_id = 'cs_test_123abc'
+        self.mock_checkout_intent.last_checkout_error = ''
+        self.mock_checkout_intent.last_provisioning_error = ''
+        self.mock_checkout_intent.workflow = None
+        self.mock_checkout_intent.admin_portal_url = 'https://portal.edx.org/test-enterprise'
 
     def _create_context(self):
         """
@@ -273,6 +286,132 @@ class TestCheckoutContextResponseBuilder(APITest):
         with self.assertRaises(Exception):
             # Should raise validation error due to incomplete data structure
             builder.serializer()
+
+    def test_build_complete_context_with_checkout_intent(self):
+        """
+        Test building a response with a complete context including checkout intent.
+        """
+        # Setup a complete context
+        context = self._create_context()
+        context.existing_customers_for_authenticated_user = [
+            {
+                'customer_uuid': '123',
+                'customer_name': 'Test Enterprise',
+                'customer_slug': 'test-enterprise',
+                'stripe_customer_id': 'cus_123',
+                'is_self_service': True,
+                'admin_portal_url': '/enterprise/test-enterprise/admin',
+            }
+        ]
+        context.pricing = {
+            'default_by_lookup_key': 'subscription_licenses_yearly',
+            'prices': [
+                {
+                    'id': 'price_123',
+                    'product': 'prod_123',
+                    'lookup_key': 'subscription_licenses_yearly',
+                    'recurring': {'interval': 'year', 'interval_count': 1},
+                    'currency': 'usd',
+                    'unit_amount': 10000,
+                    'unit_amount_decimal': Decimal('100.00'),
+                }
+            ]
+        }
+        context.field_constraints = {
+            'quantity': {'min': 5, 'max': 30},
+            'enterprise_slug': {
+                'min_length': 3,
+                'max_length': 30,
+                'pattern': '^[a-z0-9-]+$'
+            }
+        }
+        context.checkout_intent = self.mock_checkout_intent
+
+        # Create and build response
+        builder = CheckoutContextResponseBuilder(context)
+        builder.build()
+
+        # Serialize to get final output
+        data, status_code = builder.serialize()
+
+        # Assertions
+        self.assertEqual(status_code, status.HTTP_200_OK)
+
+        # Check that checkout_intent was included
+        self.assertIn('checkout_intent', data)
+        intent_data = data['checkout_intent']
+        self.assertEqual(intent_data['id'], 123)
+        self.assertEqual(intent_data['state'], 'created')
+        self.assertEqual(intent_data['enterprise_name'], 'Test Enterprise')
+        self.assertEqual(intent_data['enterprise_slug'], 'test-enterprise')
+        self.assertEqual(intent_data['stripe_checkout_session_id'], 'cs_test_123abc')
+        self.assertEqual(intent_data['admin_portal_url'], 'https://portal.edx.org/test-enterprise')
+
+    def test_build_context_with_no_checkout_intent(self):
+        """
+        Test building a response when user has no checkout intent.
+        """
+        # Setup context without a checkout intent
+        context = self._create_minimal_valid_context()
+        context.checkout_intent = None
+
+        # Create and build response
+        builder = CheckoutContextResponseBuilder(context)
+        builder.build()
+
+        # Serialize to get final output
+        data, status_code = builder.serialize()
+
+        # Assertions
+        self.assertEqual(status_code, status.HTTP_200_OK)
+        self.assertIn('checkout_intent', data)
+        self.assertIsNone(data['checkout_intent'])
+
+    def test_build_context_with_paid_checkout_intent(self):
+        """
+        Test building a response with a checkout intent in PAID state.
+        """
+        # Setup context with a PAID checkout intent
+        context = self._create_minimal_valid_context()
+        paid_intent = self.mock_checkout_intent
+        paid_intent.state = 'paid'
+        context.checkout_intent = paid_intent
+
+        # Create and build response
+        builder = CheckoutContextResponseBuilder(context)
+        builder.build()
+
+        # Serialize to get final output
+        data, status_code = builder.serialize()
+
+        # Assertions
+        self.assertEqual(status_code, status.HTTP_200_OK)
+        self.assertIn('checkout_intent', data)
+        self.assertEqual(data['checkout_intent']['state'], 'paid')
+
+    def test_build_context_with_error_checkout_intent(self):
+        """
+        Test building a response with a checkout intent in error state.
+        """
+        # Setup context with a checkout intent that has errors
+        context = self._create_minimal_valid_context()
+        error_intent = self.mock_checkout_intent
+        error_intent.state = 'errored_stripe_checkout'
+        error_intent.last_checkout_error = 'Payment processing failed'
+        context.checkout_intent = error_intent
+
+        # Create and build response
+        builder = CheckoutContextResponseBuilder(context)
+        builder.build()
+
+        # Serialize to get final output
+        data, status_code = builder.serialize()
+
+        # Assertions
+        self.assertEqual(status_code, status.HTTP_200_OK)
+        self.assertIn('checkout_intent', data)
+        self.assertEqual(data['checkout_intent']['state'], 'errored_stripe_checkout')
+        self.assertEqual(data['checkout_intent']['last_checkout_error'], 'Payment processing failed')
 
 
 @ddt.ddt
