@@ -14,6 +14,7 @@ from enterprise_access.apps.api.v1.views.bffs.checkout import CheckoutBFFViewSet
 from enterprise_access.apps.bffs.checkout.response_builder import CheckoutValidationResponseBuilder
 from enterprise_access.apps.bffs.checkout.serializers import (
     CheckoutContextResponseSerializer,
+    CheckoutIntentMinimalResponseSerializer,
     EnterpriseCustomerSerializer,
     PriceSerializer
 )
@@ -30,6 +31,20 @@ class CheckoutBFFViewSetTests(APITest):
         super().setUp()
         self.url = reverse('api:v1:checkout-bff-context')
 
+        # Create a mock checkout intent we can use in tests
+        self.mock_checkout_intent_data = {
+            'id': 123,
+            'state': 'created',
+            'enterprise_name': 'Test Enterprise',
+            'enterprise_slug': 'test-enterprise',
+            'stripe_checkout_session_id': 'cs_test_123abc',
+            'last_checkout_error': '',
+            'last_provisioning_error': '',
+            'workflow_id': None,
+            'expires_at': '2025-08-02T13:52:11Z',
+            'admin_portal_url': 'https://portal.edx.org/test-enterprise'
+        }
+
     def test_context_endpoint_unauthenticated_access(self):
         """
         Test that unauthenticated users can access the context endpoint.
@@ -44,11 +59,20 @@ class CheckoutBFFViewSetTests(APITest):
 
         # For unauthenticated users, existing_customers should be empty
         self.assertEqual(len(response.data['existing_customers_for_authenticated_user']), 0)
+        # For unauthenticated users, checkout_intent should be None
+        self.assertIsNone(response.data['checkout_intent'])
 
-    def test_context_endpoint_authenticated_access(self):
+    @mock.patch('enterprise_access.apps.customer_billing.models.CheckoutIntent.objects.filter')
+    def test_context_endpoint_authenticated_access(self, mock_filter):
         """
         Test that authenticated users can access the context endpoint.
         """
+        # Set up a mock checkout intent for the authenticated user
+        mock_intent = mock.MagicMock()
+        for key, value in self.mock_checkout_intent_data.items():
+            setattr(mock_intent, key, value)
+        mock_filter.return_value.first.return_value = mock_intent
+
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
             'context': str(uuid.uuid4()),
@@ -61,6 +85,11 @@ class CheckoutBFFViewSetTests(APITest):
         self.assertIn('existing_customers_for_authenticated_user', response.data)
         self.assertIn('pricing', response.data)
         self.assertIn('field_constraints', response.data)
+
+        # Verify checkout intent data is included
+        self.assertIsNotNone(response.data['checkout_intent'])
+        self.assertEqual(response.data['checkout_intent']['state'], 'created')
+        self.assertEqual(response.data['checkout_intent']['enterprise_name'], 'Test Enterprise')
 
     def test_response_serializer_validation(self):
         """
@@ -85,6 +114,73 @@ class CheckoutBFFViewSetTests(APITest):
 
         # Validate using our serializer
         serializer = CheckoutContextResponseSerializer(data=sample_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_response_serializer_validation_with_intent(self):
+        """
+        Test that our response serializer validates response structure with checkout intent.
+        """
+        # Create sample data matching our expected response structure
+        sample_data = {
+            'existing_customers_for_authenticated_user': [],
+            'pricing': {
+                'default_by_lookup_key': 'b2b_enterprise_self_service_yearly',
+                'prices': []
+            },
+            'field_constraints': {
+                'quantity': {'min': 5, 'max': 30},
+                'enterprise_slug': {
+                    'min_length': 3,
+                    'max_length': 30,
+                    'pattern': '^[a-z0-9-]+$'
+                }
+            },
+            'checkout_intent': self.mock_checkout_intent_data
+        }
+
+        # Validate using our serializer
+        serializer = CheckoutContextResponseSerializer(data=sample_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_response_serializer_validation_null_intent(self):
+        """
+        Test that our response serializer validates when checkout intent is null.
+        """
+        sample_data = {
+            'existing_customers_for_authenticated_user': [],
+            'pricing': {
+                'default_by_lookup_key': 'b2b_enterprise_self_service_yearly',
+                'prices': []
+            },
+            'field_constraints': {
+                'quantity': {'min': 5, 'max': 30},
+                'enterprise_slug': {
+                    'min_length': 3,
+                    'max_length': 30,
+                    'pattern': '^[a-z0-9-]+$'
+                }
+            },
+            'checkout_intent': None
+        }
+
+        serializer = CheckoutContextResponseSerializer(data=sample_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_checkout_intent_minimal_serializer(self):
+        """
+        Test that CheckoutIntentMinimalResponseSerializer correctly validates data.
+        """
+        sample_data = {
+            'id': 123,
+            'state': 'paid',
+            'enterprise_name': 'Test Enterprise',
+            'enterprise_slug': 'test-enterprise',
+            'stripe_checkout_session_id': 'cs_test_123abc',
+            'expires_at': '2025-08-02T13:52:11Z',
+            'admin_portal_url': 'https://portal.edx.org/test-enterprise'
+        }
+
+        serializer = CheckoutIntentMinimalResponseSerializer(data=sample_data)
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
     def test_enterprise_customer_serializer(self):
