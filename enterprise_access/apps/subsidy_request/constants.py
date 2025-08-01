@@ -123,6 +123,30 @@ class LearnerCreditRequestActionErrorReasons:
     )
 
 
+class LearnerCreditRequestLifecycleStates:
+    """
+    States for dynamic field: request.request_lifecycle_state.
+    """
+    FAILED = 'failed'
+    PROCESSING = 'processing'
+    APPROVED = 'approved'
+    REMINDED = 'reminded'
+    COMPLETED = 'completed'
+    DECLINED = 'declined'
+    CANCELLED = 'cancelled'
+    EXPIRED = 'expired'
+    SORT_ORDER = (
+        FAILED,
+        PROCESSING,
+        APPROVED,
+        REMINDED,
+        EXPIRED,
+        DECLINED,
+        CANCELLED,
+        COMPLETED,
+    )
+
+
 # Segment events
 
 

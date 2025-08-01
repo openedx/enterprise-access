@@ -2885,3 +2885,54 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         ).first()
         assert error_action is not None
         assert error_action.traceback == expected_error
+
+    @ddt.data(
+        'latest_action_time',
+        '-latest_action_time',
+    )
+    def test_list_ordering_latest_action_time(self, ordering_key):
+        """
+        Test that the list view returns objects in the correct order when latest_action_time is the ordering key.
+        Following the same lean pattern as content assignment's test_list_ordering_recent_action_time.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        query_params = {'ordering': ordering_key}
+        response = self.client.get(reverse('api:v1:learner-credit-requests-list'), data=query_params)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.json()['results']
+        self.assertGreaterEqual(len(results), 2)  # Should have our test requests
+
+    @ddt.data(
+        'lifecycle_state_sort_order',
+        '-lifecycle_state_sort_order',
+    )
+    def test_list_ordering_lifecycle_state_sort_order(self, ordering_key):
+        """
+        Test that the list view returns objects in the correct order when lifecycle_state_sort_order is the
+        ordering key. Following the same lean pattern as content assignment's
+        test_list_ordering_learner_state_sort_order.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        # Add error action to create different lifecycle states
+        LearnerCreditRequestActions.create_action(
+            learner_credit_request=self.user_request_2,
+            recent_action=SubsidyRequestStates.ERROR,
+            status=SubsidyRequestStates.REQUESTED,  # Use valid status choice
+            error_reason=LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL,
+        )
+
+        query_params = {'ordering': ordering_key}
+        response = self.client.get(reverse('api:v1:learner-credit-requests-list'), data=query_params)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.json()['results']
+        self.assertGreaterEqual(len(results), 2)  # Should have our test requests

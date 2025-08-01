@@ -4,11 +4,16 @@
 # pylint: skip-file
 
 import collections
+from datetime import datetime
 from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Case, Exists, F, Max, OuterRef, Q, Value, When
+from django.db.models.fields import CharField, DateTimeField, IntegerField
+from django.db.models.functions import Cast, Coalesce
+from django.db.models.lookups import GreaterThan
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from jsonfield.encoder import JSONEncoder
@@ -19,8 +24,10 @@ from simple_history.utils import bulk_update_with_history
 
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
+    LearnerCreditAdditionalActionStates,
     LearnerCreditRequestActionChoices,
     LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestLifecycleStates,
     LearnerCreditRequestUserMessages,
     SubsidyRequestStates,
     SubsidyTypeChoices
@@ -378,6 +385,170 @@ class LearnerCreditRequest(SubsidyRequest):
         self.state = SubsidyRequestStates.APPROVED
         self.reviewed_at = localized_utcnow()
         self.save()
+
+    @classmethod
+    def annotate_dynamic_fields_onto_queryset(cls, queryset):
+        """
+        Annotate extra dynamic fields used by this viewset for DRF-supported ordering and filtering.
+
+        Fields added:
+        * latest_action_type (CharField) - Most recent action type
+        * latest_action_time (DateTimeField) - Most recent action timestamp
+        * latest_action_status (CharField) - Most recent action status
+        * latest_action_error_reason (CharField) - Most recent action error
+        * request_lifecycle_state (CharField) - Derived request lifecycle state
+        * lifecycle_state_sort_order (IntegerField) - Sort order for lifecycle states
+
+        Notes:
+        * This method uses the same complex ORM annotation pattern as content assignments.
+
+        Args:
+            queryset (QuerySet): LearnerCreditRequest queryset, vanilla.
+
+        Returns:
+            QuerySet: LearnerCreditRequest queryset, same objects but with extra fields annotated.
+        """
+        # Annotate a derived field ``latest_action_time`` using pure ORM so that we can order_by() it later.
+        # ``latest_action_time`` is defined as the max of the request's creation time
+        # or the most recent, successful action completion time.
+        new_queryset = queryset.annotate(
+            most_recent_successful_action=Coalesce(
+                Max('actions__created', filter=Q(actions__error_reason__isnull=True)),
+                Cast(datetime.min, DateTimeField()),
+            )
+        ).annotate(
+            latest_action_type=Case(
+                When(GreaterThan(F('created'), F('most_recent_successful_action')),
+                     then=Value(SubsidyRequestStates.REQUESTED)),
+                When(GreaterThan(F('most_recent_successful_action'), F('created')),
+                     then=Coalesce(Max('actions__recent_action', filter=Q(actions__error_reason__isnull=True)),
+                                   Value(SubsidyRequestStates.REQUESTED), output_field=CharField())),
+                default=Value(SubsidyRequestStates.REQUESTED),
+                output_field=CharField(),
+            ),
+            latest_action_time=Case(
+                When(GreaterThan(F('created'), F('most_recent_successful_action')),
+                     then=F('created')),
+                When(GreaterThan(F('most_recent_successful_action'), F('created')),
+                     then=F('most_recent_successful_action')),
+                default=F('created'),
+                output_field=DateTimeField(),
+            ),
+        )
+
+        # Annotate a derived field ``request_lifecycle_state`` using pure ORM so that we do not need to
+        # store it as duplicate source-of-truth data in the database. This improves system integrity within
+        # production while simultaneously increasing analytics complexity downstream of production.
+        new_queryset = new_queryset.annotate(
+            # Step 1 is to add a dynamic field representing whether the request has any error actions.
+            has_error_action=Exists(
+                LearnerCreditRequestActions.objects.filter(
+                    learner_credit_request=OuterRef('pk'),
+                    error_reason__isnull=False,
+                )
+            ),
+            # ... or if they have successful actions.
+            has_successful_action=Exists(
+                LearnerCreditRequestActions.objects.filter(
+                    learner_credit_request=OuterRef('pk'),
+                    error_reason__isnull=True,
+                    created__isnull=False,
+                )
+            ),
+            # ... or if they have reminder actions specifically.
+            has_reminder_action=Exists(
+                LearnerCreditRequestActions.objects.filter(
+                    learner_credit_request=OuterRef('pk'),
+                    recent_action=LearnerCreditAdditionalActionStates.REMINDED,
+                    error_reason__isnull=True,
+                )
+            )
+        ).annotate(
+            request_lifecycle_state=Case(
+                When(
+                    Q(state=SubsidyRequestStates.REQUESTED) &
+                    Q(has_error_action=True) &
+                    Q(has_successful_action=False),
+                    then=Value('failed'),
+                ),
+                When(
+                    Q(state=SubsidyRequestStates.REQUESTED) & Q(has_successful_action=False),
+                    then=Value('processing'),
+                ),
+                When(
+                    Q(state=SubsidyRequestStates.APPROVED) & Q(has_reminder_action=True),
+                    then=Value('reminded'),
+                ),
+                When(
+                    Q(state=SubsidyRequestStates.APPROVED) & Q(has_reminder_action=False),
+                    then=Value('approved'),
+                ),
+                When(
+                    Q(state=SubsidyRequestStates.ACCEPTED),
+                    then=Value('completed'),
+                ),
+                When(
+                    Q(state=SubsidyRequestStates.DECLINED),
+                    then=Value('declined'),
+                ),
+                When(
+                    Q(state=SubsidyRequestStates.CANCELLED),
+                    then=Value('cancelled'),
+                ),
+                When(
+                    Q(state=SubsidyRequestStates.EXPIRED),
+                    then=Value('expired'),
+                ),
+                When(
+                    Q(state=SubsidyRequestStates.ERROR),
+                    then=Value('failed'),
+                ),
+                # Default case for any unhandled states
+                default=Value('unknown'),
+                output_field=CharField()
+            )
+        )
+
+        # Annotate latest action status and error reason using the same pattern as content assignments
+        new_queryset = new_queryset.annotate(
+            latest_action_status=Case(
+                When(
+                    has_error_action=True,
+                    then=Coalesce(
+                        Max('actions__status', filter=Q(actions__error_reason__isnull=False)),
+                        Value(SubsidyRequestStates.ERROR),
+                        output_field=CharField(),
+                    ),
+                ),
+                default=Coalesce(
+                    Max('actions__status', filter=Q(actions__error_reason__isnull=True)),
+                    F('state'),
+                    output_field=CharField(),
+                ),
+                output_field=CharField(),
+            ),
+            latest_action_error_reason=Coalesce(
+                Max('actions__error_reason'),
+                Value(None),
+                output_field=CharField(),
+            )
+        )
+
+        # Annotate a derived field ``lifecycle_state_sort_order`` using pure ORM so that we can order_by() it later.  It
+        # ostensibly sorts request lifecycle states based on business priority.
+        lifecycle_state_sort_order_cases = [
+            When(request_lifecycle_state=lifecycle_state, then=Value(sort_order))
+            for sort_order, lifecycle_state in enumerate(LearnerCreditRequestLifecycleStates.SORT_ORDER)
+        ]
+        new_queryset = new_queryset.annotate(
+            lifecycle_state_sort_order=Case(
+                *lifecycle_state_sort_order_cases,
+                default=Value(999),  # Anything that isn't a known lifecycle state gets sorted last.
+                output_field=IntegerField(),
+            )
+        )
+
+        return new_queryset
 
     def decline(self, reviewer, reason=None):
         self.reviewer = reviewer
