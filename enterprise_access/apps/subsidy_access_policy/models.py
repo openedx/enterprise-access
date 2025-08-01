@@ -28,7 +28,10 @@ from enterprise_access.apps.subsidy_request.constants import (
     LearnerCreditRequestUserMessages,
     SubsidyRequestStates
 )
-from enterprise_access.apps.subsidy_request.models import LearnerCreditRequestActions
+from enterprise_access.apps.subsidy_request.models import (
+    LearnerCreditRequestActions,
+    SubsidyRequestCustomerConfiguration
+)
 from enterprise_access.apps.subsidy_request.utils import (
     get_action_choice,
     get_error_reason_choice,
@@ -1409,6 +1412,29 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
         """
         proxy = True
 
+    def clean(self):
+        """
+        Validate that only one subsidy type can have B&R enabled at a time.
+        """
+        super().clean()
+
+        # Only check for conflicts if this policy has an active learner credit request config
+        if self.learner_credit_request_config and self.learner_credit_request_config.active:
+            try:
+                customer_config = (
+                    SubsidyRequestCustomerConfiguration.objects.get(
+                        enterprise_customer_uuid=self.enterprise_customer_uuid
+                    )
+                )
+                if customer_config.subsidy_requests_enabled:
+                    raise ValidationError(
+                        f"Browse & Request is already enabled for {customer_config.subsidy_type} "
+                        f"subsidy type for this enterprise. "
+                        "Only one subsidy type can have Browse & Request enabled at a time."
+                    )
+            except SubsidyRequestCustomerConfiguration.DoesNotExist:
+                pass
+
     def save(self, *args, **kwargs):
         """
         If Browse and Request is enabled and no ``assignment_configuration``
@@ -1427,6 +1453,8 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
                 self.enterprise_customer_uuid != self.assignment_configuration.enterprise_customer_uuid):
             self.assignment_configuration.enterprise_customer_uuid = self.enterprise_customer_uuid
             self.assignment_configuration.save()
+
+        self.full_clean()
         super().save(*args, **kwargs)
 
     @property

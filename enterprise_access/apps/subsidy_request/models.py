@@ -293,6 +293,26 @@ class SubsidyRequestCustomerConfiguration(TimeStampedModel):
     def _history_user(self, value):
         self.changed_by = value
 
+    def clean(self):
+        """
+        Validate that only one subsidy type can have B&R enabled at a time.
+        """
+        super().clean()
+        from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+        if self.subsidy_requests_enabled:
+            if SubsidyAccessPolicy.objects.filter(
+                enterprise_customer_uuid=self.enterprise_customer_uuid,
+                learner_credit_request_config__active=True
+            ).exists():
+                raise ValidationError(
+                    "Browse & Request is already enabled for learner credit. "
+                    "Only one subsidy type can have Browse & Request enabled at a time."
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
 
 class LearnerCreditRequestConfiguration(TimeStampedModel):
     """
@@ -315,6 +335,39 @@ class LearnerCreditRequestConfiguration(TimeStampedModel):
     )
 
     history = HistoricalRecords()
+
+    def clean(self):
+        """
+        Validate that only one subsidy type can have B&R enabled at a time.
+        """
+        super().clean()
+        from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+        if self.active:
+            policy = SubsidyAccessPolicy.objects.filter(
+                learner_credit_request_config=self
+            ).first()
+
+            if not policy:
+                return
+
+            # Check if this enterprise already has B&R enabled for other subsidy types
+            customer_config = (
+                SubsidyRequestCustomerConfiguration.objects.filter(
+                    enterprise_customer_uuid=policy.enterprise_customer_uuid,
+                    subsidy_requests_enabled=True,
+                ).first()
+            )
+
+            if customer_config:
+                raise ValidationError(
+                    f"Browse & Request is already enabled for {customer_config.subsidy_type} "
+                    f"subsidy type for enterprise {policy.enterprise_customer_uuid}. "
+                    "Only one subsidy type can have Browse & Request enabled at a time."
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class LearnerCreditRequest(SubsidyRequest):
