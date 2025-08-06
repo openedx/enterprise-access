@@ -361,6 +361,18 @@ class CheckoutIntent(TimeStampedModel):
             expires_at=expires_at,
         )
 
+    @classmethod
+    def for_user(cls, user):
+        """
+        Fetch the CheckoutIntent for a user.
+
+        Returns:
+          CheckoutIntent: The user's checkout intent, or None if not found
+        """
+        if not user or not user.is_authenticated:
+            return None
+        return cls.objects.filter(user=user).first()
+
     def update_stripe_session_id(self, session_id):
         """Update the associated Stripe checkout session ID."""
         self.stripe_checkout_session_id = session_id
