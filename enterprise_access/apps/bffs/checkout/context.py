@@ -62,13 +62,18 @@ class CheckoutValidationContext(BaseHandlerContext):
     Context class for checkout validation BFF endpoint.
     """
 
-    def __init__(self, request):
-        """
-        Initialize the checkout validaiton context with a request.
+    @property
+    def validation_decisions(self):
+        return self.data.get('validation_decisions', {})
 
-        Args:
-            request: The HTTP request
-        """
-        super().__init__(request)
-        self.validation_decisions = {}
-        self.user_authn = {}
+    @validation_decisions.setter
+    def validation_decisions(self, value):
+        self.data['validation_decisions'] = value
+
+    @property
+    def user_authn(self):
+        return self.data.get('user_authn', {})
+
+    @user_authn.setter
+    def user_authn(self, value):
+        self.data['user_authn'] = value

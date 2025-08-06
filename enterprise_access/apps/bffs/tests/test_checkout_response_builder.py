@@ -3,7 +3,6 @@ Tests for Checkout BFF response builders.
 """
 from datetime import timedelta
 from decimal import Decimal
-from unittest import mock
 
 import ddt
 from django.test import RequestFactory
@@ -30,17 +29,18 @@ class TestCheckoutContextResponseBuilder(APITest):
         self.request = self.request_factory.post('/api/v1/bffs/checkout/context')
         self.request.user = self.user
 
-        self.mock_checkout_intent = mock.MagicMock()
-        self.mock_checkout_intent.id = 123
-        self.mock_checkout_intent.state = 'created'
-        self.mock_checkout_intent.enterprise_name = 'Test Enterprise'
-        self.mock_checkout_intent.enterprise_slug = 'test-enterprise'
-        self.mock_checkout_intent.expires_at = timezone.now() + timedelta(hours=24)
-        self.mock_checkout_intent.stripe_checkout_session_id = 'cs_test_123abc'
-        self.mock_checkout_intent.last_checkout_error = ''
-        self.mock_checkout_intent.last_provisioning_error = ''
-        self.mock_checkout_intent.workflow = None
-        self.mock_checkout_intent.admin_portal_url = 'https://portal.edx.org/test-enterprise'
+        self.mock_checkout_intent = {
+            'id': 123,
+            'state': 'created',
+            'enterprise_name': 'Test Enterprise',
+            'enterprise_slug': 'test-enterprise',
+            'expires_at': timezone.now() + timedelta(hours=24),
+            'stripe_checkout_session_id': 'cs_test_123abc',
+            'last_checkout_error': '',
+            'last_provisioning_error': '',
+            'workflow': None,
+            'admin_portal_url': 'https://portal.edx.org/test-enterprise',
+        }
 
     def _create_context(self):
         """
@@ -374,7 +374,7 @@ class TestCheckoutContextResponseBuilder(APITest):
         # Setup context with a PAID checkout intent
         context = self._create_minimal_valid_context()
         paid_intent = self.mock_checkout_intent
-        paid_intent.state = 'paid'
+        paid_intent['state'] = 'paid'
         context.checkout_intent = paid_intent
 
         # Create and build response
@@ -396,8 +396,8 @@ class TestCheckoutContextResponseBuilder(APITest):
         # Setup context with a checkout intent that has errors
         context = self._create_minimal_valid_context()
         error_intent = self.mock_checkout_intent
-        error_intent.state = 'errored_stripe_checkout'
-        error_intent.last_checkout_error = 'Payment processing failed'
+        error_intent['state'] = 'errored_stripe_checkout'
+        error_intent['last_checkout_error'] = 'Payment processing failed'
         context.checkout_intent = error_intent
 
         # Create and build response

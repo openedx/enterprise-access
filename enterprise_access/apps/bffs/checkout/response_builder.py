@@ -1,12 +1,8 @@
 """
 Response builders for the Checkout BFF endpoints.
 """
-from django.conf import settings
-from rest_framework import status
-
 from enterprise_access.apps.bffs.checkout.serializers import (
     CheckoutContextResponseSerializer,
-    CheckoutIntentModelSerializer,
     CheckoutValidationResponseSerializer
 )
 from enterprise_access.apps.bffs.response_builder import BaseResponseBuilder
@@ -23,15 +19,11 @@ class CheckoutContextResponseBuilder(BaseResponseBuilder):
         Build the response data from the context. This specifically does *not*
         call super().build().
         """
-        checkout_intent_data = None
-        if self.context.checkout_intent:
-            checkout_intent_data = CheckoutIntentModelSerializer(self.context.checkout_intent).data
-
         response_data = {
             'existing_customers_for_authenticated_user': self.context.existing_customers_for_authenticated_user,
             'pricing': self.context.pricing,
             'field_constraints': self.context.field_constraints,
-            'checkout_intent': checkout_intent_data,
+            'checkout_intent': self.context.checkout_intent,
         }
 
         # Update the data with the serialized data

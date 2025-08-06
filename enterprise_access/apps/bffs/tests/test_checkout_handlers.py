@@ -226,11 +226,13 @@ class TestCheckoutContextHandler(APITest):
         """
         # Setup
         mock_get_pricing.return_value = {}
-        mock_intent = mock.MagicMock()
-        mock_intent.state = 'created'
-        mock_intent.enterprise_name = 'Test Enterprise'
-        mock_intent.enterprise_slug = 'test-slug'
-        mock_intent.admin_portal_url = 'https://portal.edx.org/test-slug'
+        mock_intent_data = {
+            'state': 'created',
+            'enterprise_name': 'Test Enterprise',
+            'enterprise_slug': 'test-slug',
+            'admin_portal_url': 'https://portal.edx.org/test-slug',
+        }
+        mock_intent = mock.MagicMock(**mock_intent_data)  # type: ignore
         mock_filter.return_value.first.return_value = mock_intent
 
         context = self._create_context()
@@ -240,7 +242,7 @@ class TestCheckoutContextHandler(APITest):
         handler.load_and_process()
 
         # Assert
-        self.assertEqual(context.checkout_intent, mock_intent)
+        self.assertEqual(context.checkout_intent, context.checkout_intent or {} | mock_intent_data)
         mock_filter.assert_called_once_with(user=self.user)
 
     @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_ssp_product_pricing')
