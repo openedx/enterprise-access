@@ -9,11 +9,12 @@ import stripe
 from django.conf import settings
 from django.http import HttpResponseServerError
 from django.views.decorators.csrf import csrf_exempt
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, OpenApiTypes, extend_schema, extend_schema_view
 from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from enterprise_access.apps.api import serializers
@@ -23,6 +24,10 @@ from enterprise_access.apps.customer_billing.api import (
     CreateCheckoutSessionValidationError,
     create_free_trial_checkout_session
 )
+from enterprise_access.apps.customer_billing.constants import ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS
+from enterprise_access.apps.customer_billing.models import CheckoutIntent
+
+from .constants import CHECKOUT_INTENT_EXAMPLES, ERROR_RESPONSES, PATCH_REQUEST_EXAMPLES
 
 stripe.api_key = settings.STRIPE_API_KEY
 logger = logging.getLogger(__name__)
@@ -216,3 +221,151 @@ class CustomerBillingViewSet(viewsets.ViewSet):
 
         # TODO: pull out session fields actually needed, and structure a response.
         return Response(customer_portal_session, status=status.HTTP_200_OK)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary='List CheckoutIntents',
+        description=(
+            'Retrieve a list of CheckoutIntent records for the authenticated user.\n'
+            'This endpoint returns only the CheckoutIntent records that belong to the '
+            'currently authenticated user.'
+        ),
+        responses={
+            200: OpenApiResponse(
+                response=serializers.CheckoutIntentReadOnlySerializer,
+                description='Successful response with paginated results',
+                examples=CHECKOUT_INTENT_EXAMPLES,
+            ),
+            **{k: v for k, v in ERROR_RESPONSES.items() if k in [401, 403, 429]},
+        },
+        tags=['Customer Billing'],
+        operation_id='list_checkout_intents',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve CheckoutIntent',
+        description=(
+            'Retrieve a specific CheckoutIntent by UUID.\n'
+            'This endpoint is designed to support polling from the frontend to check '
+            'the fulfillment state after a successful Stripe checkout.\n'
+            'Users can only retrieve their own CheckoutIntent records.\n'
+        ),
+        responses={
+            200: OpenApiResponse(
+                response=serializers.CheckoutIntentReadOnlySerializer,
+                description='Successful response',
+                examples=CHECKOUT_INTENT_EXAMPLES,
+            ),
+            **ERROR_RESPONSES,
+        },
+        tags=['Customer Billing'],
+        operation_id='retrieve_checkout_intent',
+    ),
+    partial_update=extend_schema(
+        summary='Update CheckoutIntent State',
+        description=(
+            'Update the state of a CheckoutIntent.\n'
+            'This endpoint is used to transition the CheckoutIntent through its lifecycle states. '
+            'Only valid state transitions are allowed.\n'
+            'Users can only update their own CheckoutIntent records.\n'
+            '## Allowed State Transitions\n'
+            '```\n'
+            'created → paid\n'
+            'created → errored_stripe_checkout\n'
+            'paid → fulfilled\n'
+            'paid → errored_provisioning\n'
+            'errored_stripe_checkout → paid\n'
+            'errored_provisioning → paid\n'
+            '```\n'
+            '## Integration Points\n'
+            '- **Stripe Webhook**: Transitions from `created` to `paid` after successful payment\n'
+            '- **Fulfillment Service**: Transitions from `paid` to `fulfilled` after provisioning\n'
+            '- **Error Recovery**: Allows retry from error states back to `paid`\n\n'
+        ),
+        parameters=[
+            OpenApiParameter(
+                name='id',
+                type=OpenApiTypes.UUID,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description='id of the CheckoutIntent to update',
+            ),
+        ],
+        request=serializers.CheckoutIntentUpdateRequestSerializer,
+        examples=PATCH_REQUEST_EXAMPLES,
+        responses={
+            200: OpenApiResponse(
+                response=serializers.CheckoutIntentReadOnlySerializer,
+                description='Successfully updated',
+                examples=CHECKOUT_INTENT_EXAMPLES,
+            ),
+            **ERROR_RESPONSES,
+        },
+        tags=['Customer Billing'],
+        operation_id='update_checkout_intent',
+    ),
+)
+class CheckoutIntentViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for CheckoutIntent model.
+
+    Provides list, retrieve, and partial_update actions for CheckoutIntent records.
+    Users can only access their own CheckoutIntent records.
+    """
+    authentication_classes = (JwtAuthentication,)
+    permission_classes = (permissions.IsAuthenticated,)
+    lookup_field = 'id'
+
+    # Only allow GET and PATCH operations
+    http_method_names = ['get', 'patch', 'head', 'options']
+
+    def get_serializer_class(self):
+        """
+        Use different serializers for different actions.
+        """
+        if self.action in ['partial_update', 'update']:
+            return serializers.CheckoutIntentUpdateRequestSerializer
+        return serializers.CheckoutIntentReadOnlySerializer
+
+    def get_queryset(self):
+        """
+        Filter queryset to only include CheckoutIntent records
+        belonging to the authenticated user.
+        """
+        user = self.request.user
+        return CheckoutIntent.objects.filter(user=user).select_related('user')
+
+    def partial_update(self, request, *args, **kwargs):
+        """
+        Override partial_update to validate state transitions.
+        """
+        instance = self.get_object()
+
+        # Check if state is being updated
+        new_state = request.data.get('state')
+        if new_state and new_state != instance.state:
+            if not self._is_valid_state_transition(instance.state, new_state):
+                raise ValidationError(detail={
+                    'state': f'Invalid state transition from {instance.state} to {new_state}'
+                })
+
+            logger.info(
+                f'CheckoutIntent {instance.id} state transition: '
+                f'{instance.state} -> {new_state} by user {request.user.id}'
+            )
+
+        return super().partial_update(request, *args, **kwargs)
+
+    def _is_valid_state_transition(self, current_state, new_state):
+        """
+        Validate if the state transition is allowed.
+
+        Args:
+            current_state: Current state of the CheckoutIntent
+            new_state: Proposed new state
+
+        Returns:
+            bool: True if transition is allowed, False otherwise
+        """
+        allowed_transitions = ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS.get(current_state, [])
+        return new_state in allowed_transitions

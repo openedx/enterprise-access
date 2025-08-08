@@ -72,3 +72,26 @@ class CheckoutIntentState(StrEnum):
     ERRORED_STRIPE_CHECKOUT = 'errored_stripe_checkout'
     ERRORED_PROVISIONING = 'errored_provisioning'
     EXPIRED = 'expired'
+
+
+ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS = {
+    CheckoutIntentState.CREATED: [
+        CheckoutIntentState.PAID,
+        CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
+        CheckoutIntentState.EXPIRED,
+    ],
+    CheckoutIntentState.PAID: [
+        CheckoutIntentState.FULFILLED,
+        CheckoutIntentState.ERRORED_PROVISIONING,
+    ],
+    CheckoutIntentState.ERRORED_STRIPE_CHECKOUT: [
+        CheckoutIntentState.PAID,
+    ],
+    CheckoutIntentState.ERRORED_PROVISIONING: [
+        CheckoutIntentState.PAID,
+    ],
+    CheckoutIntentState.EXPIRED: [
+        CheckoutIntentState.CREATED,
+    ],
+    CheckoutIntentState.FULFILLED: [],
+}

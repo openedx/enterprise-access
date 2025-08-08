@@ -3,6 +3,9 @@ customer billing serializers
 """
 from rest_framework import serializers
 
+from enterprise_access.apps.customer_billing.constants import ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS
+from enterprise_access.apps.customer_billing.models import CheckoutIntent
+
 
 # pylint: disable=abstract-method
 class CustomerBillingCreateCheckoutSessionRequestSerializer(serializers.Serializer):
@@ -84,3 +87,43 @@ class CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer(ser
         required=False,
         help_text='Validation results for stripe_price_id if validation failed. Absent otherwise.',
     )
+
+
+class CheckoutIntentReadOnlySerializer(serializers.ModelSerializer):
+    """
+    Serializer for reading and updating CheckoutIntent model instances.
+    """
+
+    class Meta:
+        model = CheckoutIntent
+        fields = '__all__'
+        read_only_fields = [field.name for field in CheckoutIntent._meta.get_fields()]
+
+
+class CheckoutIntentUpdateRequestSerializer(serializers.ModelSerializer):
+    """
+    Write serializer for CheckoutIntent - used for PATCH operations.
+    Only allows state field updates.
+    """
+
+    class Meta:
+        model = CheckoutIntent
+        fields = '__all__'
+        read_only_fields = [
+            field.name for field in CheckoutIntent._meta.get_fields()
+            if field.name != 'state'
+        ]
+
+    def validate_state(self, value):
+        """
+        Validate that the state transition is allowed.
+        """
+        instance = self.instance
+        if instance:
+            current_state = instance.state
+            if value not in ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS.get(current_state, []):
+                raise serializers.ValidationError(
+                    f'Invalid state transition from {current_state} to {value}'
+                )
+
+        return value
