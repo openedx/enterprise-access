@@ -35,6 +35,8 @@ router.register(
 )
 if settings.ENABLE_CUSTOMER_BILLING_API:
     router.register('customer-billing', views.CustomerBillingViewSet, 'customer-billing')
+    router.register('checkout-intent', views.CheckoutIntentViewSet, basename='checkout-intent')
+
 
 # BFFs
 router.register('bffs/learner', views.LearnerPortalBFFViewSet, 'learner-portal-bff')
