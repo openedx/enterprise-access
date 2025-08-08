@@ -4,11 +4,13 @@
 # pylint: skip-file
 
 import collections
+from datetime import datetime
 from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import OuterRef, Subquery
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from jsonfield.encoder import JSONEncoder
@@ -19,6 +21,7 @@ from simple_history.utils import bulk_update_with_history
 
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
+    LearnerCreditAdditionalActionStates,
     LearnerCreditRequestActionChoices,
     LearnerCreditRequestActionErrorReasons,
     LearnerCreditRequestUserMessages,
@@ -431,6 +434,43 @@ class LearnerCreditRequest(SubsidyRequest):
         self.state = SubsidyRequestStates.APPROVED
         self.reviewed_at = localized_utcnow()
         self.save()
+
+    @classmethod
+    def annotate_dynamic_fields_onto_queryset(cls, queryset):
+        """
+        Annotate extra dynamic fields used by this viewset for DRF-supported ordering and filtering.
+
+        Fields added:
+        * latest_action_status (CharField) - Most recent action status from related actions
+        * latest_action_time (DateTimeField) - Most recent action timestamp
+        * latest_action_type (CharField) - Most recent action type
+
+        Notes:
+        * Simple subquery approach for action-based sorting that matches viewset expectations.
+
+        Args:
+            queryset (QuerySet): LearnerCreditRequest queryset, vanilla.
+
+        Returns:
+            QuerySet: LearnerCreditRequest queryset, same objects but with extra fields annotated.
+        """
+        # Simple subquery annotations for action-based sorting
+        latest_action_subquery = LearnerCreditRequestActions.objects.filter(
+            learner_credit_request=OuterRef('pk')
+        ).order_by('-created')
+
+        new_queryset = queryset.annotate(
+            # Latest action status for sorting/filtering (what the viewset expects)
+            latest_action_status=Subquery(latest_action_subquery.values('status')[:1]),
+
+            # Latest action time for sorting
+            latest_action_time=Subquery(latest_action_subquery.values('created')[:1]),
+
+            # Latest action type for sorting
+            latest_action_type=Subquery(latest_action_subquery.values('recent_action')[:1]),
+        )
+
+        return new_queryset
 
     def decline(self, reviewer, reason=None):
         self.reviewer = reviewer
