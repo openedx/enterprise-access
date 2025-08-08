@@ -184,6 +184,7 @@ def send_learner_credit_bnr_admins_email_with_new_requests_task(
     lms_client = LmsApiClient()
     enterprise_customer_data = lms_client.get_enterprise_customer_data(enterprise_customer_uuid)
     enterprise_slug = enterprise_customer_data.get('slug')
+    organization = enterprise_customer_data.get('name')
 
     manage_requests_url = (f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}'
                            f'/admin/learner-credit/{policy_uuid}/requests')
@@ -208,6 +209,7 @@ def send_learner_credit_bnr_admins_email_with_new_requests_task(
         'manage_requests_url': manage_requests_url,
         'requests': [],
         'total_requests': len(subsidy_requests),
+        'organization': organization,
     }
 
     for subsidy_request in latest_subsidy_requests:
