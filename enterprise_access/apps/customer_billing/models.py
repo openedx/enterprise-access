@@ -344,7 +344,8 @@ class CheckoutIntent(TimeStampedModel):
             if existing_intent.state in cls.FAILURE_STATES:
                 raise ValueError("Failed checkout record already exists")
 
-            # Update the existing CREATED intent
+            # Update the existing CREATED or EXPIRED intent
+            existing_intent.state = CheckoutIntentState.CREATED
             existing_intent.enterprise_slug = slug
             existing_intent.enterprise_name = name
             existing_intent.quantity = quantity

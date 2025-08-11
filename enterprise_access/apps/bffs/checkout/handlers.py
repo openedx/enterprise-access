@@ -2,26 +2,57 @@
 Handlers for the Checkout BFF endpoints.
 """
 import logging
+from datetime import datetime
 from typing import Dict
 
+import stripe
 from django.conf import settings
+from pytz import UTC
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.bffs.api import (
     get_and_cache_enterprise_customer_users,
     transform_enterprise_customer_users_data
 )
-from enterprise_access.apps.bffs.checkout.context import CheckoutContext, CheckoutValidationContext
+from enterprise_access.apps.bffs.checkout.context import (
+    CheckoutContext,
+    CheckoutSuccessContext,
+    CheckoutValidationContext
+)
 from enterprise_access.apps.bffs.checkout.serializers import CheckoutIntentModelSerializer
 from enterprise_access.apps.bffs.handlers import BaseHandler
 from enterprise_access.apps.customer_billing.api import validate_free_trial_checkout_session
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
 from enterprise_access.apps.customer_billing.pricing_api import get_ssp_product_pricing
+from enterprise_access.apps.customer_billing.stripe_api import (
+    get_stripe_checkout_session,
+    get_stripe_customer,
+    get_stripe_invoice,
+    get_stripe_payment_intent,
+    get_stripe_payment_method,
+    get_stripe_subscription
+)
+from enterprise_access.utils import cents_to_dollars
 
 logger = logging.getLogger(__name__)
 
 
-class CheckoutContextHandler(BaseHandler):
+class CheckoutIntentAwareHandlerMixin:
+    """
+    Mixin to help fetch CheckoutIntents for the requesting user.
+    """
+    def _get_checkout_intent(self) -> Dict | None:
+        """
+        Load checkout intent data (from database) for the given user.
+        """
+        checkout_intent_instance = CheckoutIntent.for_user(self.context.user)
+        checkout_intent_data = None
+        if checkout_intent_instance:
+            checkout_intent_data = CheckoutIntentModelSerializer(checkout_intent_instance).data
+        return checkout_intent_data
+
+
+class CheckoutContextHandler(CheckoutIntentAwareHandlerMixin, BaseHandler):
     """
     Handler for the checkout context endpoint.
 
@@ -68,16 +99,6 @@ class CheckoutContextHandler(BaseHandler):
                 user_message="Could not load and/or process checkout context data",
                 developer_message=f"Unable to load and/or process checkout context data: {exc}",
             )
-
-    def _get_checkout_intent(self) -> Dict | None:
-        """
-        Load checkout intent data (from database) for the given user.
-        """
-        checkout_intent_instance = CheckoutIntent.for_user(self.context.user)
-        checkout_intent_data = None
-        if checkout_intent_instance:
-            checkout_intent_data = CheckoutIntentModelSerializer(checkout_intent_instance).data
-        return checkout_intent_data
 
     def _load_enterprise_customers(self):
         """
@@ -255,3 +276,191 @@ class CheckoutValidationHandler(BaseHandler):
         except Exception:  # pylint: disable=broad-except
             # In case of error, we don't know if the user exists
             return None
+
+
+class CheckoutSuccessHandler(CheckoutContextHandler):
+    """
+    Handler for checkout success operations. Builds on the ``CheckoutContextHandler``
+    to enhance the checkout intent record with addtional data from the stripe API.
+    """
+    context: CheckoutSuccessContext
+
+    def load_and_process(self):
+        """
+        Loads base checkout context data, then enhances
+        the checkout intent record with more data from the Stripe API.
+        """
+        super().load_and_process()
+        if self.context.checkout_intent is None:
+            return
+
+        self.context.checkout_intent['first_billable_invoice'] = None
+
+        try:
+            self.enhance_with_stripe_data()
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.exception(
+                "Error loading checkout success handler Stripe data for request user %s",
+                self.context.user,
+            )
+            self.add_error(
+                user_message="Could not load and/or process checkout success data",
+                developer_message=f"Unable to load and/or process checkout success data: {exc}",
+            )
+
+    def enhance_with_stripe_data(self):
+        """
+        Enhance checkout intent data with Stripe API data. Called for side effect.
+
+        Returns:
+            None (called for side effect)
+        """
+        checkout_intent_data = self.context.checkout_intent
+
+        session_id = checkout_intent_data.get('stripe_checkout_session_id')
+        if not session_id:
+            logger.warning(
+                "No Stripe checkout session id for checkout intent: "
+                f"{checkout_intent_data.get('id')}"
+            )
+            return
+
+        try:
+            session = get_stripe_checkout_session(session_id)
+        except stripe.error.StripeError:
+            logger.exception("Error retrieving Stripe checkout session: %s", session_id)
+            return
+
+        first_billable_invoice = {
+            'start_time': None,
+            'end_time': None,
+            'last4': None,
+            'quantity': None,
+            'unit_amount_decimal': None,
+            'customer_phone': None,
+            'customer_name': None,
+            'billing_address': None,
+        }
+        # THIS IS THE SIDE-EFFECT INITIALIZATION
+        checkout_intent_data['first_billable_invoice'] = first_billable_invoice
+
+        payment_method = self._get_payment_method(session)
+        if payment_method:
+            first_billable_invoice.update(self._get_card_billing_details(payment_method))
+
+        invoice_id = session.get('invoice')
+        subscription_id = session.get('subscription')
+
+        invoice = self._get_invoice_record(invoice_id, subscription_id)
+        if not invoice:
+            return
+
+        subscription_item = self._get_subscription_item(invoice)
+        if not subscription_item:
+            return
+
+        first_billable_invoice['quantity'] = subscription_item.get('quantity')
+
+        if unit_amount := subscription_item.get('price', {}).get('unit_amount_decimal'):
+            first_billable_invoice['unit_amount_decimal'] = cents_to_dollars(unit_amount)
+
+        first_billable_invoice.update(self._get_subscription_start_end(subscription_item))
+        first_billable_invoice.update(self._get_customer_info(invoice))
+
+    @staticmethod
+    def _get_payment_method(session):
+        """ Helper to fetch payment method record from Stripe. """
+        if not (payment_intent_id := session.get('payment_intent')):
+            logger.warning('No payment intent on stripe session %s', session.get('id'))
+            return None
+
+        try:
+            payment_intent = get_stripe_payment_intent(payment_intent_id)
+        except stripe.error.StripeError:
+            logger.exception("Error retrieving Stripe payment intent: %s", payment_intent_id)
+            return None
+
+        if not (payment_method_id := payment_intent.get('payment_method')):
+            logger.warning('No payment method on stripe payment intent %s', payment_intent_id)
+            return None
+
+        payment_method = None
+        try:
+            payment_method = get_stripe_payment_method(payment_method_id)
+        except stripe.error.StripeError:
+            logger.exception("Error retrieving Stripe payment method: %s", payment_method_id)
+        return payment_method
+
+    @staticmethod
+    def _get_card_billing_details(payment_method):
+        """ Helper to fetch card last 4 and billing address. """
+        result = {}
+        if (card_metadata := payment_method.get('card', {})):
+            result['last4'] = card_metadata.get('last4')
+        if (billing_details := payment_method.get('billing_details', {})):
+            result['billing_address'] = billing_details.get('address')
+        return result
+
+    @staticmethod
+    def _get_invoice_record(invoice_id, subscription_id):
+        """ Helper to fetch invoice record via Stripe API. """
+        if not invoice_id and subscription_id:
+            # If there's no invoice directly on the session, try to get it from the subscription
+            try:
+                subscription = get_stripe_subscription(subscription_id)
+                invoice_id = subscription.get('latest_invoice')
+            except stripe.error.StripeError:
+                logger.exception("Error retrieving Stripe subscription: %s", subscription_id)
+                return None
+
+        if not invoice_id:
+            logger.warning(
+                'Could not find invoice in Stripe subscription %s', subscription_id,
+            )
+            return None
+
+        try:
+            return get_stripe_invoice(invoice_id)
+        except stripe.error.StripeError:
+            logger.exception("Error retrieving Stripe invoice: %s", invoice_id)
+            return None
+
+    @staticmethod
+    def _get_subscription_item(invoice):
+        """
+        Helper to fetch a Stripe subscription item record from an invoice.
+        """
+        if not (lines_data := invoice.get('lines', {}).get('data', [])):
+            logger.warning('No lines on invoice %s', invoice.get('id'))
+            return None
+        if not (subscription_item := lines_data[0]):
+            logger.warning('No subscription items in invoice %s', invoice.get('id'))
+            return None
+        return subscription_item
+
+    @staticmethod
+    def _get_subscription_start_end(subscription_item):
+        """ Returns a dict with formatted subscription item start/end time. """
+        result = {}
+        if (period := subscription_item.get('period', {})):
+            if (start_timestamp := period.get('start')):
+                result['start_time'] = datetime.fromtimestamp(start_timestamp).replace(tzinfo=UTC)
+            if (end_timestamp := period.get('end')):
+                result['end_time'] = datetime.fromtimestamp(end_timestamp).replace(tzinfo=UTC)
+        return result
+
+    @staticmethod
+    def _get_customer_info(invoice):
+        """ Helper to get dict of customer info from an invoice. """
+        result = {}
+        if not (customer_id := invoice.get('customer')):
+            logger.warning('No customer available on invoice %s', invoice.get('id'))
+            return result
+
+        try:
+            customer = get_stripe_customer(customer_id)
+            result['customer_name'] = customer.get('name')
+            result['customer_phone'] = customer.get('phone')
+        except stripe.error.StripeError:
+            logger.exception("Error retrieving Stripe customer: %s", customer_id)
+        return result
