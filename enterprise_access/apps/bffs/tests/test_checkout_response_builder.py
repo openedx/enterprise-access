@@ -1,19 +1,28 @@
 """
 Tests for Checkout BFF response builders.
 """
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
+from unittest import mock
+from uuid import uuid4
 
 import ddt
+from django.conf import settings
 from django.test import RequestFactory
 from django.utils import timezone
 from rest_framework import status
 
-from enterprise_access.apps.bffs.checkout.context import CheckoutContext, CheckoutValidationContext
+from enterprise_access.apps.bffs.checkout.context import (
+    CheckoutContext,
+    CheckoutSuccessContext,
+    CheckoutValidationContext
+)
 from enterprise_access.apps.bffs.checkout.response_builder import (
     CheckoutContextResponseBuilder,
+    CheckoutSuccessResponseBuilder,
     CheckoutValidationResponseBuilder
 )
+from enterprise_access.apps.bffs.checkout.serializers import CheckoutSuccessResponseSerializer
 from test_utils import APITest
 
 
@@ -602,3 +611,135 @@ class TestCheckoutValidationResponseBuilder(APITest):
         validation_decisions = builder.response_data['validation_decisions']
         self.assertIsNone(validation_decisions['admin_email'])
         self.assertIsNone(validation_decisions['company_name'])
+
+
+class TestCheckoutSuccessResponseBuilder(APITest):
+    """Tests for the CheckoutSuccessResponseBuilder."""
+
+    def setUp(self):
+        """Set up test data before each test."""
+        self.request_factory = RequestFactory()
+        self.request = self.request_factory.post('/api/v1/bffs/checkout/context')
+        self.request.user = self.user
+
+        # Create a context
+        self.context = CheckoutSuccessContext(self.request)
+        # We don't really care about the values of these - that's covered
+        # by the base checkout context BFF tests above. We just care that they're
+        # included in the context and built response.
+        self.context.existing_customers_for_enterprise_user = []
+        self.context.pricing = {}
+        self.context.field_constraints = {}
+
+        # Sample checkout intent data with first_billable_invoice
+        self.checkout_intent_data = {
+            'uuid': str(uuid4()),
+            'state': 'created',
+            'enterprise_name': 'Test Enterprise',
+            'enterprise_slug': 'test-enterprise',
+            'stripe_checkout_session_id': 'cs_test_123',
+            'last_checkout_error': '',
+            'last_provisioning_error': '',
+            'workflow_id': str(uuid4()),
+            'expires_at': timezone.now().isoformat(),
+            'admin_portal_url': 'https://portal.edx.org/test-enterprise',
+            'first_billable_invoice': {
+                'start_time': timezone.now().isoformat(),
+                'end_time': timezone.now().isoformat(),
+                'last4': 4242,
+                'quantity': 35,
+                'unit_amount_decimal': 396.00,
+                'customer_phone': '+15551234567',
+                'customer_name': 'Test Customer',
+                'billing_address': {
+                    'city': 'New York',
+                    'country': 'US',
+                    'line1': '123 Main St',
+                    'line2': 'Apt 4B',
+                    'postal_code': '10001',
+                    'state': 'NY',
+                },
+            },
+        }
+
+        self.expected_sample_response_data = {
+            'existing_customers_for_authenticated_user': self.context.existing_customers_for_authenticated_user,
+            'pricing': self.context.pricing,
+            'field_constraints': self.context.field_constraints,
+            'checkout_intent': self.checkout_intent_data,
+        }
+
+        # Create the builder
+        self.builder = CheckoutSuccessResponseBuilder(self.context)
+
+    def test_serializer_class(self):
+        """Test that the builder uses the correct serializer class."""
+        self.assertEqual(self.builder.serializer_class, CheckoutSuccessResponseSerializer)
+
+    def test_build_empty_context(self):
+        """Test build with empty context."""
+        # Context has no checkout_intent
+        self.builder.build()
+
+        # Response should be null in this case (which is allowed by the response serializer)
+        self.assertIsNone(self.builder.response_data['checkout_intent'])
+
+    def test_build_with_checkout_intent(self):
+        """Test build with a populated checkout_intent in the context."""
+        # Set the checkout_intent in the context
+        self.context.checkout_intent = self.checkout_intent_data
+
+        self.builder.build()
+
+        # Response should contain the checkout_intent data, along with the
+        # enterprise, pricing, and validation keys.
+        self.assertEqual(self.builder.response_data, self.expected_sample_response_data)
+
+    def test_build_with_partial_data(self):
+        """Test build with partial checkout_intent data."""
+        # Create partial data (no first_billable_invoice)
+        partial_data = {
+            'uuid': str(uuid4()),
+            'state': 'created',
+            'enterprise_name': 'Test Enterprise',
+            'enterprise_slug': 'test-enterprise',
+            'stripe_checkout_session_id': 'cs_test_123',
+        }
+        self.context.checkout_intent = partial_data
+
+        self.builder.build()
+
+        # Response should contain the partial data
+        self.assertEqual(self.builder.response_data['checkout_intent'], partial_data)
+
+    def test_null_first_billable_invoice(self):
+        """Test build with null first_billable_invoice."""
+        # Create data with null first_billable_invoice
+        data_with_null = {**self.checkout_intent_data}
+        data_with_null['first_billable_invoice'] = None
+
+        self.context.checkout_intent = data_with_null
+
+        self.builder.build()
+
+        # Response should contain the data with null first_billable_invoice
+        self.assertEqual(self.builder.response_data['checkout_intent'], data_with_null)
+        self.assertIsNone(self.builder.response_data['checkout_intent']['first_billable_invoice'])
+
+    def test_partial_first_billable_invoice(self):
+        """Test build with partial first_billable_invoice data."""
+        # Create data with partial first_billable_invoice
+        data_with_partial = {**self.checkout_intent_data}
+        data_with_partial['first_billable_invoice'] = {
+            'last4': 4242,
+            'quantity': 35,
+            # Missing other fields
+        }
+        self.context.checkout_intent = data_with_partial
+
+        self.builder.build()
+
+        # Response should contain the data with partial first_billable_invoice
+        self.assertEqual(self.builder.response_data['checkout_intent'], data_with_partial)
+        self.assertEqual(self.builder.response_data['checkout_intent']['first_billable_invoice']['last4'], 4242)
+        self.assertEqual(self.builder.response_data['checkout_intent']['first_billable_invoice']['quantity'], 35)

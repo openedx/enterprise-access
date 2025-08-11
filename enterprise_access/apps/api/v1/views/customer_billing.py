@@ -170,7 +170,7 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         )
         try:
             session = create_free_trial_checkout_session(
-                request.user,
+                user=request.user,
                 **serializer.validated_data,
             )
         except CreateCheckoutSessionValidationError as exc:
