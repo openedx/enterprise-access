@@ -38,7 +38,7 @@ cffi==1.17.1
     # via
     #   cryptography
     #   pynacl
-charset-normalizer==3.4.2
+charset-normalizer==3.4.3
     # via requests
 click==8.2.1
     # via
@@ -68,7 +68,7 @@ coreschema==0.0.4
     # via coreapi
 crispy-bootstrap5==2025.6
     # via -r requirements/base.in
-cryptography==45.0.5
+cryptography==45.0.6
     # via
     #   pyjwt
     #   social-auth-core
@@ -148,7 +148,7 @@ django-waffle==5.0.0
     #   edx-toggles
 djangoql==0.18.1
     # via -r requirements/base.in
-djangorestframework==3.16.0
+djangorestframework==3.16.1
     # via
     #   -r requirements/base.in
     #   django-rest-swagger
@@ -282,7 +282,7 @@ pyjwt[crypto]==2.10.1
     #   social-auth-core
 pymemcache==4.0.0
     # via -r requirements/base.in
-pymongo==4.13.2
+pymongo==4.14.0
     # via edx-opaque-keys
 pynacl==1.5.0
     # via edx-django-utils
@@ -304,7 +304,7 @@ pyyaml==6.0.2
     #   drf-spectacular
     #   drf-yasg
     #   edx-django-release-util
-redis==6.2.0
+redis==6.4.0
     # via -r requirements/base.in
 referencing==0.36.2
     # via
@@ -322,7 +322,7 @@ requests==2.32.4
     #   stripe
 requests-oauthlib==2.0.0
     # via social-auth-core
-rpds-py==0.26.0
+rpds-py==0.27.0
     # via
     #   jsonschema
     #   referencing

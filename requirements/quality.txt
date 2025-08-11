@@ -64,7 +64,7 @@ chardet==5.2.0
     # via
     #   -r requirements/test.txt
     #   tox
-charset-normalizer==3.4.2
+charset-normalizer==3.4.3
     # via
     #   -r requirements/test.txt
     #   requests
@@ -117,13 +117,13 @@ coreschema==0.0.4
     # via
     #   -r requirements/test.txt
     #   coreapi
-coverage[toml]==7.10.2
+coverage[toml]==7.10.3
     # via
     #   -r requirements/test.txt
     #   pytest-cov
 crispy-bootstrap5==2025.6
     # via -r requirements/test.txt
-cryptography==45.0.5
+cryptography==45.0.6
     # via
     #   -r requirements/test.txt
     #   pyjwt
@@ -223,7 +223,7 @@ django-waffle==5.0.0
     #   edx-toggles
 djangoql==0.18.1
     # via -r requirements/test.txt
-djangorestframework==3.16.0
+djangorestframework==3.16.1
     # via
     #   -r requirements/test.txt
     #   django-rest-swagger
@@ -321,7 +321,7 @@ filelock==3.18.0
     #   -r requirements/test.txt
     #   tox
     #   virtualenv
-freezegun==1.5.4
+freezegun==1.5.5
     # via -r requirements/test.txt
 id==1.5.0
     # via twine
@@ -478,7 +478,7 @@ pyjwt[crypto]==2.10.1
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==3.3.7
+pylint==3.3.8
     # via
     #   -r requirements/test.txt
     #   edx-lint
@@ -500,7 +500,7 @@ pylint-plugin-utils==0.9.0
     #   pylint-django
 pymemcache==4.0.0
     # via -r requirements/test.txt
-pymongo==4.13.2
+pymongo==4.14.0
     # via
     #   -r requirements/test.txt
     #   edx-opaque-keys
@@ -550,7 +550,7 @@ pyyaml==6.0.2
     #   edx-django-release-util
 readme-renderer==44.0
     # via twine
-redis==6.2.0
+redis==6.4.0
     # via -r requirements/test.txt
 referencing==0.36.2
     # via
@@ -581,7 +581,7 @@ rfc3986==2.0.0
     # via twine
 rich==14.1.0
     # via twine
-rpds-py==0.26.0
+rpds-py==0.27.0
     # via
     #   -r requirements/test.txt
     #   jsonschema
@@ -673,7 +673,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.33.0
+virtualenv==20.33.1
     # via
     #   -r requirements/test.txt
     #   tox
