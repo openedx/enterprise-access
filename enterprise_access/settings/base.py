@@ -4,6 +4,7 @@ from os.path import abspath, dirname, join
 from corsheaders.defaults import default_headers as corsheaders_default_headers
 
 from enterprise_access.apps.core.constants import (
+    ADMIN_LEARNER_PROFILE_ADMIN_ROLE,
     BFF_ADMIN_ROLE,
     BFF_LEARNER_ROLE,
     BFF_OPERATOR_ROLE,
@@ -351,6 +352,7 @@ SYSTEM_TO_FEATURE_ROLE_MAPPING = {
         REQUESTS_ADMIN_ROLE,
         BFF_ADMIN_ROLE,
         CUSTOMER_BILLING_ADMIN_ROLE,
+        ADMIN_LEARNER_PROFILE_ADMIN_ROLE,
     ],
     SYSTEM_ENTERPRISE_LEARNER_ROLE: [
         SUBSIDY_ACCESS_POLICY_LEARNER_ROLE,
