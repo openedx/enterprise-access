@@ -29,6 +29,9 @@ class TestAdminPortalLearnerProfileView(TestCase):
         cls.admin_user = cls.User.objects.create_superuser(
             username='admin', password='password', email='admin@example.com'
         )
+        cls.regular_user = cls.User.objects.create_user(
+            username='user', password='password', email='user@example.com'
+        )
         cls.view = AdminLearnerProfileViewSet.as_view({'get': 'learner_profile'})
         cls.mock_subscriptions = {
             "uuid": "1b66a3c0-b001-48c9-a22e-c91d7a77b724",
@@ -74,11 +77,26 @@ class TestAdminPortalLearnerProfileView(TestCase):
             'group_name': 'Groups - 1'
         }
 
-    def authenticate_request(self, params):
+    def authenticate_request(self, params, user=None):
         """Helper method to create and authenticate a request."""
+        if user is None:
+            user = self.admin_user
         request = self.factory.get('/api/v1/admin-view/learner_profile', params)
-        force_authenticate(request, user=self.admin_user)
+        force_authenticate(request, user=user)
         return request
+
+    def test_permission_required_for_admin_learner_profile_access(self):
+        """Test that the new permission is required for accessing the admin learner profile."""
+        # Test with a regular user (should be denied)
+        request = self.authenticate_request({
+            'enterprise_customer_uuid': '123e4567-e89b-12d3-a456-426614174000',
+            'user_email': 'test@example.com',
+            'lms_user_id': 123,
+        }, user=self.regular_user)
+        response = self.view(request)
+
+        # Should be denied access (403 Forbidden)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_missing_enterprise_customer_uuid(self):
         """Test missing enterprise_customer_uuid returns 400 error."""
