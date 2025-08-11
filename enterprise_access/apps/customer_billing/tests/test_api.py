@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.customer_billing import api as customer_billing_api
+from enterprise_access.apps.customer_billing import stripe_api
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
 
@@ -52,7 +53,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         CheckoutIntent.objects.all().delete()
 
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
-    @mock.patch.object(customer_billing_api, 'stripe', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe', autospec=True)
     def test_create_free_trial_checkout_session_success(self, mock_stripe, mock_lms_client_class):
         """
         Happy path for ``create_free_trial_checkout_session()`` with checkout intent creation.
@@ -104,7 +105,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         self.assertEqual(metadata['lms_user_id'], str(self.user.lms_user_id))
 
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
-    @mock.patch.object(customer_billing_api, 'stripe', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe', autospec=True)
     def test_create_free_trial_checkout_session_success_without_user(self, mock_stripe, mock_lms_client_class):
         """
         Test that checkout session creation works without user (backwards compatibility).
@@ -131,7 +132,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
             self.assertIn('user', validation_errors)
 
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
-    @mock.patch.object(customer_billing_api, 'stripe', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe', autospec=True)
     def test_create_free_trial_checkout_session_replaces_user_intent(self, mock_stripe, mock_lms_client_class):
         """
         Test that creating a new checkout session replaces the user's existing intent.
@@ -243,7 +244,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
 
         # Setup mocks
         with mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True) as mock_lms_client_class:
-            with mock.patch.object(customer_billing_api, 'stripe', autospec=True) as mock_stripe:
+            with mock.patch.object(stripe_api, 'stripe', autospec=True) as mock_stripe:
                 mock_lms_client = mock_lms_client_class.return_value
                 mock_lms_client.get_lms_user_account.return_value = [{'id': 9876}]
                 mock_lms_client.get_enterprise_customer_data.side_effect = raise_404_error
@@ -353,7 +354,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
     )
     @ddt.unpack
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
-    @mock.patch.object(customer_billing_api, 'stripe', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe', autospec=True)
     def test_create_free_trial_checkout_session_errors(
         self,
         mock_stripe,
