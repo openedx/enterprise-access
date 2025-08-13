@@ -751,6 +751,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
     Viewset for learner credit requests.
     """
 
+    queryset = LearnerCreditRequest.objects.order_by("-created")
     serializer_class = serializers.LearnerCreditRequestSerializer
     filterset_class = LearnerCreditRequestFilterSet
 
@@ -790,7 +791,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
                 'reviewer'
             )
 
-        return queryset
+        return queryset.order_by('request_state_sort_order', '-created')
 
     def _reuse_existing_request(self, request, course_price):
         """

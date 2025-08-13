@@ -10,9 +10,8 @@ from uuid import uuid4
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Case, Value, When
+from django.db.models import Case, OuterRef, Subquery, Value, When
 from django.db.models.fields import IntegerField
-from django.db.models import OuterRef, Subquery
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from jsonfield.encoder import JSONEncoder
@@ -470,6 +469,15 @@ class LearnerCreditRequest(SubsidyRequest):
 
             # Latest action type for sorting
             latest_action_type=Subquery(latest_action_subquery.values('recent_action')[:1]),
+
+            # State-based sorting
+            request_state_sort_order=Case(
+                When(state=SubsidyRequestStates.REQUESTED, then=Value(0)),
+                When(state=SubsidyRequestStates.DECLINED, then=Value(1)),
+                When(state=SubsidyRequestStates.CANCELLED, then=Value(2)),
+                default=Value(3),
+                output_field=IntegerField(),
+            )
         )
 
         return new_queryset
@@ -486,39 +494,6 @@ class LearnerCreditRequest(SubsidyRequest):
         self.reviewer = reviewer
         self.reviewed_at = localized_utcnow()
         self.save()
-
-        self.reviewed_at = localized_utcnow()
-        self.save()
-
-    @classmethod
-    def annotate_dynamic_fields_onto_queryset(cls, queryset):
-        """
-        Annotate extra dynamic fields for DRF-supported ordering and filtering.
-
-        This method adds calculated fields to a queryset but does not apply
-        any ordering itself, allowing the caller to use the fields as needed.
-
-        Fields added:
-        * request_state_sort_order (IntegerField)
-
-        Args:
-            queryset (QuerySet): A vanilla LearnerCreditRequest queryset.
-
-        Returns:
-            QuerySet: The queryset with extra annotated fields.
-        """
-        # Annotate a sort order field to prioritize states.
-        # Lower numbers are sorted first.
-        new_queryset = queryset.annotate(
-            request_state_sort_order=Case(
-                When(state=SubsidyRequestStates.REQUESTED, then=Value(0)),
-                When(state=SubsidyRequestStates.DECLINED, then=Value(1)),
-                When(state=SubsidyRequestStates.CANCELLED, then=Value(2)),
-                default=Value(3),
-                output_field=IntegerField(),
-            )
-        )
-        return new_queryset
 
 
 class LearnerCreditRequestActions(TimeStampedModel):
