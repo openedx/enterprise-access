@@ -791,7 +791,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
                 'reviewer'
             )
 
-        return queryset
+        return queryset.order_by('request_state_sort_order', '-created')
 
     def _reuse_existing_request(self, request, course_price):
         """
