@@ -122,7 +122,6 @@ class LearnerCreditRequestActionErrorReasons:
         (EMAIL_ERROR, 'Email error'),
     )
 
-
 # Segment events
 
 

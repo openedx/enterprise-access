@@ -65,5 +65,5 @@ content_assignments.HistoricalLearnerContentAssignment:
   ".. pii_retirement:": local_api
 content_assignments.HistoricalLearnerContentAssignmentAction:
   ".. no_pii:": "This model has no PII"
-customer_billing.HistoricalEnterpriseSlugReservation:
+customer_billing.HistoricalCheckoutIntent:
   ".. no_pii:": "This model has no PII"

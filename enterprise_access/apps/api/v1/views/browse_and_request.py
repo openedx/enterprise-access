@@ -754,20 +754,43 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
     serializer_class = serializers.LearnerCreditRequestSerializer
     filterset_class = LearnerCreditRequestFilterSet
 
+    # Add ordering fields including simple action-based sorting
+    ordering_fields = [
+        'created',
+        'reviewed_at',
+        'course_price',
+        'state',
+        'user__email',
+        'course_title',
+
+        # Simple action-based sorting fields
+        'latest_action_time',
+        'latest_action_type',
+        'latest_action_status',
+    ]
+
     subsidy_type = SubsidyTypeChoices.LEARNER_CREDIT
 
     search_fields = ['user__email', 'course_title']
 
     def get_queryset(self):
         """
-        Returns a queryset of LearnerCreditRequest objects with a guaranteed
-        default sort order: 'REQUESTED' items appear first, followed by all
-        others, with each group sorted by most recently created.
+        Apply simple action-based annotations for sorting by latest action status.
         """
-        queryset = LearnerCreditRequest.objects.all()
-        queryset = LearnerCreditRequest.annotate_dynamic_fields_onto_queryset(queryset)
+        queryset = super().get_queryset()
 
-        return queryset.order_by('request_state_sort_order', '-created')
+        # Apply annotations for list views with sorting capabilities
+        if self.action in ('list', 'overview'):
+            queryset = LearnerCreditRequest.annotate_dynamic_fields_onto_queryset(
+                queryset
+            ).prefetch_related(
+                'actions',
+            ).select_related(
+                'user',
+                'reviewer'
+            )
+
+        return queryset
 
     def _reuse_existing_request(self, request, course_price):
         """

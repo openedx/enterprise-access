@@ -4,6 +4,7 @@
 # pylint: skip-file
 
 import collections
+from datetime import datetime
 from uuid import uuid4
 
 from django.conf import settings
@@ -11,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Case, Value, When
 from django.db.models.fields import IntegerField
+from django.db.models import OuterRef, Subquery
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from jsonfield.encoder import JSONEncoder
@@ -21,6 +23,7 @@ from simple_history.utils import bulk_update_with_history
 
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
+    LearnerCreditAdditionalActionStates,
     LearnerCreditRequestActionChoices,
     LearnerCreditRequestActionErrorReasons,
     LearnerCreditRequestUserMessages,
@@ -295,6 +298,26 @@ class SubsidyRequestCustomerConfiguration(TimeStampedModel):
     def _history_user(self, value):
         self.changed_by = value
 
+    def clean(self):
+        """
+        Validate that only one subsidy type can have B&R enabled at a time.
+        """
+        super().clean()
+        from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+        if self.subsidy_requests_enabled:
+            if SubsidyAccessPolicy.objects.filter(
+                enterprise_customer_uuid=self.enterprise_customer_uuid,
+                learner_credit_request_config__active=True
+            ).exists():
+                raise ValidationError(
+                    "Browse & Request is already enabled for learner credit. "
+                    "Only one subsidy type can have Browse & Request enabled at a time."
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
 
 class LearnerCreditRequestConfiguration(TimeStampedModel):
     """
@@ -317,6 +340,39 @@ class LearnerCreditRequestConfiguration(TimeStampedModel):
     )
 
     history = HistoricalRecords()
+
+    def clean(self):
+        """
+        Validate that only one subsidy type can have B&R enabled at a time.
+        """
+        super().clean()
+        from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+        if self.active:
+            policy = SubsidyAccessPolicy.objects.filter(
+                learner_credit_request_config=self
+            ).first()
+
+            if not policy:
+                return
+
+            # Check if this enterprise already has B&R enabled for other subsidy types
+            customer_config = (
+                SubsidyRequestCustomerConfiguration.objects.filter(
+                    enterprise_customer_uuid=policy.enterprise_customer_uuid,
+                    subsidy_requests_enabled=True,
+                ).first()
+            )
+
+            if customer_config:
+                raise ValidationError(
+                    f"Browse & Request is already enabled for {customer_config.subsidy_type} "
+                    f"subsidy type for enterprise {policy.enterprise_customer_uuid}. "
+                    "Only one subsidy type can have Browse & Request enabled at a time."
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class LearnerCreditRequest(SubsidyRequest):
@@ -380,6 +436,43 @@ class LearnerCreditRequest(SubsidyRequest):
         self.state = SubsidyRequestStates.APPROVED
         self.reviewed_at = localized_utcnow()
         self.save()
+
+    @classmethod
+    def annotate_dynamic_fields_onto_queryset(cls, queryset):
+        """
+        Annotate extra dynamic fields used by this viewset for DRF-supported ordering and filtering.
+
+        Fields added:
+        * latest_action_status (CharField) - Most recent action status from related actions
+        * latest_action_time (DateTimeField) - Most recent action timestamp
+        * latest_action_type (CharField) - Most recent action type
+
+        Notes:
+        * Simple subquery approach for action-based sorting that matches viewset expectations.
+
+        Args:
+            queryset (QuerySet): LearnerCreditRequest queryset, vanilla.
+
+        Returns:
+            QuerySet: LearnerCreditRequest queryset, same objects but with extra fields annotated.
+        """
+        # Simple subquery annotations for action-based sorting
+        latest_action_subquery = LearnerCreditRequestActions.objects.filter(
+            learner_credit_request=OuterRef('pk')
+        ).order_by('-created')
+
+        new_queryset = queryset.annotate(
+            # Latest action status for sorting/filtering (what the viewset expects)
+            latest_action_status=Subquery(latest_action_subquery.values('status')[:1]),
+
+            # Latest action time for sorting
+            latest_action_time=Subquery(latest_action_subquery.values('created')[:1]),
+
+            # Latest action type for sorting
+            latest_action_type=Subquery(latest_action_subquery.values('recent_action')[:1]),
+        )
+
+        return new_queryset
 
     def decline(self, reviewer, reason=None):
         self.reviewer = reviewer

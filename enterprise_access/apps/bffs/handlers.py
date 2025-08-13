@@ -14,7 +14,7 @@ from enterprise_access.apps.bffs.api import (
     invalidate_enterprise_course_enrollments_cache,
     invalidate_subscription_licenses_cache
 )
-from enterprise_access.apps.bffs.context import HandlerContext
+from enterprise_access.apps.bffs.context import BaseHandlerContext, HandlerContext
 from enterprise_access.apps.bffs.mixins import BaseLearnerDataMixin, LearnerDashboardDataMixin
 from enterprise_access.apps.bffs.serializers import EnterpriseCustomerUserSubsidiesSerializer
 
@@ -27,7 +27,7 @@ class BaseHandler:
     The `BaseHandler` includes core methods for loading data and adding errors to the context.
     """
 
-    def __init__(self, context: HandlerContext):
+    def __init__(self, context: BaseHandlerContext):
         """
         Initializes the BaseHandler with a HandlerContext.
         Args:
@@ -71,13 +71,14 @@ class BaseLearnerPortalHandler(BaseHandler, BaseLearnerDataMixin):
     The `BaseLearnerHandler` extends `BaseHandler` and provides shared core functionality
     across all learner-focused page routes, such as the learner dashboard, search, and course routes.
     """
+    context: HandlerContext
 
-    def __init__(self, context):
+    def __init__(self, context: HandlerContext):
         """
-         Initializes the BaseLearnerPortalHandler with a HandlerContext and API clients.
-         Args:
-             context (HandlerContext): The context object containing request information and data.
-         """
+        Initializes the BaseLearnerPortalHandler with a HandlerContext and API clients.
+        Args:
+            context (HandlerContext): The context object containing request information and data.
+        """
         super().__init__(context)
 
         # API Clients

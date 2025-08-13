@@ -3,6 +3,9 @@ Serializers for the checkout bff.
 """
 from rest_framework import serializers
 
+from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
+from enterprise_access.apps.customer_billing.models import CheckoutIntent
+
 
 # pylint: disable=abstract-method
 class EnterpriseCustomerSerializer(serializers.Serializer):
@@ -74,6 +77,65 @@ class FieldConstraintsSerializer(serializers.Serializer):
     enterprise_slug = SlugConstraintSerializer(help_text="Constraints for enterprise slug")
 
 
+class CheckoutIntentModelSerializer(serializers.ModelSerializer):
+    """
+    Model serializer to help convert CheckoutIntent objects to dicts
+    in the course of response building and other internal data transformations.
+    """
+    admin_portal_url = serializers.CharField(read_only=True, required=False, allow_blank=True)
+
+    class Meta:
+        model = CheckoutIntent
+        fields = '__all__'
+
+
+class CheckoutIntentMinimalResponseSerializer(serializers.Serializer):
+    """
+    Minimal serializer to represent CheckoutIntent records in BFF response payloads.
+    """
+    id = serializers.IntegerField(
+        help_text='CheckoutIntent id',
+    )
+    state = serializers.ChoiceField(
+        help_text='The current state of this record',
+        choices=CheckoutIntentState,
+    )
+    enterprise_name = serializers.CharField(
+        help_text='The enterprise name associated with this record', required=False,
+    )
+    enterprise_slug = serializers.CharField(
+        help_text='The enterprise slug associated with this record', required=False,
+    )
+    stripe_checkout_session_id = serializers.CharField(
+        help_text='The stripe checkout session id for this intent',
+        required=False,
+        allow_null=True,
+    )
+    last_checkout_error = serializers.CharField(
+        help_text='The last checkout error related to this intent',
+        required=False,
+        allow_blank=True,
+    )
+    last_provisioning_error = serializers.CharField(
+        help_text='The last provisioning error related to this intent',
+        required=False,
+        allow_blank=True,
+    )
+    workflow_id = serializers.CharField(
+        help_text='The workflow id related to this intent',
+        required=False,
+        allow_null=True,
+    )
+    expires_at = serializers.DateTimeField(
+        help_text='The expiration time of this intent',
+    )
+    admin_portal_url = serializers.CharField(
+        help_text='The admin portal URL related to this intent',
+        required=False,
+        allow_null=True,
+    )
+
+
 class CheckoutContextResponseSerializer(serializers.Serializer):
     """
     Serializer for the checkout context response.
@@ -84,6 +146,11 @@ class CheckoutContextResponseSerializer(serializers.Serializer):
     )
     pricing = PricingDataSerializer(help_text="Available pricing options")
     field_constraints = FieldConstraintsSerializer(help_text="Constraints for form fields")
+    checkout_intent = CheckoutIntentMinimalResponseSerializer(
+        required=False,
+        allow_null=True,
+        help_text="The existing ``CheckoutIntent`` for the requesting user, if any",
+    )
 
 
 # BFF Validation Serializers #

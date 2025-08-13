@@ -2,18 +2,20 @@
 Handlers for the Checkout BFF endpoints.
 """
 import logging
-from typing import Dict, List, Optional
+from typing import Dict
 
 from django.conf import settings
-from django.urls import reverse
 
-from enterprise_access.apps.api_client.lms_client import LmsApiClient, LmsUserApiClient
+from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.bffs.api import (
     get_and_cache_enterprise_customer_users,
     transform_enterprise_customer_users_data
 )
+from enterprise_access.apps.bffs.checkout.context import CheckoutContext, CheckoutValidationContext
+from enterprise_access.apps.bffs.checkout.serializers import CheckoutIntentModelSerializer
 from enterprise_access.apps.bffs.handlers import BaseHandler
 from enterprise_access.apps.customer_billing.api import validate_free_trial_checkout_session
+from enterprise_access.apps.customer_billing.models import CheckoutIntent
 from enterprise_access.apps.customer_billing.pricing_api import get_ssp_product_pricing
 
 logger = logging.getLogger(__name__)
@@ -28,15 +30,16 @@ class CheckoutContextHandler(BaseHandler):
     - Pricing options for self-service subscriptions
     - Field constraints for the checkout form
     """
+    context: CheckoutContext
 
-    def __init__(self, context):
+    def __init__(self, context: CheckoutContext):
         """
         Initialize with the request context.
 
         Args:
             context: The handler context object containing request information
         """
-        self.context = context
+        super().__init__(context)
         self.lms_client = LmsApiClient()
 
     def load_and_process(self):
@@ -50,13 +53,31 @@ class CheckoutContextHandler(BaseHandler):
         4. Gathers field constraints from settings
         5. Populates the context with all data
         """
-        # Initialize data structure
-        self.context.existing_customers_for_authenticated_user = []
-        self.context.pricing = self._get_pricing_data()
-        self.context.field_constraints = self._get_field_constraints()
+        try:
+            self.context.pricing = self._get_pricing_data()
+            self.context.field_constraints = self._get_field_constraints()
+            self.context.checkout_intent = self._get_checkout_intent()
+            if self.context.user:
+                self._load_enterprise_customers()
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.exception(
+                "Error loading/processing checkout context handler for request user %s",
+                self.context.user,
+            )
+            self.add_error(
+                user_message="Could not load and/or process checkout context data",
+                developer_message=f"Unable to load and/or process checkout context data: {exc}",
+            )
 
-        if self.context.user:
-            self._load_enterprise_customers()
+    def _get_checkout_intent(self) -> Dict | None:
+        """
+        Load checkout intent data (from database) for the given user.
+        """
+        checkout_intent_instance = CheckoutIntent.for_user(self.context.user)
+        checkout_intent_data = None
+        if checkout_intent_instance:
+            checkout_intent_data = CheckoutIntentModelSerializer(checkout_intent_instance).data
+        return checkout_intent_data
 
     def _load_enterprise_customers(self):
         """
@@ -100,7 +121,7 @@ class CheckoutContextHandler(BaseHandler):
                     })
 
             self.context.existing_customers_for_authenticated_user = formatted_customers
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.exception(
                 "Error loading enterprise customers for user: %s",
                 exc
@@ -124,7 +145,7 @@ class CheckoutContextHandler(BaseHandler):
 
             # Format the pricing data according to our API response schema
             prices = []
-            for product_key, price_data in pricing_data.items():
+            for _, price_data in pricing_data.items():
                 prices.append({
                     'id': price_data.get('id'),
                     'product': price_data.get('product', {}).get('id'),
@@ -179,10 +200,12 @@ class CheckoutValidationHandler(BaseHandler):
     """
     Handler for validating checkout form fields.
     """
-    def __init__(self, context):
-        self.context = context
+    context: CheckoutValidationContext
+
+    def __init__(self, context: CheckoutValidationContext):
+        super().__init__(context)
         self.user = getattr(context.request, 'user', None)
-        self.authenticated_user = self.user if self.user.is_authenticated else None
+        self.authenticated_user = self.user if self.user and self.user.is_authenticated else None
 
     def load_and_process(self):
         """
@@ -197,7 +220,8 @@ class CheckoutValidationHandler(BaseHandler):
         if (admin_email := request_data.get('admin_email')):
             user_exists_for_email = self._check_user_existence(admin_email)
 
-        validation_data = {k: v for k, v in request_data.items()}
+        # Create a mutable copy of the request data.
+        validation_data = dict(request_data.items())
         validation_decisions = {}
 
         # Only validate enterprise_slug if authenticated
