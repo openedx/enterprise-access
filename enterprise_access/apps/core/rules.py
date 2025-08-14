@@ -295,6 +295,76 @@ def has_implicit_access_to_provisioning_admin(_, *args, **kwargs):
     )
 
 
+# Customer Billing rule predicates:
+@rules.predicate
+def has_implicit_access_to_customer_billing_operator(_, enterprise_customer_uuid):
+    """
+    Check that if request user has implicit access to the given enterprise UUID for the
+    `CUSTOMER_BILLING_OPERATOR_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.CUSTOMER_BILLING_OPERATOR_ROLE)
+
+
+@rules.predicate
+def has_explicit_access_to_customer_billing_operator(user, enterprise_customer_uuid):
+    """
+    Check that if request user has explicit access to `CUSTOMER_BILLING_OPERATOR_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.CUSTOMER_BILLING_OPERATOR_ROLE)
+
+
+@rules.predicate
+def has_implicit_access_to_customer_billing_admin(_, enterprise_customer_uuid):
+    """
+    Check that if request user has implicit access to the given enterprise UUID for the
+    `CUSTOMER_BILLING_ADMIN_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.CUSTOMER_BILLING_ADMIN_ROLE)
+
+
+@rules.predicate
+def has_explicit_access_to_customer_billing_admin(user, enterprise_customer_uuid):
+    """
+    Check that if request user has explicit access to `CUSTOMER_BILLING_ADMIN_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.CUSTOMER_BILLING_ADMIN_ROLE)
+
+
+@rules.predicate
+def has_implicit_access_to_admin_learner_profile_admin(_, enterprise_customer_uuid):
+    """
+    Check that if request user has implicit access to the given enterprise UUID for the
+    `ADMIN_LEARNER_PROFILE_ADMIN_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.ADMIN_LEARNER_PROFILE_ADMIN_ROLE)
+
+
+@rules.predicate
+def has_explicit_access_to_admin_learner_profile_admin(user, enterprise_customer_uuid):
+    """
+    Check that if request user has explicit access to `ADMIN_LEARNER_PROFILE_ADMIN_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.ADMIN_LEARNER_PROFILE_ADMIN_ROLE)
+
+
 ######################################################
 # Consolidate implicit and explicit rule predicates. #
 ######################################################
@@ -344,6 +414,21 @@ has_bff_admin_access = (
 
 has_bff_operator_access = (
     has_implicit_access_to_bff_operator | has_explicit_access_to_bff_operator
+)
+
+
+has_customer_billing_operator_access = (
+    has_implicit_access_to_customer_billing_operator | has_explicit_access_to_customer_billing_operator
+)
+
+
+has_customer_billing_admin_access = (
+    has_implicit_access_to_customer_billing_admin | has_explicit_access_to_customer_billing_admin
+)
+
+
+has_admin_learner_profile_admin_access = (
+    has_implicit_access_to_admin_learner_profile_admin | has_explicit_access_to_admin_learner_profile_admin
 )
 
 
@@ -456,4 +541,16 @@ rules.add_perm(
 rules.add_perm(
     constants.PROVISIONING_CREATE_PERMISSION,
     has_implicit_access_to_provisioning_admin,
+)
+
+# Grants billing plan "create portal session" permissions to operators+admins.
+rules.add_perm(
+    constants.CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,
+    has_customer_billing_operator_access | has_customer_billing_admin_access,
+)
+
+# Grants admin learner profile read permission to admin learner profile admins.
+rules.add_perm(
+    constants.ADMIN_LEARNER_PROFILE_READ_PERMISSION,
+    has_admin_learner_profile_admin_access,
 )

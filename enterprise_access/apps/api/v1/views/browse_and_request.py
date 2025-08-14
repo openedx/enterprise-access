@@ -5,8 +5,8 @@ import logging
 
 from celery import chain
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
-from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -23,6 +23,7 @@ from enterprise_access.apps.api import serializers
 from enterprise_access.apps.api.constants import LICENSE_UNASSIGNED_STATUS
 from enterprise_access.apps.api.exceptions import SubsidyRequestCreationError, SubsidyRequestError
 from enterprise_access.apps.api.filters import (
+    LearnerCreditRequestFilterSet,
     SubsidyRequestCustomerConfigurationFilterBackend,
     SubsidyRequestFilterBackend
 )
@@ -43,15 +44,38 @@ from enterprise_access.apps.api.utils import (
 )
 from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClient
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
+from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.core import constants
-from enterprise_access.apps.subsidy_request.constants import SegmentEvents, SubsidyRequestStates, SubsidyTypeChoices
+from enterprise_access.apps.subsidy_access_policy.api import approve_learner_credit_request_via_policy
+from enterprise_access.apps.subsidy_access_policy.exceptions import SubisidyAccessPolicyRequestApprovalError
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+from enterprise_access.apps.subsidy_request.constants import (
+    REUSABLE_REQUEST_STATES,
+    LearnerCreditAdditionalActionStates,
+    LearnerCreditRequestActionErrorReasons,
+    SegmentEvents,
+    SubsidyRequestStates,
+    SubsidyTypeChoices
+)
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
+    LearnerCreditRequest,
+    LearnerCreditRequestActions,
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
+from enterprise_access.apps.subsidy_request.tasks import (
+    send_learner_credit_bnr_admins_email_with_new_requests_task,
+    send_learner_credit_bnr_request_approve_task,
+    send_reminder_email_for_pending_learner_credit_request
+)
+from enterprise_access.apps.subsidy_request.utils import (
+    get_action_choice,
+    get_error_reason_choice,
+    get_user_message_choice
+)
 from enterprise_access.apps.track.segment import track_event
-from enterprise_access.utils import get_subsidy_model
+from enterprise_access.utils import format_traceback, get_subsidy_model
 
 from .utils import PaginationWithPageCount
 
@@ -688,6 +712,482 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
             serialized_coupon_code_requests,
             status=status.HTTP_200_OK,
         )
+
+
+@extend_schema_view(
+    retrieve=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Retrieve a learner credit request.',
+    ),
+    list=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='List learner credit requests.',
+    ),
+    create=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Create a learner credit request.',
+    ),
+    approve=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Approve a learner credit request.',
+        request=serializers.LearnerCreditRequestApproveRequestSerializer,
+    ),
+    overview=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Learner credit request overview.',
+    ),
+    decline=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Decline a learner credit request.',
+        request=serializers.LearnerCreditRequestDeclineSerializer,
+    ),
+    cancel=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Learner credit request cancel endpoint.',
+    )
+)
+class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
+    """
+    Viewset for learner credit requests.
+    """
+
+    queryset = LearnerCreditRequest.objects.order_by("-created")
+    serializer_class = serializers.LearnerCreditRequestSerializer
+    filterset_class = LearnerCreditRequestFilterSet
+
+    # Add ordering fields including simple action-based sorting
+    ordering_fields = [
+        'created',
+        'reviewed_at',
+        'course_price',
+        'state',
+        'user__email',
+        'course_title',
+
+        # Simple action-based sorting fields
+        'latest_action_time',
+        'latest_action_type',
+        'latest_action_status',
+    ]
+
+    subsidy_type = SubsidyTypeChoices.LEARNER_CREDIT
+
+    search_fields = ['user__email', 'course_title']
+
+    def get_queryset(self):
+        """
+        Apply simple action-based annotations for sorting by latest action status.
+        """
+        queryset = super().get_queryset()
+
+        # Apply annotations for list views with sorting capabilities
+        if self.action in ('list', 'overview'):
+            queryset = LearnerCreditRequest.annotate_dynamic_fields_onto_queryset(
+                queryset
+            ).prefetch_related(
+                'actions',
+            ).select_related(
+                'user',
+                'reviewer'
+            )
+
+        return queryset
+
+    def _reuse_existing_request(self, request, course_price):
+        """
+        Reuse an existing learner credit request by resetting its state and attributes.
+        """
+        logger.info(
+            "Reusing existing learner credit request: %s for user: %s course: %s",
+            request.uuid,
+            request.user.lms_user_id,
+            request.course_id
+        )
+        request.state = SubsidyRequestStates.REQUESTED
+        request.assignment = None
+        request.course_price = course_price  # price may change by the time learner re-requests
+        request.reviewer = None
+        request.reviewed_at = None
+        request.decline_reason = None
+        request.save()  # this will handle updating course_title and partner info
+        return request
+
+    def _validate_subsidy_request(self):
+        """
+        Validate request creation:
+        - Ensure policy_uuid is provided and valid.
+        - Ensure Browse & Request is active for the policy.
+        - No duplicate PENDING/REQUESTED requests for the same course and policy.
+        """
+        policy_uuid = self.request.data.get("policy_uuid")
+        if not policy_uuid:
+            raise SubsidyRequestCreationError(
+                "policy_uuid is required.", status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            policy = SubsidyAccessPolicy.objects.get(uuid=policy_uuid)
+            self.request.validated_policy = policy  # Store validated policy for use in create
+        except SubsidyAccessPolicy.DoesNotExist as exc:
+            raise SubsidyRequestCreationError(
+                f"Invalid policy_uuid: {policy_uuid}.", status.HTTP_400_BAD_REQUEST
+            ) from exc
+
+        if not policy.bnr_enabled:
+            raise SubsidyRequestCreationError(
+                f"Browse & Request is not active for policy UUID: {policy_uuid}.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        enterprise_customer_uuid = policy.enterprise_customer_uuid
+        course_id = self.request.data.get("course_id")
+
+        if LearnerCreditRequest.objects.filter(
+            user__lms_user_id=self.lms_user_id,
+            enterprise_customer_uuid=enterprise_customer_uuid,
+            course_id=course_id,
+            state__in=[
+                SubsidyRequestStates.REQUESTED,
+                SubsidyRequestStates.APPROVED,
+                SubsidyRequestStates.ACCEPTED,
+                SubsidyRequestStates.ERROR
+            ]
+        ).exists():
+            error_msg = (
+                f"You already have an active learner credit request for course {course_id} "
+                f"under policy UUID: {policy_uuid}."
+            )
+            raise SubsidyRequestCreationError(
+                error_msg, status.HTTP_422_UNPROCESSABLE_ENTITY
+            )
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_LEARNER_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    def create(self, request, *args, **kwargs):
+        """
+        Create a learner credit request.
+        """
+        try:
+            self._validate_subsidy_request()
+        except SubsidyRequestCreationError as exc:
+            return Response({"detail": exc.message}, status=exc.http_status_code)
+
+        policy = self.request.validated_policy
+        course_id = self.request.data.get("course_id")
+        course_price = self.request.data.get("course_price")
+
+        # Check if learner is re-requesting the same course under the same policy.
+        existing_request = LearnerCreditRequest.objects.filter(
+            user__lms_user_id=request.user.lms_user_id,
+            learner_credit_request_config=policy.learner_credit_request_config,
+            course_id=course_id,
+        ).first()
+
+        # If an existing request is found in CANCELLED, EXPIRED or REVERSED state we
+        # reuse it instead of creating a new one.
+        if existing_request and existing_request.state in REUSABLE_REQUEST_STATES:
+            try:
+                self._reuse_existing_request(existing_request, course_price)
+                LearnerCreditRequestActions.create_action(
+                    learner_credit_request=existing_request,
+                    recent_action=get_action_choice(SubsidyRequestStates.REQUESTED),
+                    status=get_user_message_choice(SubsidyRequestStates.REQUESTED),
+                )
+                # Trigger admin email notification with the latest request
+                send_learner_credit_bnr_admins_email_with_new_requests_task.delay(
+                    str(policy.uuid),
+                    str(policy.learner_credit_request_config.uuid),
+                    str(existing_request.enterprise_customer_uuid)
+                )
+                response_data = serializers.LearnerCreditRequestSerializer(existing_request).data
+                return Response(response_data, status=status.HTTP_200_OK)
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.exception(
+                    "Error reusing existing learner credit request: %s Reason: %s",
+                    existing_request.uuid,
+                    exc
+                )
+                return Response(
+                    {"detail": "Failed to submit a request. Please try again."},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+
+        # Create a new learner credit request
+        request.data.update(
+            {
+                "user": request.user.lms_user_id,
+                "enterprise_customer_uuid": str(policy.enterprise_customer_uuid),
+                "learner_credit_request_config": str(
+                    policy.learner_credit_request_config.uuid
+                ),
+            }
+        )
+
+        response = super().create(request, *args, **kwargs)
+
+        # --- Record the creation action ---
+        if response.status_code in (status.HTTP_201_CREATED, status.HTTP_200_OK):
+            lcr_uuid = response.data.get("uuid")
+            if lcr_uuid:
+                try:
+                    lcr = LearnerCreditRequest.objects.get(uuid=lcr_uuid)
+                    LearnerCreditRequestActions.create_action(
+                        learner_credit_request=lcr,
+                        recent_action=get_action_choice(SubsidyRequestStates.REQUESTED),
+                        status=get_user_message_choice(SubsidyRequestStates.REQUESTED),
+                    )
+
+                    # Trigger admin email notification with the latest request
+                    send_learner_credit_bnr_admins_email_with_new_requests_task.delay(
+                        str(policy.uuid),
+                        str(policy.learner_credit_request_config.uuid),
+                        str(lcr.enterprise_customer_uuid)
+                    )
+                except LearnerCreditRequest.DoesNotExist:
+                    logger.warning(f"LearnerCreditRequest {lcr_uuid} not found for action creation.")
+
+        return response
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    @action(detail=False, url_path='approve', methods=['post'])
+    def approve(self, request, *args, **kwargs):
+        """
+        Approve a learner credit request.
+        """
+        # Validate the request data
+        serializer = serializers.LearnerCreditRequestApproveRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        learner_credit_request_uuid = serializer.data['learner_credit_request_uuid']
+        policy_uuid = serializer.data['policy_uuid']
+
+        lc_request = LearnerCreditRequest.objects.select_related('user').get(
+            uuid=learner_credit_request_uuid,
+        )
+
+        learner_email = lc_request.user.email
+        content_key = lc_request.course_id
+        content_price_cents = lc_request.course_price
+
+        # Log "approve" as recent action in the Request Action model.
+        lc_request_action = LearnerCreditRequestActions.create_action(
+            learner_credit_request=lc_request,
+            recent_action=get_action_choice(SubsidyRequestStates.APPROVED),
+            status=get_user_message_choice(SubsidyRequestStates.APPROVED),
+        )
+
+        try:
+            with transaction.atomic():
+                # Validate the policy, once validated, approve the request by creating a content assignment.
+                learner_credit_request_assignment = approve_learner_credit_request_via_policy(
+                    policy_uuid,
+                    content_key,
+                    content_price_cents,
+                    learner_email,
+                    lc_request.user.lms_user_id
+                )
+                # link allocated assignment to the request
+                lc_request.assignment = learner_credit_request_assignment
+                lc_request.save()
+                lc_request.approve(request.user)
+                send_learner_credit_bnr_request_approve_task.delay(learner_credit_request_assignment.uuid)
+            response_data = serializers.LearnerCreditRequestSerializer(lc_request).data
+            return Response(
+                response_data,
+                status=status.HTTP_200_OK,
+            )
+        except SubisidyAccessPolicyRequestApprovalError as exc:
+            error_msg = (
+                f"[LC REQUEST APPROVAL] Failed to approve learner credit request "
+                f"with UUID {learner_credit_request_uuid}. Reason: {exc.message}."
+            )
+            logger.exception(error_msg)
+
+            # Update approve action with error reason.
+            lc_request_action.status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
+            lc_request_action.error_reason = get_error_reason_choice(
+                LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL
+            )
+            lc_request_action.traceback = format_traceback(exc)
+            lc_request_action.save()
+            return Response({"detail": error_msg}, exc.status_code)
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    @action(
+        detail=False,
+        url_path='cancel',
+        methods=['post'],
+        serializer_class=serializers.LearnerCreditRequestCancelSerializer
+    )
+    def cancel(self, request, *args, **kwargs):
+        """
+        Cancel a learner credit request.
+        """
+        serializer = serializers.LearnerCreditRequestCancelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        learner_credit_request = serializer.get_learner_credit_request()
+
+        error_msg = None
+        lc_action = LearnerCreditRequestActions.create_action(
+            learner_credit_request=learner_credit_request,
+            recent_action=get_action_choice(SubsidyRequestStates.CANCELLED),
+            status=get_user_message_choice(SubsidyRequestStates.CANCELLED),
+        )
+
+        try:
+            with transaction.atomic():
+                response = assignments_api.cancel_assignments([learner_credit_request.assignment], False)
+                if response.get('non_cancelable'):
+                    error_msg = (
+                        f"Failed to cancel associated assignment with uuid: {learner_credit_request.assignment.uuid}"
+                        f" for request: {learner_credit_request.uuid}."
+                    )
+                    lc_action.error_reason = get_error_reason_choice(
+                        LearnerCreditRequestActionErrorReasons.FAILED_CANCELLATION
+                    )
+                    lc_action.status = get_user_message_choice(SubsidyRequestStates.APPROVED)
+                    lc_action.traceback = error_msg
+                    lc_action.save()
+                    return Response(error_msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+                learner_credit_request.cancel(self.user)
+                lc_action.save()
+            send_notification_email_for_request.delay(
+                str(learner_credit_request.uuid),
+                settings.BRAZE_LEARNER_CREDIT_BNR_CANCEL_NOTIFICATION_CAMPAIGN,
+                SubsidyTypeChoices.LEARNER_CREDIT,
+            )
+            logger.info(
+                f"Sent cancel notification email for learner credit request {learner_credit_request.uuid}"
+            )
+
+            serialized_request = serializers.LearnerCreditRequestSerializer(learner_credit_request).data
+            return Response(serialized_request, status=status.HTTP_200_OK)
+        except (ValidationError, IntegrityError, DatabaseError) as exc:
+            error_msg = format_traceback(exc)
+            logger.exception(error_msg)
+            lc_action.error_reason = get_error_reason_choice(
+                LearnerCreditRequestActionErrorReasons.FAILED_CANCELLATION
+            )
+            lc_action.status = get_user_message_choice(SubsidyRequestStates.APPROVED)
+            lc_action.traceback = error_msg
+            lc_action.save()
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    @action(detail=False, url_path="remind", methods=["post"])
+    def remind(self, request, *args, **kwargs):
+        """
+        Remind a Learner that their LearnerCreditRequest is Approved and waiting for their action.
+        """
+        serializer = serializers.LearnerCreditRequestRemindSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        learner_credit_request = serializer.get_learner_credit_request()
+        assignment = learner_credit_request.assignment
+
+        action_instance = LearnerCreditRequestActions.create_action(
+            learner_credit_request=learner_credit_request,
+            recent_action=get_action_choice(LearnerCreditAdditionalActionStates.REMINDED),
+            status=get_user_message_choice(LearnerCreditAdditionalActionStates.REMINDED),
+        )
+
+        try:
+            send_reminder_email_for_pending_learner_credit_request.delay(assignment.uuid)
+            return Response(status=status.HTTP_200_OK)
+        except Exception as exc:  # pylint: disable=broad-except
+            # Optionally log an errored action here if the task couldn't be queued
+            action_instance.status = get_user_message_choice(LearnerCreditRequestActionErrorReasons.EMAIL_ERROR)
+            action_instance.error_reason = str(exc)
+            action_instance.save()
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    @action(detail=False, url_path="decline", methods=["post"])
+    def decline(self, *args, **kwargs):
+        """
+        Action of declining a Learner Credit Subsidy Request
+        """
+        # Validate input using serializer
+        serializer = serializers.LearnerCreditRequestDeclineSerializer(data=self.request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Extract validated data and the already-fetched object
+        validated_data = serializer.validated_data
+        learner_credit_request = serializer.get_learner_credit_request()  # No DB query!
+        learner_credit_request_uuid = validated_data["subsidy_request_uuid"]
+        send_notification = validated_data["send_notification"]
+        disassociate_from_org = validated_data["disassociate_from_org"]
+
+        enterprise_customer_uuid = get_enterprise_uuid_from_request_data(self.request)
+
+        # Create the action instance before attempting the decline operation
+        action_instance = LearnerCreditRequestActions.create_action(
+            learner_credit_request=learner_credit_request,
+            recent_action=get_action_choice(SubsidyRequestStates.DECLINED),
+            status=get_user_message_choice(SubsidyRequestStates.DECLINED),
+        )
+
+        try:
+            with transaction.atomic():
+                learner_credit_request.decline(self.user)
+        except (ValidationError, IntegrityError, DatabaseError) as exc:
+            action_instance.status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
+            action_instance.error_reason = get_error_reason_choice(
+                LearnerCreditRequestActionErrorReasons.FAILED_DECLINE
+            )
+            action_instance.traceback = str(exc)
+            action_instance.save()
+
+            logger.exception(f"Error declining learner credit request {learner_credit_request_uuid}: {exc}")
+            return Response(
+                "An error occurred while declining the request. Please try again.",
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # Handle post-decline operations
+        serialized_request = serializers.LearnerCreditRequestSerializer(learner_credit_request).data
+        lms_user_id = serialized_request["lms_user_id"]
+
+        if send_notification:
+            send_notification_email_for_request.delay(
+                learner_credit_request_uuid,
+                settings.BRAZE_LEARNER_CREDIT_BNR_DECLINE_NOTIFICATION_CAMPAIGN,
+                SubsidyTypeChoices.LEARNER_CREDIT,
+            )
+            logger.info(
+                f"Sent decline notification email for learner credit request {learner_credit_request_uuid}"
+            )
+        if disassociate_from_org:
+            try:
+                unlink_users_from_enterprise_task.delay(enterprise_customer_uuid, [lms_user_id])
+            except (ConnectionError, TimeoutError, OSError) as exc:
+                action_instance.status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
+                action_instance.error_reason = get_error_reason_choice(
+                    LearnerCreditRequestActionErrorReasons.FAILED_DECLINE
+                )
+                action_instance.traceback = str(exc)
+                action_instance.save()
+
+                logger.exception(
+                    f"Error unlinking user from enterprise for request {learner_credit_request_uuid}: {exc}"
+                )
+
+        return Response(serialized_request, status=status.HTTP_200_OK)
 
 
 @extend_schema_view(

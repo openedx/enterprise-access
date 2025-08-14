@@ -8,13 +8,18 @@ from uuid import uuid4
 import factory
 from faker import Faker
 
+from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
+    LearnerCreditRequest,
+    LearnerCreditRequestActions,
+    LearnerCreditRequestConfiguration,
     LicenseRequest,
     SubsidyRequestCustomerConfiguration
 )
+from enterprise_access.apps.subsidy_request.utils import get_action_choice, get_user_message_choice
 
 FAKER = Faker()
 
@@ -71,3 +76,40 @@ class SubsidyRequestCustomerConfigurationFactory(factory.django.DjangoModelFacto
 
     class Meta:
         model = SubsidyRequestCustomerConfiguration
+
+
+class LearnerCreditRequestConfigurationFactory(factory.django.DjangoModelFactory):
+    """
+    Test factory for the `LearnerCreditRequestConfiguration` model.
+    """
+    uuid = factory.LazyFunction(uuid4)
+    active = True
+
+    class Meta:
+        model = LearnerCreditRequestConfiguration
+
+
+class LearnerCreditRequestFactory(SubsidyRequestFactory):
+    """
+    Test factory for the `LearnerCreditRequest` model.
+    """
+    learner_credit_request_config = factory.SubFactory(LearnerCreditRequestConfigurationFactory)
+    assignment = factory.SubFactory(LearnerContentAssignmentFactory)
+
+    class Meta:
+        model = LearnerCreditRequest
+
+
+class LearnerCreditRequestActionsFactory(factory.django.DjangoModelFactory):
+    """
+    Test factory for the `LearnerCreditRequestActions` model.
+    """
+    uuid = factory.LazyFunction(uuid4)
+    recent_action = get_action_choice(SubsidyRequestStates.REQUESTED)
+    status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
+    learner_credit_request = factory.SubFactory(LearnerCreditRequestFactory)
+    error_reason = None
+    traceback = None
+
+    class Meta:
+        model = LearnerCreditRequestActions

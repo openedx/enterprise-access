@@ -243,3 +243,18 @@ enterprise business records.
 
 Proposed March 2025, this ADR describes an abstract workflow pattern
 that will be wrapped around our provisioning implementation.
+
+`<0028-why-attrs-for-workflow.rst>`_
+***************************************
+*Feature: Self-service Provisioning and workflows*
+
+Accepted April 2025, this ADR describes the rationale
+for introducing attrs/cattrs for defining Input/Output workflow objects.
+
+`<0029-slug-reservations.rst>`_
+***************************************
+*Feature: Self-service Purchasing*
+
+Accepted June 2025, this ADR describes the rational
+for introducing the ``EnterpriseSlugReservation`` model
+and related business logic.

@@ -77,3 +77,8 @@ KAFKA_TOPICS = [
     SUBSIDY_REDEMPTION_TOPIC_NAME,
 ]
 ################### End Kafka Related Settings ##############################
+
+PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING = {
+    '1': 42,
+}
+ENABLE_CUSTOMER_BILLING_API = True

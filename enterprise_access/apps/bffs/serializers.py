@@ -150,6 +150,7 @@ class EnterpriseCustomerSerializer(BaseBffSerializer):
     enable_slug_login = serializers.BooleanField()
     disable_search = serializers.BooleanField()
     show_integration_warning = serializers.BooleanField()
+    enable_learner_credit_message_box = serializers.BooleanField()
 
 
 class EnterpriseCustomerUserSerializer(BaseBffSerializer):
@@ -161,7 +162,23 @@ class EnterpriseCustomerUserSerializer(BaseBffSerializer):
     active = serializers.BooleanField()
 
 
-class BaseResponseSerializer(BaseBffSerializer):
+class SecuredAlgoliaMetadataSerializer(BaseBffSerializer):
+    """
+    Serializer for the secured algolia key
+    """
+    secured_algolia_api_key = serializers.CharField(required=False, allow_null=True)
+    valid_until = serializers.DateTimeField(required=False, allow_null=True)
+
+
+class MinimalBffResponseSerializer(BaseBffSerializer):
+    """
+    Every response serializer should come with errors and warnings.
+    """
+    errors = ErrorSerializer(many=True, required=False, default=list)
+    warnings = WarningSerializer(many=True, required=False, default=list)
+
+
+class BaseResponseSerializer(MinimalBffResponseSerializer):
     """
     Serializer for base response.
     """
@@ -171,13 +188,11 @@ class BaseResponseSerializer(BaseBffSerializer):
     active_enterprise_customer = EnterpriseCustomerSerializer(required=False, allow_null=True)
     staff_enterprise_customer = EnterpriseCustomerSerializer(required=False, allow_null=True)
     should_update_active_enterprise_customer_user = serializers.BooleanField()
-    secured_algolia_api_key = serializers.CharField(required=False, allow_null=True)
     catalog_uuids_to_catalog_query_uuids = serializers.DictField(
         child=serializers.UUIDField(),
         help_text='Mapping of catalog UUIDs to catalog query UUIDs.',
     )
-    errors = ErrorSerializer(many=True, required=False, default=list)
-    warnings = WarningSerializer(many=True, required=False, default=list)
+    algolia = SecuredAlgoliaMetadataSerializer(required=False, allow_null=True)
     enterprise_features = serializers.DictField(required=False, default=dict)
 
 
@@ -300,7 +315,7 @@ class EnterpriseCourseEnrollmentSerializer(BaseBffSerializer):
     is_enrollment_active = serializers.BooleanField()
     is_revoked = serializers.BooleanField()
     link_to_course = serializers.URLField()
-    link_to_certificate = serializers.URLField(allow_null=True)
+    link_to_certificate = serializers.CharField(allow_null=True)
     micromasters_title = serializers.CharField(allow_null=True)
     mode = serializers.CharField()
     notifications = serializers.ListField(
@@ -372,6 +387,7 @@ class LearnerDashboardResponseSerializer(BaseLearnerPortalResponseSerializer):
 
     enterprise_course_enrollments = EnterpriseCourseEnrollmentSerializer(many=True)
     all_enrollments_by_status = LearnerEnrollmentsByStatusSerializer()
+    has_bnr_enabled_policy = serializers.BooleanField()
 
 
 class LearnerSearchResponseSerializer(BaseLearnerPortalResponseSerializer):

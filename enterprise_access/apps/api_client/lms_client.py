@@ -56,6 +56,7 @@ class LmsApiClient(BaseOAuthClient):
     pending_enterprise_admin_endpoint = enterprise_api_v1_base_url + 'pending-enterprise-admin/'
     enterprise_flex_membership_endpoint = enterprise_api_v1_base_url + 'enterprise-group-membership/'
     enterprise_course_enrollment_admin_endpoint = enterprise_api_v1_base_url + 'enterprise-course-enrollment-admin/'
+    user_accounts_endpoint = settings.LMS_URL + '/api/user/v1/accounts'
 
     def get_course_enrollments_for_learner_profile(self, enterprise_uuid, lms_user_id):
         """
@@ -151,7 +152,9 @@ class LmsApiClient(BaseOAuthClient):
             "enroll_learners_in_courses/",
         )
 
-    def get_enterprise_customer_data(self, enterprise_customer_uuid=None, enterprise_customer_slug=None):
+    def get_enterprise_customer_data(
+        self, enterprise_customer_uuid=None, enterprise_customer_slug=None, enterprise_customer_name=None,
+    ):
         """
         Gets the data for an EnterpriseCustomer for the given uuid or slug.
 
@@ -167,8 +170,10 @@ class LmsApiClient(BaseOAuthClient):
         elif enterprise_customer_slug:
             # Returns a list of dicts
             endpoint = f'{self.enterprise_customer_endpoint}?slug={enterprise_customer_slug}'
+        elif enterprise_customer_name:
+            endpoint = f'{self.enterprise_customer_endpoint}?name={enterprise_customer_name}'
         else:
-            raise ValueError('Either enterprise_customer_uuid or enterprise_customer_slug is required.')
+            raise ValueError('One of the customer uuid, slug, or name is required.')
 
         try:
             response = self.client.get(endpoint, timeout=settings.LMS_CLIENT_TIMEOUT)
@@ -281,23 +286,31 @@ class LmsApiClient(BaseOAuthClient):
         Returns:
             List of dictionaries of pending admin users.
         """
-        response = self.client.get(
-            self.pending_enterprise_admin_endpoint + f'?enterprise_customer={enterprise_customer_uuid}',
-            timeout=settings.LMS_CLIENT_TIMEOUT,
-        )
         try:
-            response.raise_for_status()
-            logger.info(
-                'Fetched pending admin records for customer %s', enterprise_customer_uuid,
-            )
-            payload = response.json()
-            return payload.get('results', [])
-        except requests.exceptions.HTTPError:
+            url = self.pending_enterprise_admin_endpoint + f'?enterprise_customer={enterprise_customer_uuid}'
+            results = []
+
+            while url:
+                response = self.client.get(url, timeout=settings.LMS_CLIENT_TIMEOUT)
+                response.raise_for_status()
+                resp_json = response.json()
+                logger.info(
+                    'Fetched pending admin records for customer %s, %s',
+                    enterprise_customer_uuid, resp_json,
+                )
+                url = resp_json['next']
+                results.extend(resp_json['results'])
+        except requests.exceptions.HTTPError as exc:
+            content = getattr(exc.response, 'content', None)
+            if content:
+                content = content.decode()
             logger.exception(
                 'Failed to fetch pending admin record for customer %s: %s',
-                enterprise_customer_uuid, response.content.decode()
+                enterprise_customer_uuid, content,
             )
             raise
+
+        return results
 
     def create_enterprise_admin_user(self, enterprise_customer_uuid, user_email):
         """
@@ -634,13 +647,12 @@ class LmsApiClient(BaseOAuthClient):
                             'recent_action': recent_action,
                             'user_email': user_email,
                         })
-            return results
         except requests.exceptions.HTTPError:
             logger.exception('Failed to fetch data from LMS. URL: [%s].', url)
         except KeyError:
             logger.exception('Incorrect data received from LMS. [%s]', url)
 
-        return None
+        return results
 
     def update_pending_learner_status(self, enterprise_group_uuid, learner_email):
         """
@@ -717,6 +729,30 @@ class LmsApiClient(BaseOAuthClient):
             )
             raise exc
 
+    def get_lms_user_account(
+        self,
+        username: str | None = None,
+        email: str | None = None,
+    ) -> dict | None:
+        """
+        Fetch LMS learner data for a given username or email.
+        """
+        if bool(username) == bool(email):
+            raise ValueError('Expected exactly one of `username` or `email`.')
+        if username:
+            query_params = {'username': username}
+        else:
+            query_params = {'email': email}
+        response = self.client.get(
+            self.user_accounts_endpoint,
+            params=query_params,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+        if response.status_code == status.HTTP_404_NOT_FOUND:
+            return None
+        response.raise_for_status()
+        return response.json()
+
 
 class LmsUserApiClient(BaseUserApiClient):
     """
@@ -733,23 +769,33 @@ class LmsUserApiClient(BaseUserApiClient):
         f'{enterprise_learner_portal_api_base_url}enterprise_course_enrollments/'
     )
 
-    def get_enterprise_customers_for_user(self, username, traverse_pagination=False):
+    def get_enterprise_customers_for_user(
+        self,
+        username: str | None = None,
+        email: str | None = None,
+        traverse_pagination: bool = False,
+    ) -> dict:
         """
-        Fetches enterprise learner data for a given username.
+        Fetches enterprise learner data for a given username or email.
 
         Arguments:
-            username (str): Username of the learner
+            username (str): Username of the learner.
+            email (str): Email of the learner.
+            traverse_pagination (bool, Optional): Read past the first page of results if True.
 
         Returns:
             dict: Dictionary representation of the JSON response from the API
         """
-        query_params = {
-            'username': username,
-        }
+        if bool(username) == bool(email):
+            raise ValueError('Expected exactly one of `username` or `email`.')
+        if username:
+            query_params = {'username': username}
+        else:
+            query_params = {'email': email}
         results = []
         initial_response_data = None
         current_response = None
-        next_url = self.enterprise_learner_endpoint
+        next_url: str | None = self.enterprise_learner_endpoint
         try:
             while next_url:
                 current_response = self.get(
@@ -781,7 +827,7 @@ class LmsUserApiClient(BaseUserApiClient):
             return consolidated_response
         except requests.exceptions.HTTPError as exc:
             logger.exception(
-                f"Failed to fetch enterprise learner for learner {username}: {exc} "
+                f"Failed to fetch enterprise learner for learner {username if username else email}: {exc} "
                 f"Response content: {current_response.content if current_response else None}"
             )
             raise

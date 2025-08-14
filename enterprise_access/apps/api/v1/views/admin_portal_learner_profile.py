@@ -4,6 +4,7 @@ REST API views for the admin_portal_learner_profile app.
 import logging
 
 from drf_spectacular.utils import extend_schema
+from edx_rbac.decorators import permission_required
 from rest_framework import permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -11,6 +12,7 @@ from rest_framework.viewsets import ViewSet
 
 from enterprise_access.apps.admin_portal_learner_profile import api as admin_portal_learner_profile_api
 from enterprise_access.apps.admin_portal_learner_profile import serializers
+from enterprise_access.apps.core.constants import ADMIN_LEARNER_PROFILE_READ_PERMISSION
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,7 @@ class AdminLearnerProfileViewSet(ViewSet):
     - enterprise_customer_uuid (string): The UUID of an enterprise customer.
     """
 
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
 
     @extend_schema(
         tags=['Admin Portal Learner Profile'],
@@ -39,6 +41,9 @@ class AdminLearnerProfileViewSet(ViewSet):
         }
     )
     @action(detail=False, methods=['get'])
+    @permission_required(
+        ADMIN_LEARNER_PROFILE_READ_PERMISSION,
+        fn=lambda request, *args, **kwargs: request.query_params.get('enterprise_customer_uuid'))
     def learner_profile(self, request):
         """
         Retrieves all licenses, subscriptions, and enrollments associated with

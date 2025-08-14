@@ -1,5 +1,6 @@
 """ API v1 URLs. """
 
+from django.conf import settings
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
@@ -14,6 +15,7 @@ router.register("policy-allocation", views.SubsidyAccessPolicyAllocateViewset, '
 router.register("subsidy-access-policies", views.SubsidyAccessPolicyViewSet, 'subsidy-access-policies')
 router.register("license-requests", views.LicenseRequestViewSet, 'license-requests')
 router.register("coupon-code-requests", views.CouponCodeRequestViewSet, 'coupon-code-requests')
+router.register('learner-credit-requests', views.LearnerCreditRequestViewSet, 'learner-credit-requests')
 router.register("customer-configurations", views.SubsidyRequestCustomerConfigurationViewSet, 'customer-configurations')
 router.register("assignment-configurations", views.AssignmentConfigurationViewSet, 'assignment-configurations')
 router.register(
@@ -31,9 +33,16 @@ router.register(
     views.AdminLearnerProfileViewSet,
     'admin-view',
 )
+if settings.ENABLE_CUSTOMER_BILLING_API:
+    router.register('customer-billing', views.CustomerBillingViewSet, 'customer-billing')
+    router.register('checkout-intent', views.CheckoutIntentViewSet, basename='checkout-intent')
+
 
 # BFFs
 router.register('bffs/learner', views.LearnerPortalBFFViewSet, 'learner-portal-bff')
+router.register('bffs/health', views.PingViewSet, 'bff-health')
+if settings.ENABLE_CUSTOMER_BILLING_API:
+    router.register('bffs/checkout', views.CheckoutBFFViewSet, 'checkout-bff')
 
 # Other endpoints
 urlpatterns = [

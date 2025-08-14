@@ -102,8 +102,9 @@ class TestLicenseManagerApiClient(TestCase):
         lm_client = LicenseManagerApiClient()
 
         result = lm_client.create_subscription_plan(
-            customer_agreement_uuid, enterprise_catalog_uuid, salesforce_opportunity_line_item,
-            title, start_date, expiration_date, desired_num_licenses, other_field='foo'
+            customer_agreement_uuid, salesforce_opportunity_line_item,
+            title, start_date, expiration_date, desired_num_licenses,
+            enterprise_catalog_uuid=enterprise_catalog_uuid, other_field='foo'
         )
 
         self.assertEqual(result, mock_post.return_value.json.return_value)
@@ -190,7 +191,10 @@ class TestLicenseManagerUserApiClient(MockLicenseManagerMetadataMixin):
 
         # Assert query parameters are correctly set
         parsed_params = parse_qs(parsed_url.query)
-        expected_params = {'enterprise_customer_uuid': [self.mock_enterprise_customer_uuid]}
+        expected_params = {
+            'enterprise_customer_uuid': [self.mock_enterprise_customer_uuid],
+            'page_size': ['100'],
+        }
         self.assertEqual(parsed_params, expected_params)
 
         # Assert headers are correctly set

@@ -5,8 +5,13 @@ import hashlib
 
 from django.apps import apps
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from edx_enterprise_subsidy_client import get_enterprise_subsidy_api_client
 from simple_history.models import HistoricalRecords, registered_models
+
+from enterprise_access.apps.subsidy_access_policy import constants
+
+from .constants import ERROR_MSG_ACTIVE_UNKNOWN_SPEND, ERROR_MSG_ACTIVE_WITH_SPEND
 
 LEDGERED_SUBSIDY_IDEMPOTENCY_KEY_PREFIX = 'ledger-for-subsidy'
 TRANSACTION_METADATA_KEYS = {
@@ -42,6 +47,21 @@ def create_idempotency_key_for_transaction(subsidy_uuid, **metadata):
     }
     hashed_metadata = hashlib.md5(str(idpk_data).encode()).hexdigest()
     return f'{LEDGERED_SUBSIDY_IDEMPOTENCY_KEY_PREFIX}-{subsidy_uuid}-{hashed_metadata}'
+
+
+def sort_subsidy_access_policies_for_redemption(queryset):
+    """
+    Sorts the query set during can-redeem by the following parameters
+           - priority (of type)
+           - expiration, sooner to expire first
+           - balance, lower balance first
+    """
+    if queryset.count() <= 1:
+        return queryset
+    return sorted(
+        queryset,
+        key=lambda p: (p.priority, p.subsidy_expiration_datetime, p.subsidy_balance())
+    )
 
 
 class ProxyAwareHistoricalRecords(HistoricalRecords):
@@ -113,3 +133,47 @@ class ProxyAwareHistoricalRecords(HistoricalRecords):
         name = self.get_history_model_name(model)
         registered_models[opts.db_table] = model
         return type(str(name), (base_history,), attrs)
+
+
+def cents_to_usd_string(cents):
+    """
+    Helper to convert cents as an int to dollars as a
+    nicely formatted string.
+    """
+    if cents is None:
+        return None
+    return "${:,.2f}".format(float(cents) / constants.CENTS_PER_DOLLAR)
+
+
+def validate_budget_deactivation_with_spend(policy_instance):
+    """
+    Raise a ValidationError if a policy would become inactive while having existing spend.
+    The error is attached to the field(s) being changed: 'active', 'retired', or both.
+    Uses original values from the database to detect changes.
+
+    A Django setting ALLOW_BUDGET_DEACTIVATION_WITH_SPEND can be set to True
+    to temporarily bypass this validation.
+    """
+    # Check if the Django setting allows bypassing this validation (for temporary use only)
+    if getattr(settings, 'ALLOW_BUDGET_DEACTIVATION_WITH_SPEND', False):
+        return
+
+    # Only validate on updates (not creates) and only when deactivating
+    if not policy_instance.pk or policy_instance.active:
+        return
+
+    # For updates, check if we're actually changing from active to inactive
+    try:
+        original = type(policy_instance).objects.get(pk=policy_instance.pk)
+        if original.active == policy_instance.active:
+            return  # No change to active status
+    except ObjectDoesNotExist:
+        return  # Can't determine original state, skip validation
+
+    try:
+        total_redeemed = policy_instance.total_redeemed
+    except Exception as exc:
+        raise ValidationError({'active': ERROR_MSG_ACTIVE_UNKNOWN_SPEND}) from exc
+
+    if total_redeemed < 0:  # total_redeemed is negative
+        raise ValidationError({'active': ERROR_MSG_ACTIVE_WITH_SPEND})

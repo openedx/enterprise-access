@@ -3,10 +3,21 @@ Filter backends for Enterprise Access API.
 """
 
 from django.db.models import Q
+from django_filters import CharFilter
+from django_filters import rest_framework as drf_filters
 from edx_rbac import utils
 from rest_framework import filters
 
 from enterprise_access.apps.core import constants
+from enterprise_access.apps.subsidy_request.constants import LearnerCreditRequestActionChoices
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
+
+from .base import CharInFilter
+
+LATEST_ACTION_STATUS_HELP_TEXT = (
+    'Choose from the following valid action statuses: ' +
+    ', '.join([choice for choice, _ in LearnerCreditRequestActionChoices])
+)
 
 
 class SubsidyRequestFilterBackend(filters.BaseFilterBackend):
@@ -89,3 +100,27 @@ class SubsidyRequestCustomerConfigurationFilterBackend(filters.BaseFilterBackend
         return queryset.filter(
             Q(enterprise_customer_uuid__in=accessible_enterprises_as_admin.union(accessible_enterprises_as_learner))
         )
+
+
+class LearnerCreditRequestFilterSet(drf_filters.FilterSet):
+    """
+    Custom FilterSet for LearnerCreditRequest to allow filtering by policy_uuid and latest_action_status.
+    """
+
+    policy_uuid = drf_filters.UUIDFilter(field_name='learner_credit_request_config__learner_credit_config__uuid')
+
+    # Add filtering support for annotated field
+    latest_action_status = CharFilter(
+        field_name='latest_action_status',
+        lookup_expr='exact',
+        help_text=LATEST_ACTION_STATUS_HELP_TEXT,
+    )
+    latest_action_status__in = CharInFilter(
+        field_name='latest_action_status',
+        lookup_expr='in',
+        help_text=LATEST_ACTION_STATUS_HELP_TEXT,
+    )
+
+    class Meta:
+        model = LearnerCreditRequest
+        fields = ['uuid', 'user__email', 'course_id', 'enterprise_customer_uuid', 'policy_uuid']

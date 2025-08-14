@@ -5,8 +5,13 @@ import logging
 
 from rest_framework import serializers
 
+from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
+    LearnerCreditRequest,
+    LearnerCreditRequestActions,
+    LearnerCreditRequestConfiguration,
     LicenseRequest,
     SubsidyRequest,
     SubsidyRequestCustomerConfiguration
@@ -121,3 +126,253 @@ class SubsidyRequestCustomerConfigurationSerializer(serializers.ModelSerializer)
         # Pop enterprise_customer_uuid so that it's read-only for updates.
         validated_data.pop('enterprise_customer_uuid', None)
         return super().update(instance, validated_data)
+
+
+class LearnerCreditRequestConfigurationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the `LearnerCreditRequestConfiguration` model.
+    """
+
+    class Meta:
+        model = LearnerCreditRequestConfiguration
+        fields = "__all__"
+        read_only_fields = ["uuid", "created", "modified"]
+
+
+class LearnerCreditRequestSerializer(SubsidyRequestSerializer):
+    """
+    Serializer for the `LearnerCreditRequest` model.
+    """
+
+    learner_credit_request_config = serializers.PrimaryKeyRelatedField(
+        queryset=LearnerCreditRequestConfiguration.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    assignment = serializers.PrimaryKeyRelatedField(
+        queryset=LearnerContentAssignment.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    course_price = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Cost of the content in USD Cents.",
+    )
+    latest_action = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LearnerCreditRequest
+        fields = SubsidyRequestSerializer.Meta.fields + [
+            "learner_credit_request_config",
+            "assignment",
+            "course_price",
+            "latest_action",
+        ]
+        read_only_fields = SubsidyRequestSerializer.Meta.read_only_fields + [
+            "latest_action",
+        ]
+        extra_kwargs = SubsidyRequestSerializer.Meta.extra_kwargs
+
+    def get_latest_action(self, obj):
+        """
+        Returns the latest action for this learner credit request, if any exists.
+        """
+        latest_action = obj.actions.order_by('-created').first()
+        if latest_action:
+            return LearnerCreditRequestActionsSerializer(latest_action).data
+        return None
+
+
+class LearnerCreditRequestActionsSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the `LearnerCreditRequestActions` model.
+    """
+
+    class Meta:
+        model = LearnerCreditRequestActions
+        fields = [
+            'uuid',
+            'recent_action',
+            'status',
+            'error_reason',
+            'traceback',
+            'created',
+            'modified',
+            'learner_credit_request',
+        ]
+        read_only_fields = [
+            'uuid',
+            'created',
+            'modified',
+        ]
+        extra_kwargs = {
+            'learner_credit_request': {'write_only': True},
+        }
+
+
+class LearnerCreditRequestDeclineSerializer(serializers.Serializer):
+    """
+    Serializer for declining a learner credit request.
+    """
+
+    subsidy_request_uuid = serializers.UUIDField(
+        required=True, help_text="UUID of the learner credit request to decline"
+    )
+    send_notification = serializers.BooleanField(
+        default=False, help_text="Whether to send decline notification email to the learner"
+    )
+    disassociate_from_org = serializers.BooleanField(
+        default=False, help_text="Whether to unlink the user from the enterprise organization"
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._learner_credit_request = None
+
+    def validate_subsidy_request_uuid(self, value):
+        """
+        Validate that the subsidy request exists and can be declined.
+        """
+        try:
+            learner_credit_request = LearnerCreditRequest.objects.get(uuid=value)
+        except LearnerCreditRequest.DoesNotExist as exc:
+            raise serializers.ValidationError(f"Learner Credit Request with UUID {value} not found.") from exc
+
+        if learner_credit_request.state not in [SubsidyRequestStates.REQUESTED]:
+            raise serializers.ValidationError(
+                f'Learner Credit Request with UUID {value} cannot be declined. '
+                f'Current state: {learner_credit_request.state}'
+            )
+
+        # Store the fetched object for later use
+        self._learner_credit_request = learner_credit_request
+
+        return value
+
+    def get_learner_credit_request(self):
+        """
+        Return the already-fetched LearnerCreditRequest object
+        """
+        return self._learner_credit_request
+
+    def create(self, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
+
+    def update(self, instance, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
+
+
+class LearnerCreditRequestApproveRequestSerializer(serializers.Serializer):
+    """
+    Request Serializer to validate subsidy-request ``approve`` endpoint POST data.
+
+    For view: LearnerCreditRequestViewSet.approve
+    """
+    policy_uuid = serializers.UUIDField(
+        required=True,
+        help_text='The UUID of the policy to which the request belongs.',
+    )
+    enterprise_customer_uuid = serializers.UUIDField(
+        required=True,
+        help_text='The UUID of the Enterprise Customer.',
+    )
+    learner_credit_request_uuid = serializers.UUIDField(
+        required=True,
+        help_text='The UUID of the LearnerCreditRequest to be approved.',
+    )
+
+    def create(self, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
+
+    def update(self, instance, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
+
+
+# pylint: disable=abstract-method
+class LearnerCreditRequestCancelSerializer(serializers.Serializer):
+    """
+    Request serializer to validate cancel endpoint query params.
+
+    For view: LearnerCreditRequestViewSet.cancel
+    """
+    request_uuid = serializers.UUIDField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._learner_credit_request = None
+
+    def validate_request_uuid(self, value):
+        """
+        Validate that the learner credit request exists and store it for later use.
+        """
+        try:
+            learner_credit_request = LearnerCreditRequest.objects.get(uuid=value)
+            self._learner_credit_request = learner_credit_request
+            return value
+        except LearnerCreditRequest.DoesNotExist as exc:
+            raise serializers.ValidationError(f"Learner credit request with uuid {value} not found.") from exc
+
+    def get_learner_credit_request(self):
+        """
+        Return the already-fetched learner credit request object.
+        """
+        return getattr(self, '_learner_credit_request', None)
+
+
+class LearnerCreditRequestRemindSerializer(serializers.Serializer):
+    """
+    Request serializer to validate remind endpoint for a LearnerCreditRequest.
+
+    For view: LearnerCreditRequestViewSet.remind
+    """
+    learner_credit_request_uuid = serializers.UUIDField(
+        required=True,
+        help_text="The UUID of the LearnerCreditRequest to be reminded."
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._learner_credit_request = None
+
+    def validate_learner_credit_request_uuid(self, value):
+        """
+        Validate that the learner credit request exists, has an associated assignment,
+        and is in a state where a reminder is appropriate.
+        """
+        try:
+            learner_credit_request = LearnerCreditRequest.objects.select_related('assignment').get(uuid=value)
+        except LearnerCreditRequest.DoesNotExist as exc:
+            raise serializers.ValidationError(f"Learner credit request with uuid {value} not found.") from exc
+
+        if learner_credit_request.state != SubsidyRequestStates.APPROVED:
+            raise serializers.ValidationError(
+                f"Cannot send a reminder for a request in the '{learner_credit_request.state}' state. "
+                "Reminders can only be sent for 'APPROVED' requests."
+            )
+
+        if not learner_credit_request.assignment:
+            raise serializers.ValidationError(
+                f"The learner credit request with uuid {value} does not have an associated assignment."
+            )
+
+        self._learner_credit_request = learner_credit_request
+        return value
+
+    def get_learner_credit_request(self):
+        """
+        Return the already-fetched learner credit request object.
+        """
+        return getattr(self, '_learner_credit_request', None)

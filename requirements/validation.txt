@@ -148,6 +148,10 @@ coverage[toml]==7.10.3
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pytest-cov
+crispy-bootstrap5==2025.6
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
 cryptography==45.0.6
     # via
     #   -r requirements/quality.txt
@@ -184,8 +188,10 @@ django==4.2.23
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
+    #   crispy-bootstrap5
     #   django-celery-results
     #   django-cors-headers
+    #   django-crispy-forms
     #   django-crum
     #   django-extensions
     #   django-filter
@@ -222,6 +228,11 @@ django-countries==7.6.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
+django-crispy-forms==2.4
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   crispy-bootstrap5
 django-crum==0.7.9
     # via
     #   -r requirements/quality.txt
@@ -492,7 +503,7 @@ kombu==5.5.4
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   celery
-markdown-it-py==4.0.0
+markdown-it-py==3.0.0
     # via
     #   -r requirements/quality.txt
     #   rich
@@ -731,6 +742,7 @@ requests==2.32.4
     #   requests-oauthlib
     #   requests-toolbelt
     #   social-auth-core
+    #   stripe
     #   twine
 requests-oauthlib==2.0.0
     # via
@@ -811,6 +823,10 @@ stevedore==5.4.1
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
+stripe==12.4.0
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
 text-unidecode==1.3
     # via
     #   -r requirements/quality.txt
@@ -835,6 +851,7 @@ typing-extensions==4.14.1
     #   django-countries
     #   edx-opaque-keys
     #   referencing
+    #   stripe
 tzdata==2025.2
     # via
     #   -r requirements/quality.txt

@@ -159,18 +159,16 @@ class LicenseManagerApiClient(BaseOAuthClient):
             raise
 
     def create_subscription_plan(
-        self, customer_agreement_uuid, enterprise_catalog_uuid, salesforce_opportunity_line_item,
-        title, start_date, expiration_date, desired_num_licenses,
+        self, customer_agreement_uuid, salesforce_opportunity_line_item, title,
+        start_date, expiration_date, desired_num_licenses, enterprise_catalog_uuid=None, product_id=None,
         **kwargs,
     ):
         """
         Creates a Subscription Plan associated with the provided customer agreement.
         """
-
         endpoint = self.subscription_provisioning_endpoint
         payload = {
             'customer_agreement': str(customer_agreement_uuid),
-            'enterprise_catalog_uuid': str(enterprise_catalog_uuid),
             'salesforce_opportunity_line_item': salesforce_opportunity_line_item,
             'title': title,
             'start_date': start_date,
@@ -178,10 +176,14 @@ class LicenseManagerApiClient(BaseOAuthClient):
             'desired_num_licenses': desired_num_licenses,
             'change_reason': NEW_SUBSCRIPTION_CHANGE_REASON,
             'for_internal_use_only': settings.PROVISIONING_DEFAULTS['subscription']['for_internal_use_only'],
-            'product': settings.PROVISIONING_DEFAULTS['subscription']['product_id'],
+            'product': product_id or settings.PROVISIONING_DEFAULTS['subscription']['product_id'],
             'is_active': settings.PROVISIONING_DEFAULTS['subscription']['is_active'],
         }
+
         payload.update(kwargs)
+        if enterprise_catalog_uuid:
+            payload['enterprise_catalog_uuid'] = str(enterprise_catalog_uuid)
+
         response = self.client.post(endpoint, json=payload)
         try:
             response.raise_for_status()
@@ -219,6 +221,7 @@ class LicenseManagerUserApiClient(BaseUserApiClient):
         """
         query_params = {
             'enterprise_customer_uuid': enterprise_customer_uuid,
+            'page_size': 100,
             **kwargs,
         }
         url = self.learner_licenses_endpoint

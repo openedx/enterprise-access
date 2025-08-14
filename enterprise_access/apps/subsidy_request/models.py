@@ -4,11 +4,13 @@
 # pylint: skip-file
 
 import collections
+from datetime import datetime
 from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import OuterRef, Subquery
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from jsonfield.encoder import JSONEncoder
@@ -19,6 +21,10 @@ from simple_history.utils import bulk_update_with_history
 
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
+    LearnerCreditAdditionalActionStates,
+    LearnerCreditRequestActionChoices,
+    LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestUserMessages,
     SubsidyRequestStates,
     SubsidyTypeChoices
 )
@@ -132,9 +138,9 @@ class SubsidyRequest(TimeStampedModel, SoftDeletableModel):
 
     class Meta:
         abstract = True
-        index_together = [
-            ['uuid', 'state'],
-            ['user', 'enterprise_customer_uuid', 'state', 'course_id']
+        indexes = [
+            models.Index(fields=['uuid', 'state']),
+            models.Index(fields=['user', 'enterprise_customer_uuid', 'state', 'course_id']),
         ]
 
 
@@ -290,25 +296,25 @@ class SubsidyRequestCustomerConfiguration(TimeStampedModel):
     def _history_user(self, value):
         self.changed_by = value
 
+    def clean(self):
+        """
+        Validate that only one subsidy type can have B&R enabled at a time.
+        """
+        super().clean()
+        from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+        if self.subsidy_requests_enabled:
+            if SubsidyAccessPolicy.objects.filter(
+                enterprise_customer_uuid=self.enterprise_customer_uuid,
+                learner_credit_request_config__active=True
+            ).exists():
+                raise ValidationError(
+                    "Browse & Request is already enabled for learner credit. "
+                    "Only one subsidy type can have Browse & Request enabled at a time."
+                )
 
-@receiver(models.signals.post_save, sender=CouponCodeRequest)
-@receiver(models.signals.post_save, sender=LicenseRequest)
-def update_course_info_for_subsidy_request(sender, **kwargs):  # pylint: disable=unused-argument
-    """ Post save hook to grab course info from discovery service """
-
-    subsidy_request = kwargs['instance']
-    if subsidy_request.course_title and subsidy_request.course_partners:
-        return
-
-    if isinstance(subsidy_request, CouponCodeRequest):
-        subsidy_type = SubsidyTypeChoices.COUPON
-    else:
-        subsidy_type = SubsidyTypeChoices.LICENSE
-
-    update_course_info_for_subsidy_request_task.delay(
-        subsidy_type,
-        str(subsidy_request.uuid),
-    )
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class LearnerCreditRequestConfiguration(TimeStampedModel):
@@ -332,6 +338,39 @@ class LearnerCreditRequestConfiguration(TimeStampedModel):
     )
 
     history = HistoricalRecords()
+
+    def clean(self):
+        """
+        Validate that only one subsidy type can have B&R enabled at a time.
+        """
+        super().clean()
+        from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+        if self.active:
+            policy = SubsidyAccessPolicy.objects.filter(
+                learner_credit_request_config=self
+            ).first()
+
+            if not policy:
+                return
+
+            # Check if this enterprise already has B&R enabled for other subsidy types
+            customer_config = (
+                SubsidyRequestCustomerConfiguration.objects.filter(
+                    enterprise_customer_uuid=policy.enterprise_customer_uuid,
+                    subsidy_requests_enabled=True,
+                ).first()
+            )
+
+            if customer_config:
+                raise ValidationError(
+                    f"Browse & Request is already enabled for {customer_config.subsidy_type} "
+                    f"subsidy type for enterprise {policy.enterprise_customer_uuid}. "
+                    "Only one subsidy type can have Browse & Request enabled at a time."
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class LearnerCreditRequest(SubsidyRequest):
@@ -359,6 +398,12 @@ class LearnerCreditRequest(SubsidyRequest):
         help_text="The learner credit request configuration associated with this request.",
     )
 
+    course_price = models.BigIntegerField(
+        null=True,
+        blank=True,
+        help_text="Cost of the content in USD Cents.",
+    )
+
     history = HistoricalRecords()
 
     class Meta:
@@ -366,7 +411,13 @@ class LearnerCreditRequest(SubsidyRequest):
             models.UniqueConstraint(
                 fields=['user', 'enterprise_customer_uuid', 'course_id'],
                 name='unique_learner_course_request',
-                condition=models.Q(state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.PENDING]),
+                condition=models.Q(
+                    state__in=[
+                        SubsidyRequestStates.REQUESTED,
+                        SubsidyRequestStates.APPROVED,
+                        SubsidyRequestStates.ERROR,
+                        SubsidyRequestStates.ACCEPTED
+                    ]),
             )
         ]
 
@@ -384,9 +435,178 @@ class LearnerCreditRequest(SubsidyRequest):
         self.reviewed_at = localized_utcnow()
         self.save()
 
+    @classmethod
+    def annotate_dynamic_fields_onto_queryset(cls, queryset):
+        """
+        Annotate extra dynamic fields used by this viewset for DRF-supported ordering and filtering.
+
+        Fields added:
+        * latest_action_status (CharField) - Most recent action status from related actions
+        * latest_action_time (DateTimeField) - Most recent action timestamp
+        * latest_action_type (CharField) - Most recent action type
+
+        Notes:
+        * Simple subquery approach for action-based sorting that matches viewset expectations.
+
+        Args:
+            queryset (QuerySet): LearnerCreditRequest queryset, vanilla.
+
+        Returns:
+            QuerySet: LearnerCreditRequest queryset, same objects but with extra fields annotated.
+        """
+        # Simple subquery annotations for action-based sorting
+        latest_action_subquery = LearnerCreditRequestActions.objects.filter(
+            learner_credit_request=OuterRef('pk')
+        ).order_by('-created')
+
+        new_queryset = queryset.annotate(
+            # Latest action status for sorting/filtering (what the viewset expects)
+            latest_action_status=Subquery(latest_action_subquery.values('status')[:1]),
+
+            # Latest action time for sorting
+            latest_action_time=Subquery(latest_action_subquery.values('created')[:1]),
+
+            # Latest action type for sorting
+            latest_action_type=Subquery(latest_action_subquery.values('recent_action')[:1]),
+        )
+
+        return new_queryset
+
     def decline(self, reviewer, reason=None):
         self.reviewer = reviewer
         self.state = SubsidyRequestStates.DECLINED
         self.decline_reason = reason
         self.reviewed_at = localized_utcnow()
         self.save()
+
+    def cancel(self, reviewer):
+        self.state = SubsidyRequestStates.CANCELLED
+        self.reviewer = reviewer
+        self.reviewed_at = localized_utcnow()
+        self.save()
+
+
+class LearnerCreditRequestActions(TimeStampedModel):
+    """
+    Stores information related to actions performed on a learner credit request.
+
+    .. no_pii: This model has no PII
+    """
+    uuid = models.UUIDField(
+        primary_key=True,
+        default=uuid4,
+        editable=False,
+        unique=True,
+    )
+
+    learner_credit_request = models.ForeignKey(
+        LearnerCreditRequest,
+        related_name="actions",
+        on_delete=models.CASCADE,
+        help_text="The learner credit request associated with this action."
+    )
+
+    recent_action = models.CharField(
+        max_length=25,
+        blank=False,
+        null=False,
+        db_index=True,
+        choices=LearnerCreditRequestActionChoices,
+        help_text="The type of action taken on the learner credit request.",
+    )
+
+    status = models.CharField(
+        max_length=25,
+        blank=False,
+        null=False,
+        db_index=True,
+        choices=LearnerCreditRequestUserMessages.CHOICES,
+        help_text="The message shown to the user about the request status.",
+    )
+
+    error_reason = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        db_index=True,
+        choices=LearnerCreditRequestActionErrorReasons.CHOICES,
+        help_text="The type of error that occurred during the action, if any.",
+    )
+
+    traceback = models.TextField(
+        blank=True,
+        null=True,
+        editable=False,
+        help_text="Any traceback we recorded when an error was encountered.",
+    )
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ['created']
+        verbose_name = "Learner Credit Request Action"
+        verbose_name_plural = "Learner Credit Request Actions"
+
+    def __str__(self):
+        return (f"<LearnerCreditRequestActions for request {self.learner_credit_request}"
+                f" with action {self.recent_action}>")
+
+    @classmethod
+    def create_action(
+        cls,
+        learner_credit_request,
+        recent_action,
+        status,
+        error_reason=None,
+        traceback=None,
+    ):
+        """
+        Utility method to create a new LearnerCreditRequestActions instance.
+
+        Args:
+            learner_credit_request (LearnerCreditRequest): The associated learner credit request.
+            recent_action (str): The type of action taken (must be a valid choice from
+                LearnerCreditRequestActionChoices).
+            status (str): The status message (must be a valid choice from LearnerCreditRequestUserMessages.CHOICES).
+            error_reason (str, optional): The error reason if applicable (must be a valid choice
+                from LearnerCreditRequestActionErrorReasons.CHOICES).
+            traceback (str, optional): Any traceback information for debugging.
+
+        Returns:
+            LearnerCreditRequestActions: The created instance.
+
+        Raises:
+            ValidationError: If any of the provided values are invalid.
+            ValueError: If required parameters are missing or invalid.
+        """
+        # Create the instance
+        try:
+            action = cls(
+                learner_credit_request=learner_credit_request,
+                recent_action=recent_action,
+                status=status,
+                error_reason=error_reason,
+                traceback=traceback,
+            )
+            action.full_clean()
+            action.save()
+            return action
+        except ValidationError as e:
+            raise ValidationError(f"Failed to create LearnerCreditRequestActions: {e}")
+        except Exception as e:
+            raise ValueError(f"Unexpected error creating LearnerCreditRequestActions: {e}")
+
+
+@receiver(models.signals.post_save, sender=CouponCodeRequest)
+@receiver(models.signals.post_save, sender=LicenseRequest)
+@receiver(models.signals.post_save, sender=LearnerCreditRequest)
+def update_course_info_for_subsidy_request(sender, **kwargs):
+    subsidy_request = kwargs['instance']
+    if subsidy_request.course_title and subsidy_request.course_partners:
+        return
+
+    model_name = subsidy_request.__class__.__name__
+    update_course_info_for_subsidy_request_task.delay(
+        model_name,
+        str(subsidy_request.uuid),
+    )

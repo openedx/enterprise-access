@@ -156,10 +156,11 @@ class APITest(APITestCase):
         request.COOKIES[jwt_cookie_name()] = jwt_token
         return request
 
-    def set_jwt_cookie(self, roles_and_contexts=[]):
+    def set_jwt_cookie(self, roles_and_contexts=[], user=None):
         """
         Set jwt token in cookies.
         """
+        user_obj = user or self.user
         if not roles_and_contexts:
             roles_and_contexts = [{
                 'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -177,10 +178,10 @@ class APITest(APITestCase):
 
             roles.append(role_data)
 
-        payload = generate_unversioned_payload(self.user)
+        payload = generate_unversioned_payload(user_obj)
         payload.update({
             'roles': roles,
-            'user_id': self.user.lms_user_id,
+            'user_id': user_obj.lms_user_id,
         })
         jwt_token = generate_jwt_token(payload)
 

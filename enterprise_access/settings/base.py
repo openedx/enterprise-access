@@ -4,12 +4,15 @@ from os.path import abspath, dirname, join
 from corsheaders.defaults import default_headers as corsheaders_default_headers
 
 from enterprise_access.apps.core.constants import (
+    ADMIN_LEARNER_PROFILE_ADMIN_ROLE,
     BFF_ADMIN_ROLE,
     BFF_LEARNER_ROLE,
     BFF_OPERATOR_ROLE,
     CONTENT_ASSIGNMENTS_ADMIN_ROLE,
     CONTENT_ASSIGNMENTS_LEARNER_ROLE,
     CONTENT_ASSIGNMENTS_OPERATOR_ROLE,
+    CUSTOMER_BILLING_ADMIN_ROLE,
+    CUSTOMER_BILLING_OPERATOR_ROLE,
     PROVISIONING_ADMIN_ROLE,
     REQUESTS_ADMIN_ROLE,
     REQUESTS_LEARNER_ROLE,
@@ -57,6 +60,8 @@ INSTALLED_APPS = (
 
 THIRD_PARTY_APPS = (
     'corsheaders',
+    'crispy_forms',
+    'crispy_bootstrap5',
     'csrf.apps.CsrfAppConfig',  # Enables frontend apps to retrieve CSRF tokens,
     'djangoql',
     'django_celery_results',
@@ -82,6 +87,7 @@ PROJECT_APPS = (
     'enterprise_access.apps.enterprise_groups',
     'enterprise_access.apps.bffs',
     'enterprise_access.apps.provisioning',
+    'enterprise_access.apps.customer_billing',
 )
 
 INSTALLED_APPS += THIRD_PARTY_APPS
@@ -171,6 +177,9 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'PAGE_SIZE': 100,
     'TEST_REQUEST_DEFAULT_FORMAT': 'json',
+    'DEFAULT_THROTTLE_RATES': {
+        'bff_unauthenticated': '100/hour',
+    },
 }
 
 # DRF Spectacular settings
@@ -190,7 +199,6 @@ TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
-USE_L10N = True
 
 USE_TZ = True
 
@@ -334,6 +342,7 @@ SYSTEM_TO_FEATURE_ROLE_MAPPING = {
         REQUESTS_ADMIN_ROLE,
         BFF_OPERATOR_ROLE,
         PROVISIONING_ADMIN_ROLE,
+        CUSTOMER_BILLING_OPERATOR_ROLE,
     ],
     SYSTEM_ENTERPRISE_ADMIN_ROLE: [
         # enterprise admins only need learner-level access to Subsidy Access Policy APIs since they aren't responsible
@@ -342,6 +351,8 @@ SYSTEM_TO_FEATURE_ROLE_MAPPING = {
         CONTENT_ASSIGNMENTS_ADMIN_ROLE,
         REQUESTS_ADMIN_ROLE,
         BFF_ADMIN_ROLE,
+        CUSTOMER_BILLING_ADMIN_ROLE,
+        ADMIN_LEARNER_PROFILE_ADMIN_ROLE,
     ],
     SYSTEM_ENTERPRISE_LEARNER_ROLE: [
         SUBSIDY_ACCESS_POLICY_LEARNER_ROLE,
@@ -487,6 +498,13 @@ ECOMMERCE_CLIENT_TIMEOUT = os.environ.get('ECOMMERCE_CLIENT_TIMEOUT', 45)
 DISCOVERY_CLIENT_TIMEOUT = os.environ.get('DISCOVERY_CLIENT_TIMEOUT', 45)
 SUBSIDY_CLIENT_TIMEOUT = os.environ.get('SUBSIDY_CLIENT_TIMEOUT', 45)
 
+# Braze campaigns for learner credit browse and request(apps.subsidy_request)
+BRAZE_LEARNER_CREDIT_BNR_APPROVED_NOTIFICATION_CAMPAIGN = ''
+BRAZE_LEARNER_CREDIT_BNR_REMIND_NOTIFICATION_CAMPAIGN = ''
+BRAZE_LEARNER_CREDIT_BNR_DECLINE_NOTIFICATION_CAMPAIGN = ''
+BRAZE_LEARNER_CREDIT_BNR_CANCEL_NOTIFICATION_CAMPAIGN = ''
+BRAZE_LEARNER_CREDIT_BNR_NEW_REQUESTS_NOTIFICATION_CAMPAIGN = ''
+
 # Braze campaigns for browse and request (apps.subsidy_request)
 BRAZE_NEW_REQUESTS_NOTIFICATION_CAMPAIGN = ''
 BRAZE_APPROVE_NOTIFICATION_CAMPAIGN = ''
@@ -496,6 +514,10 @@ BRAZE_AUTO_DECLINE_NOTIFICATION_CAMPAIGN = ''
 # Braze campaigns for content assignments (apps.content_assignments)
 BRAZE_ASSIGNMENT_NOTIFICATION_CAMPAIGN = ''
 BRAZE_ASSIGNMENT_REMINDER_NOTIFICATION_CAMPAIGN = ''
+
+# Budget deactivation settings
+ALLOW_BUDGET_DEACTIVATION_WITH_SPEND = False
+
 BRAZE_ASSIGNMENT_REMINDER_POST_LOGISTRATION_NOTIFICATION_CAMPAIGN = ''
 BRAZE_ASSIGNMENT_NUDGE_EXEC_ED_ACCEPTED_ASSIGNMENT_CAMPAIGN = ''
 BRAZE_ASSIGNMENT_CANCELLED_NOTIFICATION_CAMPAIGN = ''
@@ -529,6 +551,7 @@ ENTERPRISE_COURSE_ENROLLMENTS_CACHE_TIMEOUT = 0  # 0 seconds (no caching, as enr
 SUBSIDY_RECORD_CACHE_TIMEOUT = DEFAULT_CACHE_TIMEOUT
 DEFAULT_ENTERPRISE_ENROLLMENT_INTENTIONS_CACHE_TIMEOUT = DEFAULT_CACHE_TIMEOUT
 ALL_ENTERPRISE_GROUP_MEMBERS_CACHE_TIMEOUT = DEFAULT_CACHE_TIMEOUT
+SECURED_ALGOLIA_API_KEY_CACHE_TIMEOUT = 60 * 30  # 30 minutes
 
 BRAZE_GROUP_EMAIL_FORCE_REMIND_ALL_PENDING_LEARNERS = False
 BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_5_CAMPAIGN = ''
@@ -545,8 +568,6 @@ BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_85_CAMPAIGN = ''
 SALES_CONTRACT_REFERENCE_PROVIDER_NAME = 'Salesforce OpportunityLineItem'
 SALES_CONTRACT_REFERENCE_PROVIDER_SLUG = 'salesforce_opportunity_line_item'
 
-# Settings for creation of enterprise customers
-
 PROVISIONING_DEFAULTS = {
     'customer': {
         'site_domain': 'example.com',
@@ -555,8 +576,65 @@ PROVISIONING_DEFAULTS = {
         'is_active': True,
         'product_id': 1,
         'for_internal_use_only': True,
+        'all_product_choices': [
+            (1, 'Standard Paid'),
+            (2, 'Trial'),
+        ],
+        'trial_product_choices': [
+            (1, 'Standard Paid'),
+        ],
+        'trial_catalog_query_choices': [
+            (2, 'All open courses'),
+        ],
     },
     'catalog': {
         'catalog_query_id': 1,
+        'all_catalog_query_choices': [
+            (2, 'All open courses'),
+        ],
     },
 }
+
+# Add a mapping from product_id to catalog_query_id
+# we type the keys as strings instead of ints and have related
+# code look up by str(the_value) to avoid any complications
+# with loading environment settings from yaml, where the keys
+# may *always* be safely-loaded as strings.
+PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING = {
+    '1': 1,  # Product 1 maps to catalog query 1
+    '2': 2,
+    # Add more mappings as needed
+}
+
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+################### Self-Service Purchasing (SSP) settings ###################
+
+# Stripe API key used for privileged read/write operations from a system user.
+STRIPE_API_KEY = None
+
+# Duration of trial period.
+SSP_TRIAL_PERIOD_DAYS = 14
+
+# Placeholder Stripe products, override in prod.
+SSP_PRODUCTS = {
+    'quarterly_license_plan': {
+        'stripe_price_id': 'price_1234_replace-me',
+        'quantity_range': (5, 30),
+    },
+    'yearly_license_plan': {
+        'stripe_price_id': 'price_9876_replace-me',
+        'quantity_range': (5, 30),
+    },
+}
+
+# Enable the customer billing API endpoints under /api/v1/customer-billing/*
+ENABLE_CUSTOMER_BILLING_API = False
+
+DEFAULT_SSP_PRICE_LOOKUP_KEY = 'subscription_licenses_yearly'
+
+# How long we consider Stripe prices valid for
+STRIPE_PRICE_DATA_CACHE_TIMEOUT = 300
+
+################# End Self-Service Purchasing (SSP) settings #################

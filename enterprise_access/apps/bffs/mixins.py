@@ -223,6 +223,10 @@ class EnterpriseCourseEnrollmentsDataMixin(BaseLearnerDataMixin):
             field: enrollment.get(field)
             for field in fields_to_pluck
         }
+        logger.info(
+            f"Certificate URL for enrollment {enrollment.get('course_run_id')}: "
+            f"{enrollment.get('certificate_download_url')}"
+        )
 
         # Update transformed enrollment data with additional derived fields
         transformed_data.update({
@@ -235,7 +239,7 @@ class EnterpriseCourseEnrollmentsDataMixin(BaseLearnerDataMixin):
                 enrollment.get('resume_course_run_url') or
                 enrollment.get('course_run_url')
             ),
-            'link_to_certificate': enrollment.get('certificate_download_url'),
+            'link_to_certificate': enrollment.get('certificate_download_url') or None,
             'has_emails_enabled': enrollment.get('emails_enabled', False),
             'notifications': enrollment.get('due_dates'),
             'can_unenroll': self._can_unenroll_course_enrollment(enrollment),

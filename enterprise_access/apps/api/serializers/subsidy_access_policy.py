@@ -13,6 +13,7 @@ from opaque_keys.edx.keys import CourseKey
 from requests.exceptions import HTTPError
 from rest_framework import serializers
 
+from enterprise_access.apps.api.serializers.subsidy_requests import LearnerCreditRequestSerializer
 from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
 from enterprise_access.apps.subsidy_access_policy.constants import (
     CENTS_PER_DOLLAR,
@@ -20,6 +21,8 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     PolicyTypes
 )
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
 
 from .content_assignments.assignment import (
     LearnerContentAssignmentResponseSerializer,
@@ -71,13 +74,14 @@ class SubsidyAccessPolicyAggregatesSerializer(serializers.Serializer):
     )
     amount_allocated_usd_cents = serializers.SerializerMethodField(
         help_text=(
-            f"Total amount allocated for policies of type {PolicyTypes.ASSIGNED_LEARNER_CREDIT} (0 otherwise), in "
-            "positive USD cents."
+            f"Total amount allocated for policies of type {PolicyTypes.ASSIGNED_LEARNER_CREDIT} or "
+            "{PolicyTypes.PER_LEARNER_SPEND_CREDIT} (0 otherwise), in positive USD cents."
         ),
     )
     amount_allocated_usd = serializers.SerializerMethodField(
         help_text=(
-            f"Total amount allocated for policies of type {PolicyTypes.ASSIGNED_LEARNER_CREDIT} (0 otherwise), in USD.",
+            f"Total amount allocated for policies of type {PolicyTypes.ASSIGNED_LEARNER_CREDIT} or ",
+            "{PolicyTypes.PER_LEARNER_SPEND_CREDIT} (0 otherwise), in USD."
         ),
     )
     spend_available_usd_cents = serializers.SerializerMethodField(
@@ -191,6 +195,9 @@ class SubsidyAccessPolicyResponseSerializer(serializers.ModelSerializer):
             'late_redemption_allowed_until',
             'is_late_redemption_allowed',
             'created',
+            'bnr_enabled',
+            'total_spend_limits_for_subsidy',
+            'total_deposits_for_subsidy',
         ]
         read_only_fields = fields
 
@@ -407,6 +414,23 @@ class SubsidyAccessPolicyCanRedeemRequestSerializer(serializers.Serializer):
 
 
 # pylint: disable=abstract-method
+class SubsidyAccessPolicyCanRequestRequestSerializer(serializers.Serializer):
+    """
+    Request serializer to validate can_request endpoint query params.
+
+    For view: SubsidyAccessPolicyRedeemViewset.can_request
+    """
+    content_key = serializers.CharField(
+        required=True,
+        help_text='Content key about which requestability will be queried.',
+    )
+    lms_user_id = serializers.IntegerField(
+        required=False,
+        help_text='The user identifier for which requestability will be queried (only applicable to staff users).',
+    )
+
+
+# pylint: disable=abstract-method
 class SubsidyAccessPolicyDeleteRequestSerializer(serializers.Serializer):
     """
     Request Serializer for DELETE parameters to an API call to delete a subsidy access policy.
@@ -590,6 +614,8 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
     )
     learner_content_assignments = serializers.SerializerMethodField('get_assignments_serializer')
 
+    learner_requests = serializers.SerializerMethodField('get_learner_requests')
+
     group_associations = serializers.SerializerMethodField()
 
     @extend_schema_field(LearnerContentAssignmentWithLearnerAcknowledgedResponseSerializer(many=True))
@@ -617,6 +643,36 @@ class SubsidyAccessPolicyCreditsAvailableResponseSerializer(SubsidyAccessPolicyR
             context=context,
         )
         return serializer.data
+
+    @extend_schema_field(LearnerCreditRequestSerializer(many=True))
+    def get_learner_requests(self, obj):
+        """
+        Return serialized learner credit requests associated with the user and policy's enterprise customer,
+        filtered by the specific learner credit request configuration associated with this policy.
+
+        Returns:
+            list: Serialized learner credit requests if policy has BNR enabled and user is authenticated.
+                Empty list otherwise.
+        """
+        # Early returns if BNR not enabled or no user ID
+        if not obj.bnr_enabled:
+            return []
+
+        lms_user_id = self.context.get('lms_user_id')
+        if not lms_user_id:
+            return []
+
+        learner_requests = LearnerCreditRequest.objects.filter(
+            user__lms_user_id=lms_user_id,
+            enterprise_customer_uuid=obj.enterprise_customer_uuid,
+            state__in=[SubsidyRequestStates.APPROVED, SubsidyRequestStates.REQUESTED],
+            learner_credit_request_config=obj.learner_credit_request_config
+        )
+
+        if not learner_requests:
+            return []
+
+        return LearnerCreditRequestSerializer(learner_requests, many=True).data
 
     @extend_schema_field(serializers.IntegerField)
     def get_remaining_balance_per_user(self, obj):
@@ -692,6 +748,34 @@ class SubsidyAccessPolicyCanRedeemElementResponseSerializer(serializers.Serializ
         child=SubsidyAccessPolicyCanRedeemReasonResponseSerializer(),
         help_text=(
             "List of reasons why each of the enterprise's subsidy access policies are not redeemable, grouped by reason"
+        )
+    )
+    display_reason = SubsidyAccessPolicyCanRedeemReasonResponseSerializer(
+        allow_null=True,
+        help_text="A single, user-facing object of the most salient reason for non-redeemability.",
+    )
+
+
+class SubsidyAccessPolicyCanRequestElementResponseSerializer(serializers.Serializer):
+    """
+    Response serializer representing a single element of the response list for the can_request endpoint.
+    """
+    content_key = serializers.CharField(
+        required=True,
+        help_text='Requested content_key to which the rest of this element pertains.',
+    )
+    reason = serializers.CharField(
+        allow_null=True,
+        required=False,
+        help_text="Reason code (in camel_case) for why user can't request access to this content."
+    )
+    can_request = serializers.BooleanField(
+        help_text="True if the learner can request this content."
+    )
+    requestable_subsidy_access_policy = SubsidyAccessPolicyRedeemableResponseSerializer(
+        help_text=(
+            "One subsidy access policy selected from potentially multiple redeemable policies for the requested "
+            "content_key and lms_user_id."
         )
     )
 

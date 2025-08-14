@@ -116,6 +116,7 @@ class TestHandlerContextMixin(TestCase):
             'sender_alias': None,
             'disable_search': False,
             'show_integration_warning': False,
+            'enable_learner_credit_message_box': True,
         }
         self.mock_active_enterprise_customer = {
             **self.mock_enterprise_customer
@@ -152,6 +153,7 @@ class TestHandlerContextMixin(TestCase):
             'enterprise_features': {'feature_flag': True}
         }
         self.mock_secured_algolia_api_key = 'Th15I54Fak341gOlI4K3y'
+        self.mock_valid_until = _days_from_now(1, DATE_FORMAT_ISO_8601)
         self.mock_catalog_uuid = self.faker.uuid4()
         self.mock_catalog_query_uuid = self.faker.uuid4()
         self.mock_catalog_uuids_to_catalog_query_uuids = {
@@ -163,6 +165,10 @@ class TestHandlerContextMixin(TestCase):
                 'valid_until': _days_from_now(1, DATE_FORMAT_ISO_8601)
             },
             'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids
+        }
+        self.mock_algolia_object = {
+            'secured_algolia_api_key': self.mock_secured_algolia_api_key,
+            'valid_until': self.mock_valid_until
         }
         self.mock_error = {
             "developer_message": "No enterprise uuid associated to the user mock-uuid",
@@ -217,6 +223,12 @@ class TestHandlerContextMixin(TestCase):
         mock_catalog_uuids_to_catalog_query_uuids = getattr(mock_handler_context, 'data').get(
             'catalog_uuids_to_catalog_query_uuids'
         )
+        mock_valid_until = getattr(mock_handler_context, 'data').get(
+            'valid_until'
+        )
+        mock_algolia_object = getattr(mock_handler_context, 'data').get(
+            'algolia'
+        )
         property_mocks = {
             'request': getattr(mock_handler_context, '_request'),
             'status_code': getattr(mock_handler_context, '_status_code'),
@@ -229,6 +241,8 @@ class TestHandlerContextMixin(TestCase):
             'staff_enterprise_customer': mock_staff_enterprise_customer,
             'secured_algolia_api_key': mock_secured_algolia_api_key,
             'catalog_uuids_to_catalog_query_uuids': mock_catalog_uuids_to_catalog_query_uuids,
+            'valid_until': mock_valid_until,
+            'algolia': mock_algolia_object,
             'lms_user_id': getattr(mock_handler_context, '_lms_user_id'),
             'enterprise_features': getattr(mock_handler_context, '_enterprise_features'),
             'all_linked_enterprise_customer_users': mock_linked_enterprise_customer_users,

@@ -136,13 +136,15 @@ class TestTasks(APITestWithMocks):
 
         slug = 'sluggy'
         admin_email = 'edx@example.org'
+        organization = 'Test Organization'
 
         mock_lms_client().get_enterprise_customer_data.return_value = {
             'slug': slug,
             'admin_users': [{
                 'email': admin_email,
                 'lms_user_id': 1
-            }]
+            }],
+            'name': organization
         }
 
         mock_recipient = {
@@ -168,13 +170,16 @@ class TestTasks(APITestWithMocks):
             f'http://enterprise-learner-portal.example.com/{slug}/course/' +
             self.license_requests[0].course_id
         )
+        expected_enterprise_dashboard_url = f'http://enterprise-learner-portal.example.com/{slug}'
         mock_braze_client().send_campaign_message.assert_any_call(
             'test-campaign-id',
             recipients=[mock_recipient],
             trigger_properties={
                 'contact_admin_link': mock_admin_mailto,
                 'course_title': self.license_requests[0].course_title,
-                'course_about_page_url': expected_course_about_page_url
+                'course_about_page_url': expected_course_about_page_url,
+                'enterprise_dashboard_url': expected_enterprise_dashboard_url,
+                'organization': organization,
             },
         )
         assert mock_braze_client().send_campaign_message.call_count == 1

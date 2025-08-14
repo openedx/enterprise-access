@@ -12,9 +12,27 @@ from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory
 )
-from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
-from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest, LearnerCreditRequestConfiguration
-from enterprise_access.apps.subsidy_request.tests.factories import CouponCodeRequestFactory, LicenseRequestFactory
+from enterprise_access.apps.subsidy_request.constants import (
+    LearnerCreditAdditionalActionStates,
+    LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestUserMessages,
+    SubsidyRequestStates,
+    SubsidyTypeChoices
+)
+from enterprise_access.apps.subsidy_request.models import (
+    LearnerCreditRequest,
+    LearnerCreditRequestActions,
+    LearnerCreditRequestConfiguration
+)
+from enterprise_access.apps.subsidy_request.tasks import update_course_info_for_subsidy_request_task
+from enterprise_access.apps.subsidy_request.tests.factories import (
+    CouponCodeRequestFactory,
+    LearnerCreditRequestActionsFactory,
+    LearnerCreditRequestConfigurationFactory,
+    LearnerCreditRequestFactory,
+    LicenseRequestFactory,
+    SubsidyRequestCustomerConfigurationFactory
+)
 from test_utils import TestCaseWithMockedDiscoveryApiClient
 
 now = datetime.utcnow()
@@ -71,11 +89,12 @@ class LicenseRequestTests(TestCaseWithMockedDiscoveryApiClient):
         original_call_count = self.mock_discovery_client.call_count
 
         subsidy = LicenseRequestFactory(course_title=None, course_partners=None)
-        assert self.mock_discovery_client.call_count == original_call_count + 1
+        update_course_info_for_subsidy_request_task("LicenseRequest", str(subsidy.uuid))
 
         subsidy.refresh_from_db()
-        subsidy.save()
-        assert self.mock_discovery_client.call_count == original_call_count + 1
+        assert subsidy.course_title is not None
+        assert subsidy.course_partners is not None
+        assert self.mock_discovery_client.call_count > original_call_count
 
 
 @ddt.ddt
@@ -110,13 +129,15 @@ class CouponCodeRequestTests(TestCaseWithMockedDiscoveryApiClient):
         original_call_count = self.mock_discovery_client.call_count
 
         subsidy = CouponCodeRequestFactory(course_title=None, course_partners=None)
-        assert self.mock_discovery_client.call_count == original_call_count + 1
+        update_course_info_for_subsidy_request_task("CouponCodeRequest", str(subsidy.uuid))
 
         subsidy.refresh_from_db()
-        subsidy.save()
-        assert self.mock_discovery_client.call_count == original_call_count + 1
+        assert subsidy.course_title is not None
+        assert subsidy.course_partners is not None
+        assert self.mock_discovery_client.call_count > original_call_count
 
 
+@ddt.ddt
 class LearnerCreditRequestTests(TestCase):
     """
     Test cases for the LearnerCreditRequest model.
@@ -166,11 +187,21 @@ class LearnerCreditRequestTests(TestCase):
         self.assertEqual(self.learner_credit_request.decline_reason, decline_reason)
         self.assertIsNotNone(self.learner_credit_request.reviewed_at)
 
+    def test_cancel_success(self):
+        """
+        Verify that canceling a request updates the state and sets the reviewed timestamp.
+        """
+        reviewer = UserFactory()
+        self.learner_credit_request.cancel(reviewer)
+        self.assertEqual(self.learner_credit_request.state, SubsidyRequestStates.CANCELLED)
+        self.assertEqual(self.learner_credit_request.reviewer, reviewer)
+        self.assertIsNotNone(self.learner_credit_request.reviewed_at)
+
     def test_clean_invalid_without_review_data(self):
         """
         Ensure validation fails if a reviewed request lacks a reviewer and timestamp.
         """
-        self.learner_credit_request.state = SubsidyRequestStates.PENDING
+        self.learner_credit_request.state = SubsidyRequestStates.APPROVED
         self.learner_credit_request.reviewed_at = None
         self.learner_credit_request.reviewer = None
         with self.assertRaises(ValidationError):
@@ -181,7 +212,7 @@ class LearnerCreditRequestTests(TestCase):
         Ensure validation succeeds when a reviewed request has both reviewer and timestamp.
         """
         reviewer = UserFactory()
-        self.learner_credit_request.state = SubsidyRequestStates.PENDING
+        self.learner_credit_request.state = SubsidyRequestStates.APPROVED
         self.learner_credit_request.reviewed_at = datetime.now()
         self.learner_credit_request.reviewer = reviewer
         try:
@@ -189,19 +220,37 @@ class LearnerCreditRequestTests(TestCase):
         except ValidationError:
             self.fail("ValidationError raised unexpectedly!")
 
-    def test_unique_constraint(self):
+    @ddt.data(
+        SubsidyRequestStates.REQUESTED,
+        SubsidyRequestStates.APPROVED,
+        SubsidyRequestStates.ERROR,
+        SubsidyRequestStates.ACCEPTED,
+    )
+    def test_unique_constraint(self, state):
         """
         Ensure that a LearnerCreditRequest cannot be created with the same user, course_id,
-        and enterprise_customer_uuid in REQUESTED or PENDING state.
+        and enterprise_customer_uuid in REQUESTED, APPROVED, ERROR or ACCEPTED state.
         """
         with self.assertRaises(Exception):
             LearnerCreditRequest.objects.create(
                 user=self.user,
                 course_id="edX+DemoX",
                 enterprise_customer_uuid=self.enterprise_customer_uuid,
-                state=SubsidyRequestStates.REQUESTED,
+                state=state,
                 subsidy_access_policy=self.subsidy_access_policy
             )
+
+    def test_update_course_info_from_discovery(self):
+        """
+        course data should be fetched from discovery if not set on subsidy object
+        during a save().
+        """
+
+        subsidy = LearnerCreditRequestFactory(course_title=None, course_partners=None)
+        update_course_info_for_subsidy_request_task("LearnerCreditRequest", str(subsidy.uuid))
+        subsidy.refresh_from_db()
+        assert subsidy.course_title is not None
+        assert subsidy.course_partners is not None
 
 
 class LearnerCreditRequestConfigurationTests(TestCase):
@@ -242,3 +291,264 @@ class LearnerCreditRequestConfigurationTests(TestCase):
         self.subsidy_access_policy.learner_credit_request_config = None
         self.subsidy_access_policy.save()
         self.assertFalse(self.subsidy_access_policy.bnr_enabled)
+
+
+@ddt.ddt
+class LearnerCreditRequestActionsTests(TestCase):
+    """
+    Test cases for the LearnerCreditRequestActions model.
+    """
+
+    def setUp(self):
+        """
+        Set up test data for each test case.
+        """
+        self.user = UserFactory()
+        self.learner_credit_request = LearnerCreditRequestFactory(user=self.user)
+        self.action = LearnerCreditRequestActionsFactory(
+            learner_credit_request=self.learner_credit_request,
+            recent_action=SubsidyRequestStates.REQUESTED,
+            status=SubsidyRequestStates.REQUESTED,
+        )
+        self.enterprise_customer_uuid = uuid4()
+
+    def test_string_representation(self):
+        """
+        Test the string representation of the model.
+        """
+        expected_string = (
+            f"<LearnerCreditRequestActions for request {self.learner_credit_request}"
+            f" with action {self.action.recent_action}>"
+        )
+        self.assertEqual(str(self.action), expected_string)
+
+    def test_model_creation(self):
+        """
+        Test that a LearnerCreditRequestActions instance is created successfully.
+        """
+        self.assertIsNotNone(self.action.uuid)
+        self.assertEqual(self.action.recent_action, SubsidyRequestStates.REQUESTED)
+        self.assertEqual(self.action.status, SubsidyRequestStates.REQUESTED)
+        self.assertIsNone(self.action.error_reason)
+        self.assertIsNone(self.action.traceback)
+
+    def test_reminded_action(self):
+        """
+        Test creating an action with the REMINDED state.
+        """
+        reminded_action = LearnerCreditRequestActionsFactory(
+            learner_credit_request=self.learner_credit_request,
+            recent_action=LearnerCreditAdditionalActionStates.REMINDED,
+            status=LearnerCreditAdditionalActionStates.REMINDED,
+        )
+        self.assertEqual(reminded_action.recent_action, LearnerCreditAdditionalActionStates.REMINDED)
+        self.assertEqual(reminded_action.status, LearnerCreditAdditionalActionStates.REMINDED)
+
+    def test_error_action(self):
+        """
+        Test creating an action with an error.
+        """
+        error_action = LearnerCreditRequestActionsFactory(
+            learner_credit_request=self.learner_credit_request,
+            recent_action=SubsidyRequestStates.ERROR,
+            status=SubsidyRequestStates.ERROR,
+            error_reason=LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL,
+            traceback="An error occurred",
+        )
+        self.assertEqual(error_action.recent_action, SubsidyRequestStates.ERROR)
+        self.assertEqual(error_action.status, SubsidyRequestStates.ERROR)
+        self.assertEqual(error_action.error_reason, LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL)
+        self.assertEqual(error_action.traceback, "An error occurred")
+
+    def test_model_update(self):
+        """
+        Test updating a LearnerCreditRequestActions instance.
+        """
+        self.action.recent_action = SubsidyRequestStates.APPROVED
+        self.action.status = LearnerCreditRequestUserMessages.CHOICES[3][
+            0
+        ]  # APPROVED choice
+        self.action.save()
+        updated_action = LearnerCreditRequestActions.objects.get(
+            uuid=self.action.uuid
+        )
+        self.assertEqual(
+            updated_action.recent_action, SubsidyRequestStates.APPROVED
+        )
+        self.assertEqual(
+            updated_action.status,
+            LearnerCreditRequestUserMessages.CHOICES[3][0],
+        )
+
+    def test_clean_success_when_learner_credit_config_inactive(self):
+        """
+        Test that validation passes when learner credit config exists but is inactive.
+        """
+        # Create inactive learner credit config
+        lc_config = LearnerCreditRequestConfigurationFactory(active=False)
+        PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(  # Changed here
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            learner_credit_request_config=lc_config,
+        )
+
+        config = SubsidyRequestCustomerConfigurationFactory.build(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            subsidy_requests_enabled=True,
+            subsidy_type=SubsidyTypeChoices.LICENSE,
+        )
+
+        # Should not raise ValidationError
+        try:
+            config.clean()
+        except ValidationError:
+            self.fail("ValidationError raised unexpectedly!")
+
+    def test_clean_fails_when_learner_credit_already_enabled(self):
+        """
+        Test that validation fails when trying to enable B&R while learner credit is already active.
+        """
+        # Create active learner credit config
+        lc_config = LearnerCreditRequestConfigurationFactory(active=True)
+        PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(  # Changed here
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            learner_credit_request_config=lc_config,
+        )
+
+        config = SubsidyRequestCustomerConfigurationFactory.build(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            subsidy_requests_enabled=True,
+            subsidy_type=SubsidyTypeChoices.COUPON,
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            config.clean()
+
+        expected_message = (
+            "Browse & Request is already enabled for learner credit. "
+            "Only one subsidy type can have Browse & Request enabled at a time."
+        )
+        self.assertIn(expected_message, str(context.exception))
+
+    def test_save_calls_full_clean(self):
+        """
+        Test that save() method calls full_clean() which includes our custom validation.
+        """
+        # Create active learner credit config
+        lc_config = LearnerCreditRequestConfigurationFactory(active=True)
+        PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(  # Changed here
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            learner_credit_request_config=lc_config,
+        )
+
+        config = SubsidyRequestCustomerConfigurationFactory.build(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            subsidy_requests_enabled=True,
+            subsidy_type=SubsidyTypeChoices.LICENSE,
+        )
+
+        # save() should trigger validation and raise error
+        with self.assertRaises(ValidationError):
+            config.save()
+
+
+class SubsidyRequestCustomerConfigurationTests(TestCase):
+    """
+    Test cases for SubsidyRequestCustomerConfiguration clean() validation.
+    """
+
+    def setUp(self):
+        """
+        Set up test data for each test case.
+        """
+        self.enterprise_customer_uuid = uuid4()
+
+    def test_clean_success_when_no_conflicting_learner_credit_config(self):
+        """
+        Test that validation passes when enabling B&R and no conflicting learner credit config exists.
+        This covers multiple success scenarios.
+        """
+        # Case 1: No learner credit config exists at all
+        config = SubsidyRequestCustomerConfigurationFactory.build(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            subsidy_requests_enabled=True,
+            subsidy_type=SubsidyTypeChoices.LICENSE,
+        )
+
+        try:
+            config.clean()
+        except ValidationError:
+            self.fail(
+                "ValidationError raised unexpectedly when no LC config exists!"
+            )
+
+        # Case 2: Learner credit config exists but is inactive
+        lc_config = LearnerCreditRequestConfigurationFactory(active=False)
+        PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            learner_credit_request_config=lc_config,
+        )
+
+        try:
+            config.clean()
+        except ValidationError:
+            self.fail(
+                "ValidationError raised unexpectedly when LC config is inactive!"
+            )
+
+        # Case 3: subsidy_requests_enabled is False (should always pass)
+        config_disabled = SubsidyRequestCustomerConfigurationFactory.build(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            subsidy_requests_enabled=False,  # Disabled
+            subsidy_type=SubsidyTypeChoices.COUPON,
+        )
+
+        # Make LC config active now - should still pass because customer config is disabled
+        lc_config.active = True
+        lc_config.save()
+
+        try:
+            config_disabled.clean()
+        except ValidationError:
+            self.fail(
+                "ValidationError raised unexpectedly when subsidy_requests_enabled=False!"
+            )
+
+    def test_clean_fails_when_learner_credit_already_enabled_and_save_validation(
+        self,
+    ):
+        """
+        Test that validation fails when trying to enable B&R while learner credit is already active.
+        Also tests that save() method properly calls validation.
+        """
+        lc_config = LearnerCreditRequestConfigurationFactory(active=True)
+        PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            learner_credit_request_config=lc_config,
+        )
+
+        config = SubsidyRequestCustomerConfigurationFactory.build(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            subsidy_requests_enabled=True,
+            subsidy_type=SubsidyTypeChoices.COUPON,
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            config.clean()
+
+        expected_message = (
+            "Browse & Request is already enabled for learner credit. "
+            "Only one subsidy type can have Browse & Request enabled at a time."
+        )
+        self.assertIn(expected_message, str(context.exception))
+
+        # Test that save() method also triggers validation
+        config_for_save = SubsidyRequestCustomerConfigurationFactory.build(
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            subsidy_requests_enabled=True,
+            subsidy_type=SubsidyTypeChoices.LICENSE,
+        )
+
+        with self.assertRaises(ValidationError) as save_context:
+            config_for_save.save()
+
+        self.assertIn(expected_message, str(save_context.exception))

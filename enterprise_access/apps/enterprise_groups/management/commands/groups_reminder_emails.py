@@ -61,4 +61,13 @@ class Command(BaseCommand):
                 pending_enterprise_customer_user["enterprise_customer_name"] = enterprise_customer_data["name"]
                 pending_enterprise_customer_user["enterprise_group_uuid"] = enterprise_group_uuid
                 pecu_email_properties.append(pending_enterprise_customer_user)
+
+            if not pecu_email_properties:
+                LOGGER.info(
+                    "No pending enterprise customer users found for enterprise group %s.",
+                    enterprise_group_uuid
+                )
+                # No pending enterprise customer users found for enterprise group, skip sending reminder emails.
+                continue
+
             send_group_reminder_emails.delay(pecu_email_properties)

@@ -79,6 +79,7 @@ CORS_ORIGIN_WHITELIST = [
     'http://localhost:1991',  # frontend-app-admin-portal
     'http://localhost:8734',  # frontend-app-learner-portal-enterprise
     'http://localhost:18450',  # frontend-app-support-tools
+    'http://localhost:1989',  # frontend-app-enterprise-checkout
 ]
 # END CORS
 
@@ -87,6 +88,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:1991',  # frontend-app-admin-portal
     'http://localhost:8734',  # frontend-app-learner-portal-enterprise
     'http://localhost:18450',  # frontend-app-support-tools
+    'http://localhost:1989',  # frontend-app-enterprise-checkout
 ]
 # END CSRF CONFIG
 
@@ -108,6 +110,7 @@ SHELL_PLUS_IMPORTS = [
     'from enterprise_access.apps.content_assignments import api as assignments_api',
     'from pprint import pprint',
     'from enterprise_access.apps.content_assignments import tasks as assignments_tasks',
+    'from enterprise_access.apps.customer_billing import pricing_api',
     'from enterprise_access.apps.provisioning.models import *',
     'from enterprise_access.apps.provisioning import api as provisioning_api',
 ]

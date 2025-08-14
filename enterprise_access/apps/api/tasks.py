@@ -107,6 +107,8 @@ def send_notification_email_for_request(
     recipient = braze_client_instance.create_recipient(user_email=user.email, lms_user_id=user.lms_user_id)
     enterprise_customer_data = lms_client.get_enterprise_customer_data(subsidy_request.enterprise_customer_uuid)
 
+    organization = enterprise_customer_data.get('name')
+
     admin_emails = [user['email'] for user in enterprise_customer_data['admin_users']]
     braze_trigger_properties['contact_admin_link'] = braze_client_instance.generate_mailto_link(admin_emails)
 
@@ -116,8 +118,14 @@ def send_notification_email_for_request(
         enterprise_slug,
         subsidy_request.course_id
     )
+    enterprise_dashboard_url = '{}/{}'.format(
+        settings.ENTERPRISE_LEARNER_PORTAL_URL,
+        enterprise_slug
+    )
     braze_trigger_properties['course_about_page_url'] = course_about_page_url
     braze_trigger_properties['course_title'] = subsidy_request.course_title
+    braze_trigger_properties['enterprise_dashboard_url'] = enterprise_dashboard_url
+    braze_trigger_properties['organization'] = organization
 
     logger.info(f'Sending braze campaign message for subsidy request {subsidy_request}')
     braze_client_instance.send_campaign_message(

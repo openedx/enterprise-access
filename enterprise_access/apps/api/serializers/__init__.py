@@ -16,6 +16,13 @@ from .content_assignments.assignment_configuration import (
     AssignmentConfigurationResponseSerializer,
     AssignmentConfigurationUpdateRequestSerializer
 )
+from .customer_billing import (
+    CheckoutIntentReadOnlySerializer,
+    CheckoutIntentUpdateRequestSerializer,
+    CustomerBillingCreateCheckoutSessionRequestSerializer,
+    CustomerBillingCreateCheckoutSessionSuccessResponseSerializer,
+    CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer
+)
 from .provisioning import ProvisioningRequestSerializer, ProvisioningResponseSerializer
 from .subsidy_access_policy import (
     GroupMemberWithAggregatesRequestSerializer,
@@ -25,6 +32,8 @@ from .subsidy_access_policy import (
     SubsidyAccessPolicyCanRedeemElementResponseSerializer,
     SubsidyAccessPolicyCanRedeemReasonResponseSerializer,
     SubsidyAccessPolicyCanRedeemRequestSerializer,
+    SubsidyAccessPolicyCanRequestElementResponseSerializer,
+    SubsidyAccessPolicyCanRequestRequestSerializer,
     SubsidyAccessPolicyCreditsAvailableRequestSerializer,
     SubsidyAccessPolicyCreditsAvailableResponseSerializer,
     SubsidyAccessPolicyCRUDSerializer,
@@ -38,6 +47,11 @@ from .subsidy_access_policy import (
 )
 from .subsidy_requests import (
     CouponCodeRequestSerializer,
+    LearnerCreditRequestApproveRequestSerializer,
+    LearnerCreditRequestCancelSerializer,
+    LearnerCreditRequestDeclineSerializer,
+    LearnerCreditRequestRemindSerializer,
+    LearnerCreditRequestSerializer,
     LicenseRequestSerializer,
     SubsidyRequestCustomerConfigurationSerializer,
     SubsidyRequestSerializer

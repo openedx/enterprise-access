@@ -23,6 +23,20 @@ from simple_history.models import HistoricalRecords
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.subsidy_request.constants import (
+    LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestUserMessages,
+    SubsidyRequestStates
+)
+from enterprise_access.apps.subsidy_request.models import (
+    LearnerCreditRequestActions,
+    SubsidyRequestCustomerConfiguration
+)
+from enterprise_access.apps.subsidy_request.utils import (
+    get_action_choice,
+    get_error_reason_choice,
+    get_user_message_choice
+)
 from enterprise_access.cache_utils import request_cache, versioned_cache_key
 from enterprise_access.utils import format_traceback, is_none, is_not_none, localized_utcnow
 
@@ -32,6 +46,7 @@ from .constants import (
     CREDIT_POLICY_TYPE_PRIORITY,
     FORCE_ENROLLMENT_KEYWORD,
     REASON_BEYOND_ENROLLMENT_DEADLINE,
+    REASON_BNR_NOT_ENABLED,
     REASON_CONTENT_NOT_IN_CATALOG,
     REASON_LEARNER_ASSIGNMENT_CANCELLED,
     REASON_LEARNER_ASSIGNMENT_EXPIRED,
@@ -71,7 +86,13 @@ from .subsidy_api import (
     get_tiered_cache_subsidy_record,
     set_tiered_cache_subsidy_record
 )
-from .utils import ProxyAwareHistoricalRecords, create_idempotency_key_for_transaction, get_versioned_subsidy_client
+from .utils import (
+    ProxyAwareHistoricalRecords,
+    cents_to_usd_string,
+    create_idempotency_key_for_transaction,
+    get_versioned_subsidy_client,
+    validate_budget_deactivation_with_spend
+)
 
 # Magic key that is used transaction metadata hint to the subsidy service and all downstream services that the
 # enrollment should be allowed even if the enrollment deadline has passed.
@@ -328,17 +349,26 @@ class SubsidyAccessPolicy(TimeStampedModel):
         return None
 
     @property
-    def total_spend_limit_for_all_policies_associated_to_subsidy(self):
+    def total_spend_limits_for_subsidy(self):
         """
-        Sums the policies spend_limit excluding the db's instance of this policy
+        Sum of spend_limit for all policies associated with this policy's subsidy.
+
+        Calculation is based on what the sum would be if this instance was saved to the DB.
         """
-        spend_limit = self.spend_limit if self.active and self.spend_limit else 0
         sibling_policies_sum = SubsidyAccessPolicy.objects.filter(
             enterprise_customer_uuid=self.enterprise_customer_uuid,
             subsidy_uuid=self.subsidy_uuid,
-            active=True
-        ).exclude(uuid=self.uuid).aggregate(models.Sum("spend_limit", default=0))["spend_limit__sum"]
-        return spend_limit + sibling_policies_sum
+            active=True,
+        ).exclude(
+            # Exclude self from the DB query because that value might be outdated.
+            uuid=self.uuid,
+        ).aggregate(
+            models.Sum("spend_limit", default=0),
+        )["spend_limit__sum"]
+
+        # Re-add self.spend_limit which likely is more up-to-date compared to the DB value.
+        self_spend_limit = self.spend_limit if self.active and self.spend_limit else 0
+        return self_spend_limit + sibling_policies_sum
 
     @property
     def is_spend_limit_updated(self):
@@ -372,21 +402,64 @@ class SubsidyAccessPolicy(TimeStampedModel):
     @property
     def bnr_enabled(self):
         """
-        Returns True if learner_credit_request_config exists, otherwise False.
+        Returns True if learner_credit_request_config exists and is active, otherwise False.
         """
-        return self.learner_credit_request_config and self.learner_credit_request_config.active
+        return bool(self.learner_credit_request_config and self.learner_credit_request_config.active)
+
+    @classmethod
+    def has_bnr_enabled_policy_for_enterprise(cls, enterprise_customer_uuid):
+        """
+        Check if any active SubsidyAccessPolicy for the given enterprise_customer_uuid has bnr_enabled.
+
+        Args:
+            enterprise_customer_uuid (UUID): The UUID of the enterprise customer.
+
+        Returns:
+            bool: True if bnr_enabled is True for any active policy, otherwise False.
+        """
+        return cls.objects.filter(
+            enterprise_customer_uuid=enterprise_customer_uuid,
+            active=True,
+            learner_credit_request_config__isnull=False,
+            learner_credit_request_config__active=True
+        ).exists()
+
+    def clean_spend_limit(self):
+        if self.active and (self.is_active_updated or self.is_spend_limit_updated):
+            if self.total_spend_limits_for_subsidy > self.total_deposits_for_subsidy:
+                sum_of_spend_limits_str = cents_to_usd_string(
+                    self.total_spend_limits_for_subsidy
+                )
+                sum_of_deposits_str = cents_to_usd_string(self.total_deposits_for_subsidy)
+                raise ValidationError(
+                    f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE} '
+                    f'Error: {sum_of_spend_limits_str} is greater than {sum_of_deposits_str}'
+                )
 
     def clean(self):
         """
         Used to help validate field values before saving this model instance.
         """
-        if self.active and (self.is_active_updated or self.is_spend_limit_updated):
-            if self.total_spend_limit_for_all_policies_associated_to_subsidy > self.subsidy_total_deposits():
-                raise ValidationError(f'{self} {VALIDATION_ERROR_SPEND_LIMIT_EXCEEDS_STARTING_BALANCE}')
+        validation_errors = {}
+
+        # Validate the spend_limit field.
+        try:
+            self.clean_spend_limit()
+        except ValidationError as exc:
+            validation_errors['spend_limit'] = str(exc)
+
+        # Validate that budgets with spend cannot be deactivated
+        if not self._state.adding:
+            validate_budget_deactivation_with_spend(self)
+
+        # Perform basic field constraint checks.
         for field_name, (constraint_function, error_message) in self.FIELD_CONSTRAINTS.items():
             field = getattr(self, field_name)
             if not constraint_function(field):
-                raise ValidationError(f'{self} {error_message}')
+                validation_errors[field_name] = f'{self} {error_message}'
+
+        if validation_errors:
+            raise ValidationError(validation_errors)
 
     def save(self, *args, **kwargs):
         """
@@ -482,9 +555,10 @@ class SubsidyAccessPolicy(TimeStampedModel):
         current_balance = self.subsidy_record().get('current_balance') or 0
         return int(current_balance)
 
-    def subsidy_total_deposits(self):
+    @property
+    def total_deposits_for_subsidy(self):
         """
-        Returns total remaining balance for the associated subsidy ledger.
+        Returns total amount deposited into the associated subsidy ledger.
         """
         total_deposits = self.subsidy_record().get('total_deposits') or 0
         return int(total_deposits)
@@ -705,6 +779,51 @@ class SubsidyAccessPolicy(TimeStampedModel):
             'lms_user_id: %s, content_key: %s, extra=%s'
         )
         logger.info(message, self.uuid, is_redeemable, reason, lms_user_id, content_key, extra)
+
+    def can_approve(self, content_key, content_price_cents):
+        """
+        Determines if a request with the given content_key and content_price_cents
+        can be approved under this policy.
+
+        Returns a tuple of (bool, str):
+        - bool: True if the request can be approved, False otherwise.
+        - str: A reason code if the request cannot be approved, or an empty string if it can.
+        """
+        # Since we are treating assignments as approved requests, can_allocate would give us the same result.
+        if not self.bnr_enabled:
+            return False, REASON_BNR_NOT_ENABLED
+        return self.assignment_request_can_allocate(content_key, content_price_cents)
+
+    def approve(self, learner_email, content_key, content_price_cents, lms_user_id):
+        """
+        Approves a learner credit request for the given learner_email and content_key.
+        This method allocates an assignment for the learner to be linked with the request.
+        If the allocation fails, it logs an error and returns None.
+        If the allocation is successful, it returns the created assignment.
+
+        Params:
+          learner_email: Email of the learner for whom the request is being approved.
+          content_key: Course key of the requested content.
+          content_price_cents: A **non-negative** integer reflecting the current price of the content in USD cents.
+          lms_user_id: The LMS user ID of the learner.
+        """
+        # To approve a learner credit request, we need to allocate an assignment and link it to the request.
+        assignment = assignments_api.allocate_assignment_for_request(
+            self.assignment_configuration,
+            learner_email,
+            content_key,
+            content_price_cents,
+            lms_user_id,
+        )
+
+        if not assignment:
+            error_msg = (
+                f"Failed to create for learner {learner_email} "
+                f"and content {content_key}."
+            )
+            logger.error(f"[LC REQUEST APPROVAL] {error_msg}")
+            return None
+        return assignment
 
     def can_redeem(
         self, lms_user_id, content_key,
@@ -1027,47 +1146,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
         finally:
             self.release_lock(lms_user_id, content_key)
 
-    @classmethod
-    def resolve_policy(cls, redeemable_policies):
-        """
-        Select one out of multiple policies which have already been deemed redeemable.
-
-        Prioritize learner credit policies, and then prioritize policies with a sooner expiration date,
-        and then subsidies that have smaller balances.  The type priority is codified in ``*_POLICY_TYPE_PRIORITY``
-        variables in constants.py.
-
-        Deficiencies:
-        * If multiple policies with equal policy types, balances, and expiration dates tie for first place,
-          the result is non-deterministic.
-
-        Original spec:
-        https://2u-internal.atlassian.net/wiki/spaces/SOL/pages/229212214/Commission+Subsidy+Access+Policy+API#Policy-Resolver
-
-        Args:
-            redeemable_policies (list of SubsidyAccessPolicy): A list of subsidy access policies to select one from.
-
-        Returns:
-           SubsidyAccessPolicy: one policy selected from the input list.
-        """
-        # gate for experimental functionality to resolve multiple policies
-        if not getattr(settings, 'MULTI_POLICY_RESOLUTION_ENABLED', False):
-            logger.info('resolve_policy MULTI_POLICY_RESOLUTION_ENABLED disabled')
-            return redeemable_policies[0]
-
-        if len(redeemable_policies) == 1:
-            return redeemable_policies[0]
-
-        # resolve policies by:
-        # - priority (of type)
-        # - expiration, sooner to expire first
-        # - balance, lower balance first
-        sorted_policies = sorted(
-            redeemable_policies,
-            key=lambda p: (p.priority, p.subsidy_expiration_datetime, p.subsidy_balance()),
-        )
-        logger.info('resolve_policy multiple policies resolved')
-        return sorted_policies[0]
-
     def create_deposit(
         self,
         desired_deposit_quantity,
@@ -1213,7 +1291,109 @@ class PerLearnerEnrollmentCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPol
         return self.per_learner_enrollment_limit - existing_transaction_count
 
 
-class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
+class SubsidyAccessPolicyRequestAssignmentMixin:
+
+    def copy_context_to(self, policy_class):
+        """
+        Creates a new instance of the specified policy class and copies
+        essential context from this policy to the new instance.
+
+        Args:
+            policy_class: The policy class to instantiate
+
+        Returns:
+            An instance of policy_class with context copied from self
+        """
+        # Create new instance
+        new_policy = policy_class()
+        new_policy.policy_type = 'AssignedLearnerCreditAccessPolicy'
+
+        # Copy essential context attributes
+        for attr in ['uuid', 'enterprise_customer_uuid', 'catalog_uuid',
+                     'subsidy_uuid', 'active', 'retired', 'spend_limit',
+                     'assignment_configuration', 'late_redemption_allowed_until']:
+            if hasattr(self, attr):
+                setattr(new_policy, attr, getattr(self, attr))
+            new_policy.retired_at = getattr(self, 'retired_at', None)
+
+        return new_policy
+
+    def assignment_request_can_redeem(self, lms_user_id, content_key, skip_customer_user_check=False,
+                                      skip_enrollment_deadline_check=False, **kwargs
+                                      ):
+        policy_instance = self.copy_context_to(AssignedLearnerCreditAccessPolicy)
+        return policy_instance.can_redeem(lms_user_id, content_key, skip_customer_user_check,
+                                          skip_enrollment_deadline_check, **kwargs
+                                          )
+
+    def assignment_request_redeem(self, lms_user_id, content_key, all_transactions, metadata=None, **kwargs):
+
+        learner_credit_request = kwargs.get('learner_credit_request')
+        logger.info(
+            "LearnerCreditRequestActions redeem record creation requested."
+            "lms_user_id=%s, content_key=%s",
+            lms_user_id,
+            content_key
+        )
+        if self.bnr_enabled:
+            try:
+                policy_instance = self.copy_context_to(AssignedLearnerCreditAccessPolicy)
+                found_assignment = policy_instance.get_assignment(lms_user_id, content_key)
+                logger.info(
+                    "Assignment lookup for redemption attempt: found=%s, lms_user_id=%s, content_key=%s",
+                    bool(found_assignment),
+                    lms_user_id,
+                    content_key
+                )
+                learner_credit_request = found_assignment.credit_request if found_assignment else None
+                logger.info(
+                    "Creating LearnerCreditRequestActions record for redemption attempt. "
+                    "learner_credit_request_uuid=%s, lms_user_id=%s, content_key=%s",
+                    learner_credit_request.uuid,
+                    lms_user_id,
+                    content_key
+                )
+                action = LearnerCreditRequestActions.create_action(
+                    learner_credit_request=learner_credit_request,
+                    recent_action=get_action_choice(SubsidyRequestStates.ACCEPTED),
+                    status=get_user_message_choice(SubsidyRequestStates.ACCEPTED),
+                )
+                result = policy_instance.redeem(lms_user_id, content_key, all_transactions, metadata=metadata, **kwargs)
+                learner_credit_request.state = SubsidyRequestStates.ACCEPTED
+                learner_credit_request.save()
+                logger.info(
+                    "Successfully redeemed content through assignment_request_redeem. "
+                    "lms_user_id=%s, content_key=%s, transaction_uuid=%s",
+                    lms_user_id,
+                    content_key,
+                    result.get('uuid', 'unknown')
+                )
+                return result
+            except Exception as exc:
+                logger.exception(
+                    "Error redeeming content through assignment_request_redeem. "
+                    "learner_credit_request_uuid=%s, lms_user_id=%s, content_key=%s",
+                    learner_credit_request.uuid if learner_credit_request else None,
+                    lms_user_id,
+                    content_key
+                )
+                action.status = get_action_choice(SubsidyRequestStates.APPROVED)
+                action.error_reason = get_error_reason_choice(LearnerCreditRequestActionErrorReasons.FAILED_REDEMPTION)
+                action.traceback = format_traceback(exc)
+                action.save()
+                raise
+
+    def assignment_request_can_allocate(self, content_key, content_price_cents):
+        """
+        Wrapper method to make requests that fall under a PerLearnerSpendCreditAccessPolicy work with assignments.
+        """
+        policy_instance = self.copy_context_to(AssignedLearnerCreditAccessPolicy)
+        return policy_instance.can_allocate(1, content_key, content_price_cents)
+
+
+class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
+                                        SubsidyAccessPolicyRequestAssignmentMixin
+                                        ):
     """
     Policy that limits the amount of learner spend for enrollment transactions.
 
@@ -1223,7 +1403,6 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
 
     # Policies of this type *must not* define a per-learner enrollment limit or an assignment configuration
     FIELD_CONSTRAINTS = {
-        'assignment_configuration': (is_none, 'must not relate to an AssignmentConfiguration.'),
         'per_learner_enrollment_limit': (is_none, 'must not define a per-learner enrollment limit.'),
     }
 
@@ -1233,15 +1412,95 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
         """
         proxy = True
 
+    def clean(self):
+        """
+        Validate that only one subsidy type can have B&R enabled at a time.
+        """
+        super().clean()
+
+        # Only check for conflicts if this policy has an active learner credit request config
+        if self.learner_credit_request_config and self.learner_credit_request_config.active:
+            try:
+                customer_config = (
+                    SubsidyRequestCustomerConfiguration.objects.get(
+                        enterprise_customer_uuid=self.enterprise_customer_uuid
+                    )
+                )
+                if customer_config.subsidy_requests_enabled:
+                    raise ValidationError(
+                        f"Browse & Request is already enabled for {customer_config.subsidy_type} "
+                        f"subsidy type for this enterprise. "
+                        "Only one subsidy type can have Browse & Request enabled at a time."
+                    )
+            except SubsidyRequestCustomerConfiguration.DoesNotExist:
+                pass
+
+    def save(self, *args, **kwargs):
+        """
+        If Browse and Request is enabled and no ``assignment_configuration``
+        is present, create one and associate it with this record.
+        This step is necessary to make a PerLearnerSpendCreditAccessPolicy work with the
+        assignment-based workflow.
+
+        Lastly, ensure that the associated assignment_configuration has the
+        same ``enterprise_customer_uuid`` as this policy record.
+        """
+        if self.bnr_enabled and not self.assignment_configuration:
+            self.assignment_configuration = assignments_api.create_assignment_configuration(
+                self.enterprise_customer_uuid
+            )
+        elif (self.assignment_configuration and
+                self.enterprise_customer_uuid != self.assignment_configuration.enterprise_customer_uuid):
+            self.assignment_configuration.enterprise_customer_uuid = self.enterprise_customer_uuid
+            self.assignment_configuration.save()
+
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def total_allocated(self):
+        """
+        Total amount of assignments currently allocated via this policy. The assignments have direct
+        1-1 mapping to the requests, so in this case total_allocated represents total approved requests.
+
+        Returns:
+            int: Negative USD cents representing the total amount of currently
+            allocated assignments / approved requests.
+        """
+        if not self.bnr_enabled:
+            return super().total_allocated
+
+        return assignments_api.get_allocated_quantity_for_configuration(
+            self.assignment_configuration,
+        )
+
+    @property
+    def spend_available(self):
+        """
+        Policy-wide spend available.  This sub-class definition additionally takes approved requests into account.
+
+        Returns:
+            int: quantity >= 0 of USD Cents representing the policy-wide spend available.
+        """
+        if not self.bnr_enabled:
+            return super().spend_available
+
+        # super().spend_available is POSITIVE USD Cents representing available spend ignoring assignments.
+        # self.total_allocated is NEGATIVE USD Cents representing currently allocated assignments / approved requests.
+        return max(0, super().spend_available + self.total_allocated)
+
     def can_redeem(
-        self, lms_user_id, content_key,
-        skip_customer_user_check=False, skip_enrollment_deadline_check=False,
-        **kwargs,
+        self, lms_user_id, content_key, skip_customer_user_check=False, skip_enrollment_deadline_check=False,
+            **kwargs
     ):
         """
         Determines whether learner can redeem a subsidy access policy given the
         limits specified on the policy.
         """
+        if self.bnr_enabled:
+            return self.assignment_request_can_redeem(
+                lms_user_id, content_key, skip_customer_user_check, skip_enrollment_deadline_check, **kwargs
+            )
         # perform generic access checks
         should_attempt_redemption, reason, existing_redemptions = super().can_redeem(
             lms_user_id,
@@ -1262,13 +1521,34 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
             content_price = self.get_content_price(content_key)
             if self.content_would_exceed_limit(spent_amount, self.per_learner_spend_limit, content_price):
                 self._log_redeemability(
-                    False, REASON_LEARNER_MAX_SPEND_REACHED, lms_user_id, content_key, extra=existing_redemptions,
+                    False, REASON_LEARNER_MAX_SPEND_REACHED, lms_user_id, content_key,
+                    extra=existing_redemptions,
                 )
                 return (False, REASON_LEARNER_MAX_SPEND_REACHED, existing_redemptions)
 
         # learner can redeem the subsidy access policy
         self._log_redeemability(True, None, lms_user_id, content_key)
         return (True, None, existing_redemptions)
+
+    def redeem(self, lms_user_id, content_key, all_transactions, metadata=None, **kwargs):
+        """
+        Redeem a subsidy for the given learner and content.
+
+        If bnr_enabled is True, calls assignment_request_redeem to use the assignment-based
+        workflow, otherwise calls the parent redeem method.
+
+        Returns:
+            A ledger transaction.
+
+        Raises:
+            SubsidyAPIHTTPError if the Subsidy API request failed.
+            ValueError if the access method of this policy is invalid.
+        """
+        if self.bnr_enabled:
+            return self.assignment_request_redeem(lms_user_id, content_key, all_transactions, metadata=metadata,
+                                                  **kwargs
+                                                  )
+        return super().redeem(lms_user_id, content_key, all_transactions, metadata=metadata, **kwargs)
 
     def credit_available(self, lms_user_id, *args, **kwargs):
         """
@@ -1283,6 +1563,10 @@ class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy):
 
         # Validate whether learner has enough remaining balance (spend) for this policy.
         remaining_balance_per_user = self.remaining_balance_per_user(lms_user_id)
+
+        if self.bnr_enabled and remaining_balance_per_user == 0:
+            return True
+
         return (remaining_balance_per_user is not None) and remaining_balance_per_user > 0
 
     def remaining_balance_per_user(self, lms_user_id=None):

@@ -14,6 +14,7 @@ from enterprise_access.apps.bffs.serializers import (
     LearnerSearchResponseSerializer,
     LearnerSkillsQuizResponseSerializer
 )
+from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ class BaseResponseBuilder:
             self.context.should_update_active_enterprise_customer_user
         )
         self.response_data['enterprise_features'] = self.context.enterprise_features
-        self.response_data['secured_algolia_api_key'] = self.context.secured_algolia_api_key
+        self.response_data['algolia'] = self.context.algolia
         self.response_data['catalog_uuids_to_catalog_query_uuids'] = self.context.catalog_uuids_to_catalog_query_uuids
 
     def add_errors_warnings_to_response(self):
@@ -95,6 +96,17 @@ class BaseResponseBuilder:
             )
             self.add_errors_warnings_to_response()
             return self.serializer_class(self.response_data).data, self.status_code
+
+
+class UnauthenticatedBaseResponseBuilder(BaseResponseBuilder):
+    """
+    A ResponseBuilder class for unauthenticated requests, where we don't
+    expect customer or user inputs or outputs to exist.
+    """
+    def build(self):
+        """
+        Does no enterprise- or user- specific action by default.
+        """
 
 
 class BaseLearnerResponseBuilder(BaseResponseBuilder, BaseLearnerDataMixin):
@@ -164,6 +176,9 @@ class LearnerDashboardResponseBuilder(BaseLearnerResponseBuilder, LearnerDashboa
         self.response_data.update({
             'enterprise_course_enrollments': self.enterprise_course_enrollments,
             'all_enrollments_by_status': self.all_enrollments_by_status,
+            'has_bnr_enabled_policy': bool(SubsidyAccessPolicy.has_bnr_enabled_policy_for_enterprise(
+                self.context.enterprise_customer_uuid
+            )),
         })
 
 

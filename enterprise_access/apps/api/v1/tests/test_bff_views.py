@@ -9,6 +9,7 @@ from django.core.cache import cache as django_cache
 from pytest_dictsdiff import check_objects
 from rest_framework import status
 from rest_framework.reverse import reverse
+from rest_framework.test import APIClient
 
 from enterprise_access.apps.api_client.tests.test_utils import MockLicenseManagerMetadataMixin
 from enterprise_access.apps.bffs.constants import COURSE_ENROLLMENT_STATUSES
@@ -160,8 +161,8 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
                     },
                 },
             ],
-            'secured_algolia_api_key': self.mock_secured_algolia_api_key,
             'catalog_uuids_to_catalog_query_uuids': self.mock_catalog_uuids_to_catalog_query_uuids,
+            'algolia': self.mock_algolia_object,
             'active_enterprise_customer': self.expected_enterprise_customer,
             'staff_enterprise_customer': None,
             'should_update_active_enterprise_customer_user': self.mock_should_update_active_enterprise_customer_user,
@@ -186,6 +187,7 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
         self.mock_dashboard_route_response_data = {
             **self.mock_common_response_data,
             'enterprise_course_enrollments': [],
+            'has_bnr_enabled_policy': False,
             'all_enrollments_by_status': {
                 COURSE_ENROLLMENT_STATUSES.IN_PROGRESS: [],
                 COURSE_ENROLLMENT_STATUSES.UPCOMING: [],
@@ -1008,3 +1010,86 @@ class TestLearnerPortalBFFViewSet(TestHandlerContextMixin, MockLicenseManagerMet
 
         self.assertEqual(response.status_code, expected_status_code)
         assert check_objects(response.json(), self.mock_skills_quiz_route_response_data)
+
+    @mock.patch(
+        'enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.has_bnr_enabled_policy_for_enterprise',
+        return_value=True)
+    @mock_dashboard_dependencies
+    def test_dashboard_with_bnr_enabled_policy(
+            self,
+            mock_get_enterprise_customers_for_user,
+            mock_get_secured_algolia_api_key_for_user,
+            mock_get_subscription_licenses_for_learner,
+            mock_get_default_enrollment_intentions_learner_status,
+            mock_get_enterprise_course_enrollments,
+            mock_has_bnr_enabled_policy,  # pylint: disable=unused-argument
+    ):
+        """
+        Test the dashboard route with has_bnr_enabled_policy field.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': self.mock_enterprise_customer_uuid,
+        }])
+        mock_get_enterprise_customers_for_user.return_value = self.mock_enterprise_learner_response_data
+        mock_get_secured_algolia_api_key_for_user.return_value = self.mock_secured_algolia_api_key_response
+        mock_get_subscription_licenses_for_learner.return_value = self.mock_subscription_licenses_data
+        mock_get_default_enrollment_intentions_learner_status.return_value = \
+            self.mock_default_enterprise_enrollment_intentions_learner_status_data
+        mock_get_enterprise_course_enrollments.return_value = self.mock_enterprise_course_enrollments
+
+        query_params = {
+            'enterprise_customer_slug': self.mock_enterprise_customer_slug,
+        }
+        dashboard_url = reverse('api:v1:learner-portal-bff-dashboard')
+        dashboard_url += f"?{urlencode(query_params)}"
+
+        response = self.client.post(dashboard_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        expected_response_data = self.mock_dashboard_route_response_data.copy()
+        expected_response_data.update({
+            'has_bnr_enabled_policy': True,
+        })
+
+        response_data = response.json()
+        self.assertEqual(
+            response_data.get('has_bnr_enabled_policy'), expected_response_data.get('has_bnr_enabled_policy')
+        )
+
+
+@ddt.ddt
+class TestUnauthenticatedPingBFFViewSet(TestHandlerContextMixin, APITest):
+    """
+    Test the base, unauthenticated BFF ping endpoint
+    """
+    def setUp(self):
+        """
+        Set up test client and any necessary test data.
+        """
+        super().setUp()
+        self.client = APIClient()
+        # Explicitly ensure no authentication
+        self.client.force_authenticate(user=None)
+
+    def test_ping_endpoint_unauthenticated_request(self):
+        """
+        Test that the ping endpoint can be accessed without authentication
+        and returns the expected response structure.
+        """
+        url = reverse('api:v1:bff-health-ping')
+
+        response = self.client.get(url)
+
+        # Should succeed without authentication
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify response structure and content
+        expected_response = {
+            'message': 'pong',
+            'timestamp': mock.ANY,
+            'status': 'healthy',
+            'service': 'enterprise-access-bff',
+        }
+
+        self.assertEqual(response.json(), expected_response)

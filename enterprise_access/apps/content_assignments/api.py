@@ -23,6 +23,7 @@ from enterprise_access.apps.content_assignments.tasks import (
 )
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.utils import (
     chunks,
     get_automatic_expiration_date_and_reason,
@@ -435,6 +436,86 @@ def allocate_assignments(
     }
 
 
+def allocate_assignment_for_request(
+    assignment_configuration,
+    learner_email,
+    content_key,
+    content_price_cents,
+    lms_user_id,
+):
+    """
+    Creates or reallocates an assignment record for the given ``content_key`` in the given ``assignment_configuration``,
+      and the provided ``learner_email``.
+
+    Params:
+      - ``assignment_configuration``: The AssignmentConfiguration record under which assignments should be allocated.
+      - ``learner_email``: The email address of the learner to whom the assignment should be allocated.
+      - ``content_key``: Either a course or course run key, representing the content to be allocated.
+      - ``content_price_cents``: The cost of redeeming the content, in USD cents, at the time of allocation. Should
+        always be an integer >= 0.
+      - ``lms_user_id``: lms user id of the user.
+
+    Returns: A LearnerContentAssignment record that was created or None.
+    """
+    # Set a batch ID to track assignments updated and/or created together.
+    allocation_batch_id = uuid4()
+
+    message = (
+        'Allocating assignments: assignment_configuration=%s, batch_id=%s, '
+        'learner_email=%s, content_key=%s, content_price_cents=%s'
+    )
+    logger.info(
+        message, assignment_configuration.uuid, allocation_batch_id,
+        learner_email, content_key, content_price_cents
+    )
+
+    if content_price_cents < 0:
+        raise AllocationException('Allocation price must be >= 0')
+
+    # We store the allocated quantity as a (future) debit
+    # against a store of value, so we negate the provided non-negative
+    # content_price_cents, and then persist that in the assignment records.
+    content_quantity = content_price_cents * -1
+    lms_user_ids_by_email = {learner_email.lower(): lms_user_id}
+    existing_assignments = _get_existing_assignments_for_allocation(
+        assignment_configuration,
+        [learner_email],
+        content_key,
+        lms_user_ids_by_email,
+    )
+
+    # Re-allocate existing assignment
+    if len(existing_assignments) > 0:
+        assignment = next(iter(existing_assignments), None)
+        if assignment and assignment.state in LearnerContentAssignmentStateChoices.REALLOCATE_STATES:
+            preferred_course_run_key = _get_preferred_course_run_key(assignment_configuration, content_key)
+            parent_content_key = _get_parent_content_key(assignment_configuration, content_key)
+            is_assigned_course_run = bool(parent_content_key)
+            _reallocate_assignment(
+                assignment,
+                content_quantity,
+                allocation_batch_id,
+                preferred_course_run_key,
+                parent_content_key,
+                is_assigned_course_run,
+            )
+            assignment.save()
+            return assignment
+
+    assignment = _create_new_assignments(
+        assignment_configuration,
+        [learner_email],
+        content_key,
+        content_quantity,
+        lms_user_ids_by_email,
+        allocation_batch_id,
+    )
+    # If the assignment was created, it will be a list with one item.
+    if assignment:
+        return assignment[0]
+    return None
+
+
 def _deduplicate_learner_emails_to_allocate(learner_emails):
     """
     Helper to deduplicate learner emails to allocate before any
@@ -694,7 +775,7 @@ def _create_new_assignments(
     )
 
 
-def cancel_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
+def cancel_assignments(assignments: Iterable[LearnerContentAssignment], send_cancel_email_to_learner=True) -> dict:
     """
     Bulk cancel assignments.
 
@@ -733,7 +814,8 @@ def cancel_assignments(assignments: Iterable[LearnerContentAssignment]) -> dict:
 
     cancelled_assignments = _update_and_refresh_assignments(cancelable_assignments, ['state'])
     for cancelled_assignment in cancelled_assignments:
-        send_cancel_email_for_pending_assignment.delay(cancelled_assignment.uuid)
+        if send_cancel_email_to_learner:
+            send_cancel_email_for_pending_assignment.delay(cancelled_assignment.uuid)
 
     return {
         'cancelled': list(set(cancelled_assignments) | already_cancelled_assignments),
@@ -940,7 +1022,16 @@ def expire_assignment(
         if automatic_expiration_reason == AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED:
             assignment.clear_pii()
 
+        credit_request = getattr(assignment, 'credit_request', None)
+
+        if credit_request:
+            logger.info('Modifying credit request %s to expired', credit_request.uuid)
+            credit_request.state = SubsidyRequestStates.EXPIRED
+            credit_request.save()
+
         assignment.save()
-        send_assignment_automatically_expired_email.delay(assignment.uuid)
+
+        if not credit_request:
+            send_assignment_automatically_expired_email.delay(assignment.uuid)
 
     return automatic_expiration_reason

@@ -43,6 +43,8 @@ waffle.Switch:
   ".. no_pii:": "This model has no PII"
 subsidy_request.HistoricalLicenseRequest:
   ".. no_pii:": "This model has no PII"
+subsidy_request.HistoricalLearnerCreditRequestActions:
+  ".. no_pii:": "This model has no PII"
 subsidy_request.HistoricalCouponCodeRequest:
   ".. no_pii:": "This model has no PII"
 subsidy_request.HistoricalLearnerCreditRequest:
@@ -62,4 +64,6 @@ content_assignments.HistoricalLearnerContentAssignment:
   ".. pii_types:": email_address
   ".. pii_retirement:": local_api
 content_assignments.HistoricalLearnerContentAssignmentAction:
+  ".. no_pii:": "This model has no PII"
+customer_billing.HistoricalCheckoutIntent:
   ".. no_pii:": "This model has no PII"
