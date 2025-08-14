@@ -4,8 +4,8 @@ Signal handlers for subsidy_access_policy app.
 import logging
 
 from django.dispatch import receiver
-from openedx_events.enterprise.signals import ENTERPRISE_GROUP_DELETED
 from openedx_events.enterprise.data import EnterpriseGroup
+from openedx_events.enterprise.signals import ENTERPRISE_GROUP_DELETED
 
 from enterprise_access.apps.subsidy_access_policy.models import PolicyGroupAssociation
 

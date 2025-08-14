@@ -2,17 +2,16 @@
 Tests for subsidy_access_policy signals and handlers.
 """
 import uuid
-from unittest import mock
 
 from django.test import TestCase
-
-from openedx_events.enterprise.signals import ENTERPRISE_GROUP_DELETED
 from openedx_events.enterprise.data import EnterpriseGroup
+from openedx_events.enterprise.signals import ENTERPRISE_GROUP_DELETED
+
 from enterprise_access.apps.subsidy_access_policy.models import PolicyGroupAssociation
 from enterprise_access.apps.subsidy_access_policy.signals import handle_enterprise_group_deleted
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
-  PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
-  PolicyGroupAssociationFactory
+    PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory,
+    PolicyGroupAssociationFactory
 )
 
 
@@ -29,12 +28,12 @@ class TestEnterpriseGroupDeletedSignal(TestCase):
         self.group_uuid_1 = uuid.uuid4()
         self.group_uuid_2 = uuid.uuid4()
         self.group_uuid_3 = uuid.uuid4()
-        
+
         # Create policies to associate with groups
         self.policy_1 = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
         self.policy_2 = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
         self.policy_3 = PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory()
-        
+
         # Create policy-group associations
         self.association_1 = PolicyGroupAssociationFactory.create(
             subsidy_access_policy=self.policy_1,
@@ -65,13 +64,13 @@ class TestEnterpriseGroupDeletedSignal(TestCase):
 
         # Call the signal handler directly
         handle_enterprise_group_deleted(enterprise_group=mock_enterprise_group)
-        
+
         # Verify that associations for group_uuid_1 are deleted
         self.assertFalse(
             PolicyGroupAssociation.objects.filter(enterprise_group_uuid=self.group_uuid_1).exists(),
             "Associations for deleted group should be removed"
         )
-        
+
         # Verify that associations for other groups are not affected
         self.assertTrue(
             PolicyGroupAssociation.objects.filter(enterprise_group_uuid=self.group_uuid_2).exists(),
@@ -93,13 +92,13 @@ class TestEnterpriseGroupDeletedSignal(TestCase):
 
         # Send the signal
         ENTERPRISE_GROUP_DELETED.send_event(enterprise_group=mock_enterprise_group)
-        
+
         # Verify that associations for group_uuid_1 are deleted
         self.assertFalse(
             PolicyGroupAssociation.objects.filter(enterprise_group_uuid=self.group_uuid_2).exists(),
             "Associations for deleted group should be removed when signal is sent"
         )
-        
+
         # Verify that associations for other groups are not affected
         self.assertTrue(
             PolicyGroupAssociation.objects.filter(enterprise_group_uuid=self.group_uuid_3).exists(),
@@ -118,7 +117,7 @@ class TestEnterpriseGroupDeletedSignal(TestCase):
             handle_enterprise_group_deleted()
             # Assert ValueError is raised for missing enterprise_group:
         self.assertEqual(str(e.exception), 'Missing or invalid enterprise_group in signal')
-            
+
         # Call the signal handler with an invalid enterprise_group
         with self.assertRaises(ValueError) as e:
             handle_enterprise_group_deleted(enterprise_group="invalid_group")
