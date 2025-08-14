@@ -632,6 +632,8 @@ ENABLE_CUSTOMER_BILLING_API = False
 
 DEFAULT_SSP_PRICE_LOOKUP_KEY = 'subscription_licenses_yearly'
 
+DEFAULT_STRIPE_CACHE_TIMEOUT = 60
+
 # How long we consider Stripe prices valid for
 STRIPE_PRICE_DATA_CACHE_TIMEOUT = 300
 

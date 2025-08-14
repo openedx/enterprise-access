@@ -195,3 +195,48 @@ class CheckoutValidationResponseSerializer(serializers.Serializer):
         help_text="Validation results for each field"
     )
     user_authn = UserAuthInfoSerializer(help_text="User authentication status information")
+
+
+# BFF Checkout Success Serializers #
+
+
+class BillingAddressSerializer(serializers.Serializer):
+    """Serializer for billing address information."""
+    city = serializers.CharField(allow_null=True, allow_blank=True)
+    country = serializers.CharField(allow_null=True, allow_blank=True)
+    line1 = serializers.CharField(allow_null=True, allow_blank=True)
+    line2 = serializers.CharField(allow_null=True, allow_blank=True)
+    postal_code = serializers.CharField(allow_null=True, allow_blank=True)
+    state = serializers.CharField(allow_null=True, allow_blank=True)
+
+
+class FirstBillableInvoiceSerializer(serializers.Serializer):
+    """Serializer for first billable invoice information."""
+    start_time = serializers.DateTimeField(allow_null=True)
+    end_time = serializers.DateTimeField(allow_null=True)
+    last4 = serializers.IntegerField(allow_null=True)
+    quantity = serializers.IntegerField(allow_null=True)
+    unit_amount_decimal = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
+    customer_phone = serializers.CharField(allow_null=True, allow_blank=True)
+    customer_name = serializers.CharField(allow_null=True, allow_blank=True)
+    billing_address = BillingAddressSerializer(allow_null=True)
+
+
+class CheckoutIntentExpandedSerializer(CheckoutIntentMinimalResponseSerializer):
+    """
+    Serializes checkout intent data, expanded to included related
+    stripe object data.
+    """
+    first_billable_invoice = FirstBillableInvoiceSerializer(allow_null=True)
+
+
+class CheckoutSuccessResponseSerializer(CheckoutContextResponseSerializer):
+    """Complete serializer for checkout success intent."""
+    checkout_intent = CheckoutIntentExpandedSerializer(
+        required=False,
+        allow_null=True,
+        help_text=(
+            "The existing ``CheckoutIntent`` for the requesting user, if any. "
+            "Includes expanded information from related Stripe records."
+        ),
+    )

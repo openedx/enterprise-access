@@ -20,6 +20,10 @@ class CustomerBillingCreateCheckoutSessionRequestSerializer(serializers.Serializ
         required=True,
         help_text='The unique slug proposed for the Enterprise Customer.',
     )
+    company_name = serializers.CharField(
+        required=True,
+        help_text='The unique name proposed for the Enterprise Customer.',
+    )
     quantity = serializers.IntegerField(
         required=True,
         min_value=1,

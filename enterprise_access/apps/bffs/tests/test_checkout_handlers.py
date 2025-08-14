@@ -1,19 +1,33 @@
 """
 Tests for Checkout BFF handlers.
 """
-
+import random
+from datetime import datetime
 from decimal import Decimal
 from unittest import mock
+from uuid import uuid4
 
 import ddt
+import stripe
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
+from django.utils import timezone
+from pytz import UTC
 
-from enterprise_access.apps.bffs.checkout.context import CheckoutContext, CheckoutValidationContext
-from enterprise_access.apps.bffs.checkout.handlers import CheckoutContextHandler, CheckoutValidationHandler
+from enterprise_access.apps.bffs.checkout.context import (
+    CheckoutContext,
+    CheckoutSuccessContext,
+    CheckoutValidationContext
+)
+from enterprise_access.apps.bffs.checkout.handlers import (
+    CheckoutContextHandler,
+    CheckoutSuccessHandler,
+    CheckoutValidationHandler
+)
 from enterprise_access.apps.core.tests.factories import UserFactory
+from enterprise_access.apps.customer_billing.models import CheckoutIntent
 from test_utils import APITest
 
 User = get_user_model()
@@ -535,3 +549,343 @@ class TestCheckoutValidationHandler(APITest):
 
         # Check that user_exists_for_email is None
         self.assertIsNone(self.context.user_authn['user_exists_for_email'])
+
+
+class TestCheckoutSuccessHandler(APITest):
+    """Tests for the CheckoutSuccessHandler."""
+
+    def setUp(self):
+        """Set up test data before each test."""
+        super().setUp()
+
+        self.request_factory = RequestFactory()
+        self.request = self.request_factory.post('/api/v1/bffs/checkout/success')
+        self.request.user = self.user
+
+        # Sample checkout intent data
+        self.checkout_intent_data = {
+            'id': random.randint(1, 10000),
+            'state': 'created',
+            'enterprise_name': 'Test Enterprise',
+            'enterprise_slug': 'test-enterprise',
+            'stripe_checkout_session_id': 'cs_test_123',
+            'last_checkout_error': '',
+            'last_provisioning_error': '',
+            'workflow_id': str(uuid4()),
+            'expires_at': timezone.now().isoformat(),
+            'admin_portal_url': 'https://portal.edx.org/test-enterprise',
+        }
+
+        # Sample Stripe API responses
+        self.stripe_session = {
+            'id': 'cs_test_123',
+            'payment_intent': 'pi_test_123',
+            'subscription': 'sub_test_123',
+        }
+
+        self.stripe_payment_intent = {
+            'id': 'pi_test_123',
+            'payment_method': 'pm_test_123',
+        }
+
+        self.stripe_payment_method = {
+            'id': 'pm_test_123',
+            'card': {
+                'last4': '4242',
+            },
+            'billing_details': {
+                'address': {
+                    'city': 'New York',
+                    'country': 'US',
+                    'line1': '123 Main St',
+                    'line2': 'Apt 4B',
+                    'postal_code': '10001',
+                    'state': 'NY',
+                }
+            }
+        }
+
+        self.stripe_subscription = {
+            'id': 'sub_test_123',
+            'latest_invoice': 'in_test_123',
+        }
+
+        self.stripe_invoice = {
+            'id': 'in_test_123',
+            'customer': 'cus_test_123',
+            'lines': {
+                'data': [
+                    {
+                        'quantity': 35,
+                        'price': {
+                            'unit_amount_decimal': '39600',
+                        },
+                        'period': {
+                            'start': 1657843200,  # 2022-07-15
+                            'end': 1689379200,    # 2023-07-15
+                        }
+                    }
+                ]
+            }
+        }
+
+        self.stripe_customer = {
+            'id': 'cus_test_123',
+            'name': 'Test Customer',
+            'phone': '+15551234567',
+        }
+
+        self.context = CheckoutSuccessContext(self.request)
+        self.handler = CheckoutSuccessHandler(self.context)
+
+    @mock.patch(
+        'enterprise_access.apps.bffs.checkout.handlers.get_ssp_product_pricing',
+        return_value={},
+        autospec=True,
+    )
+    @mock.patch(
+        'enterprise_access.apps.bffs.checkout.handlers.get_and_cache_enterprise_customer_users',
+        return_value={},
+        autospec=True,
+    )
+    @mock.patch(
+        'enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent',
+        return_value=None,
+        autospec=True,
+    )
+    def test_load_and_process_no_checkout_intent(self, mock_get_checkout_intent, mock_get_customers, mock_get_price):
+        """Test load_and_process when no checkout intent exists."""
+        self.handler.load_and_process()
+
+        self.assertIsNone(self.context.checkout_intent)
+        self.assertEqual(mock_get_customers.call_count, 1)
+        self.assertEqual(mock_get_price.call_count, 1)
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
+    def test_load_and_process_no_session_id(self, mock_get_checkout_intent):
+        """Test load_and_process when no session ID exists."""
+        checkout_intent_no_session = self.checkout_intent_data.copy()
+        checkout_intent_no_session['stripe_checkout_session_id'] = ''
+        mock_get_checkout_intent.return_value = checkout_intent_no_session
+
+        self.handler.load_and_process()
+
+        self.assertEqual(self.context.checkout_intent, checkout_intent_no_session)
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    def test_enhance_with_stripe_data_session_error(self, mock_session, mock_get_checkout_intent):
+        """Test when there's an error retrieving the Stripe session."""
+        mock_get_checkout_intent.return_value = self.checkout_intent_data
+        mock_session.side_effect = stripe.error.StripeError("API Error")
+
+        self.handler.load_and_process()
+
+        self.assertEqual(self.context.checkout_intent, self.checkout_intent_data)
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_intent')
+    def test_enhance_with_stripe_data_payment_intent_error(
+        self, mock_payment_intent, mock_session, mock_get_checkout_intent,
+    ):
+        """Test when there's an error retrieving the payment intent."""
+        mock_get_checkout_intent.return_value = self.checkout_intent_data
+        mock_session.return_value = self.stripe_session
+        mock_payment_intent.side_effect = stripe.error.StripeError("API Error")
+
+        self.handler.load_and_process()
+
+        self.assertIn('first_billable_invoice', self.context.checkout_intent)
+        self.assertIsNotNone(self.context.checkout_intent['first_billable_invoice'])
+        self.assertIsNone(self.context.checkout_intent['first_billable_invoice']['last4'])
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_method')
+    def test_enhance_with_stripe_data_payment_method_error(
+        self, mock_payment_method, mock_payment_intent, mock_session, mock_get_checkout_intent,
+    ):
+        """Test when there's an error retrieving the payment method."""
+        mock_get_checkout_intent.return_value = self.checkout_intent_data
+        mock_session.return_value = self.stripe_session
+        mock_payment_intent.return_value = self.stripe_payment_intent
+        mock_payment_method.side_effect = stripe.error.StripeError("API Error")
+
+        self.handler.load_and_process()
+
+        # Assert first_billable_invoice is initialized but not populated
+        self.assertIn('first_billable_invoice', self.context.checkout_intent)
+        self.assertIsNotNone(self.context.checkout_intent['first_billable_invoice'])
+        self.assertIsNone(self.context.checkout_intent['first_billable_invoice']['last4'])
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_method')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_subscription')
+    def test_enhance_with_stripe_data_subscription_error(
+        self, mock_subscription, mock_payment_method, mock_payment_intent, mock_session, mock_get_checkout_intent,
+    ):
+        """Test when there's an error retrieving the subscription."""
+        mock_get_checkout_intent.return_value = self.checkout_intent_data
+        mock_session.return_value = {**self.stripe_session, 'invoice': None}  # Force subscription path
+        mock_payment_intent.return_value = self.stripe_payment_intent
+        mock_payment_method.return_value = self.stripe_payment_method
+        mock_subscription.side_effect = stripe.error.StripeError("API Error")
+
+        self.handler.load_and_process()
+
+        # Assert card data is populated but invoice data is not
+        self.assertEqual(self.context.checkout_intent['first_billable_invoice']['last4'], '4242')
+        self.assertIsNone(self.context.checkout_intent['first_billable_invoice']['quantity'])
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_method')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_subscription')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_invoice')
+    def test_enhance_with_stripe_data_invoice_error(
+        self, mock_invoice, mock_subscription, mock_payment_method,
+        mock_payment_intent, mock_session, mock_get_checkout_intent,
+    ):
+        """Test when there's an error retrieving the invoice."""
+        mock_get_checkout_intent.return_value = self.checkout_intent_data
+        mock_session.return_value = {**self.stripe_session, 'invoice': None}  # Force subscription path
+        mock_payment_intent.return_value = self.stripe_payment_intent
+        mock_payment_method.return_value = self.stripe_payment_method
+        mock_subscription.return_value = self.stripe_subscription
+        mock_invoice.side_effect = stripe.error.StripeError("API Error")
+
+        self.handler.load_and_process()
+
+        # Assert card data is populated but invoice data is not
+        self.assertEqual(self.context.checkout_intent['first_billable_invoice']['last4'], '4242')
+        self.assertIsNone(self.context.checkout_intent['first_billable_invoice']['quantity'])
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_method')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_subscription')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_invoice')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_customer')
+    def test_enhance_with_stripe_data_full_success(
+        self, mock_customer, mock_invoice, mock_subscription, mock_payment_method,
+        mock_payment_intent, mock_session, mock_get_checkout_intent,
+    ):
+        """Test full successful flow."""
+        mock_get_checkout_intent.return_value = self.checkout_intent_data
+        mock_session.return_value = {**self.stripe_session, 'invoice': None}  # Force subscription path
+        mock_payment_intent.return_value = self.stripe_payment_intent
+        mock_payment_method.return_value = self.stripe_payment_method
+        mock_subscription.return_value = self.stripe_subscription
+        mock_invoice.return_value = self.stripe_invoice
+        mock_customer.return_value = self.stripe_customer
+
+        self.handler.load_and_process()
+
+        # Assert all data is populated correctly
+        first_billable_invoice = self.context.checkout_intent['first_billable_invoice']
+        self.assertEqual(first_billable_invoice['last4'], '4242')
+        self.assertEqual(first_billable_invoice['quantity'], 35)
+        self.assertEqual(first_billable_invoice['unit_amount_decimal'], 396.00)
+        self.assertEqual(first_billable_invoice['customer_name'], 'Test Customer')
+        self.assertEqual(first_billable_invoice['customer_phone'], '+15551234567')
+
+        address = first_billable_invoice['billing_address']
+        self.assertEqual(address['city'], 'New York')
+        self.assertEqual(address['country'], 'US')
+        self.assertEqual(address['line1'], '123 Main St')
+        self.assertEqual(address['line2'], 'Apt 4B')
+        self.assertEqual(address['postal_code'], '10001')
+        self.assertEqual(address['state'], 'NY')
+
+        # Check date fields (convert timestamps to expected datetime objects)
+        expected_start = datetime.fromtimestamp(1657843200).replace(tzinfo=UTC)
+        expected_end = datetime.fromtimestamp(1689379200).replace(tzinfo=UTC)
+        self.assertEqual(first_billable_invoice['start_time'], expected_start)
+        self.assertEqual(first_billable_invoice['end_time'], expected_end)
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    def test_no_payment_intent_in_session(self, mock_session, mock_get_checkout_intent):
+        """Test when session has no payment intent."""
+        mock_get_checkout_intent.return_value = self.checkout_intent_data
+        session_no_payment = {**self.stripe_session}
+        session_no_payment.pop('payment_intent')
+        mock_session.return_value = session_no_payment
+
+        self.handler.load_and_process()
+
+        # Assert first_billable_invoice is initialized but empty
+        self.assertIn('first_billable_invoice', self.context.checkout_intent)
+        self.assertIsNone(self.context.checkout_intent['first_billable_invoice']['last4'])
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_intent')
+    def test_no_payment_method_in_payment_intent(self, mock_payment_intent, mock_session, mock_get_checkout_intent):
+        """Test when payment intent has no payment method."""
+        mock_get_checkout_intent.return_value = self.checkout_intent_data
+        mock_session.return_value = self.stripe_session
+        payment_intent_no_method = {**self.stripe_payment_intent}
+        payment_intent_no_method.pop('payment_method')
+        mock_payment_intent.return_value = payment_intent_no_method
+
+        self.handler.load_and_process()
+
+        # Assert first_billable_invoice is initialized but empty
+        self.assertIn('first_billable_invoice', self.context.checkout_intent)
+        self.assertIsNone(self.context.checkout_intent['first_billable_invoice']['last4'])
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_method')
+    def test_no_card_in_payment_method(
+        self, mock_payment_method, mock_payment_intent, mock_session, mock_get_checkout_intent,
+    ):
+        """Test when payment method has no card info."""
+        mock_get_checkout_intent.return_value = self.checkout_intent_data
+        mock_session.return_value = self.stripe_session
+        mock_payment_intent.return_value = self.stripe_payment_intent
+        payment_method_no_card = {**self.stripe_payment_method}
+        payment_method_no_card.pop('card')
+        mock_payment_method.return_value = payment_method_no_card
+
+        self.handler.load_and_process()
+
+        self.assertIsNone(self.context.checkout_intent['first_billable_invoice']['last4'])
+
+        # But address data is still populated
+        address = self.context.checkout_intent['first_billable_invoice']['billing_address']
+        self.assertEqual(address['city'], 'New York')
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_method')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_invoice')
+    def test_invoice_with_no_lines(
+        self, mock_invoice, mock_payment_method, mock_payment_intent, mock_session, mock_get_checkout_intent,
+    ):
+        """Test when invoice has no line items."""
+        mock_get_checkout_intent.return_value = self.checkout_intent_data
+        mock_session.return_value = {**self.stripe_session, 'invoice': 'in_test_123'}  # Direct invoice path
+        mock_payment_intent.return_value = self.stripe_payment_intent
+        mock_payment_method.return_value = self.stripe_payment_method
+        invoice_no_lines = {**self.stripe_invoice}
+        invoice_no_lines.pop('lines')
+        mock_invoice.return_value = invoice_no_lines
+
+        self.handler.load_and_process()
+
+        # Assert card data is populated but invoice data is not
+        self.assertEqual(self.context.checkout_intent['first_billable_invoice']['last4'], '4242')
+        self.assertIsNone(self.context.checkout_intent['first_billable_invoice']['quantity'])
+        self.assertIsNone(self.context.checkout_intent['first_billable_invoice']['unit_amount_decimal'])
+        self.assertIsNone(self.context.checkout_intent['first_billable_invoice']['start_time'])
+        self.assertIsNone(self.context.checkout_intent['first_billable_invoice']['end_time'])

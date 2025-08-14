@@ -77,3 +77,12 @@ class CheckoutValidationContext(BaseHandlerContext):
     @user_authn.setter
     def user_authn(self, value):
         self.data['user_authn'] = value
+
+
+class CheckoutSuccessContext(CheckoutContext):
+    """
+    Context class for checkout success BFF endpoint.
+    This is the same structure as ``CheckoutContext``, only the contained
+    checkout intent record will be expanded with additional data
+    via the Stripe API.
+    """

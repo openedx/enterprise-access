@@ -9,15 +9,25 @@ from rest_framework.decorators import action
 from rest_framework.permissions import OR, AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from enterprise_access.apps.api.v1.views.bffs.common import BaseUnauthenticatedBFFViewSet
-from enterprise_access.apps.bffs.checkout.context import CheckoutContext, CheckoutValidationContext
-from enterprise_access.apps.bffs.checkout.handlers import CheckoutContextHandler, CheckoutValidationHandler
+from enterprise_access.apps.api.v1.views.bffs.common import BaseBFFViewSet, BaseUnauthenticatedBFFViewSet
+from enterprise_access.apps.bffs.checkout.context import (
+    CheckoutContext,
+    CheckoutSuccessContext,
+    CheckoutValidationContext
+)
+from enterprise_access.apps.bffs.checkout.handlers import (
+    CheckoutContextHandler,
+    CheckoutSuccessHandler,
+    CheckoutValidationHandler
+)
 from enterprise_access.apps.bffs.checkout.response_builder import (
     CheckoutContextResponseBuilder,
+    CheckoutSuccessResponseBuilder,
     CheckoutValidationResponseBuilder
 )
 from enterprise_access.apps.bffs.checkout.serializers import (
     CheckoutContextResponseSerializer,
+    CheckoutSuccessResponseSerializer,
     CheckoutValidationRequestSerializer,
     CheckoutValidationResponseSerializer
 )
@@ -31,7 +41,7 @@ class CheckoutBFFViewSet(BaseUnauthenticatedBFFViewSet):
 
     These endpoints serve both authenticated and unauthenticated users.
     """
-
+    AUTHENTICATED_ONLY_ACTIONS = ['success']
     authentication_classes = [JwtAuthentication]
 
     def get_permissions(self):
@@ -41,6 +51,8 @@ class CheckoutBFFViewSet(BaseUnauthenticatedBFFViewSet):
         and get either a hydrated user object from the JWT, or an AnonymousUser
         if not authenticated.
         """
+        if self.action in self.AUTHENTICATED_ONLY_ACTIONS:
+            return [IsAuthenticated()]
         return [OR(IsAuthenticated(), AllowAny())]
 
     @extend_schema(
@@ -98,5 +110,28 @@ class CheckoutBFFViewSet(BaseUnauthenticatedBFFViewSet):
             CheckoutValidationHandler,
             CheckoutValidationResponseBuilder,
             CheckoutValidationContext,
+        )
+        return Response(data, status=status_code)
+
+    @extend_schema(
+        operation_id="checkout_success",
+        summary="Get checkout success data",
+        description="Provides relevant data after checkout success",
+        responses={200: CheckoutSuccessResponseSerializer},
+        tags=["Checkout BFF"],
+    )
+    @action(detail=False, methods=['post'], url_path='success')
+    def success(self, request):
+        """
+        Handle the checkout success action.
+
+        Returns:
+          Response: The success response
+        """
+        data, status_code = self.load_route_data_and_build_response(
+            request,
+            CheckoutSuccessHandler,
+            CheckoutSuccessResponseBuilder,
+            CheckoutSuccessContext,
         )
         return Response(data, status=status_code)

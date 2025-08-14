@@ -84,18 +84,22 @@ class BaseResponseBuilder:
         if not hasattr(self, 'serializer_class') or self.serializer_class is None:
             raise NotImplementedError("Subclasses must define a serializer_class.")
 
+        serializer = self.serializer_class(data=self.response_data)
+
         try:
-            serializer = self.serializer_class(data=self.response_data)
             serializer.is_valid(raise_exception=True)
-            return serializer.data, self.status_code
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception('Could not serialize the response data.')
             self.context.add_warning(
                 user_message='An error occurred while processing the response data.',
                 developer_message=f'Could not serialize the response data. Error: {exc}',
             )
-            self.add_errors_warnings_to_response()
-            return self.serializer_class(self.response_data).data, self.status_code
+
+        serialized_data = serializer.data
+        serialized_data['errors'] = self.context.errors
+        serialized_data['warnings'] = self.context.warnings
+        serialized_data['enterprise_features'] = getattr(self.context, 'enterprise_features', {})
+        return serialized_data, self.status_code
 
 
 class UnauthenticatedBaseResponseBuilder(BaseResponseBuilder):
