@@ -455,9 +455,11 @@ COUPON_CODE_REQUEST_TOPIC_NAME = "coupon-code-request"
 LICENSE_REQUEST_TOPIC_NAME = "license-request"
 ACCESS_POLICY_TOPIC_NAME = "access-policy"
 SUBSIDY_REDEMPTION_TOPIC_NAME = "subsidy-redemption"
+ENTERPRISE_GROUPS_LIFECYCLE_TOPIC_NAME = "enterprise-groups-lifecycle"
 KAFKA_TOPICS = [
     COUPON_CODE_REQUEST_TOPIC_NAME,
     LICENSE_REQUEST_TOPIC_NAME,
+    ENTERPRISE_GROUPS_LIFECYCLE_TOPIC_NAME,
 
     # Access policy events
     ACCESS_POLICY_TOPIC_NAME,
@@ -558,9 +560,3 @@ PROVISIONING_DEFAULTS = {
         'catalog_query_id': 1,
     },
 }
-
-EVENT_BUS_KAFKA_SCHEMA_REGISTRY_URL = 'http://edx.devstack.schema-registry:8081'
-EVENT_BUS_KAFKA_BOOTSTRAP_SERVERS = 'edx.devstack.kafka:29092'
-EVENT_BUS_PRODUCER = 'edx_event_bus_kafka.create_producer'
-EVENT_BUS_CONSUMER = 'edx_event_bus_kafka.KafkaEventConsumer'
-EVENT_BUS_TOPIC_PREFIX = 'dev'

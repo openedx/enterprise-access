@@ -109,7 +109,7 @@ services:
       bash -c '
         make requirements &&
         pip install edx-event-bus-kafka &&
-        pip install -e /edx/src/openedx-events &&
+        pip install openedx-events>=10.4.0 &&
         pip install "confluent-kafka[avro,schema-registry]" &&
         while true; do python /edx/app/enterprise-access/manage.py consume_events -t enterprise-groups-lifecycle -g enterprise_access_dev; sleep 2; done
       '
