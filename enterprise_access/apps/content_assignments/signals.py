@@ -8,7 +8,7 @@ from django.db import DatabaseError, IntegrityError
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
-from openedx_events.enterprise.signals import LEDGER_TRANSACTION_REVERSED, ENTERPRISE_GROUP_DELETED
+from openedx_events.enterprise.signals import LEDGER_TRANSACTION_REVERSED
 
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
 from enterprise_access.apps.content_assignments.models import LearnerContentAssignment

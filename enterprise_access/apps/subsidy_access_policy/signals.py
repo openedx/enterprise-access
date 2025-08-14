@@ -5,10 +5,11 @@ import logging
 
 from django.dispatch import receiver
 from openedx_events.enterprise.signals import ENTERPRISE_GROUP_DELETED
+
 from enterprise_access.apps.subsidy_access_policy.models import PolicyGroupAssociation
 
-
 logger = logging.getLogger(__name__)
+
 
 @receiver(ENTERPRISE_GROUP_DELETED)
 def handle_enterprise_group_deleted(**kwargs):
@@ -22,5 +23,3 @@ def handle_enterprise_group_deleted(**kwargs):
         return
     deletions = PolicyGroupAssociation.cascade_delete_for_group_uuid(group_uuid)
     logger.info('PolicyGroupAssociation records deleted: %s', deletions)
-
-    # error handling
