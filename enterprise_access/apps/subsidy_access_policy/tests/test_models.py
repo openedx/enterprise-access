@@ -49,9 +49,9 @@ from enterprise_access.apps.subsidy_access_policy.models import (
     REQUEST_CACHE_NAMESPACE,
     PerLearnerEnrollmentCreditAccessPolicy,
     PerLearnerSpendCreditAccessPolicy,
+    PolicyGroupAssociation,
     SubsidyAccessPolicy,
-    SubsidyAccessPolicyLockAttemptFailed,
-    PolicyGroupAssociation
+    SubsidyAccessPolicyLockAttemptFailed
 )
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     AssignedLearnerCreditAccessPolicyFactory,
