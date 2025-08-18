@@ -261,7 +261,7 @@ packaging==25.0
     # via
     #   drf-yasg
     #   kombu
-pbr==6.1.1
+pbr==7.0.0
     # via stevedore
 ply==3.11
     # via djangoql
