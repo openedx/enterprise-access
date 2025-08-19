@@ -152,3 +152,8 @@ enterprise_access/settings/private.py
 # devstack and assets
 .dev/
 enterprise_access/assets
+
+# claude code
+CLAUDE.md
+package-lock.json
+package.json
