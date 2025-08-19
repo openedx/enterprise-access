@@ -34,7 +34,6 @@ def get_and_cache_content_metadata(enterprise_customer_uuid, content_key, timeou
     cache_key = versioned_cache_key('get_subsidy_content_metadata', enterprise_customer_uuid, content_key)
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
-        logger.info(f'cache hit for customer {enterprise_customer_uuid} and content {content_key}')
         return cached_response.value
 
     client = get_versioned_subsidy_client()
@@ -46,11 +45,6 @@ def get_and_cache_content_metadata(enterprise_customer_uuid, content_key, timeou
     except HTTPError as exc:
         raise exc
 
-    logger.info(
-        'Fetched content metadata for customer %s and content_key %s',
-        enterprise_customer_uuid,
-        content_key,
-    )
     TieredCache.set_all_tiers(cache_key, metadata, timeout or DEFAULT_CACHE_TIMEOUT)
     return metadata
 
@@ -64,7 +58,6 @@ def get_and_cache_catalog_contains_content(enterprise_catalog_uuid, content_key,
     cache_key = versioned_cache_key('contains_content_key', enterprise_catalog_uuid, content_key)
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
-        logger.info(f'cache hit for catalog {enterprise_catalog_uuid} and content {content_key}')
         return cached_response.value
 
     try:
@@ -75,12 +68,6 @@ def get_and_cache_catalog_contains_content(enterprise_catalog_uuid, content_key,
     except HTTPError as exc:
         raise exc
 
-    logger.info(
-        'Fetched catalog inclusion for catalog %s and content_key %s. Result = %s',
-        enterprise_catalog_uuid,
-        content_key,
-        result,
-    )
     TieredCache.set_all_tiers(cache_key, result, timeout or DEFAULT_CACHE_TIMEOUT)
     return result
 
