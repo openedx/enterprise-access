@@ -20,7 +20,10 @@ class BaseSubsidyRequestAdmin(DjangoQLSearchMixin):
         'enterprise_customer_uuid',
         'course_id',
         'state',
+        'modified',
     )
+
+    ordering = ['-modified']
 
     list_filter = (
         'enterprise_customer_uuid',
@@ -35,6 +38,7 @@ class BaseSubsidyRequestAdmin(DjangoQLSearchMixin):
         'state',
         'reviewer',
         'reviewed_at',
+        'modified',
     )
 
     fields = (
@@ -194,11 +198,19 @@ class LearnerCreditRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
         'course_id',
         'state',
         'assignment',
+        'modified',
+    )
+
+    search_fields = (
+        'user__email',
+        'course_id',
+        'enterprise_customer_uuid',
     )
 
     read_only_fields = (
         'uuid',
         'get_course_partners',
+        'modified',
     )
 
     fields = (
@@ -212,6 +224,8 @@ class LearnerCreditRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
         'assignment',
         'reviewer',
     ]
+
+    list_select_related = ('user',)
 
     class Meta:
         """
@@ -277,7 +291,10 @@ class LearnerCreditRequestActionsAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
         'modified',
     )
 
-    search_fields = ('uuid', 'learner_credit_request__uuid')
+    search_fields = (
+        'uuid',
+        'learner_credit_request__uuid',
+    )
 
     list_filter = (
         'recent_action',
