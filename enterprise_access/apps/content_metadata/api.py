@@ -57,7 +57,6 @@ def get_and_cache_catalog_content_metadata(
     # from the list of keys to fetch from the catalog service.
     for content_key, cache_key in cache_keys_by_content_key.items():
         if cache_key in cached_content_metadata:
-            logger.info(f'cache hit for catalog {enterprise_catalog_uuid} and content {content_key}')
             metadata_results_list.append(cached_content_metadata[cache_key])
             keys_to_fetch.remove(content_key)
 
@@ -101,11 +100,6 @@ def _fetch_catalog_content_metadata_with_client(enterprise_catalog_uuid, content
         list(content_keys),
     )
     results = response_payload['results']
-    logger.info(
-        'Fetched content metadata in catalog %s for the following content keys: %s',
-        enterprise_catalog_uuid,
-        [record.get('key') for record in results],
-    )
     return results
 
 

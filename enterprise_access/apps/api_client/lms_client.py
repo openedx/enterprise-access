@@ -492,9 +492,6 @@ class LmsApiClient(BaseOAuthClient):
             )
             cached_response = TieredCache.get_cached_response(cache_key)
             if cached_response.is_found:
-                logger.info(
-                    f'all_enterprise_group_members cache hit for group_uuid {group_uuid}.'
-                )
                 return cached_response.value
 
             params['page_size'] = 500

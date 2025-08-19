@@ -54,19 +54,12 @@ def get_and_cache_enterprise_customer_users(request, **kwargs):
     cache_key = enterprise_customer_users_cache_key(username)
     cached_response = request_cache(namespace=REQUEST_CACHE_NAMESPACE).get_cached_response(cache_key)
     if cached_response.is_found:
-        logger.info(
-            f'enterprise_customer_users cache hit for username {username}'
-        )
         return cached_response.value
 
     client = LmsUserApiClient(request)
     response_payload = client.get_enterprise_customers_for_user(
         username=username,
         **kwargs,
-    )
-    logger.info(
-        'Fetched enterprise customer user for username %s',
-        username,
     )
     request_cache(namespace=REQUEST_CACHE_NAMESPACE).set(cache_key, response_payload)
     return response_payload
@@ -87,10 +80,6 @@ def get_and_cache_enterprise_customer(
 
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
-        logger.info(
-            f'enterprise_customer cache hit for enterprise_customer_slug {enterprise_customer_slug} '
-            f'and/or enterprise_customer_uuid {enterprise_customer_uuid}'
-        )
         return cached_response.value
 
     response_payload = LmsApiClient().get_enterprise_customer_data(
@@ -119,11 +108,6 @@ def get_and_cache_secured_algolia_search_keys(
     )
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
-        logger.info(
-            f'secured_algolia_api_key cache hit '
-            f'for enterprise_customer_uuid {enterprise_customer_uuid}'
-            f'and user id {request.user.id}'
-        )
         return cached_response.value
 
     client = EnterpriseCatalogUserV1ApiClient(request)
@@ -147,9 +131,6 @@ def get_and_cache_subscription_licenses_for_learner(
     cache_key = subscription_licenses_cache_key(enterprise_customer_uuid, request.user.id)
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
-        logger.info(
-            f'subscription_licenses cache hit for enterprise_customer_uuid {enterprise_customer_uuid}'
-        )
         return cached_response.value
 
     client = LicenseManagerUserApiClient(request)
@@ -177,10 +158,6 @@ def get_and_cache_default_enterprise_enrollment_intentions_learner_status(
     )
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
-        logger.info(
-            f'default_enterprise_enrollment_intentions cache hit '
-            f'for enterprise_customer_uuid {enterprise_customer_uuid}'
-        )
         return cached_response.value
 
     client = LmsUserApiClient(request)
@@ -210,9 +187,6 @@ def get_and_cache_enterprise_course_enrollments(
     cache_key = enterprise_course_enrollments_cache_key(enterprise_customer_uuid, request.user.id)
     cached_response = TieredCache.get_cached_response(cache_key)
     if cached_response.is_found:
-        logger.info(
-            f'enterprise_course_enrollments cache hit for enterprise_customer_uuid {enterprise_customer_uuid}'
-        )
         return cached_response.value
 
     client = LmsUserApiClient(request)
@@ -286,6 +260,11 @@ def _get_staff_enterprise_customer(
             )
             return staff_enterprise_customer
         except Exception as exc:
+            logger.exception(
+                'Error retrieving enterprise customer data on slug=%s, uuid=%s',
+                enterprise_customer_slug,
+                enterprise_customer_uuid,
+            )
             raise Exception('Error retrieving enterprise customer data') from exc
     return None
 
