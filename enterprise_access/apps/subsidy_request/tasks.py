@@ -152,32 +152,33 @@ def send_learner_credit_bnr_admins_email_with_new_requests_task(
         policy_uuid, lc_request_config_uuid, enterprise_customer_uuid
 ):
     """
-    Task to send new learner credit request emails to admins.
+    Daily digest email to enterprise admins for Browse & Request learner credit requests.
 
-    This task can be manually triggered from browse_and_request when a new
-    LearnerCreditRequest is created. It will send the latest 10 requests in
-    REQUESTED state to enterprise admins.
+    Intended to be called once per day (via a scheduler). It aggregates all open learner credit
+    requests in REQUESTED state for the given policy and enterprise, and sends a summary email
+    containing up to the 10 most recent requests plus the total count of open requests.
 
     Args:
-        policy_uuid (str): subsidy access policy uuid identifier
-        lc_request_config_uuid (str): learner credit request config uuid identifier
-        enterprise_customer_uuid (str): enterprise customer uuid identifier
+        policy_uuid (str): Subsidy access policy UUID identifier.
+        lc_request_config_uuid (str): Learner credit request config UUID identifier.
+        enterprise_customer_uuid (str): Enterprise customer UUID identifier.
     Raises:
-        HTTPError if Braze client call fails with an HTTPError
+        HTTPError: If Braze client call fails with an HTTPError.
     """
-
     subsidy_model = apps.get_model('subsidy_request.LearnerCreditRequest')
     subsidy_requests = subsidy_model.objects.filter(
         enterprise_customer_uuid=enterprise_customer_uuid,
         learner_credit_request_config__uuid=lc_request_config_uuid,
         state=SubsidyRequestStates.REQUESTED,
     )
-    latest_subsidy_requests = subsidy_requests.order_by('-created')[:10]
 
-    if not subsidy_requests:
+    latest_subsidy_requests = subsidy_requests.order_by('-created')[:10]
+    total_open = subsidy_requests.count()
+
+    if total_open == 0:
         logger.info(
-            'No learner credit requests in REQUESTED state. Not sending new requests '
-            f'email to admins for enterprise {enterprise_customer_uuid}.'
+            'No open learner credit requests in REQUESTED state. Not sending digest email to admins '
+            'for enterprise %s.', enterprise_customer_uuid
         )
         return
 
@@ -192,10 +193,11 @@ def send_learner_credit_bnr_admins_email_with_new_requests_task(
 
     if not admin_users:
         logger.info(
-            f'No admin users found for enterprise {enterprise_customer_uuid}. '
-            'Not sending new requests email.'
+            'No admin users found for enterprise %s. Not sending learner credit digest email.',
+            enterprise_customer_uuid
         )
         return
+
     braze_client = BrazeApiClient()
     recipients = [
         braze_client.create_recipient(
@@ -208,7 +210,7 @@ def send_learner_credit_bnr_admins_email_with_new_requests_task(
     braze_trigger_properties = {
         'manage_requests_url': manage_requests_url,
         'requests': [],
-        'total_requests': len(subsidy_requests),
+        'total_requests': total_open,
         'organization': organization,
     }
 
@@ -219,9 +221,9 @@ def send_learner_credit_bnr_admins_email_with_new_requests_task(
         })
 
     logger.info(
-        f'Sending learner credit requests email to admins for enterprise {enterprise_customer_uuid}. '
-        f'This includes {len(subsidy_requests)} requests. '
-        f'Sending to: {admin_users}'
+        'Sending learner credit DAILY DIGEST email to admins for enterprise %s. '
+        'Total open requests=%s. Sending to %s',
+        enterprise_customer_uuid, total_open, admin_users
     )
 
     try:
@@ -232,7 +234,8 @@ def send_learner_credit_bnr_admins_email_with_new_requests_task(
         )
     except Exception:
         logger.exception(
-            f'Exception sending Braze campaign email for enterprise {enterprise_customer_uuid}.'
+            'Exception sending Braze learner credit daily digest for enterprise %s.',
+            enterprise_customer_uuid
         )
         raise
 

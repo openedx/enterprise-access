@@ -1801,8 +1801,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         SubsidyRequestStates.EXPIRED,
         SubsidyRequestStates.REVERSED,
     )
-    @mock.patch(BNR_VIEW_PATH + '.send_learner_credit_bnr_admins_email_with_new_requests_task.delay')
-    def test_create_reuse_existing_request_success(self, reusable_state, mock_email_task):
+    def test_create_reuse_existing_request_success(self, reusable_state):
         """
         Test that an existing request in reusable states (CANCELLED, EXPIRED, REVERSED)
         gets reused instead of creating a new one.
@@ -1881,13 +1880,6 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         ).first()
         assert action is not None
         assert action.status == get_user_message_choice(SubsidyRequestStates.REQUESTED)
-
-        # Verify email notification task was called
-        mock_email_task.assert_called_once_with(
-            str(self.policy.uuid),
-            str(self.policy.learner_credit_request_config.uuid),
-            str(existing_request.enterprise_customer_uuid)
-        )
 
     def test_overview_happy_path(self):
         """
