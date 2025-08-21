@@ -10,7 +10,7 @@ from uuid import uuid4
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import OuterRef, Subquery
+from django.db.models import Case, CharField, F, OuterRef, Q, Subquery, Value, When
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from jsonfield.encoder import JSONEncoder
@@ -444,9 +444,11 @@ class LearnerCreditRequest(SubsidyRequest):
         * latest_action_status (CharField) - Most recent action status from related actions
         * latest_action_time (DateTimeField) - Most recent action timestamp
         * latest_action_type (CharField) - Most recent action type
+        * learner_request_state (CharField) - Computed state based on action status and error conditions
 
         Notes:
         * Simple subquery approach for action-based sorting that matches viewset expectations.
+        * learner_request_state provides corrected status handling for waiting and failed states.
 
         Args:
             queryset (QuerySet): LearnerCreditRequest queryset, vanilla.
@@ -468,6 +470,27 @@ class LearnerCreditRequest(SubsidyRequest):
 
             # Latest action type for sorting
             latest_action_type=Subquery(latest_action_subquery.values('recent_action')[:1]),
+
+            # Latest action error reason for state computation
+            latest_action_error_reason=Subquery(latest_action_subquery.values('error_reason')[:1]),
+
+            # Computed learner request state based on action status and error conditions
+            learner_request_state=Case(
+                # Failed state: when error_reason is present (cancellation or redemption failed)
+                When(
+                    latest_action_error_reason__isnull=False,
+                    then=Value('failed')
+                ),
+                # Waiting state: approved or reminded without error
+                When(
+                    Q(latest_action_type__in=['approved', 'reminded']) &
+                    Q(latest_action_error_reason__isnull=True),
+                    then=Value('waiting')
+                ),
+                # Default: use the actual status from the latest action
+                default=F('latest_action_status'),
+                output_field=CharField()
+            ),
         )
 
         return new_queryset
