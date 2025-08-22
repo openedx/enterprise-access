@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_slug
 from django.db import models, transaction
 from django.utils import timezone
+from django_countries.fields import CountryField
 from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_update_with_history
@@ -113,6 +114,11 @@ class CheckoutIntent(TimeStampedModel):
     )
     quantity = models.PositiveIntegerField(
         help_text="How many licenses to create.",
+    )
+    country = CountryField(
+        null=True,
+        help_text="The customer's country",
+        blank_label="(select country)",
     )
     last_checkout_error = models.TextField(blank=True, null=True)
     last_provisioning_error = models.TextField(blank=True, null=True)

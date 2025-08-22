@@ -64,6 +64,7 @@ class CheckoutIntentAdmin(admin.ModelAdmin):
         'created',
         'time_remaining',
         'has_workflow',
+        'country',
     )
 
     list_filter = (
@@ -102,6 +103,7 @@ class CheckoutIntentAdmin(admin.ModelAdmin):
                 'enterprise_slug',
                 'quantity',
                 'admin_portal_url_display',
+                'country',
             )
         }),
         ('Status', {
