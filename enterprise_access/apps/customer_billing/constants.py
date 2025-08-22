@@ -88,7 +88,7 @@ ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS = {
         CheckoutIntentState.PAID,
     ],
     CheckoutIntentState.ERRORED_PROVISIONING: [
-        CheckoutIntentState.PAID,
+        CheckoutIntentState.FULFILLED,
     ],
     CheckoutIntentState.EXPIRED: [
         CheckoutIntentState.CREATED,
