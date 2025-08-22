@@ -4,6 +4,7 @@ Tests for the CheckoutIntent viewset.
 import uuid
 from datetime import timedelta
 
+import ddt
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import status
@@ -18,6 +19,7 @@ from test_utils import APITest
 User = get_user_model()
 
 
+@ddt.ddt
 class CheckoutIntentViewSetTestCase(APITest):
     """
     Test cases for CheckoutIntent ViewSet.
@@ -130,91 +132,38 @@ class CheckoutIntentViewSetTestCase(APITest):
         response = self.client.get(self.detail_url_3)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_valid_state_transition_created_to_paid(self):
-        """Test valid state transition from created to paid."""
+    @ddt.data(
+        {'current_state': CheckoutIntentState.CREATED, 'new_state': CheckoutIntentState.PAID},
+        {'current_state': CheckoutIntentState.CREATED, 'new_state': CheckoutIntentState.ERRORED_STRIPE_CHECKOUT},
+        {'current_state': CheckoutIntentState.CREATED, 'new_state': CheckoutIntentState.EXPIRED},
+        {'current_state': CheckoutIntentState.PAID, 'new_state': CheckoutIntentState.FULFILLED},
+        {'current_state': CheckoutIntentState.PAID, 'new_state': CheckoutIntentState.ERRORED_PROVISIONING},
+        {'current_state': CheckoutIntentState.ERRORED_STRIPE_CHECKOUT, 'new_state': CheckoutIntentState.PAID},
+        {'current_state': CheckoutIntentState.ERRORED_PROVISIONING, 'new_state': CheckoutIntentState.FULFILLED},
+        {'current_state': CheckoutIntentState.EXPIRED, 'new_state': CheckoutIntentState.CREATED},
+    )
+    @ddt.unpack
+    def test_valid_state_transitions(self, current_state, new_state):
+        """Test valid state transitions."""
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
             'context': str(uuid.uuid4()),
         }])
+        self.checkout_intent_1.state = current_state
+        self.checkout_intent_1.save()
 
         response = self.client.patch(
             self.detail_url_1,
-            {'state': 'paid'},
+            {'state': new_state},
             format='json'
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['state'], 'paid')
+        self.assertEqual(response.data['state'], new_state)
 
         # Verify in database
         self.checkout_intent_1.refresh_from_db()
-        self.assertEqual(self.checkout_intent_1.state, 'paid')
-
-    def test_valid_state_transition_created_to_errored_stripe(self):
-        """Test valid state transition from created to errored_stripe_checkout."""
-        self.set_jwt_cookie([{
-            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
-            'context': str(uuid.uuid4()),
-        }])
-
-        response = self.client.patch(
-            self.detail_url_1,
-            {
-                'state': 'errored_stripe_checkout',
-            },
-            format='json'
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['state'], 'errored_stripe_checkout')
-
-    def test_valid_state_transition_paid_to_fulfilled(self):
-        """Test valid state transition from paid to fulfilled."""
-        self.set_jwt_cookie([{
-            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
-            'context': str(uuid.uuid4()),
-        }], user=self.user_2)
-
-        # checkout_intent_2 is already in 'paid' state
-        detail_url_2 = reverse(
-            'api:v1:checkout-intent-detail',
-            kwargs={'id': self.checkout_intent_2.id}
-        )
-
-        response = self.client.patch(
-            detail_url_2,
-            {'state': 'fulfilled'},
-            format='json'
-        )
-
-        # self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['state'], 'fulfilled')
-
-    def test_valid_state_transition_expired_to_created(self):
-        """Test valid state transition from paid to fulfilled."""
-        self.set_jwt_cookie([{
-            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
-            'context': str(uuid.uuid4()),
-        }], user=self.user_2)
-
-        self.checkout_intent_2.state = CheckoutIntentState.EXPIRED
-        self.checkout_intent_2.save()
-
-        detail_url_2 = reverse(
-            'api:v1:checkout-intent-detail',
-            kwargs={'id': self.checkout_intent_2.id}
-        )
-
-        response = self.client.patch(
-            detail_url_2,
-            {'state': CheckoutIntentState.CREATED},
-            format='json'
-        )
-
-        # self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['state'], CheckoutIntentState.CREATED)
-        self.checkout_intent_2.refresh_from_db()
-        self.assertEqual(self.checkout_intent_2.state, CheckoutIntentState.CREATED)
+        self.assertEqual(self.checkout_intent_1.state, new_state)
 
     def test_invalid_state_transition(self):
         """Test that invalid state transitions are rejected."""
