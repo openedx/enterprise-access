@@ -65,7 +65,6 @@ from enterprise_access.apps.subsidy_request.models import (
     SubsidyRequestCustomerConfiguration
 )
 from enterprise_access.apps.subsidy_request.tasks import (
-    send_learner_credit_bnr_admins_email_with_new_requests_task,
     send_learner_credit_bnr_request_approve_task,
     send_reminder_email_for_pending_learner_credit_request
 )
@@ -895,12 +894,6 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
                     recent_action=get_action_choice(SubsidyRequestStates.REQUESTED),
                     status=get_user_message_choice(SubsidyRequestStates.REQUESTED),
                 )
-                # Trigger admin email notification with the latest request
-                send_learner_credit_bnr_admins_email_with_new_requests_task.delay(
-                    str(policy.uuid),
-                    str(policy.learner_credit_request_config.uuid),
-                    str(existing_request.enterprise_customer_uuid)
-                )
                 response_data = serializers.LearnerCreditRequestSerializer(existing_request).data
                 return Response(response_data, status=status.HTTP_200_OK)
             except Exception as exc:  # pylint: disable=broad-except
@@ -937,13 +930,6 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
                         learner_credit_request=lcr,
                         recent_action=get_action_choice(SubsidyRequestStates.REQUESTED),
                         status=get_user_message_choice(SubsidyRequestStates.REQUESTED),
-                    )
-
-                    # Trigger admin email notification with the latest request
-                    send_learner_credit_bnr_admins_email_with_new_requests_task.delay(
-                        str(policy.uuid),
-                        str(policy.learner_credit_request_config.uuid),
-                        str(lcr.enterprise_customer_uuid)
                     )
                 except LearnerCreditRequest.DoesNotExist:
                     logger.warning(f"LearnerCreditRequest {lcr_uuid} not found for action creation.")
