@@ -63,7 +63,8 @@ class BrazeCampaignSender:
         'course_partner',
         'course_card_image',
         'learner_portal_link',
-        'action_required_by_timestamp'
+        'action_required_by_timestamp',
+        'enterprise_dashboard_url'
     }
 
     def __init__(self, assignment):
@@ -263,6 +264,10 @@ class BrazeCampaignSender:
         return image_url
 
     def get_learner_portal_link(self):
+        slug = self.customer_data["slug"]
+        return f'{settings.ENTERPRISE_LEARNER_PORTAL_URL}/{slug}'
+
+    def get_enterprise_dashboard_url(self):
         slug = self.customer_data["slug"]
         return f'{settings.ENTERPRISE_LEARNER_PORTAL_URL}/{slug}'
 

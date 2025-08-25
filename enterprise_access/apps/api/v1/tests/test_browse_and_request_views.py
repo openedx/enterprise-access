@@ -314,6 +314,8 @@ class TestLicenseRequestViewSet(BaseEnterpriseAccessTestCase):
         response = self.client.post(LICENSE_REQUESTS_LIST_ENDPOINT, payload)
         assert response.status_code == status.HTTP_201_CREATED
 
+        print(response.data)
+
         self.mock_analytics.assert_called_with(
             user_id=self.user.lms_user_id,
             event=SegmentEvents.LICENSE_REQUEST_CREATED,
