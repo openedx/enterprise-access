@@ -3,6 +3,7 @@ Response builders for the Checkout BFF endpoints.
 """
 from enterprise_access.apps.bffs.checkout.serializers import (
     CheckoutContextResponseSerializer,
+    CheckoutSuccessResponseSerializer,
     CheckoutValidationResponseSerializer
 )
 from enterprise_access.apps.bffs.response_builder import BaseResponseBuilder
@@ -62,3 +63,8 @@ class CheckoutValidationResponseBuilder(BaseResponseBuilder):
             'validation_decisions': validation_decisions,
             'user_authn': user_authn,
         }
+
+
+class CheckoutSuccessResponseBuilder(CheckoutContextResponseBuilder):
+    """Builder for checkout success responses."""
+    serializer_class = CheckoutSuccessResponseSerializer

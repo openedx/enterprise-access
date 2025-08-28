@@ -44,7 +44,7 @@ backoff==1.10.0
     # via
     #   -r requirements/test.txt
     #   analytics-python
-beautifulsoup4==4.13.4
+beautifulsoup4==4.13.5
     # via pydata-sphinx-theme
 billiard==4.2.1
     # via
@@ -127,7 +127,7 @@ coreschema==0.0.4
     # via
     #   -r requirements/test.txt
     #   coreapi
-coverage[toml]==7.10.3
+coverage[toml]==7.10.5
     # via
     #   -r requirements/test.txt
     #   pytest-cov
@@ -296,7 +296,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.10
+edx-enterprise-subsidy-client==2.0.13
     # via -r requirements/test.txt
 edx-event-bus-kafka==6.1.0
     # via -r requirements/test.txt
@@ -330,7 +330,7 @@ fastavro==1.12.0
     #   -r requirements/test.txt
     #   confluent-kafka
     #   openedx-events
-filelock==3.18.0
+filelock==3.19.1
     # via
     #   -r requirements/test.txt
     #   tox
@@ -372,7 +372,7 @@ jsonfield==3.2.0
     #   edx-celeryutils
 jsonfield2==4.0.0.post0
     # via -r requirements/test.txt
-jsonschema==4.25.0
+jsonschema==4.25.1
     # via
     #   -r requirements/test.txt
     #   drf-spectacular
@@ -409,7 +409,7 @@ openapi-codec==1.3.2
     # via
     #   -r requirements/test.txt
     #   django-rest-swagger
-openedx-events==10.4.0
+openedx-events==10.5.0
     # via
     #   -r requirements/test.txt
     #   edx-event-bus-kafka
@@ -423,7 +423,7 @@ packaging==25.0
     #   pytest
     #   sphinx
     #   tox
-pbr==6.1.1
+pbr==7.0.1
     # via
     #   -r requirements/test.txt
     #   stevedore
@@ -496,7 +496,7 @@ pylint-plugin-utils==0.9.0
     #   pylint-django
 pymemcache==4.0.0
     # via -r requirements/test.txt
-pymongo==4.14.0
+pymongo==4.14.1
     # via
     #   -r requirements/test.txt
     #   edx-opaque-keys
@@ -553,7 +553,7 @@ referencing==0.36.2
     #   -r requirements/test.txt
     #   jsonschema
     #   jsonschema-specifications
-requests==2.32.4
+requests==2.32.5
     # via
     #   -r requirements/test.txt
     #   analytics-python
@@ -684,7 +684,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.33.1
+virtualenv==20.34.0
     # via
     #   -r requirements/test.txt
     #   tox

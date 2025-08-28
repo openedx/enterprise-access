@@ -38,6 +38,87 @@ The subsidy access policy application allows us to command and query who is allo
 subsidy value, from which allowed set of content, via what access method.  It also supports our
 general compliance requirements, protecting our business reputation and general business accounting veractiy.
 
+Policy Types
+************
+The enterprise-access system now supports two primary types of subsidy access
+policies, each designed for different enterprise customer needs.
+
+Per-Learner Spend Credit Access Policy (``PerLearnerSpendCreditAccessPolicy``):
+
+- Limits learners to a maximum dollar amount they can spend (e.g., $500 per learner)
+- Tracks spending in monetary units rather than enrollment count
+- Best for enterprises wanting budget-based control per learner
+
+Assigned Learner Credit Access Policy (``AssignedLearnerCreditAccessPolicy``):
+
+- Enables enterprise admins to pre-assign specific content to specific learners
+- Learners can only redeem content that has been explicitly assigned to them
+- Assignments must be accepted by learners before redemption occurs
+- Best for enterprises wanting tight administrative control over learner access
+
+Per-Learner Enrollment Credit Access Policy (``PerLearnerEnrollmentCreditAccessPolicy``):
+
+- **Not yet supported** We have stub fields in place to support these in the future, but this
+  type of policy is not yet supported in the wild.
+- Limits learners to a maximum number of course enrollments (e.g., 3 courses per
+learner)
+- Uses enrollment count rather than dollar amounts for limits
+- Best for enterprises wanting to control course consumption by quantity
+
+Access Methods
+**************
+Each access policy can be configured with different access methods that determine how
+learners interact with available content:
+
+Direct Access (``AccessMethods.DIRECT``):
+
+- Learners can immediately enroll in content without approval
+- Subject to policy limits and catalog restrictions
+- Provides the most streamlined learner experience
+
+Browse and Request (``AccessMethods.REQUEST``):
+
+- Learners can browse available content but must request approval before enrollment
+- Enterprise admins review and approve/deny requests through the admin portal
+- Enables administrative oversight while allowing learner choice
+- Requests are managed through the ``subsidy_request`` application
+
+Assignment-Based Access (``AccessMethods.ASSIGNED``):
+
+- Content is pre-assigned to learners by enterprise admins
+- Learners can only access content that has been specifically assigned to them
+- Assignments are managed through the ``content_assignments`` application
+- Requires learner acceptance before redemption and enrollment occurs
+
+Assignment-Based Workflow
+*************************
+
+Assignment-based policies represent a significant evolution in how enterprise
+customers can control learner access. Key characteristics include:
+
+- Assignment Allocation: When admins assign content, the expected cost is immediately
+  "allocated" against the policy's spend limit
+- Learner Acceptance Required: Assignments do not automatically result in enrollment,
+  learners must explicitly accept them
+- Assignment States: Assignments progress through states like allocated, accepted, expired, cancelled, and reversed
+- Email-Based Assignment: Assignments can be created using learner email addresses,
+  before learners are registered in the system
+- Integration with Content Assignments App: Managed through ``LearnerContentAssignment``
+  and ``AssignmentConfiguration`` models
+
+Browse and Request Workflow
+***************************
+
+The browse and request access method enables a workflow where:
+
+1. Discovery: Learners browse content available in their organization's catalog
+2. Request: Learners submit requests for content they want to enroll in
+3. Admin Review: Enterprise admins receive notifications and review requests
+4. Approval/Denial: Admins approve or deny requests through the admin portal
+5. Notification: Learners receive notifications about request status
+6. Enrollment: Approved requests proceed to automatic enrollment and subsidy
+   redemption
+
 Where Access Policies fit in the Big Picture
 ********************************************
 Subsidy Access Policies are one component of a system that supports the discovery of a diverse set of
@@ -88,5 +169,3 @@ about **content** through this system:
 #. **All** transactions (OCM or otherwise) are *committed* (the "happy-path success state" of a transaction)
    with a set of edX Enterprise enrollment records.  This occurs via the Enterprise Enrollments API,
    a plugin of the edx-platform service.
-
-Fin.

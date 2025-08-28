@@ -176,6 +176,7 @@ class MinimalBffResponseSerializer(BaseBffSerializer):
     """
     errors = ErrorSerializer(many=True, required=False, default=list)
     warnings = WarningSerializer(many=True, required=False, default=list)
+    enterprise_features = serializers.DictField(required=False, default=dict)
 
 
 class BaseResponseSerializer(MinimalBffResponseSerializer):
@@ -193,7 +194,6 @@ class BaseResponseSerializer(MinimalBffResponseSerializer):
         help_text='Mapping of catalog UUIDs to catalog query UUIDs.',
     )
     algolia = SecuredAlgoliaMetadataSerializer(required=False, allow_null=True)
-    enterprise_features = serializers.DictField(required=False, default=dict)
 
 
 class CustomerAgreementSerializer(BaseBffSerializer):

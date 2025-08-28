@@ -118,7 +118,6 @@ class TestBaseResponseBuilder(TestHandlerContextMixin):
         if warnings:
             mock_handler_context_instance.warnings.append(self.mock_warning)
             expected_output['warnings'] = [self.mock_warning]
-        base_response_builder.add_errors_warnings_to_response()
         base_response_builder.build()
         response_data, _ = base_response_builder.serialize()
         assert check_objects(response_data, expected_output)
@@ -243,6 +242,11 @@ class TestUnauthenticatedBaseResponseBuilder(TestHandlerContextMixin):
     """
     Tests for UnauthenticatedBaseResponseBuilder with unauthenticated requests using BaseHandlerContext.
     """
+    EXPECTED_EMPTY_RESPONSE_DATA = {
+        'errors': [],
+        'warnings': [],
+        'enterprise_features': {},
+    }
 
     def get_mock_base_handler_context(self, data=None, errors=None, warnings=None, _status_code=None):
         """
@@ -276,17 +280,11 @@ class TestUnauthenticatedBaseResponseBuilder(TestHandlerContextMixin):
 
         response_builder = MockUnauthenticatedBaseResponseBuilder(mock_context_instance)
         response_builder.build()
-        response_builder.add_errors_warnings_to_response()
         response_data, status_code = response_builder.serialize()
 
         # Since build() does nothing, we expect a minimal response with just errors/warnings
-        expected_response_data = {
-            'errors': [],
-            'warnings': [],
-        }
-
         self.assertEqual(status_code, status.HTTP_200_OK)
-        assert check_objects(response_data, expected_response_data)
+        assert check_objects(response_data, self.EXPECTED_EMPTY_RESPONSE_DATA)
 
     @mock.patch('enterprise_access.apps.bffs.context.BaseHandlerContext')
     def test_unauthenticated_build_with_context_data_ignored(self, mock_base_handler_context):
@@ -307,17 +305,11 @@ class TestUnauthenticatedBaseResponseBuilder(TestHandlerContextMixin):
 
         response_builder = MockUnauthenticatedBaseResponseBuilder(mock_context_instance)
         response_builder.build()
-        response_builder.add_errors_warnings_to_response()
         response_data, status_code = response_builder.serialize()
 
         # Data in context should be ignored since build() does nothing
-        expected_response_data = {
-            'errors': [],
-            'warnings': [],
-        }
-
         self.assertEqual(status_code, status.HTTP_200_OK)
-        assert check_objects(response_data, expected_response_data)
+        assert check_objects(response_data, self.EXPECTED_EMPTY_RESPONSE_DATA)
 
     @ddt.data(
         {
@@ -352,16 +344,17 @@ class TestUnauthenticatedBaseResponseBuilder(TestHandlerContextMixin):
 
         response_builder = MockUnauthenticatedBaseResponseBuilder(mock_context_instance)
         response_builder.build()
-        response_builder.add_errors_warnings_to_response()
         response_data, response_status_code = response_builder.serialize()
 
-        expected_response_data = {
-            'errors': errors,
-            'warnings': warnings,
-        }
-
         self.assertEqual(response_status_code, status_code)
-        assert check_objects(response_data, expected_response_data)
+        assert check_objects(
+            response_data,
+            {
+                'errors': errors,
+                'warnings': warnings,
+                'enterprise_features': {},
+            },
+        )
 
     @mock.patch('enterprise_access.apps.bffs.context.BaseHandlerContext')
     def test_unauthenticated_status_code_from_context(self, mock_base_handler_context):
@@ -396,13 +389,7 @@ class TestUnauthenticatedBaseResponseBuilder(TestHandlerContextMixin):
         response_builder.build()
 
         # Should still work fine
-        response_builder.add_errors_warnings_to_response()
         response_data, status_code = response_builder.serialize()
 
-        expected_response_data = {
-            'errors': [],
-            'warnings': [],
-        }
-
         self.assertEqual(status_code, status.HTTP_200_OK)
-        assert check_objects(response_data, expected_response_data)
+        assert check_objects(response_data, self.EXPECTED_EMPTY_RESPONSE_DATA)

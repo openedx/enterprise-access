@@ -1,6 +1,7 @@
 """
 customer billing serializers
 """
+from django_countries.serializers import CountryFieldMixin
 from rest_framework import serializers
 
 from enterprise_access.apps.customer_billing.constants import ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS
@@ -19,6 +20,10 @@ class CustomerBillingCreateCheckoutSessionRequestSerializer(serializers.Serializ
     enterprise_slug = serializers.SlugField(
         required=True,
         help_text='The unique slug proposed for the Enterprise Customer.',
+    )
+    company_name = serializers.CharField(
+        required=True,
+        help_text='The unique name proposed for the Enterprise Customer.',
     )
     quantity = serializers.IntegerField(
         required=True,
@@ -89,7 +94,7 @@ class CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer(ser
     )
 
 
-class CheckoutIntentReadOnlySerializer(serializers.ModelSerializer):
+class CheckoutIntentReadOnlySerializer(CountryFieldMixin, serializers.ModelSerializer):
     """
     Serializer for reading and updating CheckoutIntent model instances.
     """
@@ -100,7 +105,7 @@ class CheckoutIntentReadOnlySerializer(serializers.ModelSerializer):
         read_only_fields = [field.name for field in CheckoutIntent._meta.get_fields()]
 
 
-class CheckoutIntentUpdateRequestSerializer(serializers.ModelSerializer):
+class CheckoutIntentUpdateRequestSerializer(CountryFieldMixin, serializers.ModelSerializer):
     """
     Write serializer for CheckoutIntent - used for PATCH operations.
     Only allows state field updates.
@@ -111,7 +116,7 @@ class CheckoutIntentUpdateRequestSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = [
             field.name for field in CheckoutIntent._meta.get_fields()
-            if field.name != 'state'
+            if field.name not in ('state', 'country')
         ]
 
     def validate_state(self, value):

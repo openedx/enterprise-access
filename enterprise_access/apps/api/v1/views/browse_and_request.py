@@ -768,6 +768,9 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         'latest_action_time',
         'latest_action_type',
         'latest_action_status',
+
+        # State-based sorting field
+        'state_sort_order',
     ]
 
     subsidy_type = SubsidyTypeChoices.LEARNER_CREDIT
@@ -791,7 +794,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
                 'reviewer'
             )
 
-        return queryset.order_by('request_state_sort_order', '-created')
+        return queryset
 
     def _reuse_existing_request(self, request, course_price):
         """

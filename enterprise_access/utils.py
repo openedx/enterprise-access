@@ -4,6 +4,7 @@ Utils for any app in the enterprise-access project.
 import logging
 import traceback
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from django.apps import apps
 from pytz import UTC
@@ -287,3 +288,14 @@ def get_course_run_metadata_for_assignment(assignment, content_metadata):
 
     # For course-based assignments, return metadata for the advertised course run
     return get_advertised_course_run_metadata(content_metadata)
+
+
+def cents_to_dollars(value_in_cents):
+    """
+    Converts some value of cents (could be an int or a string)
+    into dollars.
+
+    Returns:
+      A Decimal representation of cents converted to dollars.
+    """
+    return Decimal(value_in_cents) / Decimal(100)

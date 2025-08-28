@@ -74,7 +74,6 @@ def get_and_cache_transactions_for_learner(subsidy_uuid, lms_user_id):
     cache_key = learner_transaction_cache_key(subsidy_uuid, lms_user_id)
     cached_response = request_cache(namespace=REQUEST_CACHE_NAMESPACE).get_cached_response(cache_key)
     if cached_response.is_found:
-        logger.info(f'cache hit for subsidy {subsidy_uuid} and user {lms_user_id}')
         return cached_response.value
 
     client = get_versioned_subsidy_client()

@@ -160,6 +160,12 @@ class LearnerCreditRequestSerializer(SubsidyRequestSerializer):
         help_text="Cost of the content in USD Cents.",
     )
     latest_action = serializers.SerializerMethodField()
+    learner_request_state = serializers.CharField(
+        read_only=True,
+        help_text="Computed state based on action status and error conditions. "
+                  "Returns 'waiting' for approved/reminded actions without errors, "
+                  "'failed' for actions with error_reason, or the actual status otherwise"
+    )
 
     class Meta:
         model = LearnerCreditRequest
@@ -168,9 +174,11 @@ class LearnerCreditRequestSerializer(SubsidyRequestSerializer):
             "assignment",
             "course_price",
             "latest_action",
+            "learner_request_state",
         ]
         read_only_fields = SubsidyRequestSerializer.Meta.read_only_fields + [
             "latest_action",
+            "learner_request_state",
         ]
         extra_kwargs = SubsidyRequestSerializer.Meta.extra_kwargs
 

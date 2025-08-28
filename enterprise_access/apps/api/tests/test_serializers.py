@@ -29,6 +29,7 @@ from enterprise_access.apps.subsidy_request.constants import (
     LearnerCreditRequestActionErrorReasons,
     SubsidyRequestStates
 )
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
 from enterprise_access.apps.subsidy_request.tests.factories import (
     LearnerCreditRequestActionsFactory,
     LearnerCreditRequestFactory
@@ -437,3 +438,84 @@ class TestLearnerCreditRequestSerializer(TestCase):
 
         self.assertIn("latest_action", data)
         self.assertIsNone(data["latest_action"])
+
+    def test_learner_request_state_field_included(self):
+        """
+        Test that the learner_request_state field is included in serialized data.
+        """
+        learner_credit_request = LearnerCreditRequestFactory()
+
+        # Create an approved action without error (should result in 'waiting')
+        LearnerCreditRequestActionsFactory(
+            learner_credit_request=learner_credit_request,
+            recent_action=SubsidyRequestStates.APPROVED,
+            status=get_user_message_choice(SubsidyRequestStates.APPROVED),
+            error_reason=None,
+        )
+
+        # Annotate the queryset to include the learner_request_state field
+        queryset = LearnerCreditRequest.objects.filter(uuid=learner_credit_request.uuid)
+        annotated_queryset = LearnerCreditRequest.annotate_dynamic_fields_onto_queryset(queryset)
+        annotated_request = annotated_queryset.first()
+
+        serializer = LearnerCreditRequestSerializer(annotated_request)
+        data = serializer.data
+
+        # Verify that learner_request_state field is present
+        self.assertIn('learner_request_state', data)
+        self.assertEqual(data['learner_request_state'], 'waiting')
+
+    def test_learner_request_state_field_failed_state(self):
+        """
+        Test that the learner_request_state field correctly shows 'failed' for error conditions.
+        """
+        learner_credit_request = LearnerCreditRequestFactory()
+
+        # Create an action with error_reason (should result in 'failed')
+        LearnerCreditRequestActionsFactory(
+            learner_credit_request=learner_credit_request,
+            recent_action=SubsidyRequestStates.CANCELLED,
+            status=get_user_message_choice(SubsidyRequestStates.APPROVED),
+            error_reason=get_error_reason_choice(
+                LearnerCreditRequestActionErrorReasons.FAILED_CANCELLATION
+            ),
+        )
+
+        # Annotate the queryset to include the learner_request_state field
+        queryset = LearnerCreditRequest.objects.filter(uuid=learner_credit_request.uuid)
+        annotated_queryset = LearnerCreditRequest.annotate_dynamic_fields_onto_queryset(queryset)
+        annotated_request = annotated_queryset.first()
+
+        serializer = LearnerCreditRequestSerializer(annotated_request)
+        data = serializer.data
+
+        # Verify that learner_request_state field shows 'failed'
+        self.assertIn('learner_request_state', data)
+        self.assertEqual(data['learner_request_state'], 'failed')
+
+    def test_learner_request_state_field_default_state(self):
+        """
+        Test that the learner_request_state field defaults to actual status for other cases.
+        """
+        learner_credit_request = LearnerCreditRequestFactory()
+
+        # Create a requested action (not approved/reminded, no error)
+        LearnerCreditRequestActionsFactory(
+            learner_credit_request=learner_credit_request,
+            recent_action=SubsidyRequestStates.REQUESTED,
+            status=get_user_message_choice(SubsidyRequestStates.REQUESTED),
+            error_reason=None,
+        )
+
+        # Annotate the queryset to include the learner_request_state field
+        queryset = LearnerCreditRequest.objects.filter(uuid=learner_credit_request.uuid)
+        annotated_queryset = LearnerCreditRequest.annotate_dynamic_fields_onto_queryset(queryset)
+        annotated_request = annotated_queryset.first()
+
+        serializer = LearnerCreditRequestSerializer(annotated_request)
+        data = serializer.data
+
+        # Verify that learner_request_state field shows the actual status
+        self.assertIn('learner_request_state', data)
+        expected_status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
+        self.assertEqual(data['learner_request_state'], expected_status)

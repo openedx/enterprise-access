@@ -20,7 +20,10 @@ class BaseSubsidyRequestAdmin(DjangoQLSearchMixin):
         'enterprise_customer_uuid',
         'course_id',
         'state',
+        'modified',
     )
+
+    ordering = ['-modified']
 
     list_filter = (
         'enterprise_customer_uuid',
@@ -35,6 +38,7 @@ class BaseSubsidyRequestAdmin(DjangoQLSearchMixin):
         'state',
         'reviewer',
         'reviewed_at',
+        'modified',
     )
 
     fields = (
@@ -193,12 +197,21 @@ class LearnerCreditRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
         'enterprise_customer_uuid',
         'course_id',
         'state',
+        'get_learner_request_state',
         'assignment',
+        'modified',
+    )
+
+    search_fields = (
+        'user__email',
+        'course_id',
+        'enterprise_customer_uuid',
     )
 
     read_only_fields = (
         'uuid',
         'get_course_partners',
+        'modified',
     )
 
     fields = (
@@ -213,6 +226,8 @@ class LearnerCreditRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
         'reviewer',
     ]
 
+    list_select_related = ('user',)
+
     class Meta:
         """
         Meta class for ``LearnerCreditRequestAdmin``.
@@ -225,6 +240,23 @@ class LearnerCreditRequestAdmin(BaseSubsidyRequestAdmin, admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         return super().fields + self.fields
+
+    @admin.display(
+        description='Learner Request State',
+        ordering='learner_request_state'
+    )
+    def get_learner_request_state(self, obj):
+        """
+        Display the computed learner request state from the annotated field.
+        """
+        return getattr(obj, 'learner_request_state', 'N/A')
+
+    def get_queryset(self, request):
+        """
+        Override to ensure the annotated fields are available in the admin.
+        """
+        queryset = super().get_queryset(request)
+        return self.model.annotate_dynamic_fields_onto_queryset(queryset)
 
 
 @admin.register(models.LearnerCreditRequestConfiguration)
@@ -277,7 +309,10 @@ class LearnerCreditRequestActionsAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
         'modified',
     )
 
-    search_fields = ('uuid', 'learner_credit_request__uuid')
+    search_fields = (
+        'uuid',
+        'learner_credit_request__uuid',
+    )
 
     list_filter = (
         'recent_action',

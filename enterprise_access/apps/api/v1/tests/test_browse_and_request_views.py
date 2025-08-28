@@ -1707,6 +1707,57 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         ])
         assert request_uuids == expected_uuids
 
+    @ddt.data(
+        'state_sort_order',
+    )
+    def test_list_ordering_by_state_sort_order(self, ordering_key):
+        """
+        Verify that the list view can be sorted by the custom state priority.
+        The expected order is REQUESTED, DECLINED, CANCELLED, then others.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        # Create requests in a non-sorted order to ensure sorting is effective.
+        req_approved = LearnerCreditRequestFactory(
+            state=SubsidyRequestStates.APPROVED, enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+        req_declined = LearnerCreditRequestFactory(
+            state=SubsidyRequestStates.DECLINED, enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+        req_requested = LearnerCreditRequestFactory(
+            state=SubsidyRequestStates.REQUESTED, enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+        req_cancelled = LearnerCreditRequestFactory(
+            state=SubsidyRequestStates.CANCELLED, enterprise_customer_uuid=self.enterprise_customer_uuid_1
+        )
+
+        # Make the API call with the specified ordering
+        response = self.client.get(
+            LEARNER_CREDIT_REQUESTS_LIST_ENDPOINT,
+            {'ordering': ordering_key}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        results = response.json()['results']
+        # Extract UUIDs from the response to check the order
+        actual_uuids = [item['uuid'] for item in results]
+
+        # Define the expected order of UUIDs based on your business logic
+        expected_order = [
+            str(req_requested.uuid),
+            str(req_declined.uuid),
+            str(req_cancelled.uuid),
+            str(req_approved.uuid),
+        ]
+
+        # Filter the actual UUIDs to only include the ones we created for this test.
+        filtered_actual_uuids = [uuid for uuid in actual_uuids if uuid in expected_order]
+
+        self.assertEqual(filtered_actual_uuids, expected_order)
+
     def test_create_missing_policy_uuid(self):
         """
         Test that policy_uuid is required.
