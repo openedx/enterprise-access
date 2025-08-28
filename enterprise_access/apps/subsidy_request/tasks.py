@@ -13,51 +13,36 @@ from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.discovery_client import DiscoveryApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments.tasks import BrazeCampaignSender, _get_assignment_or_raise
-from enterprise_access.apps.subsidy_request.constants import (
-    LearnerCreditAdditionalActionStates,
-    LearnerCreditRequestActionErrorReasons,
-    SubsidyRequestStates
-)
-from enterprise_access.apps.subsidy_request.utils import (
-    get_action_choice,
-    get_error_reason_choice,
-    get_user_message_choice
-)
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.tasks import LoggedTaskWithRetry
-from enterprise_access.utils import format_traceback, get_subsidy_model
+from enterprise_access.utils import get_subsidy_model
 
 logger = logging.getLogger(__name__)
 
 
 class BaseLearnerCreditRequestRetryAndErrorActionTask(LoggedTaskWithRetry):
     """
-    Base class that sets an errored action on a learner credit request.
+    Base class that logs errors for learner credit request tasks.
     Provides a place to define retry failure handling logic. This helps ensure
-    that only *one* error action record gets written when a task is retried
-    multiple times.
+    that task failures are properly logged with relevant context.
     """
-    def add_errored_action(self, learner_credit_request, exc):
+    def log_errored_action(self, learner_credit_request, exc):
         """
-        Do something here to add a related action with error info.
+        Log error information for the failed task.
         """
         raise NotImplementedError
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """
-        If the task fails for any reason (whether or not retries were involved), create an error action.
+        If the task fails for any reason (whether or not retries were involved), log the error.
 
         Function signature documented at: https://docs.celeryq.dev/en/stable/userguide/tasks.html#on_failure
         """
-        logger.error(
-            f'Learner credit request task {self.name} failed. task id: {task_id}, '
-            f'exception: {exc}, task args: {args}'
-        )
-
         learner_credit_request = self.get_learner_credit_request_from_args(args)
-        self.add_errored_action(learner_credit_request, exc)
+        self.log_errored_action(learner_credit_request, exc)
         if self.request.retries == settings.TASK_MAX_RETRIES:
             logger.error(
-                'The task failure resulted from exceeding the locally defined max number of retries '
+                f'The task id: {task_id} failure resulted from exceeding the locally defined max number of retries '
                 '(settings.TASK_MAX_RETRIES).'
             )
 
@@ -78,14 +63,12 @@ class SendLearnerCreditApprovalEmailTask(BaseLearnerCreditRequestRetryAndErrorAc
     """
     Base class for the ``send_learner_credit_bnr_request_approve_task`` task.
     """
-    def add_errored_action(self, learner_credit_request, exc):
-        learner_credit_request_action = apps.get_model('subsidy_request.LearnerCreditRequestActions')
-        learner_credit_request_action.create_action(
-            learner_credit_request=learner_credit_request,
-            recent_action=get_action_choice(SubsidyRequestStates.APPROVED),
-            status=get_user_message_choice(SubsidyRequestStates.APPROVED),
-            error_reason=get_error_reason_choice(LearnerCreditRequestActionErrorReasons.EMAIL_ERROR),
-            traceback=format_traceback(exc),
+    def log_errored_action(self, learner_credit_request, exc):
+        logger.error(
+            f'Learner credit approval email task failed. '
+            f'Request ID: {learner_credit_request.uuid}, '
+            f'Enterprise ID: {learner_credit_request.enterprise_customer_uuid}, '
+            f'Exception: {exc}'
         )
 
 
@@ -94,14 +77,12 @@ class SendLearnerCreditReminderEmailTask(BaseLearnerCreditRequestRetryAndErrorAc
     """
     Base class for the ``send_reminder_email_for_pending_learner_credit_request`` task.
     """
-    def add_errored_action(self, learner_credit_request, exc):
-        learner_credit_request_action = apps.get_model('subsidy_request.LearnerCreditRequestActions')
-        learner_credit_request_action.create_action(
-            learner_credit_request=learner_credit_request,
-            recent_action=get_action_choice(LearnerCreditAdditionalActionStates.REMINDED),
-            status=get_user_message_choice(SubsidyRequestStates.APPROVED),
-            error_reason=get_error_reason_choice(LearnerCreditRequestActionErrorReasons.EMAIL_ERROR),
-            traceback=format_traceback(exc),
+    def log_errored_action(self, learner_credit_request, exc):
+        logger.error(
+            f'Learner credit reminder email task failed. '
+            f'Request ID: {learner_credit_request.uuid}, '
+            f'Enterprise ID: {learner_credit_request.enterprise_customer_uuid}, '
+            f'Exception: {exc}'
         )
 
 
@@ -110,14 +91,12 @@ class SendLearnerCreditCancelEmailTask(BaseLearnerCreditRequestRetryAndErrorActi
     """
     Base class for the ``send_learner_credit_bnr_cancel_notification_task`` task.
     """
-    def add_errored_action(self, learner_credit_request, exc):
-        learner_credit_request_action = apps.get_model('subsidy_request.LearnerCreditRequestActions')
-        learner_credit_request_action.create_action(
-            learner_credit_request=learner_credit_request,
-            recent_action=get_action_choice(SubsidyRequestStates.CANCELLED),
-            status=get_user_message_choice(SubsidyRequestStates.CANCELLED),
-            error_reason=get_error_reason_choice(LearnerCreditRequestActionErrorReasons.EMAIL_ERROR),
-            traceback=format_traceback(exc),
+    def log_errored_action(self, learner_credit_request, exc):
+        logger.error(
+            f'Learner credit cancel email task failed. '
+            f'Request ID: {learner_credit_request.uuid}, '
+            f'Enterprise ID: {learner_credit_request.enterprise_customer_uuid}, '
+            f'Exception: {exc}'
         )
 
 
@@ -126,14 +105,12 @@ class SendLearnerCreditDeclineEmailTask(BaseLearnerCreditRequestRetryAndErrorAct
     """
     Base class for the ``send_learner_credit_bnr_decline_notification_task`` task.
     """
-    def add_errored_action(self, learner_credit_request, exc):
-        learner_credit_request_action = apps.get_model('subsidy_request.LearnerCreditRequestActions')
-        learner_credit_request_action.create_action(
-            learner_credit_request=learner_credit_request,
-            recent_action=get_action_choice(SubsidyRequestStates.DECLINED),
-            status=get_user_message_choice(SubsidyRequestStates.DECLINED),
-            error_reason=get_error_reason_choice(LearnerCreditRequestActionErrorReasons.EMAIL_ERROR),
-            traceback=format_traceback(exc),
+    def log_errored_action(self, learner_credit_request, exc):
+        logger.error(
+            f'Learner credit decline email task failed. '
+            f'Request ID: {learner_credit_request.uuid}, '
+            f'Enterprise ID: {learner_credit_request.enterprise_customer_uuid}, '
+            f'Exception: {exc}'
         )
 
     def get_learner_credit_request_from_args(self, args):
