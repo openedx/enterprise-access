@@ -10,7 +10,7 @@ from uuid import uuid4
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Case, CharField, F, OuterRef, Q, Subquery, Value, When
+from django.db.models import Case, CharField, F, IntegerField, OuterRef, Q, Subquery, Value, When
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
 from jsonfield.encoder import JSONEncoder
@@ -445,6 +445,7 @@ class LearnerCreditRequest(SubsidyRequest):
         * latest_action_time (DateTimeField) - Most recent action timestamp
         * latest_action_type (CharField) - Most recent action type
         * learner_request_state (CharField) - Computed state based on action status and error conditions
+        * state_sort_order (IntegerField) - Computed integer for LCRs state-based sorting
 
         Notes:
         * Simple subquery approach for action-based sorting that matches viewset expectations.
@@ -491,6 +492,15 @@ class LearnerCreditRequest(SubsidyRequest):
                 default=F('latest_action_status'),
                 output_field=CharField()
             ),
+
+            # state-based sorting
+            state_sort_order=Case(
+                When(state=SubsidyRequestStates.REQUESTED, then=Value(0)),
+                When(state=SubsidyRequestStates.DECLINED, then=Value(1)),
+                When(state=SubsidyRequestStates.CANCELLED, then=Value(2)),
+                default=Value(3),
+                output_field=IntegerField(),
+            )
         )
 
         return new_queryset
