@@ -35,7 +35,7 @@ billiard==4.2.1
     # via
     #   -r requirements/base.txt
     #   celery
-cattrs==25.1.1
+cattrs==25.2.0
     # via -r requirements/base.txt
 celery==5.5.3
     # via
@@ -228,7 +228,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.13
+edx-enterprise-subsidy-client==2.0.14
     # via -r requirements/base.txt
 edx-event-bus-kafka==6.1.0
     # via -r requirements/base.txt
@@ -254,7 +254,7 @@ fastavro==1.12.0
     #   -r requirements/base.txt
     #   confluent-kafka
     #   openedx-events
-gevent==25.5.1
+gevent==25.8.2
     # via -r requirements/production.in
 greenlet==3.2.4
     # via gevent
@@ -327,15 +327,11 @@ packaging==25.0
     #   drf-yasg
     #   gunicorn
     #   kombu
-pbr==7.0.1
-    # via
-    #   -r requirements/base.txt
-    #   stevedore
 ply==3.11
     # via
     #   -r requirements/base.txt
     #   djangoql
-prompt-toolkit==3.0.51
+prompt-toolkit==3.0.52
     # via
     #   -r requirements/base.txt
     #   click-repl
@@ -416,7 +412,7 @@ requests-oauthlib==2.0.0
     # via
     #   -r requirements/base.txt
     #   social-auth-core
-rpds-py==0.27.0
+rpds-py==0.27.1
     # via
     #   -r requirements/base.txt
     #   jsonschema
@@ -453,19 +449,19 @@ sqlparse==0.5.3
     # via
     #   -r requirements/base.txt
     #   django
-stevedore==5.4.1
+stevedore==5.5.0
     # via
     #   -r requirements/base.txt
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
-stripe==12.4.0
+stripe==12.5.0
     # via -r requirements/base.txt
 text-unidecode==1.3
     # via
     #   -r requirements/base.txt
     #   python-slugify
-typing-extensions==4.14.1
+typing-extensions==4.15.0
     # via
     #   -r requirements/base.txt
     #   cattrs
