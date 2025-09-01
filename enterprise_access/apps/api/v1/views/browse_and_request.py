@@ -768,6 +768,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         'latest_action_time',
         'latest_action_type',
         'latest_action_status',
+        'learner_request_state',
     ]
 
     subsidy_type = SubsidyTypeChoices.LEARNER_CREDIT

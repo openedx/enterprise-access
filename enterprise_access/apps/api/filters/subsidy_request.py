@@ -19,6 +19,11 @@ LATEST_ACTION_STATUS_HELP_TEXT = (
     ', '.join([choice for choice, _ in LearnerCreditRequestActionChoices])
 )
 
+LEARNER_REQUEST_STATE_HELP_TEXT = (
+    'Choose from the following valid learner request states: '
+    'requested, pending, approved, declined, accepted, cancelled, expired, reversed, reminded, waiting, failed'
+)
+
 
 class SubsidyRequestFilterBackend(filters.BaseFilterBackend):
     """
@@ -104,7 +109,7 @@ class SubsidyRequestCustomerConfigurationFilterBackend(filters.BaseFilterBackend
 
 class LearnerCreditRequestFilterSet(drf_filters.FilterSet):
     """
-    Custom FilterSet for LearnerCreditRequest to allow filtering by policy_uuid and latest_action_status.
+    Custom FilterSet for LearnerCreditRequest to allow filtering by policy_uuid and latest_action_status
     """
 
     policy_uuid = drf_filters.UUIDFilter(field_name='learner_credit_request_config__learner_credit_config__uuid')
@@ -119,6 +124,19 @@ class LearnerCreditRequestFilterSet(drf_filters.FilterSet):
         field_name='latest_action_status',
         lookup_expr='in',
         help_text=LATEST_ACTION_STATUS_HELP_TEXT,
+    )
+
+    # Add filtering support for learner_request_state annotated field
+    learner_request_state = CharFilter(
+        field_name='learner_request_state',
+        lookup_expr='exact',
+        help_text=LEARNER_REQUEST_STATE_HELP_TEXT,
+    )
+
+    learner_request_state__in = CharInFilter(
+        field_name='learner_request_state',
+        lookup_expr='in',
+        help_text=LEARNER_REQUEST_STATE_HELP_TEXT,
     )
 
     class Meta:

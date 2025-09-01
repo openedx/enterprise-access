@@ -495,7 +495,7 @@ class TestLearnerCreditRequestSerializer(TestCase):
 
     def test_learner_request_state_field_default_state(self):
         """
-        Test that the learner_request_state field defaults to actual status for other cases.
+        Test that the learner_request_state field shows the request state for non-special cases.
         """
         learner_credit_request = LearnerCreditRequestFactory()
 
@@ -515,7 +515,7 @@ class TestLearnerCreditRequestSerializer(TestCase):
         serializer = LearnerCreditRequestSerializer(annotated_request)
         data = serializer.data
 
-        # Verify that learner_request_state field shows the actual status
+        # Verify that learner_request_state field shows the actual state
         self.assertIn('learner_request_state', data)
-        expected_status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
-        self.assertEqual(data['learner_request_state'], expected_status)
+        expected_state = SubsidyRequestStates.REQUESTED
+        self.assertEqual(data['learner_request_state'], expected_state)
