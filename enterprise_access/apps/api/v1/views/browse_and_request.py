@@ -66,6 +66,8 @@ from enterprise_access.apps.subsidy_request.models import (
 )
 from enterprise_access.apps.subsidy_request.tasks import (
     send_learner_credit_bnr_admins_email_with_new_requests_task,
+    send_learner_credit_bnr_cancel_notification_task,
+    send_learner_credit_bnr_decline_notification_task,
     send_learner_credit_bnr_request_approve_task,
     send_reminder_email_for_pending_learner_credit_request
 )
@@ -1063,10 +1065,8 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
 
                 learner_credit_request.cancel(self.user)
                 lc_action.save()
-            send_notification_email_for_request.delay(
-                str(learner_credit_request.uuid),
-                settings.BRAZE_LEARNER_CREDIT_BNR_CANCEL_NOTIFICATION_CAMPAIGN,
-                SubsidyTypeChoices.LEARNER_CREDIT,
+            send_learner_credit_bnr_cancel_notification_task.delay(
+                str(learner_credit_request.assignment.uuid)
             )
             logger.info(
                 f"Sent cancel notification email for learner credit request {learner_credit_request.uuid}"
@@ -1167,10 +1167,8 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         lms_user_id = serialized_request["lms_user_id"]
 
         if send_notification:
-            send_notification_email_for_request.delay(
-                learner_credit_request_uuid,
-                settings.BRAZE_LEARNER_CREDIT_BNR_DECLINE_NOTIFICATION_CAMPAIGN,
-                SubsidyTypeChoices.LEARNER_CREDIT,
+            send_learner_credit_bnr_decline_notification_task.delay(
+                learner_credit_request_uuid
             )
             logger.info(
                 f"Sent decline notification email for learner credit request {learner_credit_request_uuid}"
