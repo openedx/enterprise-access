@@ -6,6 +6,7 @@ from unittest import mock
 from uuid import uuid4
 
 import ddt
+import freezegun
 from celery import states as celery_states
 from django.conf import settings
 from django.utils.timezone import now, timedelta
@@ -441,7 +442,9 @@ class TestBrazeEmailTasks(APITestWithMocks):
         mock_subsidy_client.retrieve_subsidy.return_value = mock_subsidy
         mock_braze_client.generate_mailto_link.return_value = f'mailto:{admin_email}'
 
-        send_reminder_email_for_pending_assignment(assignment.uuid)
+        current_time = now()
+        with freezegun.freeze_time(current_time):
+            send_reminder_email_for_pending_assignment(assignment.uuid)
 
         # Make sure our LMS client got called correct times and with what we expected
         mock_lms_client.return_value.get_enterprise_customer_data.assert_called_with(
@@ -468,8 +471,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'organization': self.enterprise_customer_name,
                 'course_title': assignment.content_title,
                 'enrollment_deadline': 'Jan 01, 2021',
-                'start_date':
-                    datetime.datetime.now().strftime(BRAZE_TIMESTAMP_FORMAT),
+                'start_date': current_time.strftime(BRAZE_TIMESTAMP_FORMAT),
                 'course_partner': 'Smart Folks, Good People, and Fast Learners',
                 'course_card_image': 'https://itsanimage.com',
                 'learner_portal_link': 'http://enterprise-learner-portal.example.com/test-slug',

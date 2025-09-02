@@ -132,3 +132,37 @@ class CheckoutIntentUpdateRequestSerializer(CountryFieldMixin, serializers.Model
                 )
 
         return value
+
+
+class CheckoutIntentCreateRequestSerializer(CountryFieldMixin, serializers.ModelSerializer):
+    """
+    A serializer intended for creating new CheckoutIntents.
+    """
+    class Meta:
+        model = CheckoutIntent
+        fields = '__all__'
+        read_only_fields = [
+            field.name for field in CheckoutIntent._meta.get_fields()
+            if field.name not in [
+                'enterprise_slug',
+                'enterprise_name',
+                'quantity',
+                'country',
+            ]
+        ]
+
+    # Put some reasonable validation bounds at this layer, and let
+    # the customer_billing.api business logic handle more detailed validation
+    quantity = serializers.IntegerField(min_value=1, max_value=1000)
+
+    def create(self, validated_data):
+        """
+        Creates a new CheckoutIntent.
+        """
+        return CheckoutIntent.create_intent(
+            user=self.context['request'].user,
+            slug=validated_data['enterprise_slug'],
+            name=validated_data['enterprise_name'],
+            quantity=validated_data['quantity'],
+            country=validated_data.get('country'),
+        )

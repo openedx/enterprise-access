@@ -306,7 +306,7 @@ class CheckoutIntent(TimeStampedModel):
 
     @classmethod
     @transaction.atomic
-    def create_intent(cls, user, slug, name, quantity):
+    def create_intent(cls, user, slug, name, quantity, country=None):
         """
         Create or update a checkout intent for a user with the given enterprise details.
 
@@ -356,6 +356,7 @@ class CheckoutIntent(TimeStampedModel):
             existing_intent.enterprise_name = name
             existing_intent.quantity = quantity
             existing_intent.expires_at = expires_at
+            existing_intent.country = country
             existing_intent.save()
             return existing_intent
 
@@ -366,6 +367,7 @@ class CheckoutIntent(TimeStampedModel):
             enterprise_name=name,
             quantity=quantity,
             expires_at=expires_at,
+            country=country,
         )
 
     @classmethod
