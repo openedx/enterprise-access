@@ -85,7 +85,7 @@ following changes need to be made at the REST API layer:
   Success page.  The extra fields are derived from Stripe API calls (mainly the
   Invoice and PaymentMethod objects related to the Subscription related to the
   CheckoutSession).
-- **ModelViewSet**: Expose a vanilla ModelViewSet for state mutation and polling.
+- **ModelViewSet**: Expose a vanilla ModelViewSet for CheckoutIntent creation, state mutation and polling.
 
 Modified "context" BFF endpoint:
 
@@ -173,9 +173,6 @@ Basic checkout-intent REST endpoints:
     GET /api/v1/customer_billing/checkout-intent/<uuid>
     POST /api/v1/customer_billing/checkout-intent/
     PATCH /api/v1/customer_billing/checkout-intent/<uuid>
-
-Finally, the create-checkout-session endpoint backend logic will need to be
-updated to create a CheckoutIntent instead of an EnterpriseSlugReservation.
 
 State
 -----

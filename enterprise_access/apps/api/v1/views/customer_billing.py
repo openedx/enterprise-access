@@ -317,7 +317,7 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
     lookup_field = 'id'
 
     # Only allow GET and PATCH operations
-    http_method_names = ['get', 'patch', 'head', 'options']
+    http_method_names = ['get', 'patch', 'post', 'head', 'options']
 
     def get_serializer_class(self):
         """
@@ -325,6 +325,8 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
         """
         if self.action in ['partial_update', 'update']:
             return serializers.CheckoutIntentUpdateRequestSerializer
+        elif self.action in ['create']:
+            return serializers.CheckoutIntentCreateRequestSerializer
         return serializers.CheckoutIntentReadOnlySerializer
 
     def get_queryset(self):

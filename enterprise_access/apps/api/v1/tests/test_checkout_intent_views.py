@@ -25,20 +25,31 @@ class CheckoutIntentViewSetTestCase(APITest):
     Test cases for CheckoutIntent ViewSet.
     """
 
-    def setUp(self):
-        """Set up test data."""
-        super().setUp()
-
-        self.user_2 = User.objects.create_user(
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_2 = User.objects.create_user(
             username='testuser2',
             email='test2@example.com',
             password='testpass123'
         )
-        self.user_3 = User.objects.create_user(
+        cls.user_3 = User.objects.create_user(
             username='testuser3',
             email='test3@example.com',
             password='testpass123'
         )
+        cls.checkout_intent_2 = CheckoutIntent.objects.create(
+            user=cls.user_2,
+            enterprise_name="Active Enterprise 2",
+            enterprise_slug="active-enterprise-2",
+            state=CheckoutIntentState.PAID,
+            quantity=25,
+            expires_at=timezone.now() + timedelta(minutes=30),
+            stripe_checkout_session_id='cs_test_456',
+        )
+
+    def setUp(self):
+        """Set up test data."""
+        super().setUp()
 
         self.checkout_intent_1 = CheckoutIntent.objects.create(
             user=self.user,
@@ -48,15 +59,6 @@ class CheckoutIntentViewSetTestCase(APITest):
             quantity=15,
             expires_at=timezone.now() + timedelta(minutes=30),
             stripe_checkout_session_id='cs_test_123',
-        )
-        self.checkout_intent_2 = CheckoutIntent.objects.create(
-            user=self.user_2,
-            enterprise_name="Active Enterprise 2",
-            enterprise_slug="active-enterprise-2",
-            state=CheckoutIntentState.PAID,
-            quantity=25,
-            expires_at=timezone.now() + timedelta(minutes=30),
-            stripe_checkout_session_id='cs_test_456',
         )
         self.checkout_intent_3 = CheckoutIntent.objects.create(
             user=self.user_3,
@@ -275,24 +277,6 @@ class CheckoutIntentViewSetTestCase(APITest):
         )
         self.assertEqual(self.checkout_intent_1.user, self.user)
 
-    def test_post_method_not_allowed(self):
-        """Test that POST method is not allowed."""
-        self.set_jwt_cookie([{
-            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
-            'context': str(uuid.uuid4()),
-        }])
-
-        response = self.client.post(
-            self.list_url,
-            {
-                'state': 'created',
-                'stripe_checkout_session_id': 'cs_test_new',
-            },
-            format='json'
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
-
     def test_delete_method_not_allowed(self):
         """Test that DELETE method is not allowed."""
         self.set_jwt_cookie([{
@@ -302,3 +286,131 @@ class CheckoutIntentViewSetTestCase(APITest):
 
         response = self.client.delete(self.detail_url_1)
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_create_checkout_intent_success(self):
+        """Test successful creation of checkout intent."""
+        other_user = UserFactory()
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }], user=other_user)
+
+        request_data = {
+            'enterprise_slug': 'test-enterprise-post',
+            'enterprise_name': 'Test Enterprise post',
+            'quantity': 13,
+            'country': 'NZ',
+        }
+
+        response = self.client.post(
+            self.list_url,
+            request_data,
+        )
+        response_data = response.json()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response_data['user'], other_user.id)
+        self.assertEqual(response_data['enterprise_slug'], 'test-enterprise-post')
+        self.assertEqual(response_data['enterprise_name'], 'Test Enterprise post')
+        self.assertEqual(response_data['quantity'], 13)
+        self.assertEqual(response_data['state'], CheckoutIntentState.CREATED)
+        self.assertEqual(response_data['country'], 'NZ')
+
+    def test_create_or_update_checkout_intent_success(self):
+        """Test successful update of checkout intent, even if it happens through a POST."""
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }])
+
+        request_data = {
+            'enterprise_slug': self.checkout_intent_1.enterprise_slug,
+            'enterprise_name': self.checkout_intent_1.enterprise_name,
+            'quantity': 33,
+            'country': 'IT',
+        }
+
+        response = self.client.post(
+            self.list_url,
+            request_data,
+        )
+        response_data = response.json()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response_data['user'], self.user.id)
+        self.assertEqual(response_data['enterprise_slug'], self.checkout_intent_1.enterprise_slug)
+        self.assertEqual(response_data['enterprise_name'], self.checkout_intent_1.enterprise_name)
+        self.assertEqual(response_data['quantity'], 33)
+        self.assertEqual(response_data['state'], CheckoutIntentState.CREATED)
+        self.assertEqual(response_data['country'], 'IT')
+        self.checkout_intent_1.refresh_from_db()
+        self.assertEqual(self.checkout_intent_1.quantity, 33)
+        self.assertEqual(self.checkout_intent_1.country, 'IT')
+
+    @ddt.data(
+        {'quantity': -1},
+        {'quantity': 0},
+        {'quantity': 'invalid'},
+        {'enterprise_slug': ''},
+        {'enterprise_name': ''},
+    )
+    @ddt.unpack
+    def test_create_checkout_intent_invalid_field_values(self, **invalid_field):
+        """Test creation fails with invalid field values."""
+        other_user = UserFactory()
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }], user=other_user)
+
+        request_data = {
+            'enterprise_slug': 'test-enterprise',
+            'enterprise_name': 'Test Enterprise',
+            'quantity': 10,
+        }
+        request_data.update(invalid_field)
+
+        response = self.client.post(
+            self.list_url,
+            request_data,
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # The field name should be in the error response
+        invalid_field_name = list(invalid_field.keys())[0]
+        self.assertIn(invalid_field_name, response.data)
+
+    @ddt.data(
+        {'enterprise_name': 'hello', 'quantity': 10},
+        {'enterprise_slug': 'hello', 'quantity': 10},
+        {'enterprise_name': 'hello', 'enterprise_slug': 'foo'},
+    )
+    @ddt.unpack
+    def test_create_checkout_intent_missing_required_fields(self, **payload):
+        """Test creation fails when required fields are missing."""
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }])
+
+        # Test missing enterprise_slug
+        response = self.client.post(
+            self.list_url,
+            payload,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        error_detail = list(response.json().values())[0][0]
+        self.assertIn('required', error_detail)
+
+    def test_create_checkout_intent_authentication_required(self):
+        """Test that creation endpoint requires authentication."""
+        response = self.client.post(
+            self.list_url,
+            {
+                'enterprise_slug': 'test-enterprise',
+                'enterprise_name': 'Test Enterprise',
+                'quantity': 10,
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
