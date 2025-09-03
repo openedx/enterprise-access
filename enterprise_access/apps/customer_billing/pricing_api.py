@@ -23,7 +23,7 @@ Basic Format Structure:
 """
 import logging
 from decimal import Decimal
-from typing import Dict, List, Optional, TypedDict
+from typing import Dict, Optional, TypedDict
 
 import stripe
 from django.conf import settings
@@ -187,67 +187,100 @@ def _validate_stripe_price_schema(stripe_price: stripe.Price) -> None:
     logger.debug(f'Stripe price {stripe_price.id} schema validation passed')
 
 
-def get_multiple_stripe_prices(
-    price_ids: List[str],
-    timeout: int = settings.CONTENT_METADATA_CACHE_TIMEOUT,
+def get_all_stripe_prices(
+    timeout: int = settings.STRIPE_PRICE_DATA_CACHE_TIMEOUT,
 ) -> Dict[str, Dict]:
     """
-    Fetch multiple Stripe prices efficiently with caching.
+    Fetch all active Stripe prices and return a mapping by lookup_key.
 
     Args:
-        price_ids: List of Stripe Price IDs to fetch
         timeout: Cache timeout in seconds
 
     Returns:
-        Dict mapping price_id to serialized price data
+        Dict mapping lookup_key to serialized price data
+
+    Raises:
+        StripePricingError: If there's an error fetching from Stripe or if prices lack lookup_keys
     """
-    results = {}
+    cache_key = versioned_cache_key('all_stripe_prices')
 
-    # Check cache for each price ID individually
-    for price_id in price_ids:
-        cache_key = versioned_cache_key(
-            'stripe_price_data',
-            price_id,
-        )
+    cached_response = TieredCache.get_cached_response(cache_key)
+    if cached_response.is_found:
+        logger.info('Cache hit for all Stripe prices')
+        return cached_response.value
 
-        cached_response = TieredCache.get_cached_response(cache_key)
-        if cached_response.is_found:
-            logger.info(f'Cache hit for Stripe price {price_id}')
-            results[price_id] = cached_response.value
-        else:
-            # Fetch uncached price from Stripe
-            try:
-                price_data = get_stripe_price_data(price_id, timeout)
-                if price_data:
-                    results[price_id] = price_data
-            except StripePricingError:
-                logger.warning(f'Failed to fetch price data for {price_id}')
+    try:
+        # Fetch all active prices from Stripe
+        stripe_prices = stripe.Price.list(active=True, expand=['data.product'])
+
+        # See https://docs.stripe.com/api/pagination/auto?lang=python
+        prices_by_lookup_key = {}
+        for stripe_price in stripe_prices.auto_paging_iter():
+            if stripe_price.type != 'recurring':
                 continue
 
-    return results
+            # Validate schema
+            _validate_stripe_price_schema(stripe_price)
+
+            # Skip prices without lookup_keys
+            lookup_key = getattr(stripe_price, 'lookup_key', None)
+            if not lookup_key:
+                logger.warning(f'Skipping Stripe price {stripe_price.id} - no lookup_key')
+                continue
+
+            # Serialize and store by lookup_key
+            serialized_data = _serialize_basic_format(stripe_price)
+            prices_by_lookup_key[lookup_key] = serialized_data
+
+        # Cache the results
+        TieredCache.set_all_tiers(
+            cache_key,
+            prices_by_lookup_key,
+            django_cache_timeout=timeout,
+        )
+        logger.info(f'Cached {len(prices_by_lookup_key)} Stripe prices by lookup_key')
+
+        return prices_by_lookup_key
+
+    except stripe.error.StripeError as exc:
+        logger.error(f'Stripe API error fetching all prices: {exc}')
+        raise StripePricingError(f'Failed to fetch all prices: {exc}') from exc
+    except Exception as exc:
+        logger.error(f'Unexpected error fetching all prices: {exc}')
+        raise StripePricingError(f'Unexpected error fetching all prices: {exc}') from exc
 
 
 def get_ssp_product_pricing() -> Dict[str, Dict]:
     """
-    Get pricing data for all configured SSP products.
+    Get pricing data for all configured SSP products using lookup_key.
 
     Returns:
         Dict mapping SSP product keys to price data
+
+    Raises:
+        StripePricingError: If lookup_key doesn't match any active Stripe price
     """
+    # Fetch all Stripe prices by lookup_key
+    all_stripe_prices = get_all_stripe_prices()
+
     ssp_pricing = {}
     for product_key, product_config in settings.SSP_PRODUCTS.items():
-        price_id = product_config.get('stripe_price_id')
-        if price_id:
-            try:
-                price_data = get_stripe_price_data(price_id)
-                if price_data:
-                    # Add SSP-specific metadata
-                    price_data['ssp_product_key'] = product_key
-                    price_data['quantity_range'] = product_config.get('quantity_range')
-                    ssp_pricing[product_key] = price_data
-            except Exception as exc:
-                logger.error(f'Failed to fetch pricing for SSP product {product_key}: {exc}')
-                raise
+        lookup_key = product_config.get('lookup_key')
+        if not lookup_key:
+            logger.error(f'SSP product {product_key} missing lookup_key')
+            raise StripePricingError(f'SSP product {product_key} missing lookup_key')
+
+        if lookup_key not in all_stripe_prices:
+            logger.error(f'lookup_key {lookup_key} for SSP product {product_key} not found in active Stripe prices')
+            raise StripePricingError(
+                f'lookup_key {lookup_key} for SSP product {product_key} not found in active Stripe prices'
+            )
+
+        price_data = all_stripe_prices[lookup_key].copy()
+        # Add SSP-specific metadata
+        price_data['ssp_product_key'] = product_key
+        price_data['quantity_range'] = product_config.get('quantity_range')
+        ssp_pricing[product_key] = price_data
 
     return ssp_pricing
 
