@@ -2,9 +2,11 @@
 Models for customer billing app.
 """
 from datetime import timedelta
+from typing import Self
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_slug
 from django.db import models, transaction
@@ -139,8 +141,12 @@ class CheckoutIntent(TimeStampedModel):
 
     def mark_as_paid(self, stripe_session_id=None):
         """Mark the intent as paid after successful Stripe checkout."""
-        if self.state != CheckoutIntentState.CREATED:
+        if self.state not in (CheckoutIntentState.CREATED, CheckoutIntentState.PAID):
             raise ValueError(f"Cannot transition to PAID from {self.state}")
+
+        if stripe_session_id:
+            if self.state == CheckoutIntentState.PAID and stripe_session_id != self.stripe_checkout_session_id:
+                raise ValueError("Cannot transition to PAID from PAID with a different stripe_checkout_session_id")
 
         self.state = CheckoutIntentState.PAID
         if stripe_session_id:
@@ -305,8 +311,14 @@ class CheckoutIntent(TimeStampedModel):
         return not queryset.exists()
 
     @classmethod
-    @transaction.atomic
-    def create_intent(cls, user, slug, name, quantity, country=None):
+    def create_intent(
+        cls,
+        user: AbstractUser,
+        slug: str,
+        name: str,
+        quantity: int,
+        country: str | None = None
+    ) -> Self:
         """
         Create or update a checkout intent for a user with the given enterprise details.
 
@@ -334,41 +346,45 @@ class CheckoutIntent(TimeStampedModel):
         Note:
             This operation is atomic - either the entire reservation succeeds or fails.
         """
-        cls.cleanup_expired()
+        # Wrap entire function body inside an atomic transaction. The decorator version of
+        # this feature (@transaction.atomic) is normally preferable, but breaks type hints
+        # because it hasn't been updated to use functools.wraps yet.
+        with transaction.atomic():
+            cls.cleanup_expired()
 
-        if not cls.can_reserve(slug, name, exclude_user=user):
-            raise ValueError(f"Slug '{slug}' or name '{name}' is already reserved")
+            if not cls.can_reserve(slug, name, exclude_user=user):
+                raise ValueError(f"Slug '{slug}' or name '{name}' is already reserved")
 
-        existing_intent = cls.objects.filter(user=user).first()
+            existing_intent = cls.objects.filter(user=user).first()
 
-        expires_at = timezone.now() + timedelta(minutes=cls.get_reservation_duration())
+            expires_at = timezone.now() + timedelta(minutes=cls.get_reservation_duration())
 
-        if existing_intent:
-            if existing_intent.state in cls.SUCCESS_STATES:
+            if existing_intent:
+                if existing_intent.state in cls.SUCCESS_STATES:
+                    return existing_intent
+
+                if existing_intent.state in cls.FAILURE_STATES:
+                    raise ValueError("Failed checkout record already exists")
+
+                # Update the existing CREATED or EXPIRED intent
+                existing_intent.state = CheckoutIntentState.CREATED
+                existing_intent.enterprise_slug = slug
+                existing_intent.enterprise_name = name
+                existing_intent.quantity = quantity
+                existing_intent.expires_at = expires_at
+                existing_intent.country = country
+                existing_intent.save()
                 return existing_intent
 
-            if existing_intent.state in cls.FAILURE_STATES:
-                raise ValueError("Failed checkout record already exists")
-
-            # Update the existing CREATED or EXPIRED intent
-            existing_intent.state = CheckoutIntentState.CREATED
-            existing_intent.enterprise_slug = slug
-            existing_intent.enterprise_name = name
-            existing_intent.quantity = quantity
-            existing_intent.expires_at = expires_at
-            existing_intent.country = country
-            existing_intent.save()
-            return existing_intent
-
-        return cls.objects.create(
-            user=user,
-            state=CheckoutIntentState.CREATED,
-            enterprise_slug=slug,
-            enterprise_name=name,
-            quantity=quantity,
-            expires_at=expires_at,
-            country=country,
-        )
+            return cls.objects.create(
+                user=user,
+                state=CheckoutIntentState.CREATED,
+                enterprise_slug=slug,
+                enterprise_name=name,
+                quantity=quantity,
+                expires_at=expires_at,
+                country=country,
+            )
 
     @classmethod
     def for_user(cls, user):
