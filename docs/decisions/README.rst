@@ -258,3 +258,11 @@ for introducing attrs/cattrs for defining Input/Output workflow objects.
 Accepted June 2025, this ADR describes the rational
 for introducing the ``EnterpriseSlugReservation`` model
 and related business logic.
+
+`<0032-stripe-price-lookup-keys.rst>`_
+***************************************
+*Feature: Self-service Purchasing*
+
+Accepted Sept 2025, this ADR describes the rational
+for identifying SSP Stripe products based on ``lookup_key``
+instead of the Stripe price id.

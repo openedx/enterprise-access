@@ -25,17 +25,45 @@ def raise_404_error(*args, **kwargs):
     mock_404_response.raise_for_status()
 
 
-@override_settings(
-    SSP_PRODUCTS={
-        'quarterly_license_plan': {
-            'stripe_price_id': 'price_ABC',
-            'quantity_range': (5, 30),
-        },
-        'yearly_license_plan': {
-            'stripe_price_id': 'price_XYZ',
-            'quantity_range': (5, 30),
-        },
+QUARTERLY_PRICE_ID = 'price_test_quarterly'
+
+MOCK_SSP_PRODUCTS = {
+    'quarterly_license_plan': {
+        'stripe_price_id': QUARTERLY_PRICE_ID,  # DEPRECATED: Use lookup_key instead
+        'lookup_key': 'price_quarterly_0002',
+        'quantity_range': (5, 30),
     },
+    'yearly_license_plan': {
+        'stripe_price_id': 'price_test_yearly',  # DEPRECATED: Use lookup_key instead
+        'lookup_key': 'price_yearly_0001',
+        'quantity_range': (5, 30),
+    },
+}
+
+MOCK_SSP_PRICING_DATA = {
+    'quarterly_license_plan': {
+        'id': QUARTERLY_PRICE_ID,
+        'lookup_key': 'price_quarterly_0002',
+        'quantity_range': (5, 30),
+        'unit_amount': 3300,
+        'unit_amount_decimal': 33.00,
+        'currency': 'usd',
+        'ssp_product_key': 'quarterly_license_plan',
+    },
+    'yearly_license_plan': {
+        'id': 'price_test_yearly',
+        'lookup_key': 'price_yearly_0001',
+        'quantity_range': (5, 30),
+        'unit_amount': 36000,
+        'unit_amount_decimal': 360.00,
+        'currency': 'usd',
+        'ssp_product_key': 'yearly_license_plan',
+    },
+}
+
+
+@override_settings(
+    SSP_PRODUCTS=MOCK_SSP_PRODUCTS,
     SSP_TRIAL_PERIOD_DAYS=14,
 )
 @ddt.ddt
@@ -52,9 +80,15 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         # Clean up any intents created during tests
         CheckoutIntent.objects.all().delete()
 
+    @mock.patch(
+        'enterprise_access.apps.customer_billing.api.get_ssp_product_pricing',
+        return_value=MOCK_SSP_PRICING_DATA,
+    )
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
     @mock.patch.object(stripe_api, 'stripe', autospec=True)
-    def test_create_free_trial_checkout_session_success(self, mock_stripe, mock_lms_client_class):
+    def test_create_free_trial_checkout_session_success(
+        self, mock_stripe, mock_lms_client_class, mock_get_ssp_pricing,  # pylint: disable=unused-argument
+    ):
         """
         Happy path for ``create_free_trial_checkout_session()`` with checkout intent creation.
         """
@@ -72,7 +106,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
             enterprise_slug='my-sluggy',
             company_name='My Cool Company',
             quantity=20,
-            stripe_price_id='price_ABC',
+            stripe_price_id=QUARTERLY_PRICE_ID,
         )
 
         # Assert API response.
@@ -104,9 +138,15 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         self.assertEqual(metadata['enterprise_customer_slug'], 'my-sluggy')
         self.assertEqual(metadata['lms_user_id'], str(self.user.lms_user_id))
 
+    @mock.patch(
+        'enterprise_access.apps.customer_billing.api.get_ssp_product_pricing',
+        return_value=MOCK_SSP_PRICING_DATA,
+    )
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
     @mock.patch.object(stripe_api, 'stripe', autospec=True)
-    def test_create_free_trial_checkout_session_success_without_user(self, mock_stripe, mock_lms_client_class):
+    def test_create_free_trial_checkout_session_success_without_user(
+        self, mock_stripe, mock_lms_client_class, mock_get_ssp_pricing,  # pylint: disable=unused-argument
+    ):
         """
         Test that checkout session creation works without user (backwards compatibility).
         """
@@ -125,15 +165,21 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
                 enterprise_slug='my-sluggy',
                 company_name='My Cool Company',
                 quantity=20,
-                stripe_price_id='price_ABC',
+                stripe_price_id=QUARTERLY_PRICE_ID,
             )
             # Should get slug reserved error
             validation_errors = cm.exception.validation_errors_by_field
             self.assertIn('user', validation_errors)
 
+    @mock.patch(
+        'enterprise_access.apps.customer_billing.api.get_ssp_product_pricing',
+        return_value=MOCK_SSP_PRICING_DATA,
+    )
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
     @mock.patch.object(stripe_api, 'stripe', autospec=True)
-    def test_create_free_trial_checkout_session_replaces_user_intent(self, mock_stripe, mock_lms_client_class):
+    def test_create_free_trial_checkout_session_replaces_user_intent(
+        self, mock_stripe, mock_lms_client_class, mock_get_ssp_pricing,  # pylint: disable=unused-argument
+    ):
         """
         Test that creating a new checkout session replaces the user's existing intent.
         """
@@ -154,7 +200,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
             enterprise_slug='new-sluggy',
             company_name='New Company',
             quantity=20,
-            stripe_price_id='price_ABC',
+            stripe_price_id=QUARTERLY_PRICE_ID,
         )
 
         # Should succeed and replace the old intent
@@ -168,7 +214,15 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         self.assertEqual(intent.stripe_checkout_session_id, 'new-stripe-session')
         self.assertFalse(intent.is_expired())
 
-    def test_slug_reservation_conflict(self):
+    @mock.patch(
+        'enterprise_access.apps.customer_billing.api.get_ssp_product_pricing',
+        return_value=MOCK_SSP_PRICING_DATA,
+    )
+    @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe', autospec=True)
+    def test_slug_reservation_conflict(
+        self, mock_stripe, mock_lms_client_class, mock_get_ssp_pricing,   # pylint: disable=unused-argument
+    ):
         """
         Test that slug reservation prevents conflicts between different users.
         """
@@ -176,29 +230,35 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         CheckoutIntent.create_intent(self.other_user, 'conflicting-slug', 'My company', 10)
 
         # Setup mocks
-        with mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True) as mock_lms_client_class:
-            with mock.patch.object(customer_billing_api, 'stripe', autospec=True):
-                mock_lms_client = mock_lms_client_class.return_value
-                mock_lms_client.get_lms_user_account.return_value = [{'id': 9876}]
-                mock_lms_client.get_enterprise_customer_data.side_effect = raise_404_error
+        mock_lms_client = mock_lms_client_class.return_value
+        mock_lms_client.get_lms_user_account.return_value = [{'id': 9876}]
+        mock_lms_client.get_enterprise_customer_data.side_effect = raise_404_error
 
-                # User 2 tries to use the same slug - should fail
-                with self.assertRaises(customer_billing_api.CreateCheckoutSessionValidationError) as cm:
-                    customer_billing_api.create_free_trial_checkout_session(
-                        user=self.user,
-                        admin_email='test@example.com',
-                        enterprise_slug='conflicting-slug',
-                        company_name='doesnt matter',
-                        quantity=20,
-                        stripe_price_id='price_ABC',
-                    )
+        # User 2 tries to use the same slug - should fail
+        with self.assertRaises(customer_billing_api.CreateCheckoutSessionValidationError) as cm:
+            customer_billing_api.create_free_trial_checkout_session(
+                user=self.user,
+                admin_email='test@example.com',
+                enterprise_slug='conflicting-slug',
+                company_name='doesnt matter',
+                quantity=20,
+                stripe_price_id=QUARTERLY_PRICE_ID,
+            )
 
-                # Should get slug reserved error
-                validation_errors = cm.exception.validation_errors_by_field
-                self.assertIn('enterprise_slug', validation_errors)
-                self.assertEqual(validation_errors['enterprise_slug']['error_code'], 'slug_reserved')
+            # Should get slug reserved error
+            validation_errors = cm.exception.validation_errors_by_field
+            self.assertIn('enterprise_slug', validation_errors)
+            self.assertEqual(validation_errors['enterprise_slug']['error_code'], 'slug_reserved')
 
-    def test_name_reservation_conflict(self):
+    @mock.patch(
+        'enterprise_access.apps.customer_billing.api.get_ssp_product_pricing',
+        return_value=MOCK_SSP_PRICING_DATA,
+    )
+    @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe', autospec=True)
+    def test_name_reservation_conflict(
+        self, mock_stripe, mock_lms_client_class, mock_get_ssp_pricing,  # pylint: disable=unused-argument
+    ):
         """
         Test that comapny name reservation prevents conflicts between different users.
         """
@@ -206,29 +266,35 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         CheckoutIntent.create_intent(self.other_user, 'ok-slug', 'Conflicting company', 10)
 
         # Setup mocks
-        with mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True) as mock_lms_client_class:
-            with mock.patch.object(customer_billing_api, 'stripe', autospec=True):
-                mock_lms_client = mock_lms_client_class.return_value
-                mock_lms_client.get_lms_user_account.return_value = [{'id': 9876}]
-                mock_lms_client.get_enterprise_customer_data.side_effect = raise_404_error
+        mock_lms_client = mock_lms_client_class.return_value
+        mock_lms_client.get_lms_user_account.return_value = [{'id': 9876}]
+        mock_lms_client.get_enterprise_customer_data.side_effect = raise_404_error
 
-                # User 2 tries to use the same name - should fail
-                with self.assertRaises(customer_billing_api.CreateCheckoutSessionValidationError) as cm:
-                    customer_billing_api.create_free_trial_checkout_session(
-                        user=self.user,
-                        admin_email='test@example.com',
-                        enterprise_slug='different-slug',
-                        company_name='Conflicting company',
-                        quantity=20,
-                        stripe_price_id='price_ABC',
-                    )
+        # User 2 tries to use the same name - should fail
+        with self.assertRaises(customer_billing_api.CreateCheckoutSessionValidationError) as cm:
+            customer_billing_api.create_free_trial_checkout_session(
+                user=self.user,
+                admin_email='test@example.com',
+                enterprise_slug='different-slug',
+                company_name='Conflicting company',
+                quantity=20,
+                stripe_price_id=QUARTERLY_PRICE_ID,
+            )
 
-                # Should get slug reserved error
-                validation_errors = cm.exception.validation_errors_by_field
-                self.assertIn('company_name', validation_errors)
-                self.assertEqual(validation_errors['company_name']['error_code'], 'existing_enterprise_customer')
+            # Should get slug reserved error
+            validation_errors = cm.exception.validation_errors_by_field
+            self.assertIn('company_name', validation_errors)
+            self.assertEqual(validation_errors['company_name']['error_code'], 'existing_enterprise_customer')
 
-    def test_expired_intent_allows_reuse(self):
+    @mock.patch(
+        'enterprise_access.apps.customer_billing.api.get_ssp_product_pricing',
+        return_value=MOCK_SSP_PRICING_DATA,
+    )
+    @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe', autospec=True)
+    def test_expired_intent_allows_reuse(
+        self, mock_stripe, mock_lms_client_class, mock_get_ssp_pricing,  # pylint: disable=unused-argument
+    ):
         """
         Test that expired intents don't block new intents.
         """
@@ -243,34 +309,32 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         )
 
         # Setup mocks
-        with mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True) as mock_lms_client_class:
-            with mock.patch.object(stripe_api, 'stripe', autospec=True) as mock_stripe:
-                mock_lms_client = mock_lms_client_class.return_value
-                mock_lms_client.get_lms_user_account.return_value = [{'id': 9876}]
-                mock_lms_client.get_enterprise_customer_data.side_effect = raise_404_error
-                mock_stripe.checkout.Session.create.return_value = {'id': 'test-session'}
-                mock_stripe.Customer.search.return_value.data = []
+        mock_lms_client = mock_lms_client_class.return_value
+        mock_lms_client.get_lms_user_account.return_value = [{'id': 9876}]
+        mock_lms_client.get_enterprise_customer_data.side_effect = raise_404_error
+        mock_stripe.checkout.Session.create.return_value = {'id': 'test-session'}
+        mock_stripe.Customer.search.return_value.data = []
 
-                # Should be able to reserve the expired slug
-                result = customer_billing_api.create_free_trial_checkout_session(
-                    user=self.user,
-                    admin_email='test@example.com',
-                    enterprise_slug='expired-slug',
-                    company_name='anything',
-                    quantity=20,
-                    stripe_price_id='price_ABC',
-                )
+        # Should be able to reserve the expired slug
+        result = customer_billing_api.create_free_trial_checkout_session(
+            user=self.user,
+            admin_email='test@example.com',
+            enterprise_slug='expired-slug',
+            company_name='anything',
+            quantity=20,
+            stripe_price_id=QUARTERLY_PRICE_ID,
+        )
 
-                # Should succeed
-                self.assertEqual(result, {'id': 'test-session'})
+        # Should succeed
+        self.assertEqual(result, {'id': 'test-session'})
 
-                # Assert that a CheckoutIntent was created
-                intent = CheckoutIntent.objects.get(user=self.user)
-                self.assertEqual(intent.state, CheckoutIntentState.CREATED)
-                self.assertEqual(intent.enterprise_slug, 'expired-slug')
-                self.assertEqual(intent.enterprise_name, 'anything')
-                self.assertEqual(intent.stripe_checkout_session_id, 'test-session')
-                self.assertFalse(intent.is_expired())
+        # Assert that a CheckoutIntent was created
+        intent = CheckoutIntent.objects.get(user=self.user)
+        self.assertEqual(intent.state, CheckoutIntentState.CREATED)
+        self.assertEqual(intent.enterprise_slug, 'expired-slug')
+        self.assertEqual(intent.enterprise_name, 'anything')
+        self.assertEqual(intent.stripe_checkout_session_id, 'test-session')
+        self.assertFalse(intent.is_expired())
 
     @ddt.data(
         {
@@ -353,18 +417,23 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         },
     )
     @ddt.unpack
+    @mock.patch(
+        'enterprise_access.apps.customer_billing.api.get_ssp_product_pricing',
+        return_value=MOCK_SSP_PRICING_DATA,
+    )
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
     @mock.patch.object(stripe_api, 'stripe', autospec=True)
     def test_create_free_trial_checkout_session_errors(
         self,
         mock_stripe,
         mock_lms_client_class,
+        mock_get_ssp_pricing,  # pylint: disable=unused-argument
         email_registered=True,
         customer_exists=False,
         is_admin_for_existing_customer=False,
         request_enterprise_slug='my-sluggy',
         request_quantity=15,
-        request_stripe_price_id='price_ABC',
+        request_stripe_price_id=QUARTERLY_PRICE_ID,
         expected_validation_errors=None,
     ):
         """

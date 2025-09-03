@@ -11,20 +11,22 @@ from stripe.error import InvalidRequestError
 
 from enterprise_access.apps.customer_billing import pricing_api
 
+MOCK_SSP_PRODUCTS = {
+    'quarterly_license_plan': {
+        'stripe_price_id': 'price_test_quarterly',  # DEPRECATED: Use lookup_key instead
+        'lookup_key': 'price_quarterly_0002',
+        'quantity_range': (5, 30),
+    },
+    'yearly_license_plan': {
+        'stripe_price_id': 'price_test_yearly',  # DEPRECATED: Use lookup_key instead
+        'lookup_key': 'price_yearly_0001',
+        'quantity_range': (5, 30),
+    },
+}
+
 
 @override_settings(
-    SSP_PRODUCTS={
-        'quarterly_license_plan': {
-            'stripe_price_id': 'price_ABC',
-            'stripe_product_id': 'prod_ABC',
-            'quantity_range': (5, 30),
-        },
-        'yearly_license_plan': {
-            'stripe_price_id': 'price_XYZ',
-            'stripe_product_id': 'prod_XYZ',
-            'quantity_range': (5, 30),
-        },
-    },
+    SSP_PRODUCTS=MOCK_SSP_PRODUCTS
 )
 @ddt.ddt
 class TestStripePricingAPI(TestCase):
@@ -48,6 +50,7 @@ class TestStripePricingAPI(TestCase):
         product_id='prod_123',
         product_name='Test Product',
         recurring=None,
+        lookup_key=None,
     ):
         """Helper to create mock Stripe price object."""
         mock_product = mock.MagicMock()
@@ -57,12 +60,12 @@ class TestStripePricingAPI(TestCase):
         mock_product.metadata = {'test': 'value'}
 
         mock_price = mock.MagicMock()
-        mock_price.id = price_id
+        mock_price.id = price_id or MOCK_SSP_PRODUCTS['quarterly_license_plan']['stripe_price_id']
         mock_price.unit_amount = unit_amount
         mock_price.currency = currency
         mock_price.product = mock_product
         mock_price.recurring = recurring
-        mock_price.lookup_key = 'foo-bar'
+        mock_price.lookup_key = lookup_key or MOCK_SSP_PRODUCTS['quarterly_license_plan']['lookup_key']
         mock_price.billing_scheme = 'per_unit'
         mock_price.type = 'recurring'
 
@@ -71,17 +74,19 @@ class TestStripePricingAPI(TestCase):
     @mock.patch('enterprise_access.apps.customer_billing.pricing_api.stripe')
     def test_get_stripe_price_data_basic_format(self, mock_stripe):
         """Test fetching price data in basic format."""
-        mock_price = self._create_mock_stripe_price()
+        price_id = MOCK_SSP_PRODUCTS['quarterly_license_plan']['stripe_price_id']
+        lookup_key = MOCK_SSP_PRODUCTS['quarterly_license_plan']['lookup_key']
+        mock_price = self._create_mock_stripe_price(price_id=price_id, lookup_key=lookup_key)
         mock_stripe.Price.retrieve.return_value = mock_price
 
-        result = pricing_api.get_stripe_price_data('price_123')
+        result = pricing_api.get_stripe_price_data(price_id)
 
         expected = {
-            'id': 'price_123',
+            'id': price_id,
             'unit_amount_decimal': Decimal(100.0),
             'unit_amount': 10000,
             'currency': 'usd',
-            'lookup_key': 'foo-bar',
+            'lookup_key': lookup_key,
             'product': {
                 'id': 'prod_123',
                 'name': 'Test Product',
@@ -91,7 +96,7 @@ class TestStripePricingAPI(TestCase):
         }
 
         self.assertEqual(result, expected)
-        mock_stripe.Price.retrieve.assert_called_once_with('price_123', expand=['product'])
+        mock_stripe.Price.retrieve.assert_called_once_with(price_id, expand=['product'])
 
     @mock.patch('enterprise_access.apps.customer_billing.pricing_api.stripe')
     def test_get_stripe_price_data_with_recurring(self, mock_stripe):
@@ -137,29 +142,15 @@ class TestStripePricingAPI(TestCase):
         with self.assertRaises(pricing_api.StripePricingError):
             pricing_api.get_stripe_price_data('price_123')
 
-    @mock.patch('enterprise_access.apps.customer_billing.pricing_api.get_stripe_price_data')
-    def test_get_multiple_stripe_prices(self, mock_get_price):
-        """Test fetching multiple prices."""
-        mock_get_price.side_effect = [
-            {'currency': 'usd', 'unit_amount_decimal': Decimal(100.0), 'unit_amount': 10000},
-            {'currency': 'usd', 'unit_amount_decimal': Decimal(200.0), 'unit_amount': 20000},
-        ]
-
-        result = pricing_api.get_multiple_stripe_prices(['price_1', 'price_2'])
-
-        expected = {
-            'price_1': {'currency': 'usd', 'unit_amount_decimal': Decimal(100.0), 'unit_amount': 10000},
-            'price_2': {'currency': 'usd', 'unit_amount_decimal': Decimal(200.0), 'unit_amount': 20000},
-        }
-
-        self.assertEqual(result, expected)
-        self.assertEqual(mock_get_price.call_count, 2)
-
     @mock.patch('enterprise_access.apps.customer_billing.pricing_api.stripe')
     def test_get_ssp_product_pricing(self, mock_stripe):
         """Test fetching SSP product pricing."""
-        mock_price = self._create_mock_stripe_price()
-        mock_stripe.Price.retrieve.return_value = mock_price
+        quarterly_price = self._create_mock_stripe_price()
+        yearly_price = self._create_mock_stripe_price(
+            price_id=MOCK_SSP_PRODUCTS['yearly_license_plan']['stripe_price_id'],
+            lookup_key=MOCK_SSP_PRODUCTS['yearly_license_plan']['lookup_key'],
+        )
+        mock_stripe.Price.list().auto_paging_iter.return_value = [quarterly_price, yearly_price]
 
         result = pricing_api.get_ssp_product_pricing()
 
