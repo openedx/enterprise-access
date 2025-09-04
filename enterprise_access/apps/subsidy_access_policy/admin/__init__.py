@@ -1,6 +1,7 @@
 """ Admin configuration for subsidy_access_policy models. """
 import json
 import logging
+from typing import Any, Dict
 
 from django.conf import settings
 from django.contrib import admin, messages
@@ -39,7 +40,12 @@ EVERY_SPEND_LIMIT_FIELD = [
     'per_learner_enrollment_limit',
 ]
 
-FORCED_REDEMPTION_GEAG_KEYS = ('geag_first_name', 'geag_last_name', 'geag_date_of_birth')
+FORCED_REDEMPTION_GEAG_KEYS = (
+    'geag_first_name',
+    'geag_last_name',
+    'geag_date_of_birth',
+    constants.FALLBACK_EXTERNAL_REFERENCE_ID_KEY,
+)
 FORCED_REDEMPTION_CURRENT_TIME_KEY = 'geag_terms_accepted_at'
 FORCED_REDEMPTION_DATA_SHARE_CONSENT_KEY = 'geag_data_share_consent'
 FORCED_REDEMPTION_EMAIL_KEY = 'geag_email'
@@ -451,7 +457,7 @@ class ForcedPolicyRedemptionAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
         'traceback',
     ]
 
-    def save_model(self, request, obj, form, change):
+    def save_model(self, request, obj, form, change) -> None:
         """
         If this record has not been successfully redeemed yet,
         and if ``wait_to_redeem`` is false, then call ``force_redeem()`` on
@@ -475,7 +481,7 @@ class ForcedPolicyRedemptionAdmin(DjangoQLSearchMixin, SimpleHistoryAdmin):
 
         form.full_clean()  # populates cleaned_data below
         try:
-            extra_metadata = {
+            extra_metadata: Dict[str, Any] = {
                 key: str(form.cleaned_data.get(key))
                 for key in FORCED_REDEMPTION_GEAG_KEYS
                 if form.cleaned_data.get(key)

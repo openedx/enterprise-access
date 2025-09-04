@@ -129,6 +129,9 @@ REASON_LEARNER_ASSIGNMENT_REVERSED = "reason_learner_assignment_reversed"
 # forces enrollment to take place, regardless of course state.
 FORCE_ENROLLMENT_KEYWORD = 'allow_late_enrollment'
 
+# Transaction metadata key used by the forced redemption tool to provide a fallback external fulfillment reference ID.
+FALLBACK_EXTERNAL_REFERENCE_ID_KEY = 'fallback_external_fulfillment_reference_id'
+
 SORT_BY_ENROLLMENT_COUNT = 'enrollment_count'
 
 GROUP_MEMBERS_WITH_AGGREGATES_DEFAULT_PAGE_SIZE = 10

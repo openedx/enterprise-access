@@ -92,6 +92,15 @@ class ForcedPolicyRedemptionForm(forms.ModelForm):
         help_text=_("Learner date of birth, only used for Exec Ed Redemptions"),
         required=False,
     )
+    fallback_external_fulfillment_reference_id = forms.UUIDField(
+        label=_("Order UUID of existing GEAG allocation (EE-only)"),
+        help_text=_(
+            "Link new transaction to a specific Order UUID. This is rarely needed, "
+            "as a GEAG allocation will typically not yet exist and neither will an "
+            "Order UUID. Only used for Exec Ed Redemptions."
+        ),
+        required=False,
+    )
 
     class Meta:
         model = ForcedPolicyRedemption
