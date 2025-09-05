@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 stripe.api_key = settings.STRIPE_API_KEY
 
 
-def create_subscription_checkout_session(input_data, lms_user_id) -> stripe.checkout.Session:
+def create_subscription_checkout_session(input_data, lms_user_id, checkout_intent) -> stripe.checkout.Session:
     """
     Creates a free trial subscription checkout session.
     """
@@ -40,10 +40,13 @@ def create_subscription_checkout_session(input_data, lms_user_id) -> stripe.chec
                 'end_behavior': {'missing_payment_method': 'cancel'},
             },
             'metadata': {
-                # Communicate to downstream services what the admin intends the enterprise customer slug to be.
+                # Downstream services need to know the intended enterprise customer name & slug.
+                'enterprise_customer_name': input_data['company_name'],
                 'enterprise_customer_slug': input_data['enterprise_slug'],
                 # Store the lms_user_id for improved debugging experience.
                 'lms_user_id': str(lms_user_id),
+                # Store the checkout_intent ID
+                'checkout_intent_id': str(checkout_intent.id),
             }
         },
         # Always collect payment method, not just when the amount is greater than zero.  This is influential for

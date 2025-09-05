@@ -368,7 +368,7 @@ def create_free_trial_checkout_session(
 
     user = input_data['user']
 
-    # Create checkout intent instead of just reserving a slug
+    # Create checkout intent, which reserves the enterprise name & slug.
     try:
         intent = CheckoutIntent.create_intent(
             user=user,
@@ -387,7 +387,11 @@ def create_free_trial_checkout_session(
         ) from exc
 
     lms_user_id = user.lms_user_id
-    checkout_session = create_subscription_checkout_session(input_data, lms_user_id)
+    checkout_session = create_subscription_checkout_session(
+        input_data=input_data,
+        lms_user_id=lms_user_id,
+        checkout_intent=intent,
+    )
 
     intent.update_stripe_session_id(checkout_session['id'])
     logger.info(f'Updated checkout intent {intent.id} with Stripe session {checkout_session["id"]}')
