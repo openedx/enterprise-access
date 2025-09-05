@@ -26,6 +26,7 @@ from enterprise_access.apps.content_assignments.tests.factories import (
 from enterprise_access.apps.subsidy_access_policy.constants import (
     ERROR_MSG_ACTIVE_UNKNOWN_SPEND,
     ERROR_MSG_ACTIVE_WITH_SPEND,
+    FALLBACK_EXTERNAL_REFERENCE_ID_KEY,
     REASON_BEYOND_ENROLLMENT_DEADLINE,
     REASON_BNR_NOT_ENABLED,
     REASON_CONTENT_NOT_IN_CATALOG,
@@ -1430,6 +1431,14 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
             'fail_subsidy_create_transaction': False,
             'redeem_raises': None,
         },
+        # Happy path, simulate a forced redemption with a predetermined external fulfillment ID.
+        {
+            'assignment_starting_state': LearnerContentAssignmentStateChoices.ALLOCATED,
+            'assignment_ending_state': LearnerContentAssignmentStateChoices.ACCEPTED,
+            'fail_subsidy_create_transaction': False,
+            'forced_with_external_reference_id': True,
+            'redeem_raises': None,
+        },
         # Sad path, no assignment exists.
         {
             'assignment_starting_state': None,
@@ -1473,6 +1482,7 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         assignment_ending_state,
         fail_subsidy_create_transaction,
         redeem_raises,
+        forced_with_external_reference_id=False,
     ):
         """
         Test redeem() for assigned learner credit policies.
@@ -1517,12 +1527,19 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
                 state=assignment_starting_state,
             )
 
+        test_external_reference_id = uuid4()
+        extra_redeem_kwargs = {}
+        if forced_with_external_reference_id:
+            extra_redeem_kwargs = {'metadata': {FALLBACK_EXTERNAL_REFERENCE_ID_KEY: str(test_external_reference_id)}}
+
         # Do the redemption
-        if redeem_raises:
-            with self.assertRaises(redeem_raises):
-                self.active_policy.redeem(self.lms_user_id, self.course_run_key, [])
-        else:
-            self.active_policy.redeem(self.lms_user_id, self.course_run_key, [])
+        with self.assertRaises(redeem_raises) if redeem_raises else contextlib.nullcontext():
+            self.active_policy.redeem(
+                lms_user_id=self.lms_user_id,
+                content_key=self.course_run_key,
+                all_transactions=[],
+                **extra_redeem_kwargs,
+            )
 
         # Assert that we call the subsidy client's `create_subsidy_transaction` method
         # with the expected payload, but only for test conditions where redeem() doesn't
@@ -1538,6 +1555,11 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
             }
             if assignment:
                 expected_redeem_payload['requested_price_cents'] = -1 * assignment.content_quantity
+            if forced_with_external_reference_id:
+                expected_redeem_payload['metadata'] = expected_redeem_payload['metadata'] or {}
+                expected_redeem_payload['metadata'].update({
+                    FALLBACK_EXTERNAL_REFERENCE_ID_KEY: str(test_external_reference_id),
+                })
             self.mock_subsidy_client.create_subsidy_transaction.assert_called_once_with(
                 **expected_redeem_payload,
             )
