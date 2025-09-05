@@ -618,11 +618,13 @@ SSP_TRIAL_PERIOD_DAYS = 14
 # Placeholder Stripe products, override in prod.
 SSP_PRODUCTS = {
     'quarterly_license_plan': {
-        'stripe_price_id': 'price_1234_replace-me',
+        'stripe_price_id': 'price_1234_replace-me',  # DEPRECATED: Use lookup_key instead
+        'lookup_key': 'price_quarterly_0002',
         'quantity_range': (5, 30),
     },
     'yearly_license_plan': {
-        'stripe_price_id': 'price_9876_replace-me',
+        'stripe_price_id': 'price_9876_replace-me',  # DEPRECATED: Use lookup_key instead
+        'lookup_key': 'price_yearly_0001',
         'quantity_range': (5, 30),
     },
 }

@@ -7,7 +7,6 @@ from functools import cache
 from typing import TypedDict, Unpack, cast
 
 import stripe
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email, validate_slug
@@ -16,6 +15,7 @@ from requests.exceptions import HTTPError
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.customer_billing.constants import CHECKOUT_SESSION_ERROR_CODES
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.pricing_api import get_ssp_product_pricing
 from enterprise_access.apps.customer_billing.stripe_api import create_subscription_checkout_session
 
 User = get_user_model()
@@ -184,7 +184,7 @@ class CheckoutSessionInputValidator():
 
     def handle_quantity(self, input_data: CheckoutSessionInputValidatorData) -> FieldValidationResult:
         """
-        Validate the `quantity` field.
+        Validate the `quantity` field using Stripe price data.
         """
         quantity = input_data.get('quantity')
         stripe_price_id = input_data.get('stripe_price_id')
@@ -199,24 +199,41 @@ class CheckoutSessionInputValidator():
             error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['quantity']['INVALID_FORMAT']
             return {'error_code': error_code, 'developer_message': developer_message}
 
-        # Specific range allowed, e.g. "between 5 and 30 licenses".
-        valid_quantity_range_by_stripe_price = {
-            product['stripe_price_id']: product['quantity_range']
-            for product in settings.SSP_PRODUCTS.values()
-        }
-        if stripe_price_id not in valid_quantity_range_by_stripe_price:
+        try:
+            # Get the SSP product pricing data (includes quantity ranges)
+            ssp_pricing = get_ssp_product_pricing()
+
+            # Find the SSP product that matches this stripe_price_id
+            matching_product = None
+            for _, price_data in ssp_pricing.items():
+                if price_data.get('id') == stripe_price_id:
+                    matching_product = price_data
+                    break
+
+            if not matching_product:
+                error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['common']['INCOMPLETE_DATA']
+                return {'error_code': error_code, 'developer_message': developer_message}
+
+            quantity_range = matching_product.get('quantity_range')
+            if not quantity_range:
+                error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['common']['INCOMPLETE_DATA']
+                return {'error_code': error_code, 'developer_message': developer_message}
+
+            min_quantity, max_quantity = quantity_range
+            if quantity < min_quantity or quantity > max_quantity:
+                error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['quantity']['RANGE_EXCEEDED']
+                return {'error_code': error_code, 'developer_message': developer_message}
+
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.error(f'Error validating quantity for stripe_price_id {stripe_price_id}: {exc}')
             error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['common']['INCOMPLETE_DATA']
-            return {'error_code': error_code, 'developer_message': developer_message}
-        min_quantity, max_quantity = valid_quantity_range_by_stripe_price[stripe_price_id]
-        if quantity < min_quantity or quantity > max_quantity:
-            error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['quantity']['RANGE_EXCEEDED']
             return {'error_code': error_code, 'developer_message': developer_message}
 
         return {'error_code': None, 'developer_message': None}
 
     def handle_stripe_price_id(self, input_data: CheckoutSessionInputValidatorData) -> FieldValidationResult:
         """
-        Validate the `stripe_price_id` field.
+        Validate the `stripe_price_id` field against active Stripe prices.
         """
         stripe_price_id = input_data.get('stripe_price_id')
 
@@ -225,9 +242,22 @@ class CheckoutSessionInputValidator():
             error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['stripe_price_id']['INVALID_FORMAT']
             return {'error_code': error_code, 'developer_message': developer_message}
 
-        # Check that the Stripe product has actually been configured in settings.
-        valid_stripe_prices = [product['stripe_price_id'] for product in settings.SSP_PRODUCTS.values()]
-        if stripe_price_id not in valid_stripe_prices:
+        try:
+            # Get SSP product pricing data (validates lookup_keys against Stripe)
+            ssp_pricing = get_ssp_product_pricing()
+
+            # Check if the price_id exists in any of the configured SSP products
+            price_exists = any(
+                price_data.get('id') == stripe_price_id
+                for price_data in ssp_pricing.values()
+            )
+
+            if not price_exists:
+                error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['stripe_price_id']['DOES_NOT_EXIST']
+                return {'error_code': error_code, 'developer_message': developer_message}
+
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.error(f'Error validating stripe_price_id {stripe_price_id}: {exc}')
             error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['stripe_price_id']['DOES_NOT_EXIST']
             return {'error_code': error_code, 'developer_message': developer_message}
 
