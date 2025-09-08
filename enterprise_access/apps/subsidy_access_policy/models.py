@@ -1063,9 +1063,6 @@ class SubsidyAccessPolicy(TimeStampedModel):
                 requested_price_cents = kwargs.get('requested_price_cents')
                 if requested_price_cents is not None:
                     creation_payload['requested_price_cents'] = requested_price_cents
-                external_fulfillment_reference_id = kwargs.get('external_fulfillment_reference_id')
-                if external_fulfillment_reference_id is not None:
-                    creation_payload['external_fulfillment_reference_id'] = external_fulfillment_reference_id
                 return self.subsidy_client.create_subsidy_transaction(**creation_payload)
             except requests.exceptions.HTTPError as exc:
                 raise SubsidyAPIHTTPError('HTTPError occurred in Subsidy API request.') from exc
