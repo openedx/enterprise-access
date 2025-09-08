@@ -2,9 +2,11 @@
 Tests for the ``enterprise_access.customer_billing.models`` module.
 """
 from datetime import timedelta
+from typing import cast
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
@@ -90,7 +92,7 @@ class TestCheckoutIntentModel(TestCase):
     def test_create_intent_success(self):
         """Test successful creation of checkout intent."""
         intent = CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug=self.basic_data['enterprise_slug'],
             name=self.basic_data['enterprise_name'],
             quantity=self.basic_data['quantity']
@@ -108,7 +110,7 @@ class TestCheckoutIntentModel(TestCase):
         """Test that creating an intent with conflicting slug/name fails."""
         # First user reserves slug and name
         CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug=self.basic_data['enterprise_slug'],
             name=self.basic_data['enterprise_name'],
             quantity=self.basic_data['quantity']
@@ -117,7 +119,7 @@ class TestCheckoutIntentModel(TestCase):
         # Second user tries to use same slug
         with self.assertRaises(ValueError):
             CheckoutIntent.create_intent(
-                user=self.user2,
+                user=cast(AbstractUser, self.user2),
                 slug=self.basic_data['enterprise_slug'],
                 name='Different Enterprise',
                 quantity=self.basic_data['quantity']
@@ -126,7 +128,7 @@ class TestCheckoutIntentModel(TestCase):
         # Second user tries to use same name
         with self.assertRaises(ValueError):
             CheckoutIntent.create_intent(
-                user=self.user2,
+                user=cast(AbstractUser, self.user2),
                 slug='different-slug',
                 name=self.basic_data['enterprise_name'],
                 quantity=self.basic_data['quantity']
@@ -136,7 +138,7 @@ class TestCheckoutIntentModel(TestCase):
         """Test that creating an intent updates the user's existing one."""
         # Create first intent
         first_intent = CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug='first-slug',
             name='First Enterprise',
             quantity=5
@@ -144,7 +146,7 @@ class TestCheckoutIntentModel(TestCase):
 
         # Create second intent for same user
         second_intent = CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug='second-slug',
             name='Second Enterprise',
             quantity=10
@@ -165,7 +167,7 @@ class TestCheckoutIntentModel(TestCase):
         """
         # First create a normal intent
         intent = CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug='original-slug',
             name='Original Enterprise',
             quantity=5
@@ -178,7 +180,7 @@ class TestCheckoutIntentModel(TestCase):
         # Trying to create a new intent for the same user should fail
         with self.assertRaises(ValueError) as context:
             CheckoutIntent.create_intent(
-                user=self.user1,
+                user=cast(AbstractUser, self.user1),
                 slug='new-slug',
                 name='New Enterprise',
                 quantity=10
@@ -197,13 +199,18 @@ class TestCheckoutIntentModel(TestCase):
     def test_state_transitions_happy_path(self):
         """Test the state transitions for the happy path."""
         intent = CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug=self.basic_data['enterprise_slug'],
             name=self.basic_data['enterprise_name'],
             quantity=self.basic_data['quantity']
         )
 
         # CREATED → PAID
+        intent.mark_as_paid('cs_test_123')
+        self.assertEqual(intent.state, CheckoutIntentState.PAID)
+        self.assertEqual(intent.stripe_checkout_session_id, 'cs_test_123')
+
+        # PAID → PAID
         intent.mark_as_paid('cs_test_123')
         self.assertEqual(intent.state, CheckoutIntentState.PAID)
         self.assertEqual(intent.stripe_checkout_session_id, 'cs_test_123')
@@ -217,7 +224,7 @@ class TestCheckoutIntentModel(TestCase):
     def test_state_transitions_error_paths(self):
         """Test state transitions for error paths."""
         intent = CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug=self.basic_data['enterprise_slug'],
             name=self.basic_data['enterprise_name'],
             quantity=self.basic_data['quantity']
@@ -230,7 +237,7 @@ class TestCheckoutIntentModel(TestCase):
 
         # Reset for testing PAID → ERRORED_PROVISIONING
         intent = CheckoutIntent.create_intent(
-            user=self.user2,
+            user=cast(AbstractUser, self.user2),
             slug='another-slug',
             name='Another Enterprise',
             quantity=7
@@ -246,7 +253,7 @@ class TestCheckoutIntentModel(TestCase):
     def test_invalid_state_transitions(self):
         """Test that invalid state transitions raise exceptions."""
         intent = CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug=self.basic_data['enterprise_slug'],
             name=self.basic_data['enterprise_name'],
             quantity=self.basic_data['quantity']
@@ -261,7 +268,7 @@ class TestCheckoutIntentModel(TestCase):
 
         # Create a new intent
         intent2 = CheckoutIntent.create_intent(
-            user=self.user2,
+            user=cast(AbstractUser, self.user2),
             slug='another-slug',
             name='Another Enterprise',
             quantity=7
@@ -270,6 +277,22 @@ class TestCheckoutIntentModel(TestCase):
         # Should not be able to go from CREATED to FULFILLED (skipping PAID)
         with self.assertRaises(ValueError):
             intent2.mark_as_fulfilled()
+
+    def test_invalid_state_transitions_paid_different_session(self):
+        """Attempting a PAID->PAID state transition with different checkout_session_id raises an exception."""
+        intent = CheckoutIntent.create_intent(
+            user=cast(AbstractUser, self.user1),
+            slug=self.basic_data['enterprise_slug'],
+            name=self.basic_data['enterprise_name'],
+            quantity=self.basic_data['quantity']
+        )
+
+        # Mark as paid
+        intent.mark_as_paid('foobar')
+
+        # Should not be able to transition from paid to paid while changing the stripe checkout session ID
+        with self.assertRaises(ValueError):
+            intent.mark_as_paid('binbaz')
 
     def test_intent_expiration(self):
         """Test intent expiration logic."""
@@ -291,7 +314,7 @@ class TestCheckoutIntentModel(TestCase):
         with mock.patch.object(CheckoutIntent, 'cleanup_expired') as mock_cleanup:
             CheckoutIntent.cleanup_expired.return_value = 1
             CheckoutIntent.create_intent(
-                user=self.user2,
+                user=cast(AbstractUser, self.user2),
                 slug='new-slug',
                 name='New Enterprise',
                 quantity=10
@@ -301,7 +324,7 @@ class TestCheckoutIntentModel(TestCase):
     def test_admin_portal_url(self):
         """Test the admin_portal_url property."""
         intent = CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug=self.basic_data['enterprise_slug'],
             name=self.basic_data['enterprise_name'],
             quantity=self.basic_data['quantity']
@@ -332,7 +355,7 @@ class TestCheckoutIntentModel(TestCase):
 
         # Create an intent
         CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug=self.basic_data['enterprise_slug'],
             name=self.basic_data['enterprise_name'],
             quantity=self.basic_data['quantity']
@@ -396,7 +419,7 @@ class TestCheckoutIntentModel(TestCase):
         """Test the filter_by_name_and_slug method."""
         # Create an intent
         CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug='test-slug-123',
             name='Test Name 123',
             quantity=5
@@ -422,7 +445,7 @@ class TestCheckoutIntentModel(TestCase):
     def test_custom_reservation_duration(self):
         """Test that custom reservation duration is respected."""
         intent = CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug=self.basic_data['enterprise_slug'],
             name=self.basic_data['enterprise_name'],
             quantity=self.basic_data['quantity']
@@ -438,7 +461,7 @@ class TestCheckoutIntentModel(TestCase):
     def test_update_stripe_session_id(self):
         """Test updating Stripe session ID."""
         intent = CheckoutIntent.create_intent(
-            user=self.user1,
+            user=cast(AbstractUser, self.user1),
             slug=self.basic_data['enterprise_slug'],
             name=self.basic_data['enterprise_name'],
             quantity=self.basic_data['quantity']

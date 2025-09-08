@@ -26,6 +26,7 @@ from enterprise_access.apps.customer_billing.api import (
 )
 from enterprise_access.apps.customer_billing.constants import ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
 
 from .constants import CHECKOUT_INTENT_EXAMPLES, ERROR_RESPONSES, PATCH_REQUEST_EXAMPLES
 
@@ -85,17 +86,9 @@ class CustomerBillingViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        event_type = event["type"]
-        logger.info(f'Received Stripe event: {event_type}')
-
-        if event_type == 'invoice.paid':
-            pass
-        elif event_type == 'customer.subscription.trial_will_end':
-            pass
-        elif event_type == 'payment_method.attached':
-            pass
-        elif event_type == 'customer.subscription.deleted':
-            pass
+        # Could throw an exception. Do NOT swallow the exception because we
+        # need the error response to trigger webhook retries.
+        StripeEventHandler.dispatch(event)
 
         return Response(status=status.HTTP_200_OK)
 
