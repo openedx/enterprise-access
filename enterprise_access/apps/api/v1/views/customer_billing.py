@@ -24,7 +24,6 @@ from enterprise_access.apps.customer_billing.api import (
     CreateCheckoutSessionValidationError,
     create_free_trial_checkout_session
 )
-from enterprise_access.apps.customer_billing.constants import ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
 from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
 
@@ -338,8 +337,8 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
 
         # Check if state is being updated
         new_state = request.data.get('state')
-        if new_state and new_state != instance.state:
-            if not self._is_valid_state_transition(instance.state, new_state):
+        if new_state:
+            if not CheckoutIntent.is_valid_state_transition(instance.state, new_state):
                 raise ValidationError(detail={
                     'state': f'Invalid state transition from {instance.state} to {new_state}'
                 })
@@ -350,17 +349,3 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
             )
 
         return super().partial_update(request, *args, **kwargs)
-
-    def _is_valid_state_transition(self, current_state, new_state):
-        """
-        Validate if the state transition is allowed.
-
-        Args:
-            current_state: Current state of the CheckoutIntent
-            new_state: Proposed new state
-
-        Returns:
-            bool: True if transition is allowed, False otherwise
-        """
-        allowed_transitions = ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS.get(current_state, [])
-        return new_state in allowed_transitions

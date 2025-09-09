@@ -259,10 +259,12 @@ class TestCheckoutIntentModel(TestCase):
             quantity=self.basic_data['quantity']
         )
 
-        # Mark as errored
-        intent.mark_checkout_error('Payment failed')
+        # Move to ERRORED_PROVISIONING.
+        intent.mark_as_paid()
+        intent.mark_provisioning_error('Provisioning failed')
 
-        # Should not be able to transition from error to paid
+        # Should not be able to transition from ERRORED_PROVISIONING to PAID,
+        # as this would require going back in time.
         with self.assertRaises(ValueError):
             intent.mark_as_paid()
 

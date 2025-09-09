@@ -1,6 +1,7 @@
 """
 Models for customer billing app.
 """
+import logging
 from datetime import timedelta
 from typing import Self
 
@@ -16,10 +17,12 @@ from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_update_with_history
 
+from enterprise_access.apps.customer_billing.constants import ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS
 from enterprise_access.apps.provisioning.models import ProvisionNewCustomerWorkflow
 
 from .constants import INTENT_RESERVATION_DURATION_MINUTES, CheckoutIntentState
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -135,50 +138,92 @@ class CheckoutIntent(TimeStampedModel):
 
     def __str__(self):
         return (
-            f"{self.user.email}, slug: {self.enterprise_slug}, name: {self.enterprise_name}, "
-            f"state: {self.state}, (expires {self.expires_at})"
+            "<CheckoutIntent "
+            f"id={self.id}, "
+            f"email={self.user.email}, "
+            f"enterprise_slug={self.enterprise_slug}, "
+            f"enterprise_name={self.enterprise_name}, "
+            f"state={self.state}, "
+            f"expires_at={self.expires_at}>"
         )
+
+    @classmethod
+    def is_valid_state_transition(
+        cls,
+        current_state: CheckoutIntentState,
+        new_state: CheckoutIntentState,
+    ) -> bool:
+        """
+        Validate if the state transition is allowed.
+
+        Args:
+            current_state: Current state of the CheckoutIntent
+            new_state: Proposed new state
+
+        Returns:
+            bool: True if transition is allowed, False otherwise
+        """
+        if current_state == new_state:
+            return True
+        allowed_transitions = ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS.get(current_state, [])
+        return new_state in allowed_transitions
 
     def mark_as_paid(self, stripe_session_id=None):
         """Mark the intent as paid after successful Stripe checkout."""
-        if self.state not in (CheckoutIntentState.CREATED, CheckoutIntentState.PAID):
-            raise ValueError(f"Cannot transition to PAID from {self.state}")
+        if not self.is_valid_state_transition(CheckoutIntentState(self.state), CheckoutIntentState.PAID):
+            raise ValueError(f"Cannot transition from {self.state} to {CheckoutIntentState.PAID}.")
 
         if stripe_session_id:
             if self.state == CheckoutIntentState.PAID and stripe_session_id != self.stripe_checkout_session_id:
-                raise ValueError("Cannot transition to PAID from PAID with a different stripe_checkout_session_id")
+                raise ValueError("Cannot transition from PAID to PAID with a different stripe_checkout_session_id")
 
         self.state = CheckoutIntentState.PAID
         if stripe_session_id:
             self.stripe_checkout_session_id = stripe_session_id
         self.save(update_fields=['state', 'stripe_checkout_session_id', 'modified'])
+        logger.info(f'CheckoutIntent {self} marked as {CheckoutIntentState.PAID}.')
         return self
 
     def mark_as_fulfilled(self, workflow=None):
         """Mark the intent as fulfilled after successful provisioning."""
-        if self.state != CheckoutIntentState.PAID:
-            raise ValueError(f"Cannot transition to FULFILLED from {self.state}")
+        if not self.is_valid_state_transition(CheckoutIntentState(self.state), CheckoutIntentState.FULFILLED):
+            raise ValueError(f"Cannot transition from {self.state} to {CheckoutIntentState.FULFILLED}.")
 
         self.state = CheckoutIntentState.FULFILLED
         if workflow:
             self.workflow = workflow
         self.save(update_fields=['state', 'workflow', 'modified'])
+        logger.info(f'CheckoutIntent {self} marked as {CheckoutIntentState.FULFILLED}.')
         return self
 
     def mark_checkout_error(self, error_message):
         """Record a checkout error."""
+        if not self.is_valid_state_transition(
+            CheckoutIntentState(self.state),
+            CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
+        ):
+            raise ValueError(f"Cannot transition from {self.state} to {CheckoutIntentState.ERRORED_STRIPE_CHECKOUT}.")
+
         self.state = CheckoutIntentState.ERRORED_STRIPE_CHECKOUT
         self.last_checkout_error = error_message
         self.save(update_fields=['state', 'last_checkout_error', 'modified'])
+        logger.info(f'CheckoutIntent {self} marked as {CheckoutIntentState.ERRORED_STRIPE_CHECKOUT}.')
         return self
 
     def mark_provisioning_error(self, error_message, workflow=None):
         """Record a provisioning error."""
+        if not self.is_valid_state_transition(
+            CheckoutIntentState(self.state),
+            CheckoutIntentState.ERRORED_PROVISIONING,
+        ):
+            raise ValueError(f"Cannot transition from {self.state} to {CheckoutIntentState.ERRORED_PROVISIONING}.")
+
         self.state = CheckoutIntentState.ERRORED_PROVISIONING
         self.last_provisioning_error = error_message
         if workflow:
             self.workflow = workflow
         self.save(update_fields=['state', 'last_provisioning_error', 'workflow', 'modified'])
+        logger.info(f'CheckoutIntent {self} marked as {CheckoutIntentState.ERRORED_PROVISIONING}.')
         return self
 
     @property
