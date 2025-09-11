@@ -310,6 +310,40 @@ class LearnerCreditRequestApproveRequestSerializer(serializers.Serializer):
 
 
 # pylint: disable=abstract-method
+class LearnerCreditRequestBulkApproveRequestSerializer(serializers.Serializer):
+    """
+    Request Serializer to validate learner-credit bulk ``approve`` endpoint POST data.
+
+    For view: LearnerCreditRequestViewSet.bulk_approve
+    """
+    policy_uuid = serializers.UUIDField(
+        required=True,
+        help_text='The UUID of the policy to which the requests belong.',
+    )
+    enterprise_customer_uuid = serializers.UUIDField(
+        required=True,
+        help_text='The UUID of the Enterprise Customer.',
+    )
+    subsidy_request_uuids = serializers.ListField(
+        child=serializers.UUIDField(),
+        allow_empty=False,
+        help_text='List of LearnerCreditRequest UUIDs to approve.',
+    )
+
+    def create(self, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
+
+    def update(self, instance, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
+
+
+# pylint: disable=abstract-method
 class LearnerCreditRequestCancelSerializer(serializers.Serializer):
     """
     Request serializer to validate cancel endpoint query params.
