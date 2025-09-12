@@ -155,5 +155,6 @@ enterprise_access/assets
 
 # claude code
 CLAUDE.md
+.claude/
 package-lock.json
 package.json
