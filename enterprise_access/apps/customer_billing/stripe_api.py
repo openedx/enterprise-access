@@ -53,7 +53,7 @@ def create_subscription_checkout_session(input_data, lms_user_id, checkout_inten
         # creating a free trial plan because the amount is always zero.
         'payment_method_collection': 'always',
         # This restricts the output for the payment element to only show the card option
-        'payment_method_types':[
+        'payment_method_types': [
             'card'
         ]
 
