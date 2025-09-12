@@ -52,6 +52,10 @@ def create_subscription_checkout_session(input_data, lms_user_id, checkout_inten
         # Always collect payment method, not just when the amount is greater than zero.  This is influential for
         # creating a free trial plan because the amount is always zero.
         'payment_method_collection': 'always',
+        # This restricts the output for the payment element to only show the card option
+        'payment_method_types':[
+            'card'
+        ]
 
         # `return_url` is not required because we won't use any "redirect-based" payment methods,
         # including: iDEAL, Bancontact, SOFORT, Apple Pay, Google Pay, etc. We only support the
