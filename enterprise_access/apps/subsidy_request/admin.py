@@ -6,7 +6,9 @@ from django.contrib import admin
 from djangoql.admin import DjangoQLSearchMixin
 
 from enterprise_access.apps.subsidy_request import models
+from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.utils import get_data_from_jwt_payload, get_user_from_request_session
+from enterprise_access.utils import localized_utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,43 @@ class BaseSubsidyRequestAdmin(DjangoQLSearchMixin):
     autocomplete_fields = [
         'user',
     ]
+
+    actions = ['bulk_decline_requests']
+
+    @admin.action(description='Decline selected subsidy requests')
+    def bulk_decline_requests(self, request, queryset):
+        """
+        Admin action to decline multiple subsidy requests at once.
+        """
+        reviewer = get_user_from_request_session(request)
+        decline_reason = "Declined via admin bulk action"
+        reviewed_at = localized_utcnow()
+
+        # Filter to only requested subsidy requests
+        requested_queryset = queryset.filter(state=SubsidyRequestStates.REQUESTED)
+
+        # Update fields for bulk decline
+        requests_to_update = []
+        for subsidy_request in requested_queryset:
+            subsidy_request.state = SubsidyRequestStates.DECLINED
+            subsidy_request.reviewer = reviewer
+            subsidy_request.decline_reason = decline_reason
+            subsidy_request.reviewed_at = reviewed_at
+            requests_to_update.append(subsidy_request)
+
+        if requests_to_update:
+            # Use the model's bulk_update method which handles history tracking
+            model_class = requests_to_update[0].__class__
+            model_class.bulk_update(
+                requests_to_update,
+                ['state', 'reviewer', 'decline_reason', 'reviewed_at']
+            )
+
+        updated_count = len(requests_to_update)
+        self.message_user(  # pylint: disable=no-member
+            request,
+            f'Successfully declined {updated_count} subsidy request(s).'
+        )
 
     @admin.display(
         description='Course partners'
