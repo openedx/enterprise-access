@@ -734,6 +734,11 @@ class CouponCodeRequestViewSet(SubsidyRequestViewSet):
         summary='Approve a learner credit request.',
         request=serializers.LearnerCreditRequestApproveRequestSerializer,
     ),
+    bulk_approve=extend_schema(
+        tags=['Learner Credit Requests'],
+        summary='Bulk approve learner credit requests.',
+        request=serializers.LearnerCreditRequestBulkApproveRequestSerializer,
+    ),
     overview=extend_schema(
         tags=['Learner Credit Requests'],
         summary='Learner credit request overview.',
@@ -1020,6 +1025,111 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
             lc_request_action.traceback = format_traceback(exc)
             lc_request_action.save()
             return Response({"detail": error_msg}, exc.status_code)
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    @action(detail=False, url_path="bulk-approve", methods=["post"])
+    def bulk_approve(self, request, *args, **kwargs):
+        """
+        Bulk approve learner credit requests.
+
+        Processes each request independently and returns a summary with
+        approved and failed items. Partial success is allowed.
+        """
+        serializer = (
+            serializers.LearnerCreditRequestBulkApproveRequestSerializer(
+                data=request.data
+            )
+        )
+        serializer.is_valid(raise_exception=True)
+        policy_uuid = serializer.validated_data["policy_uuid"]
+        subsidy_request_uuids = serializer.validated_data[
+            "subsidy_request_uuids"
+        ]
+
+        # Fetch all requests upfront to limit queries
+        requests_by_uuid = {
+            str(req.uuid): req
+            for req in LearnerCreditRequest.objects.select_related(
+                "user"
+            ).filter(uuid__in=subsidy_request_uuids)
+        }
+
+        results = {
+            "approved": [],
+            "failed": [],
+            "not_found": [],
+            "skipped": [],
+        }
+
+        # Validate presence
+        for uuid_val in map(str, subsidy_request_uuids):
+            if uuid_val not in requests_by_uuid:
+                results["not_found"].append(
+                    {"uuid": uuid_val, "detail": "Request not found"}
+                )
+
+        for uuid_val, lc_request in requests_by_uuid.items():
+            if lc_request.state != SubsidyRequestStates.REQUESTED:
+                results["skipped"].append(
+                    {"uuid": uuid_val, "state": lc_request.state}
+                )
+                continue
+
+            learner_email = lc_request.user.email
+            content_key = lc_request.course_id
+            content_price_cents = lc_request.course_price
+
+            lc_request_action = LearnerCreditRequestActions.create_action(
+                learner_credit_request=lc_request,
+                recent_action=get_action_choice(
+                    SubsidyRequestStates.APPROVED
+                ),
+                status=get_user_message_choice(SubsidyRequestStates.APPROVED),
+            )
+
+            try:
+                with transaction.atomic():
+                    assignment = approve_learner_credit_request_via_policy(
+                        policy_uuid,
+                        content_key,
+                        content_price_cents,
+                        learner_email,
+                        lc_request.user.lms_user_id,
+                    )
+                    lc_request.assignment = assignment
+                    lc_request.save()
+                    lc_request.approve(request.user)
+                    send_learner_credit_bnr_request_approve_task.delay(
+                        assignment.uuid
+                    )
+                results["approved"].append(
+                    serializers.LearnerCreditRequestSerializer(
+                        lc_request
+                    ).data
+                )
+            except SubisidyAccessPolicyRequestApprovalError as exc:
+                error_msg = (
+                    f"[LC REQUEST BULK APPROVAL] Failed to approve learner credit request "
+                    f"with UUID {uuid_val}. Reason: {exc.message}."
+                )
+                logger.exception(error_msg)
+                # Update action with error
+                lc_request_action.status = get_user_message_choice(
+                    SubsidyRequestStates.REQUESTED
+                )
+                lc_request_action.error_reason = get_error_reason_choice(
+                    LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL
+                )
+                lc_request_action.traceback = format_traceback(exc)
+                lc_request_action.save()
+                results["failed"].append(
+                    {"uuid": uuid_val, "detail": exc.message}
+                )
+
+        return Response(results, status=status.HTTP_200_OK)
 
     @permission_required(
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
