@@ -497,7 +497,7 @@ psutil==7.0.0
     #   edx-django-utils
 pycodestyle==2.14.0
     # via -r requirements/validation.txt
-pycparser==2.22
+pycparser==2.23
     # via
     #   -r requirements/validation.txt
     #   cffi
@@ -540,11 +540,11 @@ pylint-plugin-utils==0.9.0
     #   pylint-django
 pymemcache==4.0.0
     # via -r requirements/validation.txt
-pymongo==4.14.1
+pymongo==4.15.0
     # via
     #   -r requirements/validation.txt
     #   edx-opaque-keys
-pynacl==1.5.0
+pynacl==1.6.0
     # via
     #   -r requirements/validation.txt
     #   edx-django-utils
@@ -562,7 +562,7 @@ pytest==8.4.2
     #   -r requirements/validation.txt
     #   pytest-cov
     #   pytest-django
-pytest-cov==6.3.0
+pytest-cov==7.0.0
     # via -r requirements/validation.txt
 pytest-dictsdiff==0.5.8
     # via -r requirements/validation.txt
@@ -642,7 +642,7 @@ rpds-py==0.27.1
     #   referencing
 rules==3.5
     # via -r requirements/validation.txt
-secretstorage==3.3.3
+secretstorage==3.4.0
     # via
     #   -r requirements/validation.txt
     #   keyring
