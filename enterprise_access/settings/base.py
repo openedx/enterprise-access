@@ -619,12 +619,12 @@ SSP_TRIAL_PERIOD_DAYS = 14
 SSP_PRODUCTS = {
     'quarterly_license_plan': {
         'stripe_price_id': 'price_1234_replace-me',  # DEPRECATED: Use lookup_key instead
-        'lookup_key': 'price_quarterly_0002',
+        'lookup_key': 'teams_subscription_licenses_quarterly',
         'quantity_range': (5, 30),
     },
     'yearly_license_plan': {
         'stripe_price_id': 'price_9876_replace-me',  # DEPRECATED: Use lookup_key instead
-        'lookup_key': 'price_yearly_0001',
+        'lookup_key': 'teams_subscription_licenses_yearly',
         'quantity_range': (5, 30),
     },
 }
@@ -632,7 +632,7 @@ SSP_PRODUCTS = {
 # Enable the customer billing API endpoints under /api/v1/customer-billing/*
 ENABLE_CUSTOMER_BILLING_API = False
 
-DEFAULT_SSP_PRICE_LOOKUP_KEY = 'subscription_licenses_yearly'
+DEFAULT_SSP_PRICE_LOOKUP_KEY = 'teams_subscription_licenses_yearly'
 
 DEFAULT_STRIPE_CACHE_TIMEOUT = 60
 
