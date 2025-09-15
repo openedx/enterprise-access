@@ -449,7 +449,7 @@ class LearnerCreditRequest(SubsidyRequest):
 
         Notes:
         * Simple subquery approach for action-based sorting that matches viewset expectations.
-        * learner_request_state provides corrected status handling for waiting and failed states.
+        * learner_request_state provides state-based logic with error overrides and waiting states.
 
         Args:
             queryset (QuerySet): LearnerCreditRequest queryset, vanilla.
@@ -477,19 +477,35 @@ class LearnerCreditRequest(SubsidyRequest):
 
             # Computed learner request state based on action status and error conditions
             learner_request_state=Case(
-                # Failed state: when error_reason is present (cancellation or redemption failed)
                 When(
-                    latest_action_error_reason__isnull=False,
+                    Q(latest_action_error_reason__isnull=False),
                     then=Value('failed')
                 ),
-                # Waiting state: approved or reminded without error
                 When(
-                    Q(latest_action_type__in=['approved', 'reminded']) &
-                    Q(latest_action_error_reason__isnull=True),
+                    Q(latest_action_type__in=['approved', 'reminded']),
                     then=Value('waiting')
                 ),
-                # Default: use the actual status from the latest action
-                default=F('latest_action_status'),
+                When(
+                    Q(state=SubsidyRequestStates.REQUESTED),
+                    then=Value(SubsidyRequestStates.REQUESTED)
+                ),
+                When(
+                    Q(state=SubsidyRequestStates.DECLINED),
+                    then=Value(SubsidyRequestStates.DECLINED)
+                ),
+                When(
+                    Q(state=SubsidyRequestStates.CANCELLED),
+                    then=Value(SubsidyRequestStates.CANCELLED)
+                ),
+                When(
+                    Q(state=SubsidyRequestStates.ERROR),
+                    then=Value(SubsidyRequestStates.ERROR)
+                ),
+                When(
+                    Q(state=SubsidyRequestStates.APPROVED),
+                    then=Value('waiting')
+                ),
+                default=None,
                 output_field=CharField()
             ),
 

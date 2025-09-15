@@ -770,6 +770,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         'latest_action_time',
         'latest_action_type',
         'latest_action_status',
+        'learner_request_state',
 
         # State-based sorting field
         'state_sort_order',
