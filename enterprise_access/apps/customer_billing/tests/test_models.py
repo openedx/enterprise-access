@@ -48,7 +48,9 @@ class TestCheckoutIntentModel(TestCase):
             enterprise_slug="expired-enterprise",
             state=CheckoutIntentState.CREATED,
             quantity=10,
-            expires_at=timezone.now() - timedelta(minutes=5)
+            expires_at=timezone.now() - timedelta(minutes=5),
+            country='US',
+            terms_metadata={'version': '1.0'}
         )
 
         # Intent 2: Not expired time - should not be updated
@@ -58,7 +60,9 @@ class TestCheckoutIntentModel(TestCase):
             enterprise_slug="active-enterprise",
             state=CheckoutIntentState.CREATED,
             quantity=15,
-            expires_at=timezone.now() + timedelta(minutes=30)
+            expires_at=timezone.now() + timedelta(minutes=30),
+            country='CA',
+            terms_metadata={'version': '1.1'}
         )
 
         # Intent 3: Expired time but already in PAID state - should not be updated
@@ -68,7 +72,9 @@ class TestCheckoutIntentModel(TestCase):
             enterprise_slug="paid-enterprise",
             state=CheckoutIntentState.PAID,
             quantity=20,
-            expires_at=timezone.now() - timedelta(minutes=10)
+            expires_at=timezone.now() - timedelta(minutes=10),
+            country='GB',
+            terms_metadata={'version': '2.0'}
         )
 
         # Run the cleanup method
@@ -91,17 +97,20 @@ class TestCheckoutIntentModel(TestCase):
 
     def test_create_intent_success(self):
         """Test successful creation of checkout intent."""
+        terms_metadata = {'version': '1.0', 'accepted_at': '2024-01-15T10:30:00Z'}
         intent = CheckoutIntent.create_intent(
             user=cast(AbstractUser, self.user1),
             slug=self.basic_data['enterprise_slug'],
             name=self.basic_data['enterprise_name'],
-            quantity=self.basic_data['quantity']
+            quantity=self.basic_data['quantity'],
+            terms_metadata=terms_metadata
         )
 
         self.assertEqual(intent.user, self.user1)
         self.assertEqual(intent.enterprise_slug, self.basic_data['enterprise_slug'])
         self.assertEqual(intent.enterprise_name, self.basic_data['enterprise_name'])
         self.assertEqual(intent.quantity, self.basic_data['quantity'])
+        self.assertEqual(intent.terms_metadata, terms_metadata)
         self.assertEqual(intent.state, CheckoutIntentState.CREATED)
         self.assertIsNone(intent.workflow)
         self.assertFalse(intent.is_expired())
@@ -137,19 +146,23 @@ class TestCheckoutIntentModel(TestCase):
     def test_create_intent_updates_existing(self):
         """Test that creating an intent updates the user's existing one."""
         # Create first intent
+        first_terms = {'version': '1.0', 'accepted_at': '2024-01-15T10:30:00Z'}
         first_intent = CheckoutIntent.create_intent(
             user=cast(AbstractUser, self.user1),
             slug='first-slug',
             name='First Enterprise',
-            quantity=5
+            quantity=5,
+            terms_metadata=first_terms
         )
 
         # Create second intent for same user
+        second_terms = {'version': '1.1', 'accepted_at': '2024-01-20T14:45:00Z'}
         second_intent = CheckoutIntent.create_intent(
             user=cast(AbstractUser, self.user1),
             slug='second-slug',
             name='Second Enterprise',
-            quantity=10
+            quantity=10,
+            terms_metadata=second_terms
         )
 
         # Should be the same object but with updated fields
@@ -157,6 +170,7 @@ class TestCheckoutIntentModel(TestCase):
         self.assertEqual(second_intent.enterprise_slug, 'second-slug')
         self.assertEqual(second_intent.enterprise_name, 'Second Enterprise')
         self.assertEqual(second_intent.quantity, 10)
+        self.assertEqual(second_intent.terms_metadata, second_terms)
 
         # Should still only have one intent for this user
         self.assertEqual(CheckoutIntent.objects.filter(user=self.user1).count(), 1)
@@ -307,7 +321,9 @@ class TestCheckoutIntentModel(TestCase):
             enterprise_slug='expired-slug',
             enterprise_name='Expired Enterprise',
             quantity=5,
-            expires_at=past_time
+            expires_at=past_time,
+            country='FR',
+            terms_metadata={'version': '1.0', 'test': True}
         )
 
         self.assertTrue(intent.is_expired())
@@ -391,7 +407,9 @@ class TestCheckoutIntentModel(TestCase):
             enterprise_slug="future-enterprise",
             state=CheckoutIntentState.EXPIRED,  # Already expired state
             quantity=10,
-            expires_at=timezone.now() + timedelta(hours=2)  # Future date
+            expires_at=timezone.now() + timedelta(hours=2),  # Future date
+            country='DE',
+            terms_metadata={'version': '1.5', 'future': True}
         )
 
         # Check if we can reserve the same name and slug
@@ -477,3 +495,47 @@ class TestCheckoutIntentModel(TestCase):
         intent.refresh_from_db()
         self.assertEqual(intent.stripe_checkout_session_id, 'cs_test_789')
         self.assertGreater(intent.modified, original_modified)
+
+    def test_create_intent_with_terms_metadata(self):
+        """Test creating intent with various terms_metadata values."""
+        # Test with None (should work)
+        intent1 = CheckoutIntent.create_intent(
+            user=cast(AbstractUser, self.user1),
+            slug='test-slug-1',
+            name='Test Enterprise 1',
+            quantity=5,
+            terms_metadata=None
+        )
+        self.assertIsNone(intent1.terms_metadata)
+
+        # Test with empty dict (should work)
+        intent2 = CheckoutIntent.create_intent(
+            user=cast(AbstractUser, self.user2),
+            slug='test-slug-2',
+            name='Test Enterprise 2',
+            quantity=10,
+            terms_metadata={}
+        )
+        self.assertEqual(intent2.terms_metadata, {})
+
+        # Test with complex metadata
+        complex_metadata = {
+            'version': '2.1',
+            'accepted_at': '2024-01-15T10:30:00Z',
+            'user_agent': 'Mozilla/5.0...',
+            'ip_address': '192.168.1.100',
+            'accepted_sections': ['privacy', 'terms', 'cookies'],
+            'preferences': {
+                'marketing': True,
+                'analytics': False
+            }
+        }
+        user3 = UserFactory()
+        intent3 = CheckoutIntent.create_intent(
+            user=cast(AbstractUser, user3),
+            slug='test-slug-3',
+            name='Test Enterprise 3',
+            quantity=15,
+            terms_metadata=complex_metadata
+        )
+        self.assertEqual(intent3.terms_metadata, complex_metadata)

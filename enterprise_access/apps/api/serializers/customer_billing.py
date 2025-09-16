@@ -108,7 +108,6 @@ class CheckoutIntentReadOnlySerializer(CountryFieldMixin, serializers.ModelSeria
 class CheckoutIntentUpdateRequestSerializer(CountryFieldMixin, serializers.ModelSerializer):
     """
     Write serializer for CheckoutIntent - used for PATCH operations.
-    Only allows state field updates.
     """
 
     class Meta:
@@ -116,7 +115,7 @@ class CheckoutIntentUpdateRequestSerializer(CountryFieldMixin, serializers.Model
         fields = '__all__'
         read_only_fields = [
             field.name for field in CheckoutIntent._meta.get_fields()
-            if field.name not in ('state', 'country')
+            if field.name not in ('state', 'country', 'terms_metadata')
         ]
 
     def validate_state(self, value):
@@ -126,11 +125,22 @@ class CheckoutIntentUpdateRequestSerializer(CountryFieldMixin, serializers.Model
         instance = self.instance
         if instance:
             current_state = instance.state
-            if value not in ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS.get(current_state, []):
+            if (current_state != value) and \
+               (value not in ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS.get(current_state, [])):
                 raise serializers.ValidationError(
                     f'Invalid state transition from {current_state} to {value}'
                 )
 
+        return value
+
+    def validate_terms_metadata(self, value):
+        """
+        Validate that terms_metadata is a dictionary/object, not a list or string.
+        """
+        if value is not None and not isinstance(value, dict):
+            raise serializers.ValidationError(
+                'terms_metadata must be a dictionary/object, not a list or string.'
+            )
         return value
 
 
@@ -148,12 +158,23 @@ class CheckoutIntentCreateRequestSerializer(CountryFieldMixin, serializers.Model
                 'enterprise_name',
                 'quantity',
                 'country',
+                'terms_metadata',
             ]
         ]
 
     # Put some reasonable validation bounds at this layer, and let
     # the customer_billing.api business logic handle more detailed validation
     quantity = serializers.IntegerField(min_value=1, max_value=1000)
+
+    def validate_terms_metadata(self, value):
+        """
+        Validate that terms_metadata is a dictionary/object, not a list or string.
+        """
+        if value is not None and not isinstance(value, dict):
+            raise serializers.ValidationError(
+                'terms_metadata must be a dictionary/object, not a list or string.'
+            )
+        return value
 
     def create(self, validated_data):
         """
@@ -165,4 +186,5 @@ class CheckoutIntentCreateRequestSerializer(CountryFieldMixin, serializers.Model
             name=validated_data['enterprise_name'],
             quantity=validated_data['quantity'],
             country=validated_data.get('country'),
+            terms_metadata=validated_data.get('terms_metadata'),
         )

@@ -184,7 +184,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         Test that creating a new checkout session replaces the user's existing intent.
         """
         # Create an existing intent for the user
-        CheckoutIntent.create_intent(self.user, 'old-slug', 'Old Comapny', 10)
+        CheckoutIntent.create_intent(self.user, 'old-slug', 'Old Comapny', 10, terms_metadata={'version': '1.0'})
 
         # Setup mocks
         mock_lms_client = mock_lms_client_class.return_value
@@ -227,7 +227,10 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         Test that slug reservation prevents conflicts between different users.
         """
         # User 1 reserves a slug
-        CheckoutIntent.create_intent(self.other_user, 'conflicting-slug', 'My company', 10)
+        CheckoutIntent.create_intent(
+            self.other_user, 'conflicting-slug', 'My company',
+            10, terms_metadata={'version': '1.0'},
+        )
 
         # Setup mocks
         mock_lms_client = mock_lms_client_class.return_value
@@ -263,7 +266,10 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         Test that comapny name reservation prevents conflicts between different users.
         """
         # User 1 reserves a slug
-        CheckoutIntent.create_intent(self.other_user, 'ok-slug', 'Conflicting company', 10)
+        CheckoutIntent.create_intent(
+            self.other_user, 'ok-slug', 'Conflicting company',
+            10, terms_metadata={'version': '1.0'},
+        )
 
         # Setup mocks
         mock_lms_client = mock_lms_client_class.return_value
@@ -303,9 +309,12 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         CheckoutIntent.objects.create(
             user=self.other_user,
             enterprise_slug='expired-slug',
+            enterprise_name='Expired Company',
             state=CheckoutIntentState.EXPIRED,
             expires_at=expired_time,
             quantity=10,
+            country='US',
+            terms_metadata={'version': '1.0', 'expired': True}
         )
 
         # Setup mocks
