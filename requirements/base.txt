@@ -267,7 +267,7 @@ prompt-toolkit==3.0.52
     # via click-repl
 psutil==7.0.0
     # via edx-django-utils
-pycparser==2.22
+pycparser==2.23
     # via cffi
 pygments==2.19.2
     # via -r requirements/base.in
@@ -280,9 +280,9 @@ pyjwt[crypto]==2.10.1
     #   social-auth-core
 pymemcache==4.0.0
     # via -r requirements/base.in
-pymongo==4.14.1
+pymongo==4.15.0
     # via edx-opaque-keys
-pynacl==1.5.0
+pynacl==1.6.0
     # via edx-django-utils
 python-dateutil==2.9.0.post0
     # via
