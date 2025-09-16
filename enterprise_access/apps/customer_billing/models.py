@@ -133,6 +133,11 @@ class CheckoutIntent(TimeStampedModel):
         null=True,
         blank=True,
     )
+    terms_metadata = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Metadata relating to the terms and conditions accepted by the user.",
+    )
 
     history = HistoricalRecords()
 
@@ -362,7 +367,8 @@ class CheckoutIntent(TimeStampedModel):
         slug: str,
         name: str,
         quantity: int,
-        country: str | None = None
+        country: str | None = None,
+        terms_metadata: dict | None = None
     ) -> Self:
         """
         Create or update a checkout intent for a user with the given enterprise details.
@@ -418,6 +424,7 @@ class CheckoutIntent(TimeStampedModel):
                 existing_intent.quantity = quantity
                 existing_intent.expires_at = expires_at
                 existing_intent.country = country
+                existing_intent.terms_metadata = terms_metadata
                 existing_intent.save()
                 return existing_intent
 
@@ -429,6 +436,7 @@ class CheckoutIntent(TimeStampedModel):
                 quantity=quantity,
                 expires_at=expires_at,
                 country=country,
+                terms_metadata=terms_metadata,
             )
 
     @classmethod

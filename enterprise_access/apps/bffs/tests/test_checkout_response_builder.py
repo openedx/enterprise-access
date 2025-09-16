@@ -643,6 +643,13 @@ class TestCheckoutSuccessResponseBuilder(APITest):
             'workflow_id': str(uuid4()),
             'expires_at': timezone.now().isoformat(),
             'admin_portal_url': 'https://portal.edx.org/test-enterprise',
+            'country': 'US',
+            'terms_metadata': {
+                'version': '2.1',
+                'accepted_at': '2024-01-15T10:30:00Z',
+                'user_agent': 'Mozilla/5.0 (compatible)',
+                'accepted_sections': ['privacy', 'terms', 'cookies']
+            },
             'first_billable_invoice': {
                 'start_time': timezone.now().isoformat(),
                 'end_time': timezone.now().isoformat(),
@@ -704,6 +711,8 @@ class TestCheckoutSuccessResponseBuilder(APITest):
             'enterprise_name': 'Test Enterprise',
             'enterprise_slug': 'test-enterprise',
             'stripe_checkout_session_id': 'cs_test_123',
+            'country': 'CA',
+            'terms_metadata': {'version': '1.0', 'minimal': True},
         }
         self.context.checkout_intent = partial_data
 

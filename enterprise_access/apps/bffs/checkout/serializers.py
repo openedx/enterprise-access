@@ -1,6 +1,8 @@
 """
 Serializers for the checkout bff.
 """
+from django_countries.serializer_fields import CountryField
+from django_countries.serializers import CountryFieldMixin
 from rest_framework import serializers
 
 from enterprise_access.apps.bffs.serializers import MinimalBffResponseSerializer
@@ -78,7 +80,7 @@ class FieldConstraintsSerializer(serializers.Serializer):
     enterprise_slug = SlugConstraintSerializer(help_text="Constraints for enterprise slug")
 
 
-class CheckoutIntentModelSerializer(serializers.ModelSerializer):
+class CheckoutIntentModelSerializer(CountryFieldMixin, serializers.ModelSerializer):
     """
     Model serializer to help convert CheckoutIntent objects to dicts
     in the course of response building and other internal data transformations.
@@ -132,6 +134,16 @@ class CheckoutIntentMinimalResponseSerializer(serializers.Serializer):
     )
     admin_portal_url = serializers.CharField(
         help_text='The admin portal URL related to this intent',
+        required=False,
+        allow_null=True,
+    )
+    country = CountryField(
+        help_text='The customer country code',
+        required=False,
+        allow_null=True,
+    )
+    terms_metadata = serializers.JSONField(
+        help_text='Metadata relating to the terms and conditions accepted by the user',
         required=False,
         allow_null=True,
     )

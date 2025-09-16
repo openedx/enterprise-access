@@ -14,7 +14,6 @@ from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from enterprise_access.apps.api import serializers
@@ -328,24 +327,3 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
         """
         user = self.request.user
         return CheckoutIntent.objects.filter(user=user).select_related('user')
-
-    def partial_update(self, request, *args, **kwargs):
-        """
-        Override partial_update to validate state transitions.
-        """
-        instance = self.get_object()
-
-        # Check if state is being updated
-        new_state = request.data.get('state')
-        if new_state:
-            if not CheckoutIntent.is_valid_state_transition(instance.state, new_state):
-                raise ValidationError(detail={
-                    'state': f'Invalid state transition from {instance.state} to {new_state}'
-                })
-
-            logger.info(
-                f'CheckoutIntent {instance.id} state transition: '
-                f'{instance.state} -> {new_state} by user {request.user.id}'
-            )
-
-        return super().partial_update(request, *args, **kwargs)

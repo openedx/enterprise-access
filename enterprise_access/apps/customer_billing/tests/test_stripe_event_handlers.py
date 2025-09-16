@@ -30,6 +30,8 @@ class TestStripeEventHandler(TestCase):
             slug='test-enterprise',
             name='Test Enterprise',
             quantity=10,
+            country='US',
+            terms_metadata={'version': '1.0', 'test_mode': True}
         )
         self.stripe_checkout_session_id = 'cs_test_1234'
 

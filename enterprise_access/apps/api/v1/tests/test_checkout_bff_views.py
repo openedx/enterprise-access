@@ -48,7 +48,9 @@ class CheckoutBFFViewSetTests(APITest):
             'last_provisioning_error': '',
             'workflow_id': None,
             'expires_at': '2025-08-02T13:52:11Z',
-            'admin_portal_url': 'https://portal.edx.org/test-enterprise'
+            'admin_portal_url': 'https://portal.edx.org/test-enterprise',
+            'country': 'US',
+            'terms_metadata': {},
         }
 
     def test_context_endpoint_unauthenticated_access(self):
@@ -502,7 +504,7 @@ class CheckoutBFFSuccessViewSetTests(APITest):
             'first_billable_invoice': {
                 'start_time': datetime.now(tz=UTC).isoformat(),
                 'end_time': datetime.now(tz=UTC).isoformat(),
-                'last4': 4242,
+                'last4': '4242',
                 'quantity': 35,
                 'unit_amount_decimal': 396.00,
                 'customer_phone': '+15551234567',
@@ -695,7 +697,7 @@ class CheckoutBFFSuccessViewSetTests(APITest):
         self.assertEqual(response_data['state'], mock_checkout_intent.state)
 
         invoice = response_data['first_billable_invoice']
-        self.assertEqual(invoice['last4'], 4242)
+        self.assertEqual(invoice['last4'], '4242')
         self.assertEqual(invoice['quantity'], 35)
         self.assertEqual(Decimal(invoice['unit_amount_decimal']), 396.00)
         self.assertEqual(invoice['customer_name'], 'Test Customer')
