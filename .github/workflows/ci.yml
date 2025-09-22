@@ -30,5 +30,9 @@ jobs:
         fi
     - name: Validate translations
       run: make validate_translations
-    - name: Run tests and style checks
-      run: make validate
+    - name: Run tests
+      run: make test
+    - name: Run lint
+      run: make lint
+    - name: Run style
+      run: make style isort_check pii_check check_keywords

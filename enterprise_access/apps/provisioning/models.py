@@ -9,6 +9,8 @@ from attrs import define, field, validators
 from django.conf import settings
 from django_countries import countries
 
+from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
+from enterprise_access.apps.customer_billing.models import CheckoutIntent
 from enterprise_access.apps.workflow.exceptions import UnitOfWorkException
 from enterprise_access.apps.workflow.models import AbstractWorkflow, AbstractWorkflowStep
 from enterprise_access.apps.workflow.serialization import BaseInputOutput
@@ -416,18 +418,52 @@ class GetCreateSubscriptionPlanStep(AbstractWorkflowStep):
         else:
             catalog_uuid = str(accumulated_output.create_catalog_output.uuid)
 
-        result_dict = get_or_create_subscription_plan(
-            customer_agreement_uuid=str(accumulated_output.create_customer_agreement_output.uuid),
-            existing_subscription_list=accumulated_output.create_customer_agreement_output.subscriptions,
-            plan_title=self.input_object.title,
-            catalog_uuid=catalog_uuid,
-            opp_line_item=self.input_object.salesforce_opportunity_line_item,
-            start_date=self.input_object.start_date.isoformat(),
-            expiration_date=self.input_object.expiration_date.isoformat(),
-            desired_num_licenses=self.input_object.desired_num_licenses,
-            product_id=self.input_object.product_id,
-        )
-        return self.output_class.from_dict(result_dict)
+        customer_agreement_uuid = str(accumulated_output.create_customer_agreement_output.uuid)
+
+        try:
+            result_dict = get_or_create_subscription_plan(
+                customer_agreement_uuid=customer_agreement_uuid,
+                existing_subscription_list=accumulated_output.create_customer_agreement_output.subscriptions,
+                plan_title=self.input_object.title,
+                catalog_uuid=catalog_uuid,
+                opp_line_item=self.input_object.salesforce_opportunity_line_item,
+                start_date=self.input_object.start_date.isoformat(),
+                expiration_date=self.input_object.expiration_date.isoformat(),
+                desired_num_licenses=self.input_object.desired_num_licenses,
+                product_id=self.input_object.product_id,
+            )
+            self.synchronize_checkout_intent()
+            return self.output_class.from_dict(result_dict)
+        except Exception as exc:
+            self.synchronize_checkout_intent(exc)
+            raise GetCreateSubscriptionPlanException(
+                f'Failed to get/create subscription plan for customer agreement uuid {customer_agreement_uuid}'
+            ) from exc
+
+    def synchronize_checkout_intent(self, exc=None):
+        """
+        Links this step's workflow to the related CheckoutIntent, if any.
+        If found, also updates the CheckoutIntent's state.
+        """
+        workflow = self.get_workflow_record()
+        enterprise_slug = workflow.input_object.create_customer_input.slug
+        checkout_intent = CheckoutIntent.filter_by_name_and_slug(
+            slug=enterprise_slug,
+        ).filter(
+            state=CheckoutIntentState.PAID,
+        ).first()
+        if not checkout_intent:
+            return
+
+        checkout_intent.workflow = workflow
+
+        if exc:
+            checkout_intent.last_provisioning_error = str(exc)
+            checkout_intent.state = CheckoutIntentState.ERRORED_PROVISIONING
+        else:
+            checkout_intent.state = CheckoutIntentState.FULFILLED
+
+        checkout_intent.save()
 
     def get_workflow_record(self):
         return ProvisionNewCustomerWorkflow.objects.filter(
