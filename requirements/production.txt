@@ -31,7 +31,7 @@ backoff==1.10.0
     # via
     #   -r requirements/base.txt
     #   analytics-python
-billiard==4.2.1
+billiard==4.2.2
     # via
     #   -r requirements/base.txt
     #   celery
@@ -55,7 +55,7 @@ charset-normalizer==3.4.3
     # via
     #   -r requirements/base.txt
     #   requests
-click==8.2.1
+click==8.3.0
     # via
     #   -r requirements/base.txt
     #   celery
@@ -93,7 +93,7 @@ coreschema==0.0.4
     #   coreapi
 crispy-bootstrap5==2025.6
     # via -r requirements/base.txt
-cryptography==45.0.7
+cryptography==46.0.1
     # via
     #   -r requirements/base.txt
     #   pyjwt
@@ -136,7 +136,7 @@ django==4.2.24
     #   social-auth-app-django
 django-celery-results==2.6.0
     # via -r requirements/base.txt
-django-cors-headers==4.8.0
+django-cors-headers==4.9.0
     # via -r requirements/base.txt
 django-countries==7.6.1
     # via -r requirements/base.txt
@@ -228,7 +228,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.15
+edx-enterprise-subsidy-client==2.0.16
     # via -r requirements/base.txt
 edx-event-bus-kafka==6.1.0
     # via -r requirements/base.txt
@@ -254,7 +254,7 @@ fastavro==1.12.0
     #   -r requirements/base.txt
     #   confluent-kafka
     #   openedx-events
-gevent==25.8.2
+gevent==25.9.1
     # via -r requirements/production.in
 greenlet==3.2.4
     # via gevent
@@ -335,7 +335,7 @@ prompt-toolkit==3.0.52
     # via
     #   -r requirements/base.txt
     #   click-repl
-psutil==7.0.0
+psutil==7.1.0
     # via
     #   -r requirements/base.txt
     #   edx-django-utils
@@ -355,7 +355,7 @@ pyjwt[crypto]==2.10.1
     #   social-auth-core
 pymemcache==4.0.0
     # via -r requirements/base.txt
-pymongo==4.15.0
+pymongo==4.15.1
     # via
     #   -r requirements/base.txt
     #   edx-opaque-keys

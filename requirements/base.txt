@@ -23,7 +23,7 @@ avro==1.12.0
     # via confluent-kafka
 backoff==1.10.0
     # via analytics-python
-billiard==4.2.1
+billiard==4.2.2
     # via celery
 cattrs==25.2.0
     # via -r requirements/base.in
@@ -40,7 +40,7 @@ cffi==2.0.0
     #   pynacl
 charset-normalizer==3.4.3
     # via requests
-click==8.2.1
+click==8.3.0
     # via
     #   celery
     #   click-didyoumean
@@ -68,7 +68,7 @@ coreschema==0.0.4
     # via coreapi
 crispy-bootstrap5==2025.6
     # via -r requirements/base.in
-cryptography==45.0.7
+cryptography==46.0.1
     # via
     #   pyjwt
     #   social-auth-core
@@ -110,7 +110,7 @@ django==4.2.24
     #   social-auth-app-django
 django-celery-results==2.6.0
     # via -r requirements/base.in
-django-cors-headers==4.8.0
+django-cors-headers==4.9.0
     # via -r requirements/base.in
 django-countries==7.6.1
     # via -r requirements/base.in
@@ -195,7 +195,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/base.in
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.15
+edx-enterprise-subsidy-client==2.0.16
     # via -r requirements/base.in
 edx-event-bus-kafka==6.1.0
     # via -r requirements/base.in
@@ -265,7 +265,7 @@ ply==3.11
     # via djangoql
 prompt-toolkit==3.0.52
     # via click-repl
-psutil==7.0.0
+psutil==7.1.0
     # via edx-django-utils
 pycparser==2.23
     # via cffi
@@ -280,7 +280,7 @@ pyjwt[crypto]==2.10.1
     #   social-auth-core
 pymemcache==4.0.0
     # via -r requirements/base.in
-pymongo==4.15.0
+pymongo==4.15.1
     # via edx-opaque-keys
 pynacl==1.6.0
     # via edx-django-utils
