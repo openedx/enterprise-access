@@ -21,7 +21,11 @@ We will define Stripe products and prices via Terraform.  These prices will be m
 available via a central python API method within enterprise-access which
 dynamically fetches the prices from Stripe, possibly internationalizes it, then
 serializes it in a way that is consumable by frontends.  This python API in
-turn will drive the inclusion of price data within various REST APIs:
+turn will drive the inclusion of price data within various APIs:
+
+* enterprise_access.apps.customer_billing.get_price()
+
+  * Python API which powers all the following endpoints.
 
 * GET https://enterprise-access.edx.org/api/v1/billing/prices
 
