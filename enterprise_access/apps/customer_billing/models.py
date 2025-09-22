@@ -18,7 +18,6 @@ from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_update_with_history
 
 from enterprise_access.apps.customer_billing.constants import ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS
-from enterprise_access.apps.provisioning.models import ProvisionNewCustomerWorkflow
 
 from .constants import INTENT_RESERVATION_DURATION_MINUTES, CheckoutIntentState
 
@@ -87,6 +86,10 @@ class CheckoutIntent(TimeStampedModel):
         CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
         CheckoutIntentState.ERRORED_PROVISIONING,
     }
+    FULFILLABLE_STATES = {
+        CheckoutIntentState.PAID,
+        CheckoutIntentState.ERRORED_PROVISIONING,
+    }
 
     user = models.OneToOneField(
         User,
@@ -128,7 +131,7 @@ class CheckoutIntent(TimeStampedModel):
     last_checkout_error = models.TextField(blank=True, null=True)
     last_provisioning_error = models.TextField(blank=True, null=True)
     workflow = models.OneToOneField(
-        ProvisionNewCustomerWorkflow,
+        'provisioning.ProvisionNewCustomerWorkflow',
         on_delete=models.CASCADE,
         null=True,
         blank=True,
