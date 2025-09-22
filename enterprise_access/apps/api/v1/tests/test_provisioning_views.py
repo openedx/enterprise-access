@@ -1,10 +1,14 @@
 """
 Tests for the provisioning views.
 """
+import random
 import uuid
+from datetime import timedelta
 from unittest import mock
 
 import ddt
+from django.contrib.auth import get_user_model
+from django.utils import timezone
 from edx_rbac.constants import ALL_ACCESS_CONTEXT
 from rest_framework import status
 from rest_framework.reverse import reverse
@@ -15,12 +19,18 @@ from enterprise_access.apps.core.constants import (
     SYSTEM_ENTERPRISE_OPERATOR_ROLE,
     SYSTEM_ENTERPRISE_PROVISIONING_ADMIN_ROLE
 )
+from enterprise_access.apps.core.tests.factories import UserFactory
+from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
+from enterprise_access.apps.customer_billing.models import CheckoutIntent
 from enterprise_access.apps.provisioning.models import (
     GetCreateCustomerStep,
     GetCreateEnterpriseAdminUsersStep,
+    GetCreateSubscriptionPlanStep,
     ProvisionNewCustomerWorkflow
 )
 from test_utils import APITest
+
+User = get_user_model()
 
 PROVISIONING_CREATE_ENDPOINT = reverse('api:v1:provisioning-create')
 
@@ -68,7 +78,7 @@ DEFAULT_AGREEMENT_RECORD = {
 
 DEFAULT_REQUEST_PAYLOAD = {
     'enterprise_customer': {
-        'name': 'Test Customer',
+        'name': 'Test customer',
         'slug': 'test-customer',
         'country': 'US',
     },
@@ -223,9 +233,9 @@ class TestProvisioningEndToEnd(APITest):
             },
             'create_customer_called': True,
             'expected_create_customer_kwargs': {
-                'name': 'Test Customer',
-                'slug': 'test-customer',
-                'country': 'US',
+                'name': DEFAULT_CUSTOMER_RECORD['name'],
+                'slug': DEFAULT_CUSTOMER_RECORD['slug'],
+                'country': DEFAULT_CUSTOMER_RECORD['country'],
             },
         },
         # Data representing the state where a customer with the given slug exists.
@@ -695,3 +705,224 @@ class TestProvisioningEndToEnd(APITest):
             enterprise_catalog_uuid=str(TEST_CATALOG_UUID),
             product_id=1,
         )
+
+
+@ddt.ddt
+class TestCheckoutIntentSynchronization(APITest):
+    """
+    Tests for checkout intent synchronization during provisioning workflow.
+    """
+    def setUp(self):
+        super().setUp()
+        self.user = UserFactory()
+        self.enterprise_slug = f'test-checkout-enterprise-{random.randint(1, 10000)}'
+        self.set_jwt_cookie([
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_PROVISIONING_ADMIN_ROLE,
+                'context': ALL_ACCESS_CONTEXT,
+            },
+        ])
+
+    def tearDown(self):
+        super().tearDown()
+
+        CheckoutIntent.objects.all().delete()
+        GetCreateCustomerStep.objects.all().delete()
+        GetCreateEnterpriseAdminUsersStep.objects.all().delete()
+        GetCreateSubscriptionPlanStep.objects.all().delete()
+        ProvisionNewCustomerWorkflow.objects.all().delete()
+        User.objects.filter(email__endswith='@test-factory.com').delete()
+
+    def _create_checkout_intent(self, state=CheckoutIntentState.PAID, enterprise_slug=None):
+        """Helper to create a checkout intent for testing."""
+        return CheckoutIntent.objects.create(
+            user=self.user,
+            enterprise_slug=enterprise_slug or self.enterprise_slug,
+            enterprise_name='Test Enterprise',
+            quantity=10,
+            state=state,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+    def _get_base_request_payload(self):
+        """Helper to get base request payload with test enterprise slug."""
+        payload = {**DEFAULT_REQUEST_PAYLOAD}
+        payload['enterprise_customer']['slug'] = self.enterprise_slug
+        return payload
+
+    @ddt.data(*CheckoutIntent.FULFILLABLE_STATES)
+    @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
+    @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
+    def test_checkout_intent_synchronized_on_success(
+        self, intent_state, mock_lms_api_client, mock_license_manager_client,
+    ):
+        """
+        Test that a fulfillable checkout intent is linked to workflow and marked as FULFILLED on success.
+        """
+        checkout_intent = self._create_checkout_intent(state=intent_state)
+        self.assertEqual(checkout_intent.state, intent_state)
+        self.assertIsNone(checkout_intent.workflow)
+
+        # Setup mocks for successful provisioning
+        mock_lms_client = mock_lms_api_client.return_value
+        mock_lms_client.get_enterprise_customer_data.return_value = {
+            **DEFAULT_CUSTOMER_RECORD,
+            'slug': self.enterprise_slug,
+        }
+        mock_lms_client.get_enterprise_admin_users.return_value = []
+        mock_lms_client.get_enterprise_pending_admin_users.return_value = []
+        mock_lms_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
+
+        mock_license_client = mock_license_manager_client.return_value
+        mock_license_client.get_customer_agreement.return_value = None
+        mock_license_client.create_customer_agreement.return_value = {
+            **DEFAULT_AGREEMENT_RECORD, "subscriptions": []
+        }
+        mock_license_client.create_subscription_plan.return_value = DEFAULT_SUBSCRIPTION_PLAN_RECORD
+
+        # Make provisioning request
+        response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=self._get_base_request_payload())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Refresh checkout intent and verify it was synchronized
+        checkout_intent.refresh_from_db()
+        self.assertEqual(checkout_intent.state, CheckoutIntentState.FULFILLED)
+        self.assertIsNotNone(checkout_intent.workflow)
+        self.assertIsNone(checkout_intent.last_provisioning_error)
+
+        # Verify workflow was created and linked
+        workflow = ProvisionNewCustomerWorkflow.objects.first()
+        self.assertIsNotNone(workflow)
+        self.assertEqual(checkout_intent.workflow, workflow)
+
+    @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
+    @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
+    def test_checkout_intent_synchronized_on_error(self, mock_lms_api_client, mock_license_manager_client):
+        """
+        Test that a PAID checkout intent is marked as ERRORED_PROVISIONING with error message on failure.
+        """
+        # Create a checkout intent in PAID state
+        checkout_intent = self._create_checkout_intent(state=CheckoutIntentState.PAID)
+
+        # Setup mocks for provisioning up until subscription plan creation
+        mock_lms_client = mock_lms_api_client.return_value
+        mock_lms_client.get_enterprise_customer_data.return_value = {
+            **DEFAULT_CUSTOMER_RECORD,
+            'slug': self.enterprise_slug,
+        }
+        mock_lms_client.get_enterprise_admin_users.return_value = []
+        mock_lms_client.get_enterprise_pending_admin_users.return_value = []
+        mock_lms_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
+
+        mock_license_client = mock_license_manager_client.return_value
+        mock_license_client.get_customer_agreement.return_value = None
+        mock_license_client.create_customer_agreement.return_value = {
+            **DEFAULT_AGREEMENT_RECORD, "subscriptions": []
+        }
+        # Make subscription plan creation fail
+        error_message = "License Manager API error"
+        mock_license_client.create_subscription_plan.side_effect = Exception(error_message)
+
+        # Make provisioning request (should fail at subscription plan step)
+        response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=self._get_base_request_payload())
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        # Refresh checkout intent and verify it was synchronized with error
+        checkout_intent.refresh_from_db()
+        self.assertEqual(checkout_intent.state, CheckoutIntentState.ERRORED_PROVISIONING)
+        self.assertIsNotNone(checkout_intent.workflow)
+        self.assertEqual(checkout_intent.last_provisioning_error, error_message)
+
+    @ddt.data(
+        CheckoutIntentState.CREATED,
+        CheckoutIntentState.FULFILLED,
+        CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
+        CheckoutIntentState.EXPIRED,
+    )
+    @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
+    @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
+    def test_checkout_intent_wrong_state_ignored(
+        self, intent_state, mock_lms_api_client, mock_license_manager_client
+    ):
+        """
+        Test that non-fulfillable checkout intents are ignored during synchronization.
+        """
+        # Create a checkout intent in various non-PAID states
+        checkout_intent = self._create_checkout_intent(state=intent_state)
+        original_state = checkout_intent.state
+        original_workflow = checkout_intent.workflow
+
+        # Setup mocks for successful provisioning
+        mock_lms_client = mock_lms_api_client.return_value
+        mock_lms_client.get_enterprise_customer_data.return_value = {
+            **DEFAULT_CUSTOMER_RECORD,
+            'slug': self.enterprise_slug,
+        }
+        mock_lms_client.get_enterprise_admin_users.return_value = []
+        mock_lms_client.get_enterprise_pending_admin_users.return_value = []
+        mock_lms_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
+
+        mock_license_client = mock_license_manager_client.return_value
+        mock_license_client.get_customer_agreement.return_value = None
+        mock_license_client.create_customer_agreement.return_value = {
+            **DEFAULT_AGREEMENT_RECORD, "subscriptions": []
+        }
+        mock_license_client.create_subscription_plan.return_value = DEFAULT_SUBSCRIPTION_PLAN_RECORD
+
+        # Make provisioning request
+        response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=self._get_base_request_payload())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify checkout intent was not modified (stayed in original state)
+        checkout_intent.refresh_from_db()
+        self.assertEqual(checkout_intent.state, original_state)
+        self.assertEqual(checkout_intent.workflow, original_workflow)
+        self.assertIsNone(checkout_intent.last_provisioning_error)
+
+        # Verify workflow was still created successfully
+        workflow = ProvisionNewCustomerWorkflow.objects.first()
+        self.assertIsNotNone(workflow)
+
+    @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
+    @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
+    def test_checkout_intent_different_slug_ignored(self, mock_lms_api_client, mock_license_manager_client):
+        """
+        Test that checkout intents with different enterprise slug are ignored.
+        """
+        # Create a checkout intent with different enterprise slug
+        different_slug = 'different-enterprise-slug'
+        checkout_intent = self._create_checkout_intent(
+            state=CheckoutIntentState.PAID,
+            enterprise_slug=different_slug
+        )
+
+        # Setup mocks for successful provisioning
+        mock_lms_client = mock_lms_api_client.return_value
+        mock_lms_client.get_enterprise_customer_data.return_value = {
+            **DEFAULT_CUSTOMER_RECORD,
+            'slug': self.enterprise_slug,  # Different from checkout intent slug
+        }
+        mock_lms_client.get_enterprise_admin_users.return_value = []
+        mock_lms_client.get_enterprise_pending_admin_users.return_value = []
+        mock_lms_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
+
+        mock_license_client = mock_license_manager_client.return_value
+        mock_license_client.get_customer_agreement.return_value = None
+        mock_license_client.create_customer_agreement.return_value = {
+            **DEFAULT_AGREEMENT_RECORD, "subscriptions": []
+        }
+        mock_license_client.create_subscription_plan.return_value = DEFAULT_SUBSCRIPTION_PLAN_RECORD
+
+        # Make provisioning request
+        response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=self._get_base_request_payload())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify checkout intent was not modified (different slug)
+        checkout_intent.refresh_from_db()
+        self.assertEqual(checkout_intent.state, CheckoutIntentState.PAID)
+        self.assertIsNone(checkout_intent.workflow)
+        self.assertIsNone(checkout_intent.last_provisioning_error)
+
+        # Verify workflow was still created successfully
+        workflow = ProvisionNewCustomerWorkflow.objects.first()
+        self.assertIsNotNone(workflow)

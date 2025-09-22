@@ -32,7 +32,7 @@ jobs:
       run: make validate_translations
     - name: Run tests
       run: make test
-    - name: Run lint
-      run: make lint
+    # - name: Run lint  # 2025-09-23 AED: pylint is crashing in github CI
+    #   run: make lint
     - name: Run style
       run: make style isort_check pii_check check_keywords
