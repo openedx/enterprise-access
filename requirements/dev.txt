@@ -36,7 +36,7 @@ backoff==1.10.0
     # via
     #   -r requirements/validation.txt
     #   analytics-python
-billiard==4.2.1
+billiard==4.2.2
     # via
     #   -r requirements/validation.txt
     #   celery
@@ -73,7 +73,7 @@ charset-normalizer==3.4.3
     # via
     #   -r requirements/validation.txt
     #   requests
-click==8.2.1
+click==8.3.0
     # via
     #   -r requirements/pip-tools.txt
     #   -r requirements/validation.txt
@@ -122,13 +122,13 @@ coreschema==0.0.4
     # via
     #   -r requirements/validation.txt
     #   coreapi
-coverage[toml]==7.10.6
+coverage[toml]==7.10.7
     # via
     #   -r requirements/validation.txt
     #   pytest-cov
 crispy-bootstrap5==2025.6
     # via -r requirements/validation.txt
-cryptography==45.0.7
+cryptography==46.0.1
     # via
     #   -r requirements/validation.txt
     #   pyjwt
@@ -190,7 +190,7 @@ django==4.2.24
     #   social-auth-app-django
 django-celery-results==2.6.0
     # via -r requirements/validation.txt
-django-cors-headers==4.8.0
+django-cors-headers==4.9.0
     # via -r requirements/validation.txt
 django-countries==7.6.1
     # via -r requirements/validation.txt
@@ -249,7 +249,7 @@ dnspython==2.8.0
     # via
     #   -r requirements/validation.txt
     #   pymongo
-docutils==0.22
+docutils==0.22.2
     # via
     #   -r requirements/validation.txt
     #   readme-renderer
@@ -290,7 +290,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/validation.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.15
+edx-enterprise-subsidy-client==2.0.16
     # via -r requirements/validation.txt
 edx-event-bus-kafka==6.1.0
     # via -r requirements/validation.txt
@@ -317,7 +317,7 @@ edx-toggles==5.4.1
     #   edx-event-bus-kafka
 factory-boy==3.3.3
     # via -r requirements/validation.txt
-faker==37.6.0
+faker==37.8.0
     # via
     #   -r requirements/validation.txt
     #   factory-boy
@@ -491,7 +491,7 @@ prompt-toolkit==3.0.52
     # via
     #   -r requirements/validation.txt
     #   click-repl
-psutil==7.0.0
+psutil==7.1.0
     # via
     #   -r requirements/validation.txt
     #   edx-django-utils
@@ -540,7 +540,7 @@ pylint-plugin-utils==0.9.0
     #   pylint-django
 pymemcache==4.0.0
     # via -r requirements/validation.txt
-pymongo==4.15.0
+pymongo==4.15.1
     # via
     #   -r requirements/validation.txt
     #   edx-opaque-keys
