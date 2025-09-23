@@ -76,8 +76,6 @@ class CheckoutIntentAdmin(admin.ModelAdmin):
     search_fields = (
         'enterprise_slug',
         'enterprise_name',
-        'user__email',
-        'user__username',
         'stripe_checkout_session_id',
     )
 
