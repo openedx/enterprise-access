@@ -109,6 +109,9 @@ class CheckoutIntentMinimalResponseSerializer(serializers.Serializer):
     enterprise_slug = serializers.CharField(
         help_text='The enterprise slug associated with this record', required=False,
     )
+    quantity = serializers.IntegerField(
+        help_text='The amount of licences created with this checkout intent', required=False,
+    )
     stripe_checkout_session_id = serializers.CharField(
         help_text='The stripe checkout session id for this intent',
         required=False,

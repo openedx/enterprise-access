@@ -8,6 +8,7 @@ from django.test import TestCase
 from edx_django_utils.cache import TieredCache
 
 from enterprise_access.apps.customer_billing.stripe_api import (
+    create_subscription_checkout_session,
     get_stripe_checkout_session,
     get_stripe_invoice,
     get_stripe_payment_intent,
@@ -102,6 +103,56 @@ class TestStripeCheckoutSession(StripeApiFunctionsTests):
         # Call function and verify exception is raised
         with self.assertRaises(stripe.error.StripeError):
             get_stripe_checkout_session(self.session_id)
+
+
+class TestCreateSubscriptionCheckoutSession(StripeApiFunctionsTests):
+    """Tests for create_subscription_checkout_session customer vs customer_email selection."""
+
+    def _base_input(self, admin_email='admin@example.com'):
+        # Minimal inputs used by create_subscription_checkout_session
+        return {
+            'admin_email': admin_email,
+            'company_name': 'Acme Co',
+            'enterprise_slug': 'acme',
+            'stripe_price_id': 'price_123',
+            'quantity': 3,
+        }
+
+    @mock.patch('enterprise_access.apps.customer_billing.stripe_api.stripe.checkout.Session.create')
+    @mock.patch('enterprise_access.apps.customer_billing.stripe_api.stripe.Customer.search')
+    def test_sets_customer_email_when_no_existing_customer(self, mock_customer_search, mock_session_create):
+        """When no Stripe customer exists for admin_email, pass customer_email and not customer."""
+        mock_customer_search.return_value = mock.MagicMock(data=[])
+        mock_session_create.return_value = {'id': 'cs_test_abc'}
+
+        input_data = self._base_input(admin_email='new-admin@example.com')
+        checkout_intent = mock.MagicMock()
+        checkout_intent.id = 'chk_123'
+
+        create_subscription_checkout_session(input_data, lms_user_id=1, checkout_intent=checkout_intent)
+
+        # Inspect kwargs passed to Session.create
+        _, kwargs = mock_session_create.call_args
+        self.assertEqual(kwargs.get('customer_email'), 'new-admin@example.com')
+        self.assertNotIn('customer', kwargs)
+
+    @mock.patch('enterprise_access.apps.customer_billing.stripe_api.stripe.checkout.Session.create')
+    @mock.patch('enterprise_access.apps.customer_billing.stripe_api.stripe.Customer.search')
+    def test_sets_customer_when_existing_customer_found(self, mock_customer_search, mock_session_create):
+        """When a Stripe customer exists for admin_email, pass customer and not customer_email."""
+        mock_customer_search.return_value = mock.MagicMock(data=[{'id': 'cus_12345'}])
+        mock_session_create.return_value = {'id': 'cs_test_def'}
+
+        input_data = self._base_input(admin_email='existing-admin@example.com')
+        checkout_intent = mock.MagicMock()
+        checkout_intent.id = 'chk_456'
+
+        create_subscription_checkout_session(input_data, lms_user_id=2, checkout_intent=checkout_intent)
+
+        # Inspect kwargs passed to Session.create
+        _, kwargs = mock_session_create.call_args
+        self.assertEqual(kwargs.get('customer'), 'cus_12345')
+        self.assertNotIn('customer_email', kwargs)
 
 
 class TestStripePaymentIntent(StripeApiFunctionsTests):

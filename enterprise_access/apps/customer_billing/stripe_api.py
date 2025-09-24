@@ -71,6 +71,8 @@ def create_subscription_checkout_session(input_data, lms_user_id, checkout_inten
     )
     if found_stripe_customer_by_email:
         create_kwargs['customer'] = found_stripe_customer_by_email['id']
+    else:
+        create_kwargs['customer_email'] = input_data['admin_email']
 
     return stripe.checkout.Session.create(**create_kwargs)
 

@@ -43,6 +43,7 @@ class TestCheckoutContextResponseBuilder(APITest):
             'state': 'created',
             'enterprise_name': 'Test Enterprise',
             'enterprise_slug': 'test-enterprise',
+            'quantity': 5,
             'expires_at': timezone.now() + timedelta(hours=24),
             'stripe_checkout_session_id': 'cs_test_123abc',
             'last_checkout_error': '',
@@ -355,6 +356,7 @@ class TestCheckoutContextResponseBuilder(APITest):
         self.assertEqual(intent_data['enterprise_slug'], 'test-enterprise')
         self.assertEqual(intent_data['stripe_checkout_session_id'], 'cs_test_123abc')
         self.assertEqual(intent_data['admin_portal_url'], 'https://portal.edx.org/test-enterprise')
+        self.assertEqual(intent_data['quantity'], 5)
 
     def test_build_context_with_no_checkout_intent(self):
         """
@@ -637,6 +639,7 @@ class TestCheckoutSuccessResponseBuilder(APITest):
             'state': 'created',
             'enterprise_name': 'Test Enterprise',
             'enterprise_slug': 'test-enterprise',
+            'quantity': 5,
             'stripe_checkout_session_id': 'cs_test_123',
             'last_checkout_error': '',
             'last_provisioning_error': '',
