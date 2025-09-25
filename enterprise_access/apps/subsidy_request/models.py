@@ -29,6 +29,7 @@ from enterprise_access.apps.subsidy_request.constants import (
     SubsidyTypeChoices
 )
 from enterprise_access.apps.subsidy_request.tasks import update_course_info_for_subsidy_request_task
+from enterprise_access.apps.subsidy_request.utils import get_action_choice, get_user_message_choice
 from enterprise_access.utils import localized_utcnow
 
 
@@ -434,6 +435,15 @@ class LearnerCreditRequest(SubsidyRequest):
         self.state = SubsidyRequestStates.APPROVED
         self.reviewed_at = localized_utcnow()
         self.save()
+
+    def add_successful_reminded_action(self):
+        """
+        Adds a successful "reminded" LearnerCreditRequestActions for this request.
+        """
+        return self.actions.create(
+            recent_action=get_action_choice(LearnerCreditAdditionalActionStates.REMINDED),
+            status=get_user_message_choice(LearnerCreditAdditionalActionStates.REMINDED),
+        )
 
     @classmethod
     def annotate_dynamic_fields_onto_queryset(cls, queryset):
