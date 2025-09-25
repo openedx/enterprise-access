@@ -61,17 +61,18 @@ class StripeEventHandler:
         """
         Handle invoice.paid events.
         """
-        invoice = event.data.object
+        # Extract relevant metadata for logging
+        invoice_id = event.data.object.id
+        subscription_details = event.data.object.parent.subscription_details
+        subscription_id = subscription_details['subscription']
 
         # Extract the checkout_intent ID from the related subscription.
-        subscription_id = invoice['subscription']
-        subscription = get_stripe_subscription(subscription_id)
-        checkout_intent_id = int(subscription.metadata['checkout_intent_id'])
+        checkout_intent_id = int(subscription_details.metadata['checkout_intent_id'])
 
         logger.info(
             f'Found checkout_intent_id="{checkout_intent_id}" '
             f'stored on the Subscription <subscription_id="{subscription_id}"> '
-            f'related to Invoice <invoice_id="{invoice["id"]}">.'
+            f'related to Invoice <invoice_id="{invoice_id}">.'
         )
 
         checkout_intent = CheckoutIntent.objects.get(id=checkout_intent_id)
