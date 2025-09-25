@@ -2788,6 +2788,139 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         assert self.user_request_1.state == SubsidyRequestStates.REQUESTED
         assert self.user_request_1.assignment is None
 
+    @mock.patch(
+        'enterprise_access.apps.api.v1.views.browse_and_request.subsidy_request_api.remind_learner_credit_requests'
+    )
+    def test_remind_success(self, mock_remind_api):
+        """
+        Test that the remind endpoint returns 200 OK when all requests are remindable.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        remindable_request = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            state=SubsidyRequestStates.APPROVED,
+            assignment=LearnerContentAssignmentFactory(
+                assignment_configuration=self.assignment_config
+            ),
+        )
+        mock_remind_api.return_value = {
+            'remindable_requests': [remindable_request],
+            'non_remindable_requests': []
+        }
+        url = reverse('api:v1:learner-credit-requests-remind')
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'learner_credit_request_uuids': [str(remindable_request.uuid)]
+        }
+        response = self.client.post(url, data)
+        assert response.status_code == status.HTTP_200_OK
+        mock_remind_api.assert_called_once()
+
+    @mock.patch(
+        'enterprise_access.apps.api.v1.views.browse_and_request.subsidy_request_api.remind_learner_credit_requests'
+    )
+    def test_remind_no_remindable_requests(self, mock_remind_api):
+        """
+        Test that the remind endpoint returns 200 OK when all requests are remindable.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        remindable_request = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            state=SubsidyRequestStates.REQUESTED,
+            assignment=LearnerContentAssignmentFactory(
+                assignment_configuration=self.assignment_config
+            ),
+        )
+        mock_remind_api.return_value = {
+            'remindable_requests': [],
+            'non_remindable_requests': [remindable_request]
+        }
+        url = reverse('api:v1:learner-credit-requests-remind')
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'learner_credit_request_uuids': [str(remindable_request.uuid)]
+        }
+        response = self.client.post(url, data)
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        mock_remind_api.assert_called_once()
+
+    @mock.patch(
+        'enterprise_access.apps.api.v1.views.browse_and_request.subsidy_request_api.remind_learner_credit_requests'
+    )
+    def test_remind_all_success(self, mock_remind_api):
+        """
+        Test that the remind-all endpoint returns 202 ACCEPTED when all requests are remindable.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        remindable_request = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            state=SubsidyRequestStates.APPROVED,
+            assignment=LearnerContentAssignmentFactory(
+                assignment_configuration=self.assignment_config
+            ),
+            learner_credit_request_config=self.learner_credit_config,
+        )
+        mock_remind_api.return_value = {
+            'remindable_requests': [remindable_request],
+            'non_remindable_requests': []
+        }
+        url = reverse('api:v1:learner-credit-requests-remind-all')
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'policy_uuid': str(self.policy.uuid)
+        }
+        response = self.client.post(url, data)
+        assert response.status_code == status.HTTP_202_ACCEPTED
+        mock_remind_api.assert_called_once()
+
+    @mock.patch(
+        'enterprise_access.apps.api.v1.views.browse_and_request.subsidy_request_api.remind_learner_credit_requests'
+    )
+    def test_remind_all_non_remindable_requests(self, mock_remind_api):
+        """
+        Test that remind-all returns 422 if there are non-remindable requests.
+        """
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+        remindable_request = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            state=SubsidyRequestStates.APPROVED,
+            assignment=LearnerContentAssignmentFactory(
+                assignment_configuration=self.assignment_config
+            ),
+            learner_credit_request_config=self.learner_credit_config,
+        )
+        non_remindable_request = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            state=SubsidyRequestStates.REQUESTED,
+            assignment=None,
+            learner_credit_request_config=self.learner_credit_config,
+        )
+        mock_remind_api.return_value = {
+            'remindable_requests': [remindable_request],
+            'non_remindable_requests': [non_remindable_request]
+        }
+        url = reverse('api:v1:learner-credit-requests-remind-all')
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'policy_uuid': str(self.policy.uuid)
+        }
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        mock_remind_api.assert_called_once()
+
     def test_cancel_invalid_request_uuid(self):
         """
         Test cancel with invalid UUID format returns 400.

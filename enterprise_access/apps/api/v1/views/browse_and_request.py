@@ -49,6 +49,7 @@ from enterprise_access.apps.core import constants
 from enterprise_access.apps.subsidy_access_policy.api import approve_learner_credit_request_via_policy
 from enterprise_access.apps.subsidy_access_policy.exceptions import SubisidyAccessPolicyRequestApprovalError
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+from enterprise_access.apps.subsidy_request import api as subsidy_request_api
 from enterprise_access.apps.subsidy_request.constants import (
     REUSABLE_REQUEST_STATES,
     LearnerCreditAdditionalActionStates,
@@ -1093,27 +1094,79 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
     @action(detail=False, url_path="remind", methods=["post"])
     def remind(self, request, *args, **kwargs):
         """
-        Remind a Learner that their LearnerCreditRequest is Approved and waiting for their action.
+        Send reminders to a list of learners with associated ``LearnerCreditRequests``
+        record by list of uuids.
+
+        This action is idempotent and will only send reminders for requests
+        that are in a valid, remindable state (e.g., 'APPROVED').
         """
         serializer = serializers.LearnerCreditRequestRemindSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        learner_credit_request = serializer.get_learner_credit_request()
-        assignment = learner_credit_request.assignment
-
-        action_instance = LearnerCreditRequestActions.create_action(
-            learner_credit_request=learner_credit_request,
-            recent_action=get_action_choice(LearnerCreditAdditionalActionStates.REMINDED),
-            status=get_user_message_choice(LearnerCreditAdditionalActionStates.REMINDED),
+        request_uuids = serializer.validated_data['learner_credit_request_uuids']
+        learner_credit_requests = self.get_queryset().select_related('assignment').filter(
+            uuid__in=request_uuids
         )
 
+        if len(learner_credit_requests) != len(set(request_uuids)):
+            return Response(
+                status=status.HTTP_404_NOT_FOUND
+            )
+
         try:
-            send_reminder_email_for_pending_learner_credit_request.delay(assignment.uuid)
+            response = subsidy_request_api.remind_learner_credit_requests(learner_credit_requests)
+            if response.get('non_remindable_requests'):
+                return Response(
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
             return Response(status=status.HTTP_200_OK)
-        except Exception as exc:  # pylint: disable=broad-except
-            # Optionally log an errored action here if the task couldn't be queued
-            action_instance.status = get_user_message_choice(LearnerCreditRequestActionErrorReasons.EMAIL_ERROR)
-            action_instance.error_reason = str(exc)
-            action_instance.save()
+        except Exception:  # pylint: disable=broad-except
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    @action(detail=False, url_path="remind-all", methods=["post"], pagination_class=None)
+    def remind_all(self, request, *args, **kwargs):
+        """
+        Send reminders for all selected learner credit requests that are in a remindable state.
+
+        This endpoint respects the filters applied in the request (e.g., by policy_uuid),
+        allowing admins to send bulk reminders to a specific subset of requests.
+
+        ```
+        Raises:
+            404 if no remindable learner credit requests were found
+            422 if any of the learner credit requests threw an error (not found or not remindable)
+        ```
+        """
+        serializer = serializers.LearnerCreditRequestRemindAllSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        policy_uuid = serializer.validated_data['policy_uuid']
+
+        # A request is only remindable if it is in the 'APPROVED' state.
+        learner_credit_requests = self.get_queryset().filter(
+            state=SubsidyRequestStates.APPROVED,
+            learner_credit_request_config__learner_credit_config__uuid=policy_uuid
+        )
+
+        if not learner_credit_requests.exists():
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            response = subsidy_request_api.remind_learner_credit_requests(learner_credit_requests)
+            if non_remindable_requests := response.get('non_remindable_requests'):
+                # This is very unlikely to occur, because we filter down to only the remindable
+                # requests before calling `remind_learner_credit_requests()`, and that function
+                # only declares requests to be non-remindable if they are not
+                # in the set of remindable states.
+                logger.error(
+                    'There were non-remindable requests in remind-all: %s',
+                    non_remindable_requests,
+                )
+                return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            return Response(status=status.HTTP_202_ACCEPTED)
+        except Exception:  # pylint: disable=broad-except
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     @permission_required(
