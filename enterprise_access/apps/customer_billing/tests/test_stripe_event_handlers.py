@@ -16,6 +16,28 @@ from enterprise_access.apps.customer_billing.models import CheckoutIntent
 from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
 
 
+class AttrDict(dict):
+    """
+    Minimal helper that allows both attribute (obj.foo) and item (obj['foo']) access.
+    Recursively converts nested dicts to AttrDicts, but leaves non-dict values as-is.
+    """
+    def __getattr__(self, name):
+        try:
+            value = self[name]
+        except KeyError as e:
+            raise AttributeError(name) from e
+        return value
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
+    @staticmethod
+    def wrap(value):
+        if isinstance(value, dict) and not isinstance(value, AttrDict):
+            return AttrDict({k: AttrDict.wrap(v) for k, v in value.items()})
+        return value
+
+
 @ddt.ddt
 class TestStripeEventHandler(TestCase):
     """
@@ -45,19 +67,17 @@ class TestStripeEventHandler(TestCase):
         mock_event.type = event_type
         mock_event.id = f'evt_test_{event_type.replace(".", "_")}_123456'
         mock_event.data = mock.Mock()
-        mock_event.data.object = event_data
+        mock_event.data.object = AttrDict.wrap(event_data)
         return mock_event
 
     def _create_mock_stripe_subscription(self, checkout_intent_id):
         """Helper to create a mock Stripe subscription."""
-        mock_subscription = mock.MagicMock()
-        mock_subscription.metadata = {
+        return {
             'checkout_intent_id': str(checkout_intent_id),
             'enterprise_customer_name': 'Test Enterprise',
             'enterprise_customer_slug': 'test-enterprise',
             'lms_user_id': str(self.user.lms_user_id),
         }
-        return mock_subscription
 
     def test_dispatch_unknown_event_type(self):
         """Test that dispatching an unknown event type raises KeyError."""
@@ -89,22 +109,13 @@ class TestStripeEventHandler(TestCase):
             'expected_exception': ValueError,
             'expected_final_state': CheckoutIntentState.CREATED,  # Unchanged.
         },
-        # Sad Test case: Stripe API error
-        {
-            'stripe_subscription_api_throws_error': True,
-            'expected_exception': stripe.error.StripeError,
-            'expected_final_state': CheckoutIntentState.CREATED,  # Unchanged.
-        },
     )
     @ddt.unpack
-    @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.get_stripe_subscription')
     @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.logger')
     def test_invoice_paid_handler(
         self,
         mock_logger,
-        mock_get_subscription,
         checkout_intent_state=CheckoutIntentState.CREATED,
-        stripe_subscription_api_throws_error=False,
         intent_id_override=None,
         expected_exception=None,
         expected_final_state=CheckoutIntentState.PAID,
@@ -115,16 +126,16 @@ class TestStripeEventHandler(TestCase):
             self.checkout_intent.mark_as_paid()
 
         subscription_id = 'sub_test_123456'
+        mock_subscription = self._create_mock_stripe_subscription(intent_id_override or self.checkout_intent.id)
         invoice_data = {
             'id': 'in_test_123456',
-            'subscription': subscription_id
+            'parent': {
+                'subscription_details': {
+                    'metadata': mock_subscription,
+                    'subscription': subscription_id
+                }
+            },
         }
-
-        if stripe_subscription_api_throws_error:
-            mock_get_subscription.side_effect = stripe.error.StripeError('API Error')
-        else:
-            mock_subscription = self._create_mock_stripe_subscription(intent_id_override or self.checkout_intent.id)
-            mock_get_subscription.return_value = mock_subscription
 
         mock_event = self._create_mock_stripe_event('invoice.paid', invoice_data)
 
