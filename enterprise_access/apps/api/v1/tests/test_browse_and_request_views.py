@@ -31,7 +31,10 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_POLICY_SPEND_LIMIT_REACHED,
     REASON_SUBSIDY_EXPIRED
 )
-from enterprise_access.apps.subsidy_access_policy.exceptions import SubsidyAccessPolicyLockAttemptFailed
+from enterprise_access.apps.subsidy_access_policy.exceptions import (
+    SubisidyAccessPolicyRequestApprovalError,
+    SubsidyAccessPolicyLockAttemptFailed
+)
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
@@ -2878,6 +2881,94 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
             traceback=None
         ).first()
         assert success_action is not None
+
+    @mock.patch(
+        "enterprise_access.apps.api.v1.views.browse_and_request.approve_learner_credit_request_via_policy"
+    )
+    def test_bulk_approve_mixed_success(self, mock_approve):
+        """
+        Test bulk approve returns partial success without failing the whole request.
+        """
+        # Set admin context for the correct enterprise
+        self.set_jwt_cookie(
+            [
+                {
+                    "system_wide_role": SYSTEM_ENTERPRISE_ADMIN_ROLE,
+                    "context": str(self.enterprise_customer_uuid_1),
+                }
+            ]
+        )
+
+        # One request will approve, one will fail, one skipped
+        requested_ok = self.user_request_1  # requested, will approve
+        requested_fail = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            user=self.user,
+            learner_credit_request_config=self.learner_credit_config,
+            course_price=1200,
+            state=SubsidyRequestStates.REQUESTED,
+            assignment=None,
+        )
+        skipped_req = LearnerCreditRequestFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid_1,
+            learner_credit_request_config=self.learner_credit_config,
+            state=SubsidyRequestStates.APPROVED,
+        )
+
+        # Configure approve side effects
+        def approve_side_effect(
+            _policy_uuid,
+            content_key,
+            content_price_cents,
+            learner_email,
+            lms_user_id,
+        ):
+            if (str(requested_fail.user.lms_user_id) == str(lms_user_id) and
+                    content_price_cents == requested_fail.course_price):
+                raise SubisidyAccessPolicyRequestApprovalError(
+                    "policy validation failed", 422
+                )
+            # Return a basic assignment via factory
+            return LearnerContentAssignmentFactory(
+                assignment_configuration=self.assignment_config,
+                learner_email=learner_email,
+                lms_user_id=lms_user_id,
+                content_key=content_key,
+                content_quantity=-abs(content_price_cents),
+                state="allocated",
+            )
+
+        mock_approve.side_effect = approve_side_effect
+
+        url = reverse("api:v1:learner-credit-requests-bulk-approve")
+        payload = {
+            "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
+            "policy_uuid": str(self.policy.uuid),
+            "subsidy_request_uuids": [
+                str(requested_ok.uuid),
+                str(requested_fail.uuid),
+                str(skipped_req.uuid),
+                str(uuid4()),  # not found
+            ],
+        }
+        response = self.client.post(url, payload)
+        assert response.status_code == status.HTTP_200_OK
+
+        data = response.json()
+        assert len(data["approved"]) == 1
+        assert len(data["failed"]) == 1
+        assert len(data["skipped"]) == 1
+
+        requested_ok.refresh_from_db()
+        requested_fail.refresh_from_db()
+        skipped_req.refresh_from_db()
+
+        assert requested_ok.state == SubsidyRequestStates.APPROVED
+        assert requested_fail.state in [
+            SubsidyRequestStates.REQUESTED,
+            SubsidyRequestStates.ERROR,
+        ]
+        assert skipped_req.state == SubsidyRequestStates.APPROVED
 
     @mock.patch('enterprise_access.apps.content_assignments.api.cancel_assignments')
     def test_cancel_failed_assignment_cancellation(self, mock_cancel_assignments):
