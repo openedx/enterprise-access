@@ -14,7 +14,7 @@ amqp==5.3.1
     #   kombu
 analytics-python==1.4.post1
     # via -r requirements/test.txt
-asgiref==3.9.1
+asgiref==3.9.2
     # via
     #   -r requirements/test.txt
     #   django
@@ -44,7 +44,7 @@ backoff==1.10.0
     # via
     #   -r requirements/test.txt
     #   analytics-python
-beautifulsoup4==4.13.5
+beautifulsoup4==4.14.0
     # via pydata-sphinx-theme
 billiard==4.2.2
     # via
@@ -263,7 +263,7 @@ drf-jwt==1.19.2
     #   edx-drf-extensions
 drf-spectacular==0.28.0
     # via -r requirements/test.txt
-drf-yasg==1.21.10
+drf-yasg==1.21.11
     # via
     #   -r requirements/test.txt
     #   edx-api-doc-tools
@@ -384,7 +384,7 @@ kombu==5.5.4
     # via
     #   -r requirements/test.txt
     #   celery
-markupsafe==3.0.2
+markupsafe==3.0.3
     # via
     #   -r requirements/test.txt
     #   jinja2
@@ -533,7 +533,7 @@ pytz==2025.2
     # via
     #   -r requirements/test.txt
     #   drf-yasg
-pyyaml==6.0.2
+pyyaml==6.0.3
     # via
     #   -r requirements/test.txt
     #   code-annotations
@@ -580,7 +580,7 @@ semantic-version==2.10.0
     # via
     #   -r requirements/test.txt
     #   edx-drf-extensions
-simplejson==3.20.1
+simplejson==3.20.2
     # via
     #   -r requirements/test.txt
     #   django-rest-swagger
@@ -684,7 +684,7 @@ virtualenv==20.34.0
     # via
     #   -r requirements/test.txt
     #   tox
-wcwidth==0.2.13
+wcwidth==0.2.14
     # via
     #   -r requirements/test.txt
     #   prompt-toolkit

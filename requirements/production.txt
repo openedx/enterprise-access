@@ -10,7 +10,7 @@ amqp==5.3.1
     #   kombu
 analytics-python==1.4.post1
     # via -r requirements/base.txt
-asgiref==3.9.1
+asgiref==3.9.2
     # via
     #   -r requirements/base.txt
     #   django
@@ -197,7 +197,7 @@ drf-jwt==1.19.2
     #   edx-drf-extensions
 drf-spectacular==0.28.0
     # via -r requirements/base.txt
-drf-yasg==1.21.10
+drf-yasg==1.21.11
     # via
     #   -r requirements/base.txt
     #   edx-api-doc-tools
@@ -296,7 +296,7 @@ kombu==5.5.4
     # via
     #   -r requirements/base.txt
     #   celery
-markupsafe==3.0.2
+markupsafe==3.0.3
     # via
     #   -r requirements/base.txt
     #   jinja2
@@ -382,7 +382,7 @@ pytz==2025.2
     # via
     #   -r requirements/base.txt
     #   drf-yasg
-pyyaml==6.0.2
+pyyaml==6.0.3
     # via
     #   -r requirements/base.txt
     #   -r requirements/production.in
@@ -423,7 +423,7 @@ semantic-version==2.10.0
     # via
     #   -r requirements/base.txt
     #   edx-drf-extensions
-simplejson==3.20.1
+simplejson==3.20.2
     # via
     #   -r requirements/base.txt
     #   django-rest-swagger
@@ -489,13 +489,13 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-wcwidth==0.2.13
+wcwidth==0.2.14
     # via
     #   -r requirements/base.txt
     #   prompt-toolkit
 zope-event==6.0
     # via gevent
-zope-interface==8.0
+zope-interface==8.0.1
     # via gevent
 
 # The following packages are considered to be unsafe in a requirements file:

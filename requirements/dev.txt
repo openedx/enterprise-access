@@ -10,7 +10,7 @@ amqp==5.3.1
     #   kombu
 analytics-python==1.4.post1
     # via -r requirements/validation.txt
-asgiref==3.9.1
+asgiref==3.9.2
     # via
     #   -r requirements/validation.txt
     #   django
@@ -145,7 +145,7 @@ dictdiffer==0.9.0
     # via
     #   -r requirements/validation.txt
     #   pytest-dictsdiff
-diff-cover==9.6.0
+diff-cover==9.7.1
     # via -r requirements/dev.in
 dill==0.4.0
     # via
@@ -259,7 +259,7 @@ drf-jwt==1.19.2
     #   edx-drf-extensions
 drf-spectacular==0.28.0
     # via -r requirements/validation.txt
-drf-yasg==1.21.10
+drf-yasg==1.21.11
     # via
     #   -r requirements/validation.txt
     #   edx-api-doc-tools
@@ -403,7 +403,7 @@ kombu==5.5.4
     # via
     #   -r requirements/validation.txt
     #   celery
-lxml[html-clean]==6.0.1
+lxml[html-clean]==6.0.2
     # via
     #   edx-i18n-tools
     #   lxml-html-clean
@@ -413,7 +413,7 @@ markdown-it-py==4.0.0
     # via
     #   -r requirements/validation.txt
     #   rich
-markupsafe==3.0.2
+markupsafe==3.0.3
     # via
     #   -r requirements/validation.txt
     #   jinja2
@@ -586,7 +586,7 @@ pytz==2025.2
     # via
     #   -r requirements/validation.txt
     #   drf-yasg
-pyyaml==6.0.2
+pyyaml==6.0.3
     # via
     #   -r requirements/validation.txt
     #   code-annotations
@@ -650,7 +650,7 @@ semantic-version==2.10.0
     # via
     #   -r requirements/validation.txt
     #   edx-drf-extensions
-simplejson==3.20.1
+simplejson==3.20.2
     # via
     #   -r requirements/validation.txt
     #   django-rest-swagger
@@ -736,7 +736,7 @@ virtualenv==20.34.0
     # via
     #   -r requirements/validation.txt
     #   tox
-wcwidth==0.2.13
+wcwidth==0.2.14
     # via
     #   -r requirements/validation.txt
     #   prompt-toolkit
