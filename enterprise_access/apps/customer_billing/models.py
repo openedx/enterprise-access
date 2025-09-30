@@ -109,6 +109,18 @@ class CheckoutIntent(TimeStampedModel):
         validators=[validate_slug],
         help_text="Checkout intent enterprise customer slug"
     )
+    enterprise_uuid = models.UUIDField(
+        null=True,
+        blank=True,
+        help_text="The uuid of the EnterpriseCustomer, once successfully provisioned",
+    )
+    stripe_customer_id = models.CharField(
+        null=True,
+        blank=True,
+        help_text="The Stripe Customer identifier associated with this record",
+        db_index=True,
+        max_length=255,
+    )
     expires_at = models.DateTimeField(
         db_index=True,
         help_text="Checkout intent expiration timestamp"

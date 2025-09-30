@@ -8,7 +8,6 @@ from functools import wraps
 import stripe
 
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
-from enterprise_access.apps.customer_billing.stripe_api import get_stripe_subscription
 from enterprise_access.apps.customer_billing.stripe_event_types import StripeEventType
 
 logger = logging.getLogger(__name__)
