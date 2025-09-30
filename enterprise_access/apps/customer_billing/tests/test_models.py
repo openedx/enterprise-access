@@ -539,3 +539,89 @@ class TestCheckoutIntentModel(TestCase):
             terms_metadata=complex_metadata
         )
         self.assertEqual(intent3.terms_metadata, complex_metadata)
+
+    def test_mark_as_paid_with_stripe_customer_id(self):
+        """Test mark_as_paid with stripe_customer_id parameter."""
+        intent = CheckoutIntent.create_intent(
+            user=cast(AbstractUser, self.user1),
+            slug=self.basic_data['enterprise_slug'],
+            name=self.basic_data['enterprise_name'],
+            quantity=self.basic_data['quantity']
+        )
+
+        # Test marking as paid with both session_id and customer_id
+        intent.mark_as_paid('cs_test_123', 'cus_test_456')
+        self.assertEqual(intent.state, CheckoutIntentState.PAID)
+        self.assertEqual(intent.stripe_checkout_session_id, 'cs_test_123')
+        self.assertEqual(intent.stripe_customer_id, 'cus_test_456')
+
+    def test_mark_as_paid_with_only_stripe_customer_id(self):
+        """Test mark_as_paid with only stripe_customer_id parameter."""
+        intent = CheckoutIntent.create_intent(
+            user=cast(AbstractUser, self.user2),
+            slug='another-slug',
+            name='Another Enterprise',
+            quantity=7
+        )
+
+        # Test marking as paid with only customer_id
+        intent.mark_as_paid(stripe_customer_id='cus_test_789')
+        self.assertEqual(intent.state, CheckoutIntentState.PAID)
+        self.assertIsNone(intent.stripe_checkout_session_id)
+        self.assertEqual(intent.stripe_customer_id, 'cus_test_789')
+
+    def test_mark_as_paid_idempotent_with_stripe_customer_id(self):
+        """Test that mark_as_paid is idempotent when called with same stripe_customer_id."""
+        intent = CheckoutIntent.create_intent(
+            user=cast(AbstractUser, self.user1),
+            slug=self.basic_data['enterprise_slug'],
+            name=self.basic_data['enterprise_name'],
+            quantity=self.basic_data['quantity']
+        )
+
+        # Mark as paid first time
+        intent.mark_as_paid('cs_test_123', 'cus_test_456')
+        first_modified = intent.modified
+
+        # Mark as paid again with same values - should be idempotent
+        intent.mark_as_paid('cs_test_123', 'cus_test_456')
+        self.assertEqual(intent.state, CheckoutIntentState.PAID)
+        self.assertEqual(intent.stripe_checkout_session_id, 'cs_test_123')
+        self.assertEqual(intent.stripe_customer_id, 'cus_test_456')
+        # Modified time should have changed since we called save()
+        self.assertGreater(intent.modified, first_modified)
+
+    def test_mark_as_paid_different_stripe_customer_id_raises_error(self):
+        """Test that mark_as_paid raises error when called with different stripe_customer_id."""
+        intent = CheckoutIntent.create_intent(
+            user=cast(AbstractUser, self.user1),
+            slug=self.basic_data['enterprise_slug'],
+            name=self.basic_data['enterprise_name'],
+            quantity=self.basic_data['quantity']
+        )
+
+        # Mark as paid first time
+        intent.mark_as_paid(stripe_customer_id='cus_test_456')
+
+        # Try to mark as paid with different customer_id - should raise ValueError
+        with self.assertRaises(ValueError) as context:
+            intent.mark_as_paid(stripe_customer_id='cus_test_different')
+
+        self.assertIn('Cannot transition from PAID to PAID with a different stripe_customer_id', str(context.exception))
+
+    def test_mark_as_paid_update_fields_includes_stripe_customer_id(self):
+        """Test that save() includes stripe_customer_id in update_fields."""
+        intent = CheckoutIntent.create_intent(
+            user=cast(AbstractUser, self.user1),
+            slug=self.basic_data['enterprise_slug'],
+            name=self.basic_data['enterprise_name'],
+            quantity=self.basic_data['quantity']
+        )
+
+        with mock.patch.object(intent, 'save') as mock_save:
+            intent.mark_as_paid(stripe_customer_id='cus_test_456')
+
+            # Verify save was called with correct update_fields
+            mock_save.assert_called_once_with(
+                update_fields=['state', 'stripe_checkout_session_id', 'stripe_customer_id', 'modified']
+            )

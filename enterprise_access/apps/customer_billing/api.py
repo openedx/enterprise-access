@@ -423,7 +423,10 @@ def create_free_trial_checkout_session(
         checkout_intent=intent,
     )
 
-    intent.update_stripe_session_id(checkout_session['id'])
+    intent.update_stripe_identifiers(
+        session_id=checkout_session['id'],
+        customer_id=checkout_session.get('customer'),
+    )
     logger.info(f'Updated checkout intent {intent.id} with Stripe session {checkout_session["id"]}')
 
     return checkout_session

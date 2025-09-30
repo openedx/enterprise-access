@@ -122,18 +122,21 @@ class TestStripeEventHandler(TestCase):
     ):
         """Test various scenarios for the invoice.paid event handler."""
         if checkout_intent_state == CheckoutIntentState.PAID:
-            self.checkout_intent.update_stripe_session_id(self.stripe_checkout_session_id)
-            self.checkout_intent.mark_as_paid()
+            self.checkout_intent.mark_as_paid(
+                stripe_session_id=self.stripe_checkout_session_id,
+                stripe_customer_id='cus_test_789',
+            )
 
         subscription_id = 'sub_test_123456'
         mock_subscription = self._create_mock_stripe_subscription(intent_id_override or self.checkout_intent.id)
         invoice_data = {
             'id': 'in_test_123456',
+            'customer': 'cus_test_789',
             'parent': {
                 'subscription_details': {
                     'metadata': mock_subscription,
                     'subscription': subscription_id
-                }
+                },
             },
         }
 
@@ -159,6 +162,7 @@ class TestStripeEventHandler(TestCase):
             mock_logger.info.assert_any_call(
                 'Found existing CheckoutIntent record with '
                 f'id={self.checkout_intent.id}, '
+                f'stripe_customer_id=cus_test_789, '
                 f'stripe_checkout_session_id={self.checkout_intent.stripe_checkout_session_id}, '
                 f'state={checkout_intent_state}.  '
                 'Marking intent as paid...'
@@ -166,3 +170,77 @@ class TestStripeEventHandler(TestCase):
             mock_logger.info.assert_any_call(
                 f'[StripeEventHandler] handler for <stripe.Event id={mock_event.id} type=invoice.paid> complete.'
             )
+
+    @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.logger')
+    def test_invoice_paid_handler_sets_stripe_customer_id(self, mock_logger):
+        """Test that invoice.paid handler correctly sets stripe_customer_id on CheckoutIntent."""
+        subscription_id = 'sub_test_customer_id_123'
+        stripe_customer_id = 'cus_test_customer_456'
+        mock_subscription = self._create_mock_stripe_subscription(self.checkout_intent.id)
+
+        invoice_data = {
+            'id': 'in_test_customer_123',
+            'customer': stripe_customer_id,
+            'parent': {
+                'subscription_details': {
+                    'metadata': mock_subscription,
+                    'subscription': subscription_id
+                }
+            },
+        }
+
+        mock_event = self._create_mock_stripe_event('invoice.paid', invoice_data)
+
+        # Verify initial state
+        self.assertEqual(self.checkout_intent.state, CheckoutIntentState.CREATED)
+        self.assertIsNone(self.checkout_intent.stripe_customer_id)
+
+        # Handle the event
+        StripeEventHandler.dispatch(mock_event)
+
+        # Verify the checkout intent was updated correctly
+        self.checkout_intent.refresh_from_db()
+        self.assertEqual(self.checkout_intent.state, CheckoutIntentState.PAID)
+        self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)
+
+        # Verify logging includes the customer_id
+        mock_logger.info.assert_any_call(
+            'Found existing CheckoutIntent record with '
+            f'id={self.checkout_intent.id}, '
+            f'stripe_customer_id={stripe_customer_id}, '
+            f'stripe_checkout_session_id={self.checkout_intent.stripe_checkout_session_id}, '
+            f'state={CheckoutIntentState.CREATED}.  '
+            'Marking intent as paid...'
+        )
+
+    def test_invoice_paid_handler_idempotent_with_same_customer_id(self):
+        """Test that invoice.paid handler is idempotent when called with same stripe_customer_id."""
+        subscription_id = 'sub_test_idempotent_123'
+        stripe_customer_id = 'cus_test_idempotent_456'
+        mock_subscription = self._create_mock_stripe_subscription(self.checkout_intent.id)
+
+        # First mark the intent as paid with the customer_id
+        self.checkout_intent.mark_as_paid(stripe_customer_id=stripe_customer_id)
+        self.assertEqual(self.checkout_intent.state, CheckoutIntentState.PAID)
+        self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)
+
+        invoice_data = {
+            'id': 'in_test_idempotent_123',
+            'customer': stripe_customer_id,
+            'parent': {
+                'subscription_details': {
+                    'metadata': mock_subscription,
+                    'subscription': subscription_id
+                }
+            },
+        }
+
+        mock_event = self._create_mock_stripe_event('invoice.paid', invoice_data)
+
+        # Handle the event - should be idempotent
+        StripeEventHandler.dispatch(mock_event)
+
+        # Verify the checkout intent state remains unchanged
+        self.checkout_intent.refresh_from_db()
+        self.assertEqual(self.checkout_intent.state, CheckoutIntentState.PAID)
+        self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)

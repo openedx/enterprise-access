@@ -188,7 +188,7 @@ class CheckoutIntent(TimeStampedModel):
         allowed_transitions = ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS.get(current_state, [])
         return new_state in allowed_transitions
 
-    def mark_as_paid(self, stripe_session_id=None):
+    def mark_as_paid(self, stripe_session_id=None, stripe_customer_id=None, **kwargs):
         """Mark the intent as paid after successful Stripe checkout."""
         if not self.is_valid_state_transition(CheckoutIntentState(self.state), CheckoutIntentState.PAID):
             raise ValueError(f"Cannot transition from {self.state} to {CheckoutIntentState.PAID}.")
@@ -197,10 +197,17 @@ class CheckoutIntent(TimeStampedModel):
             if self.state == CheckoutIntentState.PAID and stripe_session_id != self.stripe_checkout_session_id:
                 raise ValueError("Cannot transition from PAID to PAID with a different stripe_checkout_session_id")
 
+        if stripe_customer_id:
+            if self.state == CheckoutIntentState.PAID and stripe_customer_id != self.stripe_customer_id:
+                raise ValueError("Cannot transition from PAID to PAID with a different stripe_customer_id")
+
         self.state = CheckoutIntentState.PAID
         if stripe_session_id:
             self.stripe_checkout_session_id = stripe_session_id
-        self.save(update_fields=['state', 'stripe_checkout_session_id', 'modified'])
+        if stripe_customer_id:
+            self.stripe_customer_id = stripe_customer_id
+
+        self.save(update_fields=['state', 'stripe_checkout_session_id', 'stripe_customer_id', 'modified'])
         logger.info(f'CheckoutIntent {self} marked as {CheckoutIntentState.PAID}.')
         return self
 
@@ -467,6 +474,19 @@ class CheckoutIntent(TimeStampedModel):
         return cls.objects.filter(user=user).first()
 
     def update_stripe_session_id(self, session_id):
-        """Update the associated Stripe checkout session ID."""
+        """
+        Deprecated in favor of update_stripe_identifiers below.
+        Update the associated Stripe checkout session ID.
+        """
         self.stripe_checkout_session_id = session_id
         self.save(update_fields=['stripe_checkout_session_id', 'modified'])
+
+    def update_stripe_identifiers(self, session_id=None, customer_id=None):
+        """
+        Updates stripe identifiers related to this checkout intent record.
+        """
+        if session_id:
+            self.stripe_checkout_session_id = session_id
+        if customer_id:
+            self.stripe_customer_id = customer_id
+        self.save(update_fields=['stripe_checkout_session_id', 'stripe_customer_id', 'modified'])

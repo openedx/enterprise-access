@@ -61,8 +61,10 @@ class StripeEventHandler:
         Handle invoice.paid events.
         """
         # Extract relevant metadata for logging
-        invoice_id = event.data.object.id
-        subscription_details = event.data.object.parent.subscription_details
+        invoice = event.data.object
+        invoice_id = invoice.id
+        stripe_customer_id = invoice['customer']
+        subscription_details = invoice.parent.subscription_details
         subscription_id = subscription_details['subscription']
 
         # Extract the checkout_intent ID from the related subscription.
@@ -78,11 +80,12 @@ class StripeEventHandler:
         logger.info(
             'Found existing CheckoutIntent record with '
             f'id={checkout_intent_id}, '
+            f'stripe_customer_id={stripe_customer_id}, '
             f'stripe_checkout_session_id={checkout_intent.stripe_checkout_session_id}, '
             f'state={checkout_intent.state}.  '
             'Marking intent as paid...'
         )
-        checkout_intent.mark_as_paid()
+        checkout_intent.mark_as_paid(stripe_customer_id=stripe_customer_id)
 
     @on_stripe_event('customer.subscription.trial_will_end')
     @staticmethod
