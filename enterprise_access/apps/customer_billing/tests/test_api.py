@@ -96,7 +96,10 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         mock_lms_client = mock_lms_client_class.return_value
         mock_lms_client.get_lms_user_account.return_value = [{'id': self.user.lms_user_id}]
         mock_lms_client.get_enterprise_customer_data.side_effect = raise_404_error
-        mock_stripe.checkout.Session.create.return_value = {'id': 'test-stripe-checkout-session'}
+        mock_stripe.checkout.Session.create.return_value = {
+            'id': 'test-stripe-checkout-session',
+            'customer': 'cust-123',
+        }
         mock_stripe.Customer.search.return_value.data = []
 
         # Actually call the API under test.
@@ -112,7 +115,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         # Assert API response.
         self.assertEqual(
             result,
-            {'id': 'test-stripe-checkout-session'},
+            {'id': 'test-stripe-checkout-session', 'customer': 'cust-123'},
         )
 
         # Assert that a CheckoutIntent was created
@@ -121,6 +124,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         self.assertEqual(intent.enterprise_slug, 'my-sluggy')
         self.assertEqual(intent.enterprise_name, 'My Cool Company')
         self.assertEqual(intent.stripe_checkout_session_id, 'test-stripe-checkout-session')
+        self.assertEqual(intent.stripe_customer_id, 'cust-123')
         self.assertFalse(intent.is_expired())
 
         # Assert library methods were called correctly.
