@@ -43,12 +43,13 @@ class CheckoutBFFViewSetTests(APITest):
             'state': 'created',
             'enterprise_name': 'Test Enterprise',
             'enterprise_slug': 'test-enterprise',
+            'enterprise_uuid': None,
             'stripe_checkout_session_id': 'cs_test_123abc',
+            'stripe_customer_id': None,
             'last_checkout_error': '',
             'last_provisioning_error': '',
             'workflow_id': None,
             'expires_at': '2025-08-02T13:52:11Z',
-            'admin_portal_url': 'https://portal.edx.org/test-enterprise',
             'country': 'US',
             'terms_metadata': {},
         }
@@ -76,9 +77,7 @@ class CheckoutBFFViewSetTests(APITest):
         Test that authenticated users can access the context endpoint.
         """
         # Set up a mock checkout intent for the authenticated user
-        mock_intent = mock.MagicMock()
-        for key, value in self.mock_checkout_intent_data.items():
-            setattr(mock_intent, key, value)
+        mock_intent = CheckoutIntent(**self.mock_checkout_intent_data)
         mock_filter.return_value.first.return_value = mock_intent
 
         self.set_jwt_cookie([{
