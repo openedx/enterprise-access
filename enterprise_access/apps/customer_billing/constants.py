@@ -74,6 +74,13 @@ class CheckoutIntentState(StrEnum):
     EXPIRED = 'expired'
 
 
+class CheckoutIntentSegmentEvents:
+    """
+    Segment events for CheckoutIntent lifecycle tracking.
+    """
+    LIFECYCLE_EVENT = 'edx.server.enterprise-access.checkout-intent.lifecycle.event'
+
+
 ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS = {
     CheckoutIntentState.CREATED: [
         CheckoutIntentState.PAID,

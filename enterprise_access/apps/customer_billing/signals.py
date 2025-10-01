@@ -1,0 +1,47 @@
+"""
+Signal handlers for customer billing models.
+"""
+import logging
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+from enterprise_access.apps.api.serializers import CheckoutIntentReadOnlySerializer
+from enterprise_access.apps.customer_billing.constants import CheckoutIntentSegmentEvents
+from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.track.segment import track_event
+
+logger = logging.getLogger(__name__)
+
+
+@receiver(post_save, sender=CheckoutIntent)
+def track_checkout_intent_changes(instance, created, **kwargs):
+    """Automatically track events after save."""
+    # Get the previous record from the history
+    latest_history = instance.history.latest()
+    prev_record = latest_history.prev_record if latest_history else None
+
+    # Only track if it's a creation or if the state actually changed
+    if created or (prev_record is not None and prev_record.state != instance.state):
+        previous_state = None if created else (prev_record.state if prev_record else None)
+
+        properties = dict(CheckoutIntentReadOnlySerializer(instance).data)
+        properties["previous_state"] = previous_state
+        properties["new_state"] = instance.state
+
+        logger.info(
+            (
+                f"Tracking CheckoutIntent lifecycle event: "
+                f"user={instance.user.id}, "
+                f"intent_id={instance.id}, "
+                f"previous_state={previous_state}, "
+                f"new_state={instance.state}, "
+                f"event={CheckoutIntentSegmentEvents.LIFECYCLE_EVENT}"
+            )
+        )
+
+        track_event(
+            lms_user_id=str(instance.user.id),
+            event_name=CheckoutIntentSegmentEvents.LIFECYCLE_EVENT,
+            properties=properties,
+        )
