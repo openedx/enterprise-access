@@ -243,16 +243,14 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         try:
             customer_portal_session = stripe.billing_portal.Session.create(
                 customer=stripe_customer_id,
-                return_url="https://enterprise-checkout.stage.edx.org/billing-details/success",
+                return_url=f"{origin_url}/billing-details/success",
             )
         except stripe.error.StripeError as e:
-            # Generic catch-all for other Stripe errors
             logger.exception(
                 f"StripeError creating billing portal session for CheckoutIntent {checkout_intent}: {e}",
             )
             return Response(customer_portal_session, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-        except Exception as e:
-            # Any other unexpected error
+        except Exception as e:  # pylint: disable=broad-except
             logger.exception(
                 f"General exception creating billing portal session for CheckoutIntent {checkout_intent}: {e}",
             )
@@ -264,6 +262,7 @@ class CustomerBillingViewSet(viewsets.ViewSet):
             status=status.HTTP_200_OK,
             content_type='application/json',
         )
+
     @extend_schema(
         tags=[CUSTOMER_BILLING_API_TAG],
         summary='Create a new Customer Portal Session from the enterprise checkout MFE.',
@@ -294,29 +293,27 @@ class CustomerBillingViewSet(viewsets.ViewSet):
             return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
 
         if not checkout_intent:
-            logger.error(f"No checkout intent for id {checkout_intent_id}")
+            logger.error(f"No checkout intent for id {pk}")
             return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
 
         stripe_customer_id = checkout_intent.stripe_customer_id
         enterprise_slug = checkout_intent.enterprise_slug
 
         if not (stripe_customer_id or enterprise_slug):
-            logger.error(f"No stripe customer id or enterprise slug associated to checkout_intent_id:{checkout_intent_id}")
+            logger.error(f"No stripe customer id or enterprise slug associated to checkout_intent_id:{pk}")
             return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
 
         try:
             customer_portal_session = stripe.billing_portal.Session.create(
                 customer=stripe_customer_id,
-                return_url="https://enterprise-checkout.stage.edx.org/billing-details/success",
+                return_url=f"{origin_url}/billing-details/success",
             )
         except stripe.error.StripeError as e:
-            # Generic catch-all for other Stripe errors
             logger.exception(
                 f"StripeError creating billing portal session for CheckoutIntent {checkout_intent}: {e}",
             )
             return Response(customer_portal_session, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
-        except Exception as e:
-            # Any other unexpected error
+        except Exception as e:  # pylint: disable=broad-except
             logger.exception(
                 f"General exception creating billing portal session for CheckoutIntent {checkout_intent}: {e}",
             )
