@@ -209,7 +209,8 @@ class CustomerBillingViewSet(viewsets.ViewSet):
     # # UUID in path is used as the "permission object" for role-based auth.
     @permission_required(
         CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,
-        fn=lambda request, **kwargs: kwargs.get('enterprise_customer_uuid')
+        fn=lambda request, **kwargs: request.GET.get('enterprise_customer_uuid') or kwargs.get(
+            'enterprise_customer_uuid')
     )
     def create_enterprise_admin_portal_session(self, request, **kwargs):
         """
@@ -243,7 +244,7 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         try:
             customer_portal_session = stripe.billing_portal.Session.create(
                 customer=stripe_customer_id,
-                return_url=f"{origin_url}/billing-details/success",
+                return_url=f"{origin_url}/{enterprise_slug}",
             )
         except stripe.error.StripeError as e:
             # TODO: Long term we should be explicit to different types of Stripe error exceptions available
