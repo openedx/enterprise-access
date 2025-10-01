@@ -253,10 +253,21 @@ class CustomerBillingViewSet(viewsets.ViewSet):
 
         Response structure defined here: https://docs.stripe.com/api/customer_portal/sessions/create
         """
-
         customer_portal_session = None
-        stripe_customer_id = str(kwargs['pk'])
+        checkout_intent_id = str(kwargs['pk'])
+        checkout_intent = CheckoutIntent.objects.get(id=checkout_intent_id)
         origin_url = request.META.get("HTTP_ORIGIN")
+
+        if not checkout_intent:
+            logger.error(f"No checkout intent for id {checkout_intent_id}")
+            return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
+
+        stripe_customer_id = checkout_intent.stripe_customer_id
+        enterprise_slug = checkout_intent.enterprise_slug
+
+        if not (stripe_customer_id or enterprise_slug):
+            logger.error(f"No stripe customer id or enterprise slug associated to checkout_intent_id:{checkout_intent_id}")
+            return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
 
         try:
             customer_portal_session = stripe.billing_portal.Session.create(
