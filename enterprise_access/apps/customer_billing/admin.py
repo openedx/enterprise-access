@@ -99,6 +99,7 @@ class CheckoutIntentAdmin(admin.ModelAdmin):
             'fields': (
                 'enterprise_name',
                 'enterprise_slug',
+                'enterprise_uuid',
                 'quantity',
                 'admin_portal_url_display',
                 'country',
@@ -122,6 +123,7 @@ class CheckoutIntentAdmin(admin.ModelAdmin):
         }),
         ('Integration Details', {
             'fields': (
+                'stripe_customer_id',
                 'stripe_checkout_session_id',
                 'stripe_session_link',
                 'workflow',

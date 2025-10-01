@@ -32,12 +32,32 @@ logger = logging.getLogger(__name__)
 CUSTOMER_BILLING_API_TAG = 'Customer Billing'
 
 
+class CheckoutIntentPermission(permissions.BasePermission):
+    """
+    Check for existence of a CheckoutIntent related to the requesting user,
+    but only for some views.
+    """
+    def has_permission(self, request, view):
+        if view.action != 'create_checkout_portal_session':
+            return True
+
+        checkout_intent_pk = request.parser_context['kwargs']['pk']
+        intent_record = CheckoutIntent.objects.filter(pk=checkout_intent_pk).first()
+        if not intent_record:
+            return False
+
+        if intent_record.user != request.user:
+            return False
+
+        return True
+
+
 class CustomerBillingViewSet(viewsets.ViewSet):
     """
     Viewset supporting operations pertaining to customer billing.
     """
     authentication_classes = (JwtAuthentication,)
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, CheckoutIntentPermission)
 
     @extend_schema(
         tags=[CUSTOMER_BILLING_API_TAG],
@@ -182,16 +202,16 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         summary='Create a new Customer Portal Session from the Admin portal MFE.',
     )
     @action(
-        detail=True,
+        detail=False,
         methods=['get'],
         url_path='create-enterprise-admin-portal-session',
     )
     # # UUID in path is used as the "permission object" for role-based auth.
     @permission_required(
         CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,
-        fn=lambda request, pk: pk
+        fn=lambda request, **kwargs: kwargs.get('enterprise_customer_uuid')
     )
-    def create_enterprise_admin_portal_session(self, request, pk=None, **kwargs):
+    def create_enterprise_admin_portal_session(self, request, **kwargs):
         """
         Create a new Customer Portal Session for the Admin Portal MFE.  Response dict contains "url" key
         that should be attached to a button that the customer clicks.
@@ -199,8 +219,14 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         Response structure defined here: https://docs.stripe.com/api/customer_portal/sessions/create
         """
         customer_portal_session = None
-        enterprise_uuid = pk
-        checkout_intent = CheckoutIntent.objects.get(enterprise_uuid=enterprise_uuid)
+
+        enterprise_uuid = request.query_params.get('enterprise_customer_uuid')
+        if not enterprise_uuid:
+            msg = "enterprise_customer_uuid parameter is required."
+            logger.error(msg)
+            return Response(msg, status=status.HTTP_400_BAD_REQUEST)
+
+        checkout_intent = CheckoutIntent.objects.filter(enterprise_uuid=enterprise_uuid).first()
         origin_url = request.META.get("HTTP_ORIGIN")
 
         if not checkout_intent:
@@ -217,20 +243,27 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         try:
             customer_portal_session = stripe.billing_portal.Session.create(
                 customer=stripe_customer_id,
-                return_url=f"{origin_url}/{enterprise_slug}",
+                return_url="https://enterprise-checkout.stage.edx.org/billing-details/success",
             )
         except stripe.error.StripeError as e:
             # Generic catch-all for other Stripe errors
-            logger.error(f"StripeError: {e}")
-            Response(customer_portal_session, status=status.HTTP_502_BAD_GATEWAY)
+            logger.exception(
+                f"StripeError creating billing portal session for CheckoutIntent {checkout_intent}: {e}",
+            )
+            return Response(customer_portal_session, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
         except Exception as e:
             # Any other unexpected error
-            logger.error(f"Unexpected error creating billing portal session, Error:{e}")
-            Response(customer_portal_session, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.exception(
+                f"General exception creating billing portal session for CheckoutIntent {checkout_intent}: {e}",
+            )
+            return Response(customer_portal_session, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         # TODO: pull out session fields actually needed, and structure a response.
-        return Response(customer_portal_session, status=status.HTTP_200_OK)
-
+        return Response(
+            customer_portal_session,
+            status=status.HTTP_200_OK,
+            content_type='application/json',
+        )
     @extend_schema(
         tags=[CUSTOMER_BILLING_API_TAG],
         summary='Create a new Customer Portal Session from the enterprise checkout MFE.',
@@ -240,13 +273,7 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         methods=['get'],
         url_path='create-checkout-portal-session',
     )
-    # TODO: determine permission on this API, must be authenticated at the very least
-    # # UUID in path is used as the "permission object" for role-based auth.
-    # @permission_required(
-    #     CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,
-    #     fn=lambda request, pk: pk
-    # )
-    def create_checkout_portal_session(self, request, **kwargs):
+    def create_checkout_portal_session(self, request, pk=None):
         """
         Create a new Customer Portal Session for the enterprise checkout MFE.  Response dict contains "url" key
         that should be attached to a button that the customer clicks.
@@ -254,9 +281,17 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         Response structure defined here: https://docs.stripe.com/api/customer_portal/sessions/create
         """
         customer_portal_session = None
-        checkout_intent_id = str(kwargs['pk'])
-        checkout_intent = CheckoutIntent.objects.get(id=checkout_intent_id)
         origin_url = request.META.get("HTTP_ORIGIN")
+        checkout_intent = CheckoutIntent.objects.filter(pk=int(pk)).first()
+
+        if not checkout_intent:
+            logger.error(f"No checkout intent for id, for requesting user {request.user.id}")
+            return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
+
+        stripe_customer_id = checkout_intent.stripe_customer_id
+        if not stripe_customer_id:
+            logger.error(f"No stripe customer id associated to CheckoutIntent {checkout_intent}")
+            return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
 
         if not checkout_intent:
             logger.error(f"No checkout intent for id {checkout_intent_id}")
@@ -272,19 +307,27 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         try:
             customer_portal_session = stripe.billing_portal.Session.create(
                 customer=stripe_customer_id,
-                return_url=f"{origin_url}/billing-details/success",
+                return_url="https://enterprise-checkout.stage.edx.org/billing-details/success",
             )
         except stripe.error.StripeError as e:
             # Generic catch-all for other Stripe errors
-            logger.error(f"StripeError: {e}")
-            Response(customer_portal_session, status=status.HTTP_502_BAD_GATEWAY)
+            logger.exception(
+                f"StripeError creating billing portal session for CheckoutIntent {checkout_intent}: {e}",
+            )
+            return Response(customer_portal_session, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
         except Exception as e:
             # Any other unexpected error
-            logger.error(f"Unexpected error creating billing portal session, Error:{e}")
-            Response(customer_portal_session, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.exception(
+                f"General exception creating billing portal session for CheckoutIntent {checkout_intent}: {e}",
+            )
+            return Response(customer_portal_session, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         # TODO: pull out session fields actually needed, and structure a response.
-        return Response(customer_portal_session, status=status.HTTP_200_OK)
+        return Response(
+            customer_portal_session,
+            status=status.HTTP_200_OK,
+            content_type='application/json',
+        )
 
 
 @extend_schema_view(
