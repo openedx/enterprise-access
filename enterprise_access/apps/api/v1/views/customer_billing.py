@@ -218,8 +218,6 @@ class CustomerBillingViewSet(viewsets.ViewSet):
 
         Response structure defined here: https://docs.stripe.com/api/customer_portal/sessions/create
         """
-        customer_portal_session = None
-
         enterprise_uuid = request.query_params.get('enterprise_customer_uuid')
         if not enterprise_uuid:
             msg = "enterprise_customer_uuid parameter is required."
@@ -230,15 +228,17 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         origin_url = request.META.get("HTTP_ORIGIN")
 
         if not checkout_intent:
+            msg = f"No checkout intent for id, for enterprise_uuid: {enterprise_uuid}"
             logger.error(f"No checkout intent for id, for enterprise_uuid: {enterprise_uuid}")
-            return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
+            return Response(msg, status=status.HTTP_404_NOT_FOUND)
 
         stripe_customer_id = checkout_intent.stripe_customer_id
         enterprise_slug = checkout_intent.enterprise_slug
 
         if not (stripe_customer_id or enterprise_slug):
-            logger.error(f"No stripe customer id or enterprise slug associated to enterprise_uuid:{enterprise_uuid}")
-            return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
+            msg = f"No stripe customer id or enterprise slug associated to enterprise_uuid:{enterprise_uuid}"
+            logger.error(msg)
+            return Response(msg, status=status.HTTP_404_NOT_FOUND)
 
         try:
             customer_portal_session = stripe.billing_portal.Session.create(
@@ -246,15 +246,15 @@ class CustomerBillingViewSet(viewsets.ViewSet):
                 return_url=f"{origin_url}/billing-details/success",
             )
         except stripe.error.StripeError as e:
-            logger.exception(
-                f"StripeError creating billing portal session for CheckoutIntent {checkout_intent}: {e}",
-            )
-            return Response(customer_portal_session, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            # TODO: Long term we should be explicit to different types of Stripe error exceptions available
+            # https://docs.stripe.com/api/errors/handling, https://docs.stripe.com/error-handling
+            msg = f"StripeError creating billing portal session for CheckoutIntent {checkout_intent}: {e}"
+            logger.exception(msg)
+            return Response(msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
         except Exception as e:  # pylint: disable=broad-except
-            logger.exception(
-                f"General exception creating billing portal session for CheckoutIntent {checkout_intent}: {e}",
-            )
-            return Response(customer_portal_session, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            msg = f"General exception creating billing portal session for CheckoutIntent {checkout_intent}: {e}"
+            logger.exception(msg)
+            return Response(msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         # TODO: pull out session fields actually needed, and structure a response.
         return Response(
@@ -279,29 +279,32 @@ class CustomerBillingViewSet(viewsets.ViewSet):
 
         Response structure defined here: https://docs.stripe.com/api/customer_portal/sessions/create
         """
-        customer_portal_session = None
         origin_url = request.META.get("HTTP_ORIGIN")
         checkout_intent = CheckoutIntent.objects.filter(pk=int(pk)).first()
 
         if not checkout_intent:
-            logger.error(f"No checkout intent for id, for requesting user {request.user.id}")
-            return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
+            msg = f"No checkout intent for id, for requesting user {request.user.id}"
+            logger.error(msg)
+            return Response(msg, status=status.HTTP_404_NOT_FOUND)
 
         stripe_customer_id = checkout_intent.stripe_customer_id
         if not stripe_customer_id:
-            logger.error(f"No stripe customer id associated to CheckoutIntent {checkout_intent}")
-            return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
+            msg = f"No stripe customer id associated to CheckoutIntent {checkout_intent}"
+            logger.error(msg)
+            return Response(msg, status=status.HTTP_404_NOT_FOUND)
 
         if not checkout_intent:
+            msg = f"No checkout intent for id {pk}"
             logger.error(f"No checkout intent for id {pk}")
-            return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
+            return Response(msg, status=status.HTTP_404_NOT_FOUND)
 
         stripe_customer_id = checkout_intent.stripe_customer_id
         enterprise_slug = checkout_intent.enterprise_slug
 
         if not (stripe_customer_id or enterprise_slug):
+            msg = f"No stripe customer id or enterprise slug associated to checkout_intent_id:{pk}"
             logger.error(f"No stripe customer id or enterprise slug associated to checkout_intent_id:{pk}")
-            return Response(customer_portal_session, status=status.HTTP_404_NOT_FOUND)
+            return Response(msg, status=status.HTTP_404_NOT_FOUND)
 
         try:
             customer_portal_session = stripe.billing_portal.Session.create(
@@ -309,15 +312,15 @@ class CustomerBillingViewSet(viewsets.ViewSet):
                 return_url=f"{origin_url}/billing-details/success",
             )
         except stripe.error.StripeError as e:
-            logger.exception(
-                f"StripeError creating billing portal session for CheckoutIntent {checkout_intent}: {e}",
-            )
-            return Response(customer_portal_session, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            # TODO: Long term we should be explicit to different types of Stripe error exceptions available
+            # https://docs.stripe.com/api/errors/handling, https://docs.stripe.com/error-handling
+            msg = f"StripeError creating billing portal session for CheckoutIntent {checkout_intent}: {e}"
+            logger.exception(msg)
+            return Response(msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
         except Exception as e:  # pylint: disable=broad-except
-            logger.exception(
-                f"General exception creating billing portal session for CheckoutIntent {checkout_intent}: {e}",
-            )
-            return Response(customer_portal_session, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+            msg = f"General exception creating billing portal session for CheckoutIntent {checkout_intent}: {e}"
+            logger.exception(msg)
+            return Response(msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         # TODO: pull out session fields actually needed, and structure a response.
         return Response(
