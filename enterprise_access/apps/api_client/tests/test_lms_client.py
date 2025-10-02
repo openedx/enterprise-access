@@ -477,6 +477,7 @@ class TestLmsApiClient(TestCase):
             'name': 'New Customer',
             'slug': 'new-customer',
             'country': 'US',
+            'enable_analytics_screen': False,
             'other_field': True,
         }
 
@@ -484,6 +485,7 @@ class TestLmsApiClient(TestCase):
             'name': 'New Customer',
             'slug': 'new-customer',
             'country': 'US',
+            'enable_analytics_screen': False,
             'other_field': True,
         }
         mock_json.return_value = mock_created_customer_payload
@@ -625,6 +627,7 @@ class TestLmsApiClient(TestCase):
             'name': 'New Customer',
             'slug': 'new-customer',
             'country': 'US',
+            'enable_analytics_screen': False,
             'other_field': True,
         }
 

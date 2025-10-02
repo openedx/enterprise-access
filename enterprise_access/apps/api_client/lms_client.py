@@ -204,6 +204,7 @@ class LmsApiClient(BaseOAuthClient):
             'name': name,
             'slug': slug,
             'country': country,
+            'enable_analytics_screen': False,
             'site': {
                 'domain': settings.PROVISIONING_DEFAULTS['customer']['site_domain'],
             },
