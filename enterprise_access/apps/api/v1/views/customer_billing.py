@@ -4,7 +4,6 @@ REST API views for the billing provider (Stripe) integration.
 import json
 import logging
 
-import requests
 import stripe
 from django.conf import settings
 from django.http import HttpResponseServerError
@@ -17,7 +16,6 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from enterprise_access.apps.api import serializers
-from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.core.constants import CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION
 from enterprise_access.apps.customer_billing.api import (
     CreateCheckoutSessionValidationError,
@@ -34,12 +32,32 @@ logger = logging.getLogger(__name__)
 CUSTOMER_BILLING_API_TAG = 'Customer Billing'
 
 
+class CheckoutIntentPermission(permissions.BasePermission):
+    """
+    Check for existence of a CheckoutIntent related to the requesting user,
+    but only for some views.
+    """
+    def has_permission(self, request, view):
+        if view.action != 'create_checkout_portal_session':
+            return True
+
+        checkout_intent_pk = request.parser_context['kwargs']['pk']
+        intent_record = CheckoutIntent.objects.filter(pk=checkout_intent_pk).first()
+        if not intent_record:
+            return False
+
+        if intent_record.user != request.user:
+            return False
+
+        return True
+
+
 class CustomerBillingViewSet(viewsets.ViewSet):
     """
     Viewset supporting operations pertaining to customer billing.
     """
     authentication_classes = (JwtAuthentication,)
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, CheckoutIntentPermission)
 
     @extend_schema(
         tags=[CUSTOMER_BILLING_API_TAG],
@@ -181,37 +199,136 @@ class CustomerBillingViewSet(viewsets.ViewSet):
 
     @extend_schema(
         tags=[CUSTOMER_BILLING_API_TAG],
-        summary='Create a new Customer Portal Session.',
+        summary='Create a new Customer Portal Session from the Admin portal MFE.',
     )
     @action(
-        detail=True,
+        detail=False,
         methods=['get'],
-        url_path='create-portal-session',
+        url_path='create-enterprise-admin-portal-session',
     )
-    # UUID in path is used as the "permission object" for role-based auth.
-    @permission_required(CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION, fn=lambda request, pk: pk)
-    def create_portal_session(self, request, pk=None, **kwargs):
+    # # UUID in path is used as the "permission object" for role-based auth.
+    @permission_required(
+        CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,
+        fn=lambda request, **kwargs: request.GET.get('enterprise_customer_uuid') or kwargs.get(
+            'enterprise_customer_uuid')
+    )
+    def create_enterprise_admin_portal_session(self, request, **kwargs):
         """
-        Create a new Customer Portal Session.  Response dict contains "url" key
+        Create a new Customer Portal Session for the Admin Portal MFE.  Response dict contains "url" key
         that should be attached to a button that the customer clicks.
 
         Response structure defined here: https://docs.stripe.com/api/customer_portal/sessions/create
         """
-        lms_client = LmsApiClient()
-        # First, fetch the enterprise customer data.
-        try:
-            enterprise_customer_data = lms_client.get_enterprise_customer_data(pk)
-        except requests.exceptions.HTTPError:
-            return Response(None, status=status.HTTP_404_NOT_FOUND)
+        enterprise_uuid = request.query_params.get('enterprise_customer_uuid')
+        if not enterprise_uuid:
+            msg = "enterprise_customer_uuid parameter is required."
+            logger.error(msg)
+            return Response(msg, status=status.HTTP_400_BAD_REQUEST)
 
-        # Next, create a stripe customer portal session.
-        customer_portal_session = stripe.billing_portal.Session.create(
-            customer=enterprise_customer_data['stripe_customer_id'],
-            return_url=f"https://portal.edx.org/{enterprise_customer_data['slug']}",
-        )
+        checkout_intent = CheckoutIntent.objects.filter(enterprise_uuid=enterprise_uuid).first()
+        origin_url = request.META.get("HTTP_ORIGIN")
+
+        if not checkout_intent:
+            msg = f"No checkout intent for id, for enterprise_uuid: {enterprise_uuid}"
+            logger.error(f"No checkout intent for id, for enterprise_uuid: {enterprise_uuid}")
+            return Response(msg, status=status.HTTP_404_NOT_FOUND)
+
+        stripe_customer_id = checkout_intent.stripe_customer_id
+        enterprise_slug = checkout_intent.enterprise_slug
+
+        if not (stripe_customer_id or enterprise_slug):
+            msg = f"No stripe customer id or enterprise slug associated to enterprise_uuid:{enterprise_uuid}"
+            logger.error(msg)
+            return Response(msg, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            customer_portal_session = stripe.billing_portal.Session.create(
+                customer=stripe_customer_id,
+                return_url=f"{origin_url}/{enterprise_slug}",
+            )
+        except stripe.error.StripeError as e:
+            # TODO: Long term we should be explicit to different types of Stripe error exceptions available
+            # https://docs.stripe.com/api/errors/handling, https://docs.stripe.com/error-handling
+            msg = f"StripeError creating billing portal session for CheckoutIntent {checkout_intent}: {e}"
+            logger.exception(msg)
+            return Response(msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        except Exception as e:  # pylint: disable=broad-except
+            msg = f"General exception creating billing portal session for CheckoutIntent {checkout_intent}: {e}"
+            logger.exception(msg)
+            return Response(msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         # TODO: pull out session fields actually needed, and structure a response.
-        return Response(customer_portal_session, status=status.HTTP_200_OK)
+        return Response(
+            customer_portal_session,
+            status=status.HTTP_200_OK,
+            content_type='application/json',
+        )
+
+    @extend_schema(
+        tags=[CUSTOMER_BILLING_API_TAG],
+        summary='Create a new Customer Portal Session from the enterprise checkout MFE.',
+    )
+    @action(
+        detail=True,
+        methods=['get'],
+        url_path='create-checkout-portal-session',
+    )
+    def create_checkout_portal_session(self, request, pk=None):
+        """
+        Create a new Customer Portal Session for the enterprise checkout MFE.  Response dict contains "url" key
+        that should be attached to a button that the customer clicks.
+
+        Response structure defined here: https://docs.stripe.com/api/customer_portal/sessions/create
+        """
+        origin_url = request.META.get("HTTP_ORIGIN")
+        checkout_intent = CheckoutIntent.objects.filter(pk=int(pk)).first()
+
+        if not checkout_intent:
+            msg = f"No checkout intent for id, for requesting user {request.user.id}"
+            logger.error(msg)
+            return Response(msg, status=status.HTTP_404_NOT_FOUND)
+
+        stripe_customer_id = checkout_intent.stripe_customer_id
+        if not stripe_customer_id:
+            msg = f"No stripe customer id associated to CheckoutIntent {checkout_intent}"
+            logger.error(msg)
+            return Response(msg, status=status.HTTP_404_NOT_FOUND)
+
+        if not checkout_intent:
+            msg = f"No checkout intent for id {pk}"
+            logger.error(f"No checkout intent for id {pk}")
+            return Response(msg, status=status.HTTP_404_NOT_FOUND)
+
+        stripe_customer_id = checkout_intent.stripe_customer_id
+        enterprise_slug = checkout_intent.enterprise_slug
+
+        if not (stripe_customer_id or enterprise_slug):
+            msg = f"No stripe customer id or enterprise slug associated to checkout_intent_id:{pk}"
+            logger.error(f"No stripe customer id or enterprise slug associated to checkout_intent_id:{pk}")
+            return Response(msg, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            customer_portal_session = stripe.billing_portal.Session.create(
+                customer=stripe_customer_id,
+                return_url=f"{origin_url}/billing-details/success",
+            )
+        except stripe.error.StripeError as e:
+            # TODO: Long term we should be explicit to different types of Stripe error exceptions available
+            # https://docs.stripe.com/api/errors/handling, https://docs.stripe.com/error-handling
+            msg = f"StripeError creating billing portal session for CheckoutIntent {checkout_intent}: {e}"
+            logger.exception(msg)
+            return Response(msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        except Exception as e:  # pylint: disable=broad-except
+            msg = f"General exception creating billing portal session for CheckoutIntent {checkout_intent}: {e}"
+            logger.exception(msg)
+            return Response(msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        # TODO: pull out session fields actually needed, and structure a response.
+        return Response(
+            customer_portal_session,
+            status=status.HTTP_200_OK,
+            content_type='application/json',
+        )
 
 
 @extend_schema_view(
