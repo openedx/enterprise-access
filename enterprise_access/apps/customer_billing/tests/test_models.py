@@ -356,7 +356,7 @@ class TestCheckoutIntentModel(TestCase):
         self.assertIsNone(intent.admin_portal_url)
 
         # Move to FULFILLED
-        with self.settings(ENTERPRISE_ADMIN_PORTAL_URL='https://admin.example.com/'):
+        with self.settings(ENTERPRISE_ADMIN_PORTAL_URL='https://admin.example.com'):
             intent.mark_as_fulfilled()
             self.assertEqual(
                 intent.admin_portal_url,

@@ -256,7 +256,7 @@ class CheckoutIntent(TimeStampedModel):
     @property
     def admin_portal_url(self):
         if self.state == CheckoutIntentState.FULFILLED:
-            return f"{settings.ENTERPRISE_ADMIN_PORTAL_URL}{self.enterprise_slug}"
+            return f"{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{self.enterprise_slug}"
         return None
 
     @classmethod
