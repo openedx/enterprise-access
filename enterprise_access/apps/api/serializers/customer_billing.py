@@ -3,9 +3,26 @@ customer billing serializers
 """
 from django_countries.serializers import CountryFieldMixin
 from rest_framework import serializers
+from rest_framework.exceptions import APIException
 
 from enterprise_access.apps.customer_billing.constants import ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS
-from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.models import (
+    CheckoutIntent,
+    FailedCheckoutIntentConflict,
+    SlugReservationConflict
+)
+
+
+class RecordConflictError(APIException):
+    """
+    Raise this to trigger HTTP 422, as an alternative to ValidationError (HTTP 400).
+
+    422 more accurately describes a conflicting database record, whereas 400 means there's an issue
+    with the query structure or values.
+    """
+    status_code = 422
+    default_detail = 'Encountered a conflicting record.'
+    default_code = 'record_conflict_error'
 
 
 # pylint: disable=abstract-method
@@ -69,6 +86,20 @@ class FieldValidationSerializer(serializers.Serializer):
     )
 
 
+class UnprocessableEntityErrorSerializer(serializers.Serializer):
+    """
+    Common pattern for serialized field validation errors.
+    """
+    error_code = serializers.CharField(
+        required=True,
+        help_text='Error code for validation failure.',
+    )
+    developer_message = serializers.CharField(
+        required=True,
+        help_text='System message (not intended for user display) for validation failure.',
+    )
+
+
 # pylint: disable=abstract-method
 class CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer(serializers.Serializer):
     """
@@ -91,6 +122,11 @@ class CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer(ser
     stripe_price_id = FieldValidationSerializer(
         required=False,
         help_text='Validation results for stripe_price_id if validation failed. Absent otherwise.',
+    )
+    errors = UnprocessableEntityErrorSerializer(
+        required=False,
+        many=True,
+        help_text='Errors if ChekoutIntent creation failed for non-field-specific reasons. Absent otherwise.',
     )
 
 
@@ -176,15 +212,38 @@ class CheckoutIntentCreateRequestSerializer(CountryFieldMixin, serializers.Model
             )
         return value
 
+    def validate(self, attrs):
+        """
+        Perform any cross-field validation.
+        """
+        if attrs.get('enterprise_slug') and not attrs.get('enterprise_name'):
+            raise serializers.ValidationError(
+                {'enterprise_name': 'enterprise_name is required when enterprise_slug is provided.'}
+            )
+        if attrs.get('enterprise_name') and not attrs.get('enterprise_slug'):
+            raise serializers.ValidationError(
+                {'enterprise_slug': 'enterprise_slug is required when enterprise_name is provided.'}
+            )
+        return attrs
+
     def create(self, validated_data):
         """
         Creates a new CheckoutIntent.
         """
-        return CheckoutIntent.create_intent(
-            user=self.context['request'].user,
-            slug=validated_data['enterprise_slug'],
-            name=validated_data['enterprise_name'],
-            quantity=validated_data['quantity'],
-            country=validated_data.get('country'),
-            terms_metadata=validated_data.get('terms_metadata'),
-        )
+        try:
+            return CheckoutIntent.create_intent(
+                user=self.context['request'].user,
+                slug=validated_data['enterprise_slug'],
+                name=validated_data['enterprise_name'],
+                quantity=validated_data['quantity'],
+                country=validated_data.get('country'),
+                terms_metadata=validated_data.get('terms_metadata'),
+            )
+
+        # Catch exceptions that should return 422:
+        except SlugReservationConflict as exc:
+            raise RecordConflictError('enterprise_slug or enterprise_name has already been reserved.') from exc
+        except FailedCheckoutIntentConflict as exc:
+            raise RecordConflictError('Requesting user already has a failed CheckoutIntent.') from exc
+
+        # All other exceptions should return 5xx.

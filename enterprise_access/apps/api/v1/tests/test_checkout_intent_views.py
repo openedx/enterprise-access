@@ -37,6 +37,11 @@ class CheckoutIntentViewSetTestCase(APITest):
             email='test3@example.com',
             password='testpass123'
         )
+        cls.user_4 = User.objects.create_user(
+            username='testuser4',
+            email='test4@example.com',
+            password='testpass123'
+        )
         cls.checkout_intent_2 = CheckoutIntent.objects.create(
             user=cls.user_2,
             enterprise_name="Active Enterprise 2",
@@ -45,6 +50,17 @@ class CheckoutIntentViewSetTestCase(APITest):
             quantity=25,
             expires_at=timezone.now() + timedelta(minutes=30),
             stripe_checkout_session_id='cs_test_456',
+            country='US',
+            terms_metadata={'version': '1.0', 'accepted_at': '2024-01-15T10:30:00Z'}
+        )
+        cls.checkout_intent_4 = CheckoutIntent.objects.create(
+            user=cls.user_4,
+            enterprise_name="Active Enterprise 4",
+            enterprise_slug="active-enterprise-4",
+            state=CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
+            quantity=25,
+            expires_at=timezone.now() + timedelta(minutes=30),
+            stripe_checkout_session_id='cs_test_987',
             country='US',
             terms_metadata={'version': '1.0', 'accepted_at': '2024-01-15T10:30:00Z'}
         )
@@ -355,21 +371,25 @@ class CheckoutIntentViewSetTestCase(APITest):
         self.assertEqual(response_data['quantity'], 33)
         self.assertEqual(response_data['state'], CheckoutIntentState.CREATED)
         self.assertEqual(response_data['country'], 'IT')
-        self.assertEqual(response_data['terms_metadata'], {'version': '2.0', 'updated': True})
+        self.assertEqual(response_data['terms_metadata'], {'version': '2.0', 'test_mode': True, 'updated': True})
         self.checkout_intent_1.refresh_from_db()
         self.assertEqual(self.checkout_intent_1.quantity, 33)
         self.assertEqual(self.checkout_intent_1.country, 'IT')
-        self.assertEqual(self.checkout_intent_1.terms_metadata, {'version': '2.0', 'updated': True})
+        self.assertEqual(self.checkout_intent_1.terms_metadata, {'version': '2.0', 'test_mode': True, 'updated': True})
 
     @ddt.data(
-        {'quantity': -1},
-        {'quantity': 0},
-        {'quantity': 'invalid'},
-        {'enterprise_slug': ''},
-        {'enterprise_name': ''},
+        # Invalid quantity cases:
+        {'quantity': -1, 'enterprise_slug': 'valid', 'enterprise_name': 'Valid'},
+        {'quantity': 0, 'enterprise_slug': 'valid', 'enterprise_name': 'Valid'},
+        {'quantity': 'invalid', 'enterprise_slug': 'valid', 'enterprise_name': 'Valid'},
+        # Missing slug/name when the other is provided.
+        {'quantity': 10, 'enterprise_slug': '', 'enterprise_name': 'Valid'},
+        {'quantity': 10, 'enterprise_name': 'Valid'},
+        {'quantity': 10, 'enterprise_slug': 'valid', 'enterprise_name': ''},
+        {'quantity': 10, 'enterprise_slug': 'valid'},
     )
     @ddt.unpack
-    def test_create_checkout_intent_invalid_field_values(self, **invalid_field):
+    def test_create_checkout_intent_invalid_field_values(self, **invalid_payload):
         """Test creation fails with invalid field values."""
         other_user = UserFactory()
         self.set_jwt_cookie([{
@@ -377,28 +397,18 @@ class CheckoutIntentViewSetTestCase(APITest):
             'context': str(uuid.uuid4()),
         }], user=other_user)
 
-        request_data = {
-            'enterprise_slug': 'test-enterprise',
-            'enterprise_name': 'Test Enterprise',
-            'quantity': 10,
-        }
-        request_data.update(invalid_field)
-
         response = self.client.post(
             self.list_url,
-            request_data,
+            invalid_payload,
             format='json'
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        # The field name should be in the error response
-        invalid_field_name = list(invalid_field.keys())[0]
-        self.assertIn(invalid_field_name, response.data)
 
     @ddt.data(
-        {'enterprise_name': 'hello', 'quantity': 10},
-        {'enterprise_slug': 'hello', 'quantity': 10},
-        {'enterprise_name': 'hello', 'enterprise_slug': 'foo'},
+        {},  # Missing quantity.
+        {'enterprise_slug': 'hello', 'quantity': 10},  # Missing enterprise_name.
+        {'enterprise_name': 'Hello', 'quantity': 10},  # Missing enterprise_slug.
     )
     @ddt.unpack
     def test_create_checkout_intent_missing_required_fields(self, **payload):
@@ -530,3 +540,50 @@ class CheckoutIntentViewSetTestCase(APITest):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['terms_metadata'], {})
+
+    def test_create_checkout_intent_already_failed_returns_422(self):
+        """
+        Test that trying to reserve a new slug when the current user already has a failed intent returns HTTP 422.
+        """
+        self.set_jwt_cookie(
+            [{
+                'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+                'context': str(uuid.uuid4()),
+            }],
+            # Auth as a user which already has a failed (ERRORED_STRIPE_CHECKOUT) CheckoutIntent.
+            user=self.user_4,
+        )
+
+        # No matter the request, if the existing slug is in a failed state, it should return a 422 error.
+        request_data = {
+            'enterprise_slug': 'new-slug',
+            'enterprise_name': 'New Name',
+            'quantity': 7,
+        }
+        response = self.client.post(self.list_url, request_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        assert 'already has a failed' in response.json()['detail']
+
+    def test_create_checkout_intent_slug_conflict_returns_422(self):
+        """
+        Test that trying to reserve a slug that has already been reserved returns HTTP 422.
+        """
+        # Auth as a brand new user.
+        other_user = UserFactory()
+        self.set_jwt_cookie(
+            [{
+                'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+                'context': str(uuid.uuid4()),
+            }],
+            user=other_user,
+        )
+
+        # Attempt to reserve a slug that user 1 has already reserved.
+        request_data = {
+            'enterprise_slug': 'active-enterprise',
+            'enterprise_name': 'Active Enterprise',
+            'quantity': 7,
+        }
+        response = self.client.post(self.list_url, request_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        assert 'has already been reserved' in response.json()['detail']

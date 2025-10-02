@@ -8,13 +8,18 @@ from typing import TypedDict, Unpack, cast
 
 import stripe
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email, validate_slug
 from requests.exceptions import HTTPError
 
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.customer_billing.constants import CHECKOUT_SESSION_ERROR_CODES
-from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.models import (
+    CheckoutIntent,
+    FailedCheckoutIntentConflict,
+    SlugReservationConflict
+)
 from enterprise_access.apps.customer_billing.pricing_api import get_ssp_product_pricing
 from enterprise_access.apps.customer_billing.stripe_api import create_subscription_checkout_session
 
@@ -26,7 +31,7 @@ class CheckoutSessionInputValidatorData(TypedDict, total=False):
     """
     `total=False` so that validation does not require all fields to be provided.
     """
-    user: User | None
+    user: AbstractUser | None
     admin_email: str
     full_name: str
     enterprise_slug: str
@@ -38,7 +43,7 @@ class CheckoutSessionInputData(TypedDict, total=True):
     """
     Input parameters for checkout session creation.
     """
-    user: User | None
+    user: AbstractUser | None
     admin_email: str
     enterprise_slug: str
     company_name: str
@@ -383,6 +388,24 @@ class CreateCheckoutSessionValidationError(Exception):
         self.validation_errors_by_field = validation_errors_by_field
 
 
+class CreateCheckoutSessionSlugReservationConflict(Exception):
+    def __init__(self):
+        super().__init__()
+        self.non_field_errors = [{
+            'error_code': 'checkout_intent_conflict_slug_reserved',
+            'developer_message': 'enterprise_slug or enterprise_name has already been reserved.',
+        }]
+
+
+class CreateCheckoutSessionFailedConflict(Exception):
+    def __init__(self, non_field_errors=None):
+        super().__init__()
+        self.non_field_errors = [{
+            'error_code': 'checkout_intent_conflict_failed',
+            'developer_message': 'A failed checkout intent already exists for user.',
+        }]
+
+
 def create_free_trial_checkout_session(
     **input_data: Unpack[CheckoutSessionInputData],
 ) -> stripe.checkout.Session:
@@ -402,19 +425,14 @@ def create_free_trial_checkout_session(
     try:
         intent = CheckoutIntent.create_intent(
             user=user,
+            quantity=input_data.get('quantity'),
             slug=input_data.get('enterprise_slug'),
             name=input_data.get('company_name'),
-            quantity=input_data.get('quantity'),
         )
-    except ValidationError as exc:
-        raise CreateCheckoutSessionValidationError(
-            validation_errors_by_field={
-                'enterprise_slug': {
-                    'error_code': 'checkout_intent_conflict',
-                    'developer_message': str(exc)
-                }
-            },
-        ) from exc
+    except SlugReservationConflict as exc:
+        raise CreateCheckoutSessionSlugReservationConflict() from exc
+    except FailedCheckoutIntentConflict as exc:
+        raise CreateCheckoutSessionFailedConflict() from exc
 
     lms_user_id = user.lms_user_id
     checkout_session = create_subscription_checkout_session(

@@ -20,6 +20,8 @@ from enterprise_access.apps.api import serializers
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.core.constants import CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION
 from enterprise_access.apps.customer_billing.api import (
+    CreateCheckoutSessionFailedConflict,
+    CreateCheckoutSessionSlugReservationConflict,
     CreateCheckoutSessionValidationError,
     create_free_trial_checkout_session
 )
@@ -167,6 +169,13 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         except CreateCheckoutSessionValidationError as exc:
             response_serializer = serializers.CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer(
                 data=exc.validation_errors_by_field,
+            )
+            if not response_serializer.is_valid():
+                return HttpResponseServerError()
+            return Response(response_serializer.data, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+        except (CreateCheckoutSessionSlugReservationConflict, CreateCheckoutSessionFailedConflict) as exc:
+            response_serializer = serializers.CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer(
+                errors=exc.non_field_errors,
             )
             if not response_serializer.is_valid():
                 return HttpResponseServerError()

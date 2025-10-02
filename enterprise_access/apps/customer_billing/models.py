@@ -25,6 +25,14 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+class FailedCheckoutIntentConflict(Exception):
+    pass
+
+
+class SlugReservationConflict(Exception):
+    pass
+
+
 class CheckoutIntent(TimeStampedModel):
     """
     Tracks the complete lifecycle of a self-service checkout process:
@@ -101,10 +109,14 @@ class CheckoutIntent(TimeStampedModel):
         max_length=255,
     )
     enterprise_name = models.CharField(
+        null=True,
+        blank=True,
         max_length=255,
         help_text="Checkout intent enterprise customer name",
     )
     enterprise_slug = models.SlugField(
+        null=True,
+        blank=True,
         max_length=255,
         validators=[validate_slug],
         help_text="Checkout intent enterprise customer slug"
@@ -386,9 +398,9 @@ class CheckoutIntent(TimeStampedModel):
     def create_intent(
         cls,
         user: AbstractUser,
-        slug: str,
-        name: str,
         quantity: int,
+        slug: str | None = None,
+        name: str | None = None,
         country: str | None = None,
         terms_metadata: dict | None = None
     ) -> Self:
@@ -399,22 +411,23 @@ class CheckoutIntent(TimeStampedModel):
         not already in use by another checkout flow. If the user already has an intent:
         - If it's in a success state (PAID, FULFILLED), the existing intent is returned unchanged
         - If it's in a failure state (ERRORED_*), a ValueError is raised
-        - If it's in CREATED state, it's updated with the new details
+        - If it's in CREATED state, it's updated with the new details (more like PATCH, not PUT).
 
         The method also cleans up any expired intents first to free up reserved slugs/names.
 
         Args:
             user (User): The Django User who will own this intent
-            slug (str): The enterprise slug to reserve
-            name (str): The enterprise name to reserve
             quantity (int): Number of licenses to create
+            slug (str, Optional): The enterprise slug to reserve
+            name (str, Optional): The enterprise name to reserve
 
         Returns:
             CheckoutIntent: The created or updated intent object
 
         Raises:
-            ValueError: If the slug or name is already reserved by another user
-            ValueError: If the user already has an intent that failed
+            ValueError: If only one of [slug, name] were given, but not the other.
+            SlugReservationConflict: If the slug or name is already reserved by another user
+            FailedCheckoutIntentConflict: If the user already has an intent that failed
 
         Note:
             This operation is atomic - either the entire reservation succeeds or fails.
@@ -425,28 +438,70 @@ class CheckoutIntent(TimeStampedModel):
         with transaction.atomic():
             cls.cleanup_expired()
 
-            if not cls.can_reserve(slug, name, exclude_user=user):
-                raise ValueError(f"Slug '{slug}' or name '{name}' is already reserved")
+            if bool(slug) != bool(name):
+                raise ValueError("slug and name must either both be given or neither be given.")
 
             existing_intent = cls.objects.filter(user=user).first()
 
-            expires_at = timezone.now() + timedelta(minutes=cls.get_reservation_duration())
-
+            # If an existing intent has already reached a terminal state, exit fast.
             if existing_intent:
                 if existing_intent.state in cls.SUCCESS_STATES:
                     return existing_intent
 
                 if existing_intent.state in cls.FAILURE_STATES:
-                    raise ValueError("Failed checkout record already exists")
+                    raise FailedCheckoutIntentConflict("Failed checkout record already exists")
 
-                # Update the existing CREATED or EXPIRED intent
+            # Establish whether or not a new slug needs to be reserved. This logic is really only an
+            # optimization to avoid unnecessary DB lookups to search for reservation conflicts (via
+            # can_reserve()) in cases where we know the reservation is not changing.
+            #
+            #       |    Slug    |  Intent  |      A Slug       | Requested Slug |    Requested Slug
+            #  Case | Requested? | Existed? | Already Reserved? | Is Different?  | Needs To Be Reserved
+            # ------+------------+----------+-------------------+----------------+---------------------
+            #   1   |     no     |    no    |        N/A        |      N/A       |        no
+            #   2   |     no     |    yes   |        no         |      N/A       |        no
+            #   3   |     no     |    yes   |        yes        |      N/A       |        no
+            #   4   |     yes    |    no    |        N/A        |      N/A       |        yes
+            #   5   |     yes    |    yes   |        no         |      N/A       |        yes
+            #   6   |     yes    |    yes   |        yes        |      no        |        no
+            #   7   |     yes    |    yes   |        yes        |      yes       |        yes
+            if slug:
+                if existing_intent:
+                    slug_changing = slug != existing_intent.enterprise_slug
+                    name_changing = name != existing_intent.enterprise_name
+                    should_reserve_new_slug = slug_changing or name_changing  # Cases 5, 6, 7
+                else:
+                    should_reserve_new_slug = True  # Case 4
+            else:
+                should_reserve_new_slug = False  # Cases 1, 2, 3
+
+            # If we are reserving a new slug, then gate this whole view on it not already being reserved.
+            if should_reserve_new_slug:
+                if not cls.can_reserve(slug, name, exclude_user=user):
+                    raise SlugReservationConflict(f"Slug '{slug}' or name '{name}' is already reserved")
+
+            expires_at = timezone.now() + timedelta(minutes=cls.get_reservation_duration())
+
+            # The remaining code essentially performs an update_or_create(), but we're not
+            # using update_or_create() because we already have the existing intent and
+            # don't need to spend a DB query looking it up again. Also, wouldn't be able
+            # to do the terms_metadata merging logic which could come in handy in case
+            # this ever gets called multiple times and we have terms on multiple pages.
+
+            if existing_intent:
+                # Found an existing CREATED or EXPIRED intent, so update it.
+
+                # Force update certain fields.
                 existing_intent.state = CheckoutIntentState.CREATED
-                existing_intent.enterprise_slug = slug
-                existing_intent.enterprise_name = name
                 existing_intent.quantity = quantity
                 existing_intent.expires_at = expires_at
-                existing_intent.country = country
-                existing_intent.terms_metadata = terms_metadata
+
+                # Any of the following could be None since they're optional, so lets only update them if supplied.
+                existing_intent.enterprise_slug = slug or existing_intent.enterprise_slug
+                existing_intent.enterprise_name = name or existing_intent.enterprise_name
+                existing_intent.country = country or existing_intent.country
+                existing_intent.terms_metadata = (existing_intent.terms_metadata or {}) | (terms_metadata or {})
+
                 existing_intent.save()
                 return existing_intent
 
