@@ -175,12 +175,15 @@ travis_docker_push: travis_docker_tag travis_docker_auth ## push to docker hub
 	docker push 'openedx/enterprise-access:latest-newrelic'
 	docker push "openedx/enterprise-access:$$TRAVIS_COMMIT-newrelic"
 
+dev.pull:
+	docker image pull edxops/enterprise-access-dev
+
 dev.provision:
 	bash ./provision-enterprise-access.sh
 
 # devstack-themed shortcuts
 # Starts all containers
-dev.up: dev.up.redis
+dev.up: dev.pull dev.up.redis
 	docker-compose up -d
 
 dev.up.with-events: dev.up.kafka-control-center dev.up
