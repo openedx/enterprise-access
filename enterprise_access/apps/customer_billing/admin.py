@@ -1,6 +1,7 @@
 """
 Django admin configuration for customer billing app.
 """
+import stripe
 from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
@@ -9,7 +10,8 @@ from django.utils import timezone
 from django.utils.html import format_html
 
 from .constants import CheckoutIntentState
-from .models import CheckoutIntent
+from .models import CheckoutIntent, StripeEventData
+from .stripe_event_handlers import StripeEventHandler
 
 
 class CheckoutIntentAdminForm(forms.ModelForm):
@@ -255,3 +257,34 @@ class CheckoutIntentAdmin(admin.ModelAdmin):
             request,
             "Cleanup command executed successfully. Check server logs for details."
         )
+
+
+@admin.register(StripeEventData)
+class StripeEventDataAdmin(admin.ModelAdmin):
+    """
+    The admin class for StripeEventData.
+    """
+    list_display = [
+        'event_id',
+        'event_type',
+        'created',
+        'modified',
+        'checkout_intent_id',
+    ]
+    list_filter = [
+        'event_type',
+    ]
+    search_fields = [
+        'event_id',
+    ]
+    actions = ['handle_event']
+    select_related = ['checkout_intent']
+
+    def checkout_intent_id(self, obj):
+        return obj.checkout_intent.id if obj.checkout_intent else None
+
+    @admin.action(description='Handle the selected events')
+    def handle_event(self, request, queryset):
+        for obj in queryset:
+            event = stripe.Event.construct_from(obj.data, stripe.api_key)
+            StripeEventHandler.dispatch(event)

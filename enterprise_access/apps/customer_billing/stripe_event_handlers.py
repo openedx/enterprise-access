@@ -7,7 +7,7 @@ from functools import wraps
 
 import stripe
 
-from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData
 from enterprise_access.apps.customer_billing.stripe_event_types import StripeEventType
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,35 @@ logger = logging.getLogger(__name__)
 # Needs to be in module scope instead of class scope because the decorator
 # didn't have access to the class name soon enough during runtime initialization.
 _handlers_by_type: dict[StripeEventType, Callable[[stripe.Event], None]] = {}
+
+
+def get_invoice_and_subscription(event: stripe.Event):
+    invoice = event.data.object
+    subscription_details = invoice.parent.subscription_details
+    return invoice, subscription_details
+
+
+def persist_stripe_event(event: stripe.Event) -> StripeEventData:
+    """
+    Creates and returns a new ``StripeEventData`` object.
+    """
+    _, subscription_details = get_invoice_and_subscription(event)
+    checkout_intent_id = int(subscription_details.metadata['checkout_intent_id'])
+    checkout_intent = CheckoutIntent.objects.filter(
+        id=checkout_intent_id,
+        stripe_customer_id=event.data.object.get('customer'),
+    ).first()
+
+    record, _ = StripeEventData.objects.get_or_create(
+        event_id=event.id,
+        defaults={
+            'event_type': event.type,
+            'checkout_intent': checkout_intent,
+            'data': dict(event),
+        },
+    )
+    logger.info('Persisted StripeEventData %s', record)
+    return record
 
 
 class StripeEventHandler:
@@ -41,6 +70,7 @@ class StripeEventHandler:
                 # The default __repr__ is really long because it just barfs out the entire payload.
                 event_short_repr = f'<stripe.Event id={event.id} type={event.type}>'
                 logger.info(f'[StripeEventHandler] handling {event_short_repr}.')
+                persist_stripe_event(event)
                 handler_method(event)
                 logger.info(f'[StripeEventHandler] handler for {event_short_repr} complete.')
 
@@ -60,23 +90,25 @@ class StripeEventHandler:
         """
         Handle invoice.paid events.
         """
-        # Extract relevant metadata for logging
-        invoice = event.data.object
-        invoice_id = invoice.id
+        invoice, subscription_details = get_invoice_and_subscription(event)
         stripe_customer_id = invoice['customer']
-        subscription_details = invoice.parent.subscription_details
         subscription_id = subscription_details['subscription']
 
         # Extract the checkout_intent ID from the related subscription.
         checkout_intent_id = int(subscription_details.metadata['checkout_intent_id'])
 
         logger.info(
-            f'Found checkout_intent_id="{checkout_intent_id}" '
+            f'Found checkout_intent_id={checkout_intent_id} '
             f'stored on the Subscription <subscription_id="{subscription_id}"> '
-            f'related to Invoice <invoice_id="{invoice_id}">.'
+            f'related to Invoice <invoice_id="{invoice.id}">.'
         )
 
-        checkout_intent = CheckoutIntent.objects.get(id=checkout_intent_id)
+        try:
+            checkout_intent = CheckoutIntent.objects.get(id=checkout_intent_id)
+        except CheckoutIntent.DoesNotExist as exc:
+            logger.error('Could not find CheckoutIntent record for event %s, %s', event.id, exc)
+            raise
+
         logger.info(
             'Found existing CheckoutIntent record with '
             f'id={checkout_intent_id}, '
@@ -86,6 +118,9 @@ class StripeEventHandler:
             'Marking intent as paid...'
         )
         checkout_intent.mark_as_paid(stripe_customer_id=stripe_customer_id)
+        event_data = StripeEventData.objects.get(event_id=event.id)
+        event_data.checkout_intent = checkout_intent
+        event_data.save()
 
     @on_stripe_event('customer.subscription.trial_will_end')
     @staticmethod

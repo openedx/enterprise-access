@@ -398,7 +398,7 @@ class CreateCheckoutSessionSlugReservationConflict(Exception):
 
 
 class CreateCheckoutSessionFailedConflict(Exception):
-    def __init__(self, non_field_errors=None):
+    def __init__(self, non_field_errors=None):  # pylint: disable=unused-argument
         super().__init__()
         self.non_field_errors = [{
             'error_code': 'checkout_intent_conflict_failed',

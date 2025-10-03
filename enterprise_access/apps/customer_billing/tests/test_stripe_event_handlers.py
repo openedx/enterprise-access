@@ -2,6 +2,7 @@
 Unit tests for Stripe event handlers.
 """
 from contextlib import nullcontext
+from random import randint
 from typing import Type, cast
 from unittest import mock
 
@@ -12,7 +13,7 @@ from django.test import TestCase
 
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
-from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData
 from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
 
 
@@ -60,12 +61,14 @@ class TestStripeEventHandler(TestCase):
     def tearDown(self):
         """Clean up after tests."""
         CheckoutIntent.objects.all().delete()
+        StripeEventData.objects.all().delete()
 
     def _create_mock_stripe_event(self, event_type, event_data):
         """Helper to create a mock Stripe event."""
         mock_event = mock.MagicMock(spec=stripe.Event)
         mock_event.type = event_type
-        mock_event.id = f'evt_test_{event_type.replace(".", "_")}_123456'
+        numeric_id = str(randint(1, 100000)).zfill(6)
+        mock_event.id = f'evt_test_{event_type.replace(".", "_")}_{numeric_id}'
         mock_event.data = mock.Mock()
         mock_event.data.object = AttrDict.wrap(event_data)
         return mock_event
@@ -135,7 +138,7 @@ class TestStripeEventHandler(TestCase):
             'parent': {
                 'subscription_details': {
                     'metadata': mock_subscription,
-                    'subscription': subscription_id
+                    'subscription': subscription_id,
                 },
             },
         }
@@ -149,13 +152,17 @@ class TestStripeEventHandler(TestCase):
         self.checkout_intent.refresh_from_db()
         self.assertEqual(self.checkout_intent.state, expected_final_state)
 
+        if not expected_exception:
+            event_data = StripeEventData.objects.get(event_id=mock_event.id)
+            self.assertEqual(event_data.checkout_intent, self.checkout_intent)
+
         # Verify logging for successful cases
         if not expected_exception:
             mock_logger.info.assert_any_call(
                 f'[StripeEventHandler] handling <stripe.Event id={mock_event.id} type=invoice.paid>.'
             )
             mock_logger.info.assert_any_call(
-                f'Found checkout_intent_id="{self.checkout_intent.id}" '
+                f'Found checkout_intent_id={self.checkout_intent.id} '
                 f'stored on the Subscription <subscription_id="{subscription_id}"> '
                 f'related to Invoice <invoice_id="{invoice_data["id"]}">.'
             )
@@ -184,7 +191,7 @@ class TestStripeEventHandler(TestCase):
             'parent': {
                 'subscription_details': {
                     'metadata': mock_subscription,
-                    'subscription': subscription_id
+                    'subscription': subscription_id,
                 }
             },
         }
@@ -202,6 +209,8 @@ class TestStripeEventHandler(TestCase):
         self.checkout_intent.refresh_from_db()
         self.assertEqual(self.checkout_intent.state, CheckoutIntentState.PAID)
         self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)
+        event_data = StripeEventData.objects.get(event_id=mock_event.id)
+        self.assertEqual(event_data.checkout_intent, self.checkout_intent)
 
         # Verify logging includes the customer_id
         mock_logger.info.assert_any_call(
@@ -244,3 +253,5 @@ class TestStripeEventHandler(TestCase):
         self.checkout_intent.refresh_from_db()
         self.assertEqual(self.checkout_intent.state, CheckoutIntentState.PAID)
         self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)
+        event_data = StripeEventData.objects.get(event_id=mock_event.id)
+        self.assertEqual(event_data.checkout_intent, self.checkout_intent)
