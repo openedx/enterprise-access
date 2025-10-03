@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import validate_slug
 from django.db import models, transaction
 from django.utils import timezone
@@ -545,3 +546,40 @@ class CheckoutIntent(TimeStampedModel):
         if customer_id:
             self.stripe_customer_id = customer_id
         self.save(update_fields=['stripe_checkout_session_id', 'stripe_customer_id', 'modified'])
+
+
+class StripeEventData(TimeStampedModel):
+    """
+    Persists stripe event payload data.
+
+    .. pii: The data field stores PII,
+       which is to be scrubbed after 90 days via management command under certain conditions
+    .. pii_types: email_address
+    .. pii_retirement: local_api
+    """
+    event_id = models.CharField(
+        max_length=255,
+        primary_key=True,
+        help_text='The unique event identifier',
+    )
+    event_type = models.CharField(
+        max_length=255,
+        null=False,
+        db_index=True,
+        help_text='The stripe event type.',
+    )
+    checkout_intent = models.ForeignKey(
+        CheckoutIntent,
+        null=True,
+        on_delete=models.SET_NULL,
+        help_text='The related CheckoutIntent, which is infered from the stripe customer id.',
+    )
+    data = models.JSONField(
+        null=False,
+        default={},
+        help_text='The event payload data',
+        encoder=DjangoJSONEncoder,
+    )
+
+    def __str__(self):
+        return f"<StripeEventData id={self.event_id}, event_type={self.event_type}>"
