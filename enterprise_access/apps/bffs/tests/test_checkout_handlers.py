@@ -677,7 +677,7 @@ class TestCheckoutSuccessHandler(APITest):
     def test_enhance_with_stripe_data_session_error(self, mock_session, mock_get_checkout_intent):
         """Test when there's an error retrieving the Stripe session."""
         mock_get_checkout_intent.return_value = self.checkout_intent_data
-        mock_session.side_effect = stripe.error.StripeError("API Error")
+        mock_session.side_effect = stripe.StripeError("API Error")
 
         self.handler.load_and_process()
 
@@ -692,7 +692,7 @@ class TestCheckoutSuccessHandler(APITest):
         """Test when there's an error retrieving the payment intent."""
         mock_get_checkout_intent.return_value = self.checkout_intent_data
         mock_session.return_value = self.stripe_session
-        mock_payment_intent.side_effect = stripe.error.StripeError("API Error")
+        mock_payment_intent.side_effect = stripe.StripeError("API Error")
 
         self.handler.load_and_process()
 
@@ -711,7 +711,7 @@ class TestCheckoutSuccessHandler(APITest):
         mock_get_checkout_intent.return_value = self.checkout_intent_data
         mock_session.return_value = self.stripe_session
         mock_payment_intent.return_value = self.stripe_payment_intent
-        mock_payment_method.side_effect = stripe.error.StripeError("API Error")
+        mock_payment_method.side_effect = stripe.StripeError("API Error")
 
         self.handler.load_and_process()
 
@@ -733,7 +733,7 @@ class TestCheckoutSuccessHandler(APITest):
         mock_session.return_value = {**self.stripe_session, 'invoice': None}  # Force subscription path
         mock_payment_intent.return_value = self.stripe_payment_intent
         mock_payment_method.return_value = self.stripe_payment_method
-        mock_subscription.side_effect = stripe.error.StripeError("API Error")
+        mock_subscription.side_effect = stripe.StripeError("API Error")
 
         self.handler.load_and_process()
 
@@ -757,7 +757,7 @@ class TestCheckoutSuccessHandler(APITest):
         mock_payment_intent.return_value = self.stripe_payment_intent
         mock_payment_method.return_value = self.stripe_payment_method
         mock_subscription.return_value = self.stripe_subscription
-        mock_invoice.side_effect = stripe.error.StripeError("API Error")
+        mock_invoice.side_effect = stripe.StripeError("API Error")
 
         self.handler.load_and_process()
 

@@ -132,7 +132,7 @@ def get_stripe_price_data(
 
         return serialized_data
 
-    except stripe.error.StripeError as exc:
+    except stripe.StripeError as exc:
         logger.error(f'Stripe API error fetching price {price_id}: {exc}')
         raise StripePricingError(f'Failed to fetch price {price_id}: {exc}') from exc
     except Exception as exc:
@@ -242,7 +242,7 @@ def get_all_stripe_prices(
 
         return prices_by_lookup_key
 
-    except stripe.error.StripeError as exc:
+    except stripe.StripeError as exc:
         logger.error(f'Stripe API error fetching all prices: {exc}')
         raise StripePricingError(f'Failed to fetch all prices: {exc}') from exc
     except Exception as exc:

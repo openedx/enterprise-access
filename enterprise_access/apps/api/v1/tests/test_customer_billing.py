@@ -137,7 +137,7 @@ class CustomerBillingPortalSessionTests(APITest):
         url = reverse('api:v1:customer-billing-create-enterprise-admin-portal-session')
 
         with mock.patch('stripe.billing_portal.Session.create') as mock_create:
-            mock_create.side_effect = stripe.error.InvalidRequestError(
+            mock_create.side_effect = stripe.InvalidRequestError(
                 'Customer does not exist',
                 'customer'
             )
@@ -161,7 +161,7 @@ class CustomerBillingPortalSessionTests(APITest):
         url = reverse('api:v1:customer-billing-create-enterprise-admin-portal-session')
 
         with mock.patch('stripe.billing_portal.Session.create') as mock_create:
-            mock_create.side_effect = stripe.error.InvalidRequestError(
+            mock_create.side_effect = stripe.InvalidRequestError(
                 'Customer does not exist',
                 'customer'
             )
@@ -313,7 +313,7 @@ class CustomerBillingPortalSessionTests(APITest):
                       kwargs={'pk': self.checkout_intent.id})
 
         with mock.patch('stripe.billing_portal.Session.create') as mock_create:
-            mock_create.side_effect = stripe.error.AuthenticationError('Invalid API key')
+            mock_create.side_effect = stripe.AuthenticationError('Invalid API key')
 
             response = self.client.get(
                 url,
