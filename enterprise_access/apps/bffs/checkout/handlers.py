@@ -327,7 +327,7 @@ class CheckoutSuccessHandler(CheckoutContextHandler):
 
         try:
             session = get_stripe_checkout_session(session_id)
-        except stripe.error.StripeError:
+        except stripe.StripeError:
             logger.exception("Error retrieving Stripe checkout session: %s", session_id)
             return
 
@@ -376,7 +376,7 @@ class CheckoutSuccessHandler(CheckoutContextHandler):
 
         try:
             payment_intent = get_stripe_payment_intent(payment_intent_id)
-        except stripe.error.StripeError:
+        except stripe.StripeError:
             logger.exception("Error retrieving Stripe payment intent: %s", payment_intent_id)
             return None
 
@@ -387,7 +387,7 @@ class CheckoutSuccessHandler(CheckoutContextHandler):
         payment_method = None
         try:
             payment_method = get_stripe_payment_method(payment_method_id)
-        except stripe.error.StripeError:
+        except stripe.StripeError:
             logger.exception("Error retrieving Stripe payment method: %s", payment_method_id)
         return payment_method
 
@@ -409,7 +409,7 @@ class CheckoutSuccessHandler(CheckoutContextHandler):
             try:
                 subscription = get_stripe_subscription(subscription_id)
                 invoice_id = subscription.get('latest_invoice')
-            except stripe.error.StripeError:
+            except stripe.StripeError:
                 logger.exception("Error retrieving Stripe subscription: %s", subscription_id)
                 return None
 
@@ -421,7 +421,7 @@ class CheckoutSuccessHandler(CheckoutContextHandler):
 
         try:
             return get_stripe_invoice(invoice_id)
-        except stripe.error.StripeError:
+        except stripe.StripeError:
             logger.exception("Error retrieving Stripe invoice: %s", invoice_id)
             return None
 
@@ -461,6 +461,6 @@ class CheckoutSuccessHandler(CheckoutContextHandler):
             customer = get_stripe_customer(customer_id)
             result['customer_name'] = customer.get('name')
             result['customer_phone'] = customer.get('phone')
-        except stripe.error.StripeError:
+        except stripe.StripeError:
             logger.exception("Error retrieving Stripe customer: %s", customer_id)
         return result

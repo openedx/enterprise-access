@@ -246,7 +246,7 @@ class CustomerBillingViewSet(viewsets.ViewSet):
                 customer=stripe_customer_id,
                 return_url=f"{origin_url}/{enterprise_slug}",
             )
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             # TODO: Long term we should be explicit to different types of Stripe error exceptions available
             # https://docs.stripe.com/api/errors/handling, https://docs.stripe.com/error-handling
             msg = f"StripeError creating billing portal session for CheckoutIntent {checkout_intent}: {e}"
@@ -312,7 +312,7 @@ class CustomerBillingViewSet(viewsets.ViewSet):
                 customer=stripe_customer_id,
                 return_url=f"{origin_url}/billing-details/success",
             )
-        except stripe.error.StripeError as e:
+        except stripe.StripeError as e:
             # TODO: Long term we should be explicit to different types of Stripe error exceptions available
             # https://docs.stripe.com/api/errors/handling, https://docs.stripe.com/error-handling
             msg = f"StripeError creating billing portal session for CheckoutIntent {checkout_intent}: {e}"

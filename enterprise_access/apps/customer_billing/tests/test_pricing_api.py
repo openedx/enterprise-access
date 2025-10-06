@@ -7,7 +7,7 @@ from unittest import mock
 import ddt
 from django.test import TestCase, override_settings
 from edx_django_utils.cache import TieredCache
-from stripe.error import InvalidRequestError
+from stripe import InvalidRequestError
 
 from enterprise_access.apps.customer_billing import pricing_api
 

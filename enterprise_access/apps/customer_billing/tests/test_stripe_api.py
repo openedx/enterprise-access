@@ -98,10 +98,10 @@ class TestStripeCheckoutSession(StripeApiFunctionsTests):
     def test_get_stripe_checkout_session_api_error(self, mock_retrieve):
         """Test API error handling for checkout session."""
         # Setup API error
-        mock_retrieve.side_effect = stripe.error.StripeError("API Error")
+        mock_retrieve.side_effect = stripe.StripeError("API Error")
 
         # Call function and verify exception is raised
-        with self.assertRaises(stripe.error.StripeError):
+        with self.assertRaises(stripe.StripeError):
             get_stripe_checkout_session(self.session_id)
 
 
@@ -215,10 +215,10 @@ class TestStripePaymentIntent(StripeApiFunctionsTests):
     def test_get_stripe_payment_intent_api_error(self, mock_retrieve):
         """Test API error handling for payment intent."""
         # Setup API error
-        mock_retrieve.side_effect = stripe.error.StripeError("API Error")
+        mock_retrieve.side_effect = stripe.StripeError("API Error")
 
         # Call function and verify exception is raised
-        with self.assertRaises(stripe.error.StripeError):
+        with self.assertRaises(stripe.StripeError):
             get_stripe_payment_intent(self.payment_intent_id)
 
 
@@ -282,10 +282,10 @@ class TestStripeInvoice(StripeApiFunctionsTests):
     def test_get_stripe_invoice_api_error(self, mock_retrieve):
         """Test API error handling for invoice."""
         # Setup API error
-        mock_retrieve.side_effect = stripe.error.StripeError("API Error")
+        mock_retrieve.side_effect = stripe.StripeError("API Error")
 
         # Call function and verify exception is raised
-        with self.assertRaises(stripe.error.StripeError):
+        with self.assertRaises(stripe.StripeError):
             get_stripe_invoice(self.invoice_id)
 
 
@@ -349,10 +349,10 @@ class TestStripePaymentMethod(StripeApiFunctionsTests):
     def test_get_stripe_payment_method_api_error(self, mock_retrieve):
         """Test API error handling for payment method."""
         # Setup API error
-        mock_retrieve.side_effect = stripe.error.StripeError("API Error")
+        mock_retrieve.side_effect = stripe.StripeError("API Error")
 
         # Call function and verify exception is raised
-        with self.assertRaises(stripe.error.StripeError):
+        with self.assertRaises(stripe.StripeError):
             get_stripe_payment_method(self.payment_method_id)
 
 
