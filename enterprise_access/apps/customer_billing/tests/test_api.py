@@ -188,7 +188,12 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         Test that creating a new checkout session replaces the user's existing intent.
         """
         # Create an existing intent for the user
-        CheckoutIntent.create_intent(self.user, 'old-slug', 'Old Comapny', 10, terms_metadata={'version': '1.0'})
+        CheckoutIntent.create_intent(
+            user=self.user, quantity=10,
+            slug='old-slug',
+            name='Old Comapny',
+            terms_metadata={'version': '1.0'}
+        )
 
         # Setup mocks
         mock_lms_client = mock_lms_client_class.return_value
@@ -232,8 +237,11 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         """
         # User 1 reserves a slug
         CheckoutIntent.create_intent(
-            self.other_user, 'conflicting-slug', 'My company',
-            10, terms_metadata={'version': '1.0'},
+            user=self.other_user,
+            quantity=10,
+            slug='conflicting-slug',
+            name='My company',
+            terms_metadata={'version': '1.0'},
         )
 
         # Setup mocks
@@ -271,8 +279,11 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         """
         # User 1 reserves a slug
         CheckoutIntent.create_intent(
-            self.other_user, 'ok-slug', 'Conflicting company',
-            10, terms_metadata={'version': '1.0'},
+            user=self.other_user,
+            quantity=10,
+            slug='ok-slug',
+            name='Conflicting company',
+            terms_metadata={'version': '1.0'},
         )
 
         # Setup mocks

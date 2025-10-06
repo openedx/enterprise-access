@@ -5,6 +5,7 @@ from datetime import timedelta
 from typing import cast
 from unittest import mock
 
+import ddt
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.test import TestCase, override_settings
@@ -12,12 +13,17 @@ from django.utils import timezone
 
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
-from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.models import (
+    CheckoutIntent,
+    FailedCheckoutIntentConflict,
+    SlugReservationConflict
+)
 from enterprise_access.apps.provisioning.tests.factories import ProvisionNewCustomerWorkflowFactory
 
 User = get_user_model()
 
 
+@ddt.ddt
 class TestCheckoutIntentModel(TestCase):
     """
     Tests for the CheckoutIntent model methods.
@@ -126,7 +132,7 @@ class TestCheckoutIntentModel(TestCase):
         )
 
         # Second user tries to use same slug
-        with self.assertRaises(ValueError):
+        with self.assertRaises(SlugReservationConflict):
             CheckoutIntent.create_intent(
                 user=cast(AbstractUser, self.user2),
                 slug=self.basic_data['enterprise_slug'],
@@ -135,7 +141,7 @@ class TestCheckoutIntentModel(TestCase):
             )
 
         # Second user tries to use same name
-        with self.assertRaises(ValueError):
+        with self.assertRaises(SlugReservationConflict):
             CheckoutIntent.create_intent(
                 user=cast(AbstractUser, self.user2),
                 slug='different-slug',
@@ -192,7 +198,7 @@ class TestCheckoutIntentModel(TestCase):
         self.assertIn(intent.state, CheckoutIntent.FAILURE_STATES)
 
         # Trying to create a new intent for the same user should fail
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(FailedCheckoutIntentConflict) as context:
             CheckoutIntent.create_intent(
                 user=cast(AbstractUser, self.user1),
                 slug='new-slug',
@@ -625,3 +631,76 @@ class TestCheckoutIntentModel(TestCase):
             mock_save.assert_called_once_with(
                 update_fields=['state', 'stripe_checkout_session_id', 'stripe_customer_id', 'modified']
             )
+
+    def test_create_intent_patch_fields_do_not_unset(self):
+        """
+        Test that calling create_intent() without supplying slug, name, country, or terms_metadata
+        does NOT unset those fields in the DB record (acts like PATCH).
+        """
+        user = UserFactory()
+        initial_intent = CheckoutIntent.create_intent(
+            user=user,
+            quantity=11,
+            slug=self.basic_data['enterprise_slug'],
+            name=self.basic_data['enterprise_name'],
+            country='JP',
+            terms_metadata={'foo': 'bar'}
+        )
+
+        # Call create_intent() again, omitting slug, name, country, and terms_metadata
+        updated_intent = CheckoutIntent.create_intent(
+            user=user,
+            quantity=22  # Only update quantity
+            # No slug, name, country, or terms_metadata
+        )
+
+        initial_intent.refresh_from_db()
+
+        # Make sure we only created one new intent record, not two.
+        assert initial_intent == updated_intent
+        # Should have updated quantity field only.
+        self.assertEqual(updated_intent.quantity, 22)  # Updated
+        # Old values should remain the same as they were omitted from the 2nd call.
+        assert updated_intent.enterprise_slug == self.basic_data['enterprise_slug']
+        assert updated_intent.enterprise_name == self.basic_data['enterprise_name']
+        assert updated_intent.country == 'JP'
+        assert updated_intent.terms_metadata == {'foo': 'bar'}
+
+    def test_create_intent_blank_slug_and_name_success(self):
+        """
+        Test that calling create_intent() with both slug and name blank does not throw.
+
+        This test case supports the use case of creating an intent without reserving,
+        needed for the Plan Details page.
+        """
+        user = UserFactory()
+        intent = CheckoutIntent.create_intent(
+            user=user,
+            quantity=self.basic_data['quantity'],
+            slug=None,
+            name=None,
+        )
+        intent.refresh_from_db()
+        assert intent.enterprise_slug is None
+        assert intent.enterprise_name is None
+        assert intent.quantity == self.basic_data['quantity']
+
+    @ddt.data(
+        {'slug': 'present-slug', 'name': None},
+        {'slug': None, 'name': 'Present Name'}
+    )
+    @ddt.unpack
+    def test_create_intent_blank_slug_or_name_raises(self, slug, name):
+        """
+        Test that calling create_intent() with a non-blank slug and blank name, or vice-versa,
+        raises a ValueError.
+        """
+        user = UserFactory()
+        with self.assertRaises(ValueError) as exc:
+            CheckoutIntent.create_intent(
+                user=user,
+                quantity=self.basic_data['quantity'],
+                slug=slug,
+                name=name,
+            )
+        self.assertIn("slug and name must either both be given or neither be given", str(exc.exception))
