@@ -233,9 +233,9 @@ class CheckoutIntentCreateRequestSerializer(CountryFieldMixin, serializers.Model
         try:
             return CheckoutIntent.create_intent(
                 user=self.context['request'].user,
-                slug=validated_data['enterprise_slug'],
-                name=validated_data['enterprise_name'],
                 quantity=validated_data['quantity'],
+                slug=validated_data.get('enterprise_slug'),
+                name=validated_data.get('enterprise_name'),
                 country=validated_data.get('country'),
                 terms_metadata=validated_data.get('terms_metadata'),
             )

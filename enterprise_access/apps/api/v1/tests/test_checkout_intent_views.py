@@ -541,6 +541,37 @@ class CheckoutIntentViewSetTestCase(APITest):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['terms_metadata'], {})
 
+    def test_create_checkout_intent_without_slug_or_name_success(self):
+        """
+        Test that trying to create a checkout intent without an enterprise name/slug is allowed.
+        """
+        other_user = UserFactory()
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }], user=other_user)
+
+        request_data = {
+            'quantity': 13,
+            'country': 'NZ',
+            'terms_metadata': {'version': '1.0', 'accepted_at': '2024-01-15T10:30:00Z'}
+        }
+
+        response = self.client.post(
+            self.list_url,
+            request_data,
+        )
+        response_data = response.json()
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response_data['user'] == other_user.id
+        assert response_data['enterprise_slug'] is None
+        assert response_data['enterprise_name'] is None
+        assert response_data['quantity'] == 13
+        assert response_data['state'] == CheckoutIntentState.CREATED
+        assert response_data['country'] == 'NZ'
+        assert response_data['terms_metadata'] == {'version': '1.0', 'accepted_at': '2024-01-15T10:30:00Z'}
+
     def test_create_checkout_intent_already_failed_returns_422(self):
         """
         Test that trying to reserve a new slug when the current user already has a failed intent returns HTTP 422.
