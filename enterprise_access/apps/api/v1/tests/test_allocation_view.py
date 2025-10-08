@@ -599,7 +599,8 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'content_price_cents': assignment_content_quantity_usd_cents,  # this should be well below limit
         }
 
-        response = self.client.post(allocate_url, data=allocate_payload)
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(allocate_url, data=allocate_payload)
 
         allocation_records_by_email = {
             assignment.learner_email: assignment
@@ -1032,7 +1033,8 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'content_price_cents': 1,
         }
 
-        ok_response = self.client.post(allocate_url, data=allocate_payload)
+        with self.captureOnCommitCallbacks(execute=True):
+            ok_response = self.client.post(allocate_url, data=allocate_payload)
 
         # The spend alone, with no existing allocations, plus
         # one more cent should be fine to allocate.
@@ -1045,7 +1047,9 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'content_key': self.content_key,
             'content_price_cents': 1,
         }
-        response = self.client.post(allocate_url, data=allocate_payload)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(allocate_url, data=allocate_payload)
 
         self.assertEqual(status.HTTP_422_UNPROCESSABLE_ENTITY, response.status_code)
         self.assertEqual(

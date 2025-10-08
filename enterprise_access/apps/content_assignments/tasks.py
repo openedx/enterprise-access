@@ -41,7 +41,10 @@ def _get_assignment_or_raise(assignment_uuid):
     try:
         return learner_content_assignment_model.objects.get(uuid=assignment_uuid)
     except learner_content_assignment_model.DoesNotExist:
-        logger.warning(f'Request with uuid: {assignment_uuid} does not exist.')
+        logger.warning(
+            '_get_assignment_or_raise: LearnerContentAssignment with uuid %s does not exist.',
+            assignment_uuid,
+        )
         raise
 
 

@@ -527,12 +527,13 @@ class TestContentAssignmentApi(TestCase):
             'state': LearnerContentAssignmentStateChoices.ERRORED,
         })
 
-        allocation_results = allocate_assignments(
-            self.assignment_configuration,
-            learners_to_assign,
-            content_key,
-            content_price_cents,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            allocation_results = allocate_assignments(
+                self.assignment_configuration,
+                learners_to_assign,
+                content_key,
+                content_price_cents,
+            )
 
         # Refresh from db to get any updates reflected in the python objects.
         assignments_to_refresh = (
@@ -855,12 +856,13 @@ class TestContentAssignmentApi(TestCase):
                 state=existing_assignment_state,
             )
 
-        allocate_assignments(
-            self.assignment_configuration,
-            [learner_email],
-            content_key,
-            content_price_cents,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            allocate_assignments(
+                self.assignment_configuration,
+                [learner_email],
+                content_key,
+                content_price_cents,
+            )
 
         # Get the latest assignment from the db.
         assignment = LearnerContentAssignment.objects.get(learner_email=learner_email)

@@ -5,6 +5,7 @@ records and business logic.
 from __future__ import annotations  # needed for using QuerySet in type hinting.
 
 import logging
+from functools import partial
 from typing import Iterable
 from uuid import uuid4
 
@@ -420,10 +421,15 @@ def allocate_assignments(
 
     # Enqueue an asynchronous task to link assigned learners to the customer
     # This has to happen outside of the atomic block to avoid a race condition
-    # when the celery task does its read of updated/created assignments.
-    for assignment in updated_assignments + created_assignments:
-        create_pending_enterprise_learner_for_assignment_task.delay(assignment.uuid)
-        send_email_for_new_assignment.delay(assignment.uuid)
+    # when the celery task does its read of updated/created assignments. Furthermore,
+    # we might be in an *inner* atomic block, and a commit would not occur
+    # until existing an *outer* atomic block, so we need to ensure these tasks
+    # only run on that commit.
+    transaction.on_commit(partial(
+        _do_async_tasks_after_assignment_writes,
+        updated_assignments=updated_assignments,
+        created_assignments=created_assignments,
+    ))
 
     # Make a list of all pre-existing assignments that were not updated.
     unchanged_assignments = list(set(existing_assignments) - set(updated_assignments))
@@ -434,6 +440,16 @@ def allocate_assignments(
         'created': created_assignments,
         'no_change': unchanged_assignments,
     }
+
+
+def _do_async_tasks_after_assignment_writes(updated_assignments, created_assignments):
+    """
+    Helper function to initialize async celery tasks
+    on updated and created assignments.
+    """
+    for assignment in updated_assignments + created_assignments:
+        create_pending_enterprise_learner_for_assignment_task.delay(assignment.uuid)
+        send_email_for_new_assignment.delay(assignment.uuid)
 
 
 def allocate_assignment_for_request(
