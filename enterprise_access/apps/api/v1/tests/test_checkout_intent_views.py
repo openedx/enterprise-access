@@ -618,3 +618,46 @@ class CheckoutIntentViewSetTestCase(APITest):
         response = self.client.post(self.list_url, request_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
         assert 'has already been reserved' in response.json()['detail']
+
+    @ddt.data('RU', 'IR', 'KP', 'SY', 'CU')
+    def test_patch_embargoed_country_rejected(self, embargoed_country_code):
+        """Test that PATCH with embargoed countries is rejected."""
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }])
+
+        response = self.client.patch(
+            self.detail_url_1,
+            {'country': embargoed_country_code},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('country', response.data)
+        self.assertIn('not supported', str(response.data['country'][0]))
+        self.assertIn(embargoed_country_code, str(response.data['country'][0]))
+
+        # Verify country hasn't changed in database
+        self.checkout_intent_1.refresh_from_db()
+        self.assertEqual(self.checkout_intent_1.country, 'CA')
+
+    def test_patch_non_embargoed_country_succeeds(self):
+        """Test that PATCH with non-embargoed countries succeeds."""
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }])
+
+        response = self.client.patch(
+            self.detail_url_1,
+            {'country': 'DE'},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['country'], 'DE')
+
+        # Verify in database
+        self.checkout_intent_1.refresh_from_db()
+        self.assertEqual(self.checkout_intent_1.country, 'DE')

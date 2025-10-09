@@ -6,6 +6,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import APIException
 
 from enterprise_access.apps.customer_billing.constants import ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS
+from enterprise_access.apps.customer_billing.embargo import get_embargoed_countries
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
     FailedCheckoutIntentConflict,
@@ -167,6 +168,17 @@ class CheckoutIntentUpdateRequestSerializer(CountryFieldMixin, serializers.Model
                     f'Invalid state transition from {current_state} to {value}'
                 )
 
+        return value
+
+    def validate_country(self, value):
+        """
+        Reject embargoed countries.
+        """
+
+        if value and value in get_embargoed_countries():
+            raise serializers.ValidationError(
+                f'Country {value} is not supported.'
+            )
         return value
 
     def validate_terms_metadata(self, value):
