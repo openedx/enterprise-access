@@ -133,6 +133,18 @@ class CheckoutIntentUpdateRequestSerializer(CountryFieldMixin, serializers.Model
 
         return value
 
+    def validate_country(self, value):
+        """
+        Reject embargoed countries.
+        """
+        from enterprise_access.apps.customer_billing.embargo import get_embargoed_countries
+
+        if value and value.code in get_embargoed_countries():
+            raise serializers.ValidationError(
+                f'Country {value.code} is not supported.'
+            )
+        return value
+
     def validate_terms_metadata(self, value):
         """
         Validate that terms_metadata is a dictionary/object, not a list or string.
