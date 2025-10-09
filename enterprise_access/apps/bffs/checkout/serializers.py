@@ -78,6 +78,11 @@ class FieldConstraintsSerializer(serializers.Serializer):
     """
     quantity = QuantityConstraintSerializer(help_text="Constraints for license quantity")
     enterprise_slug = SlugConstraintSerializer(help_text="Constraints for enterprise slug")
+    embargoed_countries = serializers.ListField(
+        child=serializers.CharField(max_length=2),
+        help_text="Embargoed country codes",
+        required=False,
+    )
 
 
 class CheckoutIntentModelSerializer(CountryFieldMixin, serializers.ModelSerializer):

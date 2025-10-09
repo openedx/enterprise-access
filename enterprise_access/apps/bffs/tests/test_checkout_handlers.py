@@ -211,6 +211,19 @@ class TestCheckoutContextHandler(APITest):
         self.assertIn('pattern', constraints['enterprise_slug'])
         self.assertTrue(constraints['enterprise_slug']['pattern'].startswith('^'))
 
+    def test_get_field_constraints_includes_embargoed_countries(self):
+        """
+        Test that _get_field_constraints includes embargoed countries list.
+        """
+        context = self._create_context()
+        handler = CheckoutContextHandler(context)
+
+        constraints = handler._get_field_constraints()
+
+        self.assertIn('embargoed_countries', constraints)
+        self.assertIsInstance(constraints['embargoed_countries'], list)
+        self.assertEqual(constraints['embargoed_countries'], ['RU', 'IR', 'KP', 'SY', 'CU'])
+
     @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_ssp_product_pricing')
     def test_handler_adds_error_on_pricing_failure(self, mock_get_pricing):
         """

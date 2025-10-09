@@ -22,6 +22,7 @@ from enterprise_access.apps.bffs.checkout.context import (
 from enterprise_access.apps.bffs.checkout.serializers import CheckoutIntentModelSerializer
 from enterprise_access.apps.bffs.handlers import BaseHandler
 from enterprise_access.apps.customer_billing.api import validate_free_trial_checkout_session
+from enterprise_access.apps.customer_billing.embargo import get_embargoed_countries
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
 from enterprise_access.apps.customer_billing.pricing_api import get_ssp_product_pricing
 from enterprise_access.apps.customer_billing.stripe_api import (
@@ -213,7 +214,8 @@ class CheckoutContextHandler(CheckoutIntentAwareHandlerMixin, BaseHandler):
                 'min_length': 3,
                 'max_length': 30,
                 'pattern': '^[a-z0-9-]+$'
-            }
+            },
+            'embargoed_countries': get_embargoed_countries()
         }
 
 
