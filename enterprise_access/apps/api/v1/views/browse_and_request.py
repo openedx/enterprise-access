@@ -46,9 +46,8 @@ from enterprise_access.apps.api_client.ecommerce_client import EcommerceApiClien
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.core import constants
-from enterprise_access.apps.subsidy_access_policy.api import approve_learner_credit_request_via_policy
-from enterprise_access.apps.subsidy_access_policy.exceptions import SubisidyAccessPolicyRequestApprovalError
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
+from enterprise_access.apps.subsidy_request import api as subsidy_request_api
 from enterprise_access.apps.subsidy_request.constants import (
     REUSABLE_REQUEST_STATES,
     LearnerCreditAdditionalActionStates,
@@ -68,7 +67,6 @@ from enterprise_access.apps.subsidy_request.tasks import (
     send_learner_credit_bnr_admins_email_with_new_requests_task,
     send_learner_credit_bnr_cancel_notification_task,
     send_learner_credit_bnr_decline_notification_task,
-    send_learner_credit_bnr_request_approve_task,
     send_reminder_email_for_pending_learner_credit_request
 )
 from enterprise_access.apps.subsidy_request.utils import (
@@ -963,64 +961,87 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
     @action(detail=False, url_path='approve', methods=['post'])
     def approve(self, request, *args, **kwargs):
         """
-        Approve a learner credit request.
+        Approve a list of learner credit requests against a single policy.
+
+        - On success, returns a `200 OK` with a list of the approved request objects.
+        - If any of the specified requests fail to be approved, returns a
+          `422 Unprocessable Entity` with a detail message. The successful
+          approvals will still be committed.
         """
-        # Validate the request data
         serializer = serializers.LearnerCreditRequestApproveRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        learner_credit_request_uuid = serializer.data['learner_credit_request_uuid']
-        policy_uuid = serializer.data['policy_uuid']
 
-        lc_request = LearnerCreditRequest.objects.select_related('user').get(
-            uuid=learner_credit_request_uuid,
+        learner_credit_request_uuids = serializer.validated_data['learner_credit_request_uuids']
+        policy_uuid = serializer.validated_data['policy_uuid']
+
+        learner_credit_requests = self.get_queryset().select_related('user').filter(
+            uuid__in=learner_credit_request_uuids,
+            learner_credit_request_config__learner_credit_config__uuid=policy_uuid
         )
 
-        learner_email = lc_request.user.email
-        content_key = lc_request.course_id
-        content_price_cents = lc_request.course_price
-
-        # Log "approve" as recent action in the Request Action model.
-        lc_request_action = LearnerCreditRequestActions.create_action(
-            learner_credit_request=lc_request,
-            recent_action=get_action_choice(SubsidyRequestStates.APPROVED),
-            status=get_user_message_choice(SubsidyRequestStates.APPROVED),
-        )
+        if len(learner_credit_requests) != len(set(learner_credit_request_uuids)):
+            return Response(
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         try:
-            with transaction.atomic():
-                # Validate the policy, once validated, approve the request by creating a content assignment.
-                learner_credit_request_assignment = approve_learner_credit_request_via_policy(
-                    policy_uuid,
-                    content_key,
-                    content_price_cents,
-                    learner_email,
-                    lc_request.user.lms_user_id
+            response = subsidy_request_api.approve_learner_credit_requests(
+                learner_credit_requests=learner_credit_requests,
+                policy_uuid=policy_uuid,
+                reviewer=request.user
+            )
+            if response['failed_approval']:
+                return Response(
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
                 )
-                # link allocated assignment to the request
-                lc_request.assignment = learner_credit_request_assignment
-                lc_request.save()
-                lc_request.approve(request.user)
-                send_learner_credit_bnr_request_approve_task.delay(learner_credit_request_assignment.uuid)
-            response_data = serializers.LearnerCreditRequestSerializer(lc_request).data
-            return Response(
-                response_data,
-                status=status.HTTP_200_OK,
-            )
-        except SubisidyAccessPolicyRequestApprovalError as exc:
-            error_msg = (
-                f"[LC REQUEST APPROVAL] Failed to approve learner credit request "
-                f"with UUID {learner_credit_request_uuid}. Reason: {exc.message}."
-            )
-            logger.exception(error_msg)
+            response_data = self.get_serializer(response['approved'], many=True).data
+            return Response(response_data, status=status.HTTP_200_OK)
+        except Exception:  # pylint: disable=broad-except
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
-            # Update approve action with error reason.
-            lc_request_action.status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
-            lc_request_action.error_reason = get_error_reason_choice(
-                LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL
+    @permission_required(
+        constants.REQUESTS_ADMIN_ACCESS_PERMISSION,
+        fn=get_enterprise_uuid_from_request_data,
+    )
+    @action(detail=False, url_path='approve-all', methods=['post'], pagination_class=None)
+    def approve_all(self, request, *args, **kwargs):
+        """
+        Approve all filtered learner credit requests against a single policy.
+
+        - On success, returns a `202 Accepted` status, indicating that the
+          bulk approval process has been initiated.
+        - If no approvable requests are found for the given policy and filters,
+          returns a `404 Not Found`.
+        - If any requests fail during the bulk approval, returns a
+          `422 Unprocessable Entity` to indicate a partial failure.
+        """
+        serializer = serializers.LearnerCreditRequestApproveAllSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        policy_uuid = serializer.validated_data['policy_uuid']
+
+        learner_credit_requests = self.get_queryset().filter(
+            state__in=[SubsidyRequestStates.REQUESTED, SubsidyRequestStates.ERROR],
+            learner_credit_request_config__learner_credit_config__uuid=policy_uuid
+        )
+
+        if not learner_credit_requests.exists():
+            return Response(
+                status=status.HTTP_404_NOT_FOUND
             )
-            lc_request_action.traceback = format_traceback(exc)
-            lc_request_action.save()
-            return Response({"detail": error_msg}, exc.status_code)
+
+        try:
+            response = subsidy_request_api.approve_learner_credit_requests(
+                learner_credit_requests=learner_credit_requests,
+                policy_uuid=policy_uuid,
+                reviewer=request.user
+            )
+            if response['failed_approval']:
+                return Response(
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+            return Response(status=status.HTTP_202_ACCEPTED)
+        except Exception:  # pylint: disable=broad-except
+            return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     @permission_required(
         constants.REQUESTS_ADMIN_ACCESS_PERMISSION,

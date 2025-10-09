@@ -21,9 +21,8 @@ from simple_history.utils import bulk_update_with_history
 
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
-    LearnerCreditAdditionalActionStates,
-    LearnerCreditRequestActionChoices,
     LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestActionTypes,
     LearnerCreditRequestUserMessages,
     SubsidyRequestStates,
     SubsidyTypeChoices
@@ -429,12 +428,6 @@ class LearnerCreditRequest(SubsidyRequest):
             return f'<LearnerCreditRequest for user {self.user} and course {self.course_id}>'
         return f'<LearnerCreditRequest for user {self.user}>'
 
-    def approve(self, reviewer):
-        self.reviewer = reviewer
-        self.state = SubsidyRequestStates.APPROVED
-        self.reviewed_at = localized_utcnow()
-        self.save()
-
     @classmethod
     def annotate_dynamic_fields_onto_queryset(cls, queryset):
         """
@@ -521,6 +514,12 @@ class LearnerCreditRequest(SubsidyRequest):
 
         return new_queryset
 
+    def approve(self, reviewer):
+        self.reviewer = reviewer
+        self.state = SubsidyRequestStates.APPROVED
+        self.reviewed_at = localized_utcnow()
+        self.save()
+
     def decline(self, reviewer, reason=None):
         self.reviewer = reviewer
         self.state = SubsidyRequestStates.DECLINED
@@ -533,6 +532,27 @@ class LearnerCreditRequest(SubsidyRequest):
         self.reviewer = reviewer
         self.reviewed_at = localized_utcnow()
         self.save()
+
+    def add_successful_approved_action(self):
+        """
+        Adds a successful 'approved' action for this request record.
+        """
+        return self.actions.create(
+            recent_action=LearnerCreditRequestActionTypes.APPROVED,
+            status=LearnerCreditRequestUserMessages.APPROVED,
+        )
+
+    def add_errored_approved_action(self, exc):
+        """
+        Adds an errored 'approved' action for this request record.
+        """
+        from enterprise_access.utils import format_traceback
+        return self.actions.create(
+            recent_action=LearnerCreditRequestActionTypes.APPROVED,
+            status=LearnerCreditRequestUserMessages.REQUESTED,
+            error_reason=LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL,
+            traceback=format_traceback(exc),
+        )
 
 
 class LearnerCreditRequestActions(TimeStampedModel):
@@ -560,7 +580,7 @@ class LearnerCreditRequestActions(TimeStampedModel):
         blank=False,
         null=False,
         db_index=True,
-        choices=LearnerCreditRequestActionChoices,
+        choices=LearnerCreditRequestActionTypes.CHOICES,
         help_text="The type of action taken on the learner credit request.",
     )
 
@@ -615,7 +635,7 @@ class LearnerCreditRequestActions(TimeStampedModel):
         Args:
             learner_credit_request (LearnerCreditRequest): The associated learner credit request.
             recent_action (str): The type of action taken (must be a valid choice from
-                LearnerCreditRequestActionChoices).
+                LearnerCreditRequestActionTypes.CHOICES).
             status (str): The status message (must be a valid choice from LearnerCreditRequestUserMessages.CHOICES).
             error_reason (str, optional): The error reason if applicable (must be a valid choice
                 from LearnerCreditRequestActionErrorReasons.CHOICES).
