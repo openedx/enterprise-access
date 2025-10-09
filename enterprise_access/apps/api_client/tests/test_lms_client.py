@@ -478,6 +478,7 @@ class TestLmsApiClient(TestCase):
             'slug': 'new-customer',
             'country': 'US',
             'enable_analytics_screen': False,
+            'enable_portal_subscription_management_screen': True,
             'other_field': True,
         }
 
@@ -486,6 +487,7 @@ class TestLmsApiClient(TestCase):
             'slug': 'new-customer',
             'country': 'US',
             'enable_analytics_screen': False,
+            'enable_portal_subscription_management_screen': True,
             'other_field': True,
         }
         mock_json.return_value = mock_created_customer_payload
@@ -628,6 +630,7 @@ class TestLmsApiClient(TestCase):
             'slug': 'new-customer',
             'country': 'US',
             'enable_analytics_screen': False,
+            'enable_portal_subscription_management_screen': True,
             'other_field': True,
         }
 
