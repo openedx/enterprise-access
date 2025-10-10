@@ -21,17 +21,53 @@ _handlers_by_type: dict[StripeEventType, Callable[[stripe.Event], None]] = {}
 
 
 def get_invoice_and_subscription(event: stripe.Event):
+    """
+    Given a stripe invoice event, return the invoice and related subscription records.
+    """
     invoice = event.data.object
     subscription_details = invoice.parent.subscription_details
     return invoice, subscription_details
+
+
+def get_checkout_intent_id_from_subscription(stripe_subscription):
+    """
+    Returns the CheckoutIntent identifier stored in the given
+    stripe subscription's metadata, or None if no such value is present.
+    """
+    if 'checkout_intent_id' in stripe_subscription.metadata:
+        # The stripe subscription object may actually be a SubscriptionDetails
+        # record from an invoice.
+        stripe_subscription_id = (
+            getattr(stripe_subscription, 'id', None) or getattr(stripe_subscription, 'subscription', None)
+        )
+        checkout_intent_id = int(stripe_subscription.metadata['checkout_intent_id'])
+        logger.info(
+            'Found checkout_intent_id=%s from subscription=%s',
+            checkout_intent_id, stripe_subscription_id,
+        )
+        return checkout_intent_id
+    return None
 
 
 def persist_stripe_event(event: stripe.Event) -> StripeEventData:
     """
     Creates and returns a new ``StripeEventData`` object.
     """
-    _, subscription_details = get_invoice_and_subscription(event)
-    checkout_intent_id = int(subscription_details.metadata['checkout_intent_id'])
+    stripe_subscription = None
+    if event.type == 'invoice.paid':
+        _, stripe_subscription = get_invoice_and_subscription(event)
+    elif event.type.startswith('customer.subscription'):
+        stripe_subscription = event.data.object
+
+    if not stripe_subscription:
+        logger.error(
+            'Cannot persist StripeEventData, no subscription found for event %s with type %s',
+            event.id,
+            event.type,
+        )
+        return None
+
+    checkout_intent_id = get_checkout_intent_id_from_subscription(stripe_subscription)
     checkout_intent = CheckoutIntent.objects.filter(
         id=checkout_intent_id,
         stripe_customer_id=event.data.object.get('customer'),
@@ -47,6 +83,32 @@ def persist_stripe_event(event: stripe.Event) -> StripeEventData:
     )
     logger.info('Persisted StripeEventData %s', record)
     return record
+
+
+def get_checkout_intent_or_raise(checkout_intent_id, event_id) -> CheckoutIntent:
+    """
+    Returns a CheckoutIntent with the given id, or logs and raises an exception.
+    """
+    try:
+        checkout_intent = CheckoutIntent.objects.get(id=checkout_intent_id)
+    except CheckoutIntent.DoesNotExist:
+        logger.exception('Could not find CheckoutIntent record for event %s', event_id)
+        raise
+
+    logger.info(
+        'Found existing CheckoutIntent record with id=%s, state=%s, for event=%s',
+        checkout_intent.id, checkout_intent.state, event_id,
+    )
+    return checkout_intent
+
+
+def link_event_data_to_checkout_intent(event, checkout_intent):
+    """
+    Sets the StripeEventData record for the given event to point at the provided CheckoutIntent.
+    """
+    event_data = StripeEventData.objects.get(event_id=event.id)
+    event_data.checkout_intent = checkout_intent
+    event_data.save()
 
 
 class StripeEventHandler:
@@ -92,35 +154,15 @@ class StripeEventHandler:
         """
         invoice, subscription_details = get_invoice_and_subscription(event)
         stripe_customer_id = invoice['customer']
-        subscription_id = subscription_details['subscription']
 
-        # Extract the checkout_intent ID from the related subscription.
-        checkout_intent_id = int(subscription_details.metadata['checkout_intent_id'])
-
+        checkout_intent_id = get_checkout_intent_id_from_subscription(subscription_details)
+        checkout_intent = get_checkout_intent_or_raise(checkout_intent_id, event.id)
         logger.info(
-            f'Found checkout_intent_id={checkout_intent_id} '
-            f'stored on the Subscription <subscription_id="{subscription_id}"> '
-            f'related to Invoice <invoice_id="{invoice.id}">.'
-        )
-
-        try:
-            checkout_intent = CheckoutIntent.objects.get(id=checkout_intent_id)
-        except CheckoutIntent.DoesNotExist as exc:
-            logger.error('Could not find CheckoutIntent record for event %s, %s', event.id, exc)
-            raise
-
-        logger.info(
-            'Found existing CheckoutIntent record with '
-            f'id={checkout_intent_id}, '
-            f'stripe_customer_id={stripe_customer_id}, '
-            f'stripe_checkout_session_id={checkout_intent.stripe_checkout_session_id}, '
-            f'state={checkout_intent.state}.  '
-            'Marking intent as paid...'
+            'Marking checkout_intent_id=%s as paid via invoice=%s',
+            checkout_intent_id, invoice.id,
         )
         checkout_intent.mark_as_paid(stripe_customer_id=stripe_customer_id)
-        event_data = StripeEventData.objects.get(event_id=event.id)
-        event_data.checkout_intent = checkout_intent
-        event_data.save()
+        link_event_data_to_checkout_intent(event, checkout_intent)
 
     @on_stripe_event('customer.subscription.trial_will_end')
     @staticmethod
@@ -131,6 +173,54 @@ class StripeEventHandler:
     @staticmethod
     def payment_method_attached(event: stripe.Event) -> None:
         pass
+
+    @on_stripe_event('customer.subscription.created')
+    @staticmethod
+    def subscription_created(event: stripe.Event) -> None:
+        """
+        Handle customer.subscription.created events.
+        Enable pending updates to prevent license count drift on failed payments.
+        """
+        subscription = event.data.object
+
+        logger.info(f'Enabling pending updates for created subscription {subscription.id}')
+
+        try:
+            # Update the subscription to enable pending updates for future modifications
+            # This ensures that quantity changes through the billing portal will only
+            # be applied if payment succeeds, preventing license count drift
+            stripe.Subscription.modify(
+                subscription.id,
+                payment_behavior='pending_if_incomplete',
+            )
+
+            logger.info(f'Successfully enabled pending updates for subscription {subscription.id}')
+        except stripe.StripeError as e:
+            logger.error(f'Failed to enable pending updates for subscription {subscription.id}: {e}')
+
+    @on_stripe_event('customer.subscription.updated')
+    @staticmethod
+    def subscription_updated(event: stripe.Event) -> None:
+        """
+        Handle customer.subscription.updated events.
+        Track when subscriptions have pending updates and update related CheckoutIntent state.
+        """
+        subscription = event.data.object
+        pending_update = getattr(subscription, 'pending_update', None)
+
+        checkout_intent_id = get_checkout_intent_id_from_subscription(subscription)
+        checkout_intent = get_checkout_intent_or_raise(checkout_intent_id, event.id)
+        link_event_data_to_checkout_intent(event, checkout_intent)
+
+        if pending_update:
+            # TODO: take necessary action on the actual SubscriptionPlan
+            # and update the CheckoutIntent.
+            logger.warning(
+                'Subscription %s has pending update: %s. checkout_intent_id: %s',
+                subscription.id,
+                pending_update,
+                get_checkout_intent_id_from_subscription(subscription),
+            )
 
     @on_stripe_event('customer.subscription.deleted')
     @staticmethod

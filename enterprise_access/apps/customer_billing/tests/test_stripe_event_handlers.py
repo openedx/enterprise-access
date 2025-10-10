@@ -76,6 +76,7 @@ class TestStripeEventHandler(TestCase):
     def _create_mock_stripe_subscription(self, checkout_intent_id):
         """Helper to create a mock Stripe subscription."""
         return {
+            'id': randint(1, 100000),
             'checkout_intent_id': str(checkout_intent_id),
             'enterprise_customer_name': 'Test Enterprise',
             'enterprise_customer_slug': 'test-enterprise',
@@ -114,10 +115,8 @@ class TestStripeEventHandler(TestCase):
         },
     )
     @ddt.unpack
-    @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.logger')
     def test_invoice_paid_handler(
         self,
-        mock_logger,
         checkout_intent_state=CheckoutIntentState.CREATED,
         intent_id_override=None,
         expected_exception=None,
@@ -156,30 +155,7 @@ class TestStripeEventHandler(TestCase):
             event_data = StripeEventData.objects.get(event_id=mock_event.id)
             self.assertEqual(event_data.checkout_intent, self.checkout_intent)
 
-        # Verify logging for successful cases
-        if not expected_exception:
-            mock_logger.info.assert_any_call(
-                f'[StripeEventHandler] handling <stripe.Event id={mock_event.id} type=invoice.paid>.'
-            )
-            mock_logger.info.assert_any_call(
-                f'Found checkout_intent_id={self.checkout_intent.id} '
-                f'stored on the Subscription <subscription_id="{subscription_id}"> '
-                f'related to Invoice <invoice_id="{invoice_data["id"]}">.'
-            )
-            mock_logger.info.assert_any_call(
-                'Found existing CheckoutIntent record with '
-                f'id={self.checkout_intent.id}, '
-                f'stripe_customer_id=cus_test_789, '
-                f'stripe_checkout_session_id={self.checkout_intent.stripe_checkout_session_id}, '
-                f'state={checkout_intent_state}.  '
-                'Marking intent as paid...'
-            )
-            mock_logger.info.assert_any_call(
-                f'[StripeEventHandler] handler for <stripe.Event id={mock_event.id} type=invoice.paid> complete.'
-            )
-
-    @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.logger')
-    def test_invoice_paid_handler_sets_stripe_customer_id(self, mock_logger):
+    def test_invoice_paid_handler_sets_stripe_customer_id(self):
         """Test that invoice.paid handler correctly sets stripe_customer_id on CheckoutIntent."""
         subscription_id = 'sub_test_customer_id_123'
         stripe_customer_id = 'cus_test_customer_456'
@@ -211,16 +187,6 @@ class TestStripeEventHandler(TestCase):
         self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)
         event_data = StripeEventData.objects.get(event_id=mock_event.id)
         self.assertEqual(event_data.checkout_intent, self.checkout_intent)
-
-        # Verify logging includes the customer_id
-        mock_logger.info.assert_any_call(
-            'Found existing CheckoutIntent record with '
-            f'id={self.checkout_intent.id}, '
-            f'stripe_customer_id={stripe_customer_id}, '
-            f'stripe_checkout_session_id={self.checkout_intent.stripe_checkout_session_id}, '
-            f'state={CheckoutIntentState.CREATED}.  '
-            'Marking intent as paid...'
-        )
 
     def test_invoice_paid_handler_idempotent_with_same_customer_id(self):
         """Test that invoice.paid handler is idempotent when called with same stripe_customer_id."""
