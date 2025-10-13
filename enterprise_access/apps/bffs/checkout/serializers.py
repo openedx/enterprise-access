@@ -241,6 +241,7 @@ class FirstBillableInvoiceSerializer(serializers.Serializer):
     start_time = serializers.DateTimeField(allow_null=True)
     end_time = serializers.DateTimeField(allow_null=True)
     last4 = serializers.IntegerField(allow_null=True)
+    card_brand = serializers.CharField(allow_null=True, allow_blank=True)
     quantity = serializers.IntegerField(allow_null=True)
     unit_amount_decimal = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
     customer_phone = serializers.CharField(allow_null=True, allow_blank=True)
