@@ -592,6 +592,7 @@ class TestCheckoutSuccessHandler(APITest):
             'id': 'pm_test_123',
             'card': {
                 'last4': '4242',
+                'brand': 'visa',
             },
             'billing_details': {
                 'address': {
@@ -790,6 +791,7 @@ class TestCheckoutSuccessHandler(APITest):
         # Assert all data is populated correctly
         first_billable_invoice = self.context.checkout_intent['first_billable_invoice']
         self.assertEqual(first_billable_invoice['last4'], '4242')
+        self.assertEqual(first_billable_invoice['card_brand'], 'visa')
         self.assertEqual(first_billable_invoice['quantity'], 35)
         self.assertEqual(first_billable_invoice['unit_amount_decimal'], 396.00)
         self.assertEqual(first_billable_invoice['customer_name'], 'Test Customer')
@@ -811,16 +813,52 @@ class TestCheckoutSuccessHandler(APITest):
 
     @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
     @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
-    def test_no_payment_intent_in_session(self, mock_session, mock_get_checkout_intent):
-        """Test when session has no payment intent."""
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_subscription')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_payment_method')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_invoice')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_customer')
+    def test_trial_subscription_gets_payment_method_from_subscription(
+        self, mock_customer, mock_invoice, mock_payment_method, mock_subscription, mock_session,
+        mock_get_checkout_intent,
+    ):
+        """Test trial subscription case where payment method comes from subscription.default_payment_method."""
         mock_get_checkout_intent.return_value = self.checkout_intent_data
+        # Trial subscription: no payment_intent on session
         session_no_payment = {**self.stripe_session}
         session_no_payment.pop('payment_intent')
         mock_session.return_value = session_no_payment
 
+        # Subscription has default_payment_method (set during checkout)
+        subscription_with_payment_method = {**self.stripe_subscription, 'default_payment_method': 'pm_test_123'}
+        mock_subscription.return_value = subscription_with_payment_method
+        mock_payment_method.return_value = self.stripe_payment_method
+        mock_invoice.return_value = self.stripe_invoice
+        mock_customer.return_value = self.stripe_customer
+
         self.handler.load_and_process()
 
-        # Assert first_billable_invoice is initialized but empty
+        # Assert payment method data is populated from subscription
+        first_billable_invoice = self.context.checkout_intent['first_billable_invoice']
+        self.assertEqual(first_billable_invoice['last4'], '4242')
+        self.assertEqual(first_billable_invoice['card_brand'], 'visa')
+        self.assertIsNotNone(first_billable_invoice['billing_address'])
+        self.assertEqual(first_billable_invoice['quantity'], 35)
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutSuccessHandler._get_checkout_intent')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_subscription')
+    def test_no_payment_intent_in_session(self, mock_subscription, mock_session, mock_get_checkout_intent):
+        """Test when session has no payment intent but has subscription (trial subscription case)."""
+        mock_get_checkout_intent.return_value = self.checkout_intent_data
+        session_no_payment = {**self.stripe_session}
+        session_no_payment.pop('payment_intent')
+        mock_session.return_value = session_no_payment
+        # Mock subscription with no default_payment_method (edge case)
+        mock_subscription.return_value = {**self.stripe_subscription, 'default_payment_method': None}
+
+        self.handler.load_and_process()
+
+        # Assert first_billable_invoice is initialized but empty since no payment method found
         self.assertIn('first_billable_invoice', self.context.checkout_intent)
         self.assertIsNone(self.context.checkout_intent['first_billable_invoice']['last4'])
 
