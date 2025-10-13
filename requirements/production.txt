@@ -16,7 +16,7 @@ asgiref==3.10.0
     #   django
     #   django-cors-headers
     #   django-countries
-attrs==25.3.0
+attrs==25.4.0
     # via
     #   -r requirements/base.txt
     #   cattrs
@@ -35,7 +35,7 @@ billiard==4.2.2
     # via
     #   -r requirements/base.txt
     #   celery
-cattrs==25.2.0
+cattrs==25.3.0
     # via -r requirements/base.txt
 celery==5.5.3
     # via
@@ -97,7 +97,6 @@ cryptography==46.0.2
     # via
     #   -r requirements/base.txt
     #   pyjwt
-    #   social-auth-core
 defusedxml==0.7.1
     # via
     #   -r requirements/base.txt
@@ -228,7 +227,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/base.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.16
+edx-enterprise-subsidy-client==2.0.18
     # via -r requirements/base.txt
 edx-event-bus-kafka==6.1.0
     # via -r requirements/base.txt
@@ -249,7 +248,7 @@ edx-toggles==5.4.1
     #   -r requirements/base.txt
     #   edx-auth-backends
     #   edx-event-bus-kafka
-fastavro==1.12.0
+fastavro==1.12.1
     # via
     #   -r requirements/base.txt
     #   confluent-kafka
@@ -260,7 +259,7 @@ greenlet==3.2.4
     # via gevent
 gunicorn==23.0.0
     # via -r requirements/production.in
-idna==3.10
+idna==3.11
     # via
     #   -r requirements/base.txt
     #   requests
@@ -355,7 +354,7 @@ pyjwt[crypto]==2.10.1
     #   social-auth-core
 pymemcache==4.0.0
     # via -r requirements/base.txt
-pymongo==4.15.2
+pymongo==4.15.3
     # via
     #   -r requirements/base.txt
     #   edx-opaque-keys
@@ -440,7 +439,7 @@ social-auth-app-django==5.4.3
     # via
     #   -r requirements/base.txt
     #   edx-auth-backends
-social-auth-core==4.7.0
+social-auth-core==4.8.1
     # via
     #   -r requirements/base.txt
     #   edx-auth-backends
