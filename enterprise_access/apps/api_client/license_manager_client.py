@@ -8,6 +8,7 @@ from django.conf import settings
 
 from enterprise_access.apps.api_client.base_oauth import BaseOAuthClient
 from enterprise_access.apps.api_client.base_user import BaseUserApiClient
+from enterprise_access.apps.api_client.exceptions import APIClientException, safe_error_response_content
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,10 @@ class LicenseManagerApiClient(BaseOAuthClient):
             return response.json()
         except requests.exceptions.HTTPError as exc:
             logger.exception(exc)
-            raise
+            raise APIClientException(
+                f'Could not fetch subscription data for {subscription_uuid}',
+                exc,
+            ) from exc
 
     def get_learner_subscription_licenses_for_admin(
         self,
@@ -85,7 +89,9 @@ class LicenseManagerApiClient(BaseOAuthClient):
                 next_url = data.get('next') if traverse_pagination else None
             return results
         except requests.exceptions.HTTPError as exc:
-            logger.exception(f"Failed to get learner subscription licenses for admin : {exc}")
+            logger.exception(
+                f"Failed to get learner subscription licenses for admin : {safe_error_response_content(exc)}"
+            )
             raise
 
     def assign_licenses(self, user_emails, subscription_uuid):
@@ -128,9 +134,12 @@ class LicenseManagerApiClient(BaseOAuthClient):
         except requests.exceptions.HTTPError as exc:
             logger.exception(
                 'Error fetching customer agreements for customer id %s, response: %s, exc: %s',
-                customer_uuid, response.content.decode(), exc,
+                customer_uuid, safe_error_response_content(exc), exc,
             )
-            raise
+            raise APIClientException(
+                f'Could not fetch customer agreement for customer {customer_uuid}',
+                exc,
+            ) from exc
 
     def create_customer_agreement(self, customer_uuid, customer_slug, default_catalog_uuid=None, **kwargs):
         """
@@ -154,9 +163,12 @@ class LicenseManagerApiClient(BaseOAuthClient):
         except requests.exceptions.HTTPError as exc:
             logger.exception(
                 'Error creating customer agreement for customer id %s, response: %s, exc: %s',
-                customer_uuid, response.content.decode(), exc
+                customer_uuid, safe_error_response_content(exc), exc
             )
-            raise
+            raise APIClientException(
+                f'Could not create customer agreement for customer {customer_uuid}',
+                exc,
+            ) from exc
 
     def create_subscription_plan(
         self, customer_agreement_uuid, salesforce_opportunity_line_item, title,
@@ -191,10 +203,13 @@ class LicenseManagerApiClient(BaseOAuthClient):
         except requests.exceptions.HTTPError as exc:
             logger.exception(
                 'Failed to create subscription plan, response %s, exception: %s',
-                response.content.decode('utf-8'),
+                safe_error_response_content(exc),
                 exc,
             )
-            raise
+            raise APIClientException(
+                f'Could not create subscription plan for customer agreement {customer_agreement_uuid}',
+                exc,
+            ) from exc
 
 
 class LicenseManagerUserApiClient(BaseUserApiClient):
