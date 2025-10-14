@@ -965,8 +965,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
 
         - On success, returns a `200 OK` with a list of the approved request objects.
         - If any of the specified requests fail to be approved, returns a
-          `422 Unprocessable Entity` with a detail message. The successful
-          approvals will still be committed.
+          `422 Unprocessable Entity`. The successful approvals will still be committed.
         """
         serializer = serializers.LearnerCreditRequestApproveRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

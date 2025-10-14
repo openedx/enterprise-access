@@ -4,7 +4,6 @@
 # pylint: skip-file
 
 import collections
-from datetime import datetime
 from uuid import uuid4
 
 from django.conf import settings
@@ -12,12 +11,13 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Case, CharField, F, IntegerField, OuterRef, Q, Subquery, Value, When
 from django.dispatch import receiver
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from jsonfield.encoder import JSONEncoder
 from jsonfield.fields import JSONField
 from model_utils.models import SoftDeletableModel, TimeStampedModel
 from simple_history.models import HistoricalRecords
-from simple_history.utils import bulk_update_with_history
+from simple_history.utils import bulk_create_with_history, bulk_update_with_history
 
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
@@ -533,27 +533,28 @@ class LearnerCreditRequest(SubsidyRequest):
         self.reviewed_at = localized_utcnow()
         self.save()
 
-    def add_successful_approved_action(self):
+    @classmethod
+    def bulk_update(cls, lcr_records, updated_field_names):
         """
-        Adds a successful 'approved' action for this request record.
-        """
-        return self.actions.create(
-            recent_action=LearnerCreditRequestActionTypes.APPROVED,
-            status=LearnerCreditRequestUserMessages.APPROVED,
-        )
+        Updates and saves the given ``lcr_records`` in bulk,
+        while saving their history:
+        https://django-simple-history.readthedocs.io/en/latest/common_issues.html#bulk-updating-a-model-with-history-new
 
-    def add_errored_approved_action(self, exc):
-        """
-        Adds an errored 'approved' action for this request record.
-        """
-        from enterprise_access.utils import format_traceback
-        return self.actions.create(
-            recent_action=LearnerCreditRequestActionTypes.APPROVED,
-            status=LearnerCreditRequestUserMessages.REQUESTED,
-            error_reason=LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL,
-            traceback=format_traceback(exc),
-        )
+        Note that the simple-history utility function uses Django's bulk_update() under the hood:
+        https://docs.djangoproject.com/en/3.2/ref/models/querysets/#bulk-update
 
+        which does *not* call save(), so we have to manually update the `modified` field
+        during this bulk operation in order for that field's value to be updated.
+        """
+        for record in lcr_records:
+            record.modified = timezone.now()
+
+        return bulk_update_with_history(
+            lcr_records,
+            cls,
+            updated_field_names + ['modified'],
+            batch_size=SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
+        )
 
 class LearnerCreditRequestActions(TimeStampedModel):
     """
@@ -619,6 +620,19 @@ class LearnerCreditRequestActions(TimeStampedModel):
     def __str__(self):
         return (f"<LearnerCreditRequestActions for request {self.learner_credit_request}"
                 f" with action {self.recent_action}>")
+
+    @classmethod
+    def bulk_create(cls, lcr_action_records):
+        """
+        Creates new ``LearnerCreditRequestActions`` records in bulk,
+        while saving their history:
+        https://django-simple-history.readthedocs.io/en/latest/common_issues.html#bulk-creating-a-model-with-history
+        """
+        return bulk_create_with_history(
+            lcr_action_records,
+            cls,
+            batch_size=SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
+        )
 
     @classmethod
     def create_action(
