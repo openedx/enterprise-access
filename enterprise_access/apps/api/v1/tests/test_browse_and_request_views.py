@@ -31,7 +31,10 @@ from enterprise_access.apps.subsidy_access_policy.constants import (
     REASON_POLICY_SPEND_LIMIT_REACHED,
     REASON_SUBSIDY_EXPIRED
 )
-from enterprise_access.apps.subsidy_access_policy.exceptions import SubsidyAccessPolicyLockAttemptFailed
+from enterprise_access.apps.subsidy_access_policy.exceptions import (
+    PriceValidationError,
+    SubsidyAccessPolicyLockAttemptFailed
+)
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
@@ -2074,28 +2077,19 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         )
 
     @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
     @mock.patch(
-        'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
-        return_value=mock.MagicMock(),
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
     )
     def test_approve_happy_path(
         self,
-        mock_get_and_cache_content_metadata,
-        mock_catalog_contains,
-        mock_content_metadata,
+        mock_catalog_content_metadata,
         mock_get_enterprise_uuid
     ):
         """
         Test successful approve of a learner credit request.
         """
         mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
-        mock_content_metadata.return_value = {
-            'content_key': 'some-content-key',
-            'content_price': 1000,
-        }
-        mock_catalog_contains.return_value = True
 
         # Set up mock client and its methods
         self.mock_subsidy_client.retrieve_subsidy.return_value = {
@@ -2122,10 +2116,16 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
             }
         }
 
-        mock_get_and_cache_content_metadata.return_value = {
-            'content_title': 'Demo Course',
-            'content_key': 'some-content-key',
-            'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+        mock_catalog_content_metadata.return_value = {
+            'results': [{
+                'key': self.user_request_1.course_id,
+                'title': 'Demo Course',
+                'content_type': 'courserun',
+                'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+                'first_enrollable_paid_seat_price': '10',
+                'content_price': 10,
+                'uuid': str(uuid4()),
+            }]
         }
 
         # set up some approved requests with allocated assignments
@@ -2153,7 +2153,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
             "policy_uuid": str(self.policy.uuid),
-            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+            "learner_credit_request_uuids": [str(self.user_request_1.uuid)]
         }
         response = self.client.post(url, data)
         assert response.status_code == status.HTTP_200_OK
@@ -2187,18 +2187,14 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         LearnerContentAssignmentStateChoices.REVERSED,
     )
     @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
     @mock.patch(
-        'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
-        return_value=mock.MagicMock(),
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
     )
     def test_approve_reallocate_assignment(
         self,
         reallocate_state,
-        mock_get_and_cache_content_metadata,
-        mock_catalog_contains,
-        mock_content_metadata,
+        mock_catalog_content_metadata,
         mock_get_enterprise_uuid
     ):
         """
@@ -2206,11 +2202,6 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         gets reallocated instead of creating a new one.
         """
         mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
-        mock_content_metadata.return_value = {
-            'content_key': self.user_request_1.course_id,
-            'content_price': self.user_request_1.course_price,
-        }
-        mock_catalog_contains.return_value = True
 
         # Set up mock client and its methods
         self.mock_subsidy_client.retrieve_subsidy.return_value = {
@@ -2230,10 +2221,16 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
             }
         }
 
-        mock_get_and_cache_content_metadata.return_value = {
-            'content_title': 'Demo Course',
-            'content_key': self.user_request_1.course_id,
-            'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+        mock_catalog_content_metadata.return_value = {
+            'results': [{
+                'key': self.user_request_1.course_id,
+                'title': 'Demo Course',
+                'content_type': 'courserun',
+                'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+                'first_enrollable_paid_seat_price': '10',
+                'content_price': 10,
+                'uuid': str(uuid4()),
+            }]
         }
 
         # set up a content assignment in REALLOCATE state
@@ -2264,7 +2261,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
             "policy_uuid": str(self.policy.uuid),
-            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+            "learner_credit_request_uuids": [str(self.user_request_1.uuid)]
         }
         response = self.client.post(url, data)
         assert response.status_code == status.HTTP_200_OK
@@ -2306,18 +2303,11 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         )
 
     @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
-    def test_approve_policy_expired(self, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid):
+    def test_approve_policy_expired(self, mock_get_enterprise_uuid):
         """
         Test approve when policy is expired/inactive (is_redemption_enabled = False).
         """
         mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
-        mock_content_metadata.return_value = {
-            'content_key': 'some-content-key',
-            'content_price': 1000,
-        }
-        mock_catalog_contains.return_value = True
 
         # Set up mock subsidy client to return proper values
         self.mock_subsidy_client.retrieve_subsidy.return_value = {
@@ -2349,7 +2339,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
             "policy_uuid": str(self.policy.uuid),
-            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+            "learner_credit_request_uuids": [str(self.user_request_1.uuid)]
         }
         response = self.client.post(url, data)
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
@@ -2370,20 +2360,23 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         assert latest_action.error_reason is not None
 
     @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
+    )
     def test_approve_content_not_in_catalog(
-        self, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid
+        self, mock_catalog_content_metadata, mock_get_enterprise_uuid
     ):
         """
         Test approve when content is not in the policy's catalog.
         """
         mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
-        mock_content_metadata.return_value = {
-            'content_key': 'some-content-key',
-            'content_price': 1000,
+
+        mock_catalog_content_metadata.return_value = {
+            'results': [{
+                'key': 'some-content-key',
+            }]
         }
-        mock_catalog_contains.return_value = False
 
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -2394,12 +2387,12 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
             "policy_uuid": str(self.policy.uuid),
-            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+            "learner_credit_request_uuids": [str(self.user_request_1.uuid)]
         }
         response = self.client.post(url, data)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-        assert REASON_CONTENT_NOT_IN_CATALOG in response.data['detail'].lower()
+        assert 'failed to approve' in response.data['detail'].lower()
 
         # Verify request was not approved
         self.user_request_1.refresh_from_db()
@@ -2419,18 +2412,20 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         assert REASON_CONTENT_NOT_IN_CATALOG in latest_action.traceback.lower()
 
     @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
-    def test_approve_subsidy_inactive(self, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid):
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
+    )
+    def test_approve_subsidy_inactive(self, mock_catalog_content_metadata, mock_get_enterprise_uuid):
         """
         Test approve when subsidy is inactive.
         """
         mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
-        mock_content_metadata.return_value = {
-            'content_key': 'some-content-key',
-            'content_price': 1000,
+        mock_catalog_content_metadata.return_value = {
+            'results': [{
+                'key': 'some-content-key',
+            }]
         }
-        mock_catalog_contains.return_value = True
 
         # Mock inactive subsidy
         self.mock_subsidy_client.retrieve_subsidy.return_value = {
@@ -2452,7 +2447,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
             "policy_uuid": str(self.policy.uuid),
-            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+            "learner_credit_request_uuids": [str(self.user_request_1.uuid)]
         }
         response = self.client.post(url, data)
 
@@ -2465,20 +2460,28 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         assert self.user_request_1.assignment is None
 
     @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
+    )
     def test_approve_insufficient_subsidy_balance(
-        self, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid
+        self, mock_catalog_content_metadata, mock_get_enterprise_uuid
     ):
         """
         Test approve when subsidy has insufficient balance.
         """
         mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
-        mock_content_metadata.return_value = {
-            'content_key': 'some-content-key',
-            'content_price': 1000,
+        mock_catalog_content_metadata.return_value = {
+            'results': [{
+                'key': self.user_request_1.course_id,
+                'title': 'Demo Course',
+                'content_type': 'courserun',
+                'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+                'first_enrollable_paid_seat_price': '10',
+                'content_price': 10,
+                'uuid': str(uuid4()),
+            }]
         }
-        mock_catalog_contains.return_value = True
 
         # Mock subsidy with insufficient balance
         self.mock_subsidy_client.retrieve_subsidy.return_value = {
@@ -2523,7 +2526,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
             "policy_uuid": str(self.policy.uuid),
-            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+            "learner_credit_request_uuids": [str(self.user_request_1.uuid)]
         }
         response = self.client.post(url, data)
 
@@ -2536,20 +2539,17 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         assert self.user_request_1.assignment is None
 
     @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
+    )
     def test_approve_policy_spend_limit_exceeded(
-        self, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid
+        self, mock_catalog_content_metadata, mock_get_enterprise_uuid
     ):
         """
         Test approve when policy spend limit would be exceeded.
         """
         mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
-        mock_content_metadata.return_value = {
-            'content_key': 'some-content-key',
-            'content_price': 2500,  # Request price is 2500
-        }
-        mock_catalog_contains.return_value = True
         self.mock_subsidy_client.retrieve_subsidy.return_value = {
             'uuid': str(uuid4()),
             'title': 'Test Subsidy',
@@ -2568,6 +2568,18 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
             state=SubsidyRequestStates.REQUESTED,
             assignment=None
         )
+
+        mock_catalog_content_metadata.return_value = {
+            'results': [{
+                'key': request_exceed_spend_limit.course_id,
+                'title': 'Demo Course',
+                'content_type': 'courserun',
+                'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+                'first_enrollable_paid_seat_price': '25',
+                'content_price': 25,
+                'uuid': str(uuid4()),
+            }]
+        }
 
         total_quantity_transactions = self.mock_transaction_record_1['quantity'] + \
             self.mock_transaction_record_2['quantity']
@@ -2606,7 +2618,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
             "policy_uuid": str(self.policy.uuid),
-            "learner_credit_request_uuid": str(request_exceed_spend_limit.uuid)
+            "learner_credit_request_uuids": [str(request_exceed_spend_limit.uuid)]
         }
         response = self.client.post(url, data)
 
@@ -2619,21 +2631,29 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         assert request_exceed_spend_limit.assignment is None
 
     @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
+    )
     def test_approve_invalid_price_validation(
-        self, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid
+        self, mock_catalog_content_metadata, mock_get_enterprise_uuid
     ):
         """
         Test approve when content price validation fails.
         """
         course_canonical_price = 200
         mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
-        mock_content_metadata.return_value = {
-            'content_key': 'some-content-key',
-            'content_price': course_canonical_price,  # request price way beyond canonical price range.
+        mock_catalog_content_metadata.return_value = {
+            'results': [{
+                'key': self.user_request_1.course_id,
+                'title': 'Demo Course',
+                'content_type': 'courserun',
+                'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+                'first_enrollable_paid_seat_price': str(course_canonical_price),
+                'content_price': course_canonical_price,  # request price way beyond canonical price range.
+                'uuid': str(uuid4()),
+            }]
         }
-        mock_catalog_contains.return_value = True
 
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -2644,18 +2664,22 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
             "policy_uuid": str(self.policy.uuid),
-            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+            "learner_credit_request_uuids": [str(self.user_request_1.uuid)]
         }
         response = self.client.post(url, data)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-        assert f'outside of acceptable interval on canonical course price of {course_canonical_price}' \
-            in response.data['detail'].lower()
 
         # Verify request was not approved
         self.user_request_1.refresh_from_db()
         assert self.user_request_1.state == SubsidyRequestStates.REQUESTED
         assert self.user_request_1.assignment is None
+
+        actions = LearnerCreditRequestActions.objects.filter(
+            learner_credit_request=self.user_request_1
+        ).order_by('-created')
+        latest_action = actions.first()
+        assert PriceValidationError.__name__ in latest_action.traceback
 
     def test_approve_nonexistent_policy(self):
         """
@@ -2671,12 +2695,11 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
             "policy_uuid": non_existent_policy_uuid,  # Nonexistent UUID
-            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+            "learner_credit_request_uuids": [str(self.user_request_1.uuid)]
         }
         response = self.client.post(url, data)
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
-        assert f"policy with uuid {non_existent_policy_uuid} does not exist" in response.data['detail'].lower()
 
     def test_approve_missing_required_fields(self):
         """
@@ -2692,7 +2715,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         # Test missing policy_uuid
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
-            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+            "learner_credit_request_uuids": [str(self.user_request_1.uuid)]
         }
         response = self.client.post(url, data)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -2705,7 +2728,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         }
         response = self.client.post(url, data)
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "required" in response.data['learner_credit_request_uuid'][0].lower()
+        assert "required" in response.data['learner_credit_request_uuids'][0].lower()
 
     def test_approve_unauthorized_access(self):
         """
@@ -2721,7 +2744,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
             "policy_uuid": str(self.policy.uuid),
-            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+            "learner_credit_request_uuids": [str(self.user_request_1.uuid)]
         }
         response = self.client.post(url, data)
 
@@ -2741,28 +2764,36 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
             "policy_uuid": str(self.policy.uuid),
-            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+            "learner_credit_request_uuids": [str(self.user_request_1.uuid)]
         }
         response = self.client.post(url, data)
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
 
     @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.get_content_metadata')
-    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.catalog_contains_content_key')
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
+    )
     @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.lock')
     def test_approve_policy_lock_failure(
-        self, mock_lock, mock_catalog_contains, mock_content_metadata, mock_get_enterprise_uuid
+        self, mock_lock, mock_catalog_content_metadata, mock_get_enterprise_uuid
     ):
         """
         Test approve when policy lock acquisition fails.
         """
         mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
-        mock_content_metadata.return_value = {
-            'content_key': 'some-content-key',
-            'content_price': 1000,
+        mock_catalog_content_metadata.return_value = {
+            'results': [{
+                'key': self.user_request_1.course_id,
+                'title': 'Demo Course',
+                'content_type': 'courserun',
+                'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+                'first_enrollable_paid_seat_price': '10',
+                'content_price': 10,
+                'uuid': str(uuid4()),
+            }]
         }
-        mock_catalog_contains.return_value = True
 
         # Mock lock failure
         mock_lock.side_effect = SubsidyAccessPolicyLockAttemptFailed("Lock failed")
@@ -2776,7 +2807,7 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         data = {
             "enterprise_customer_uuid": str(self.enterprise_customer_uuid_1),
             "policy_uuid": str(self.policy.uuid),
-            "learner_credit_request_uuid": str(self.user_request_1.uuid)
+            "learner_credit_request_uuids": [str(self.user_request_1.uuid)]
         }
         response = self.client.post(url, data)
 

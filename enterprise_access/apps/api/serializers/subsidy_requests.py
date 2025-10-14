@@ -294,6 +294,7 @@ class LearnerCreditRequestApproveRequestSerializer(serializers.Serializer):
         help_text="The UUID of the SubsidyAccessPolicy to use for this approval."
     )
 
+
 class LearnerCreditRequestApproveAllSerializer(serializers.Serializer):
     """
     Request serializer to validate the approve-all action.

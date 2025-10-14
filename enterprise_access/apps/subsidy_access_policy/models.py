@@ -23,9 +23,12 @@ from simple_history.models import HistoricalRecords
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments import api as assignments_api
 from enterprise_access.apps.content_assignments.constants import LearnerContentAssignmentStateChoices
+from enterprise_access.apps.content_metadata.api import (
+    get_and_cache_catalog_content_metadata,
+    get_canonical_content_price_from_metadata
+)
 from enterprise_access.apps.subsidy_request.constants import (
     LearnerCreditRequestActionErrorReasons,
-    LearnerCreditRequestUserMessages,
     SubsidyRequestStates
 )
 from enterprise_access.apps.subsidy_request.models import (
@@ -780,50 +783,40 @@ class SubsidyAccessPolicy(TimeStampedModel):
         )
         logger.info(message, self.uuid, is_redeemable, reason, lms_user_id, content_key, extra)
 
-    def can_approve(self, content_key, content_price_cents):
+    def can_approve(self, learner_credit_requests):
         """
-        Determines if a request with the given content_key and content_price_cents
-        can be approved under this policy.
+        Determines which requests in a batch can be approved under this policy.
 
-        Returns a tuple of (bool, str):
-        - bool: True if the request can be approved, False otherwise.
-        - str: A reason code if the request cannot be approved, or an empty string if it can.
+        This now supports partial success by returning a dictionary of valid and failed requests.
+
+        Returns:
+            A dict with 'valid_requests' and 'failed_requests_by_reason'.
         """
-        # Since we are treating assignments as approved requests, can_allocate would give us the same result.
         if not self.bnr_enabled:
-            return False, REASON_BNR_NOT_ENABLED
-        return self.assignment_request_can_allocate(content_key, content_price_cents)
+            return {
+                "error_reason": REASON_BNR_NOT_ENABLED
+            }
+        return self.assignment_request_can_allocate(learner_credit_requests)
 
-    def approve(self, learner_email, content_key, content_price_cents, lms_user_id):
+    def approve(self, learner_credit_requests):
         """
-        Approves a learner credit request for the given learner_email and content_key.
-        This method allocates an assignment for the learner to be linked with the request.
-        If the allocation fails, it logs an error and returns None.
-        If the allocation is successful, it returns the created assignment.
+        Approves a batch of learner credit requests by allocating assignments for them.
 
-        Params:
-          learner_email: Email of the learner for whom the request is being approved.
-          content_key: Course key of the requested content.
-          content_price_cents: A **non-negative** integer reflecting the current price of the content in USD cents.
-          lms_user_id: The LMS user ID of the learner.
+        This method serves as a wrapper around the core content_assignments API.
+
+        Args:
+            learner_credit_requests (list[LearnerCreditRequest]): A list of valid
+                requests to be approved.
+
+        Returns:
+            dict: A map of {request.uuid: assignment_object} for all created or
+                  re-allocated assignments.
         """
         # To approve a learner credit request, we need to allocate an assignment and link it to the request.
-        assignment = assignments_api.allocate_assignment_for_request(
+        return assignments_api.allocate_assignment_for_requests(
             self.assignment_configuration,
-            learner_email,
-            content_key,
-            content_price_cents,
-            lms_user_id,
+            learner_credit_requests
         )
-
-        if not assignment:
-            error_msg = (
-                f"Failed to create for learner {learner_email} "
-                f"and content {content_key}."
-            )
-            logger.error(f"[LC REQUEST APPROVAL] {error_msg}")
-            return None
-        return assignment
 
     def can_redeem(
         self, lms_user_id, content_key,
@@ -1383,12 +1376,12 @@ class SubsidyAccessPolicyRequestAssignmentMixin:
                 action.save()
                 raise
 
-    def assignment_request_can_allocate(self, content_key, content_price_cents):
+    def assignment_request_can_allocate(self, learner_credit_requests):
         """
         Wrapper method to make requests that fall under a PerLearnerSpendCreditAccessPolicy work with assignments.
         """
         policy_instance = self.copy_context_to(AssignedLearnerCreditAccessPolicy)
-        return policy_instance.can_allocate(1, content_key, content_price_cents)
+        return policy_instance.can_allocate_all(learner_credit_requests)
 
 
 class PerLearnerSpendCreditAccessPolicy(CreditPolicyMixin, SubsidyAccessPolicy,
@@ -1906,6 +1899,161 @@ class AssignedLearnerCreditAccessPolicy(AssignedCreditPolicyMixin, SubsidyAccess
             return (False, REASON_POLICY_SPEND_LIMIT_REACHED)
 
         return (True, None)
+
+    def validate_learner_credit_requests_allocation_prices(self, learner_credit_requests, all_metadata):
+        """
+        Verifies that the price on each LearnerCreditRequest is within the
+        acceptable tolerance range of its canonical price.
+
+        Args:
+            learner_credit_requests (list[LearnerCreditRequest]): The requests to validate.
+            all_metadata (dict): Pre-fetched metadata from the catalog service.
+        """
+        valid_requests = []
+        failed_requests = []
+        for request in learner_credit_requests:
+            if request.course_price < 0:
+                logger.warning(f"Can only allocate non-negative course_price_cents for {request.course_id}.")
+                failed_requests.append(request)
+                continue
+
+            metadata = all_metadata.get(request.course_id)
+
+            canonical_price_cents = get_canonical_content_price_from_metadata(request.course_id, metadata)
+            requested_price_cents = request.course_price
+
+            lower_bound = settings.ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO * canonical_price_cents
+            upper_bound = settings.ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO * canonical_price_cents
+
+            if not (lower_bound <= requested_price_cents <= upper_bound):
+                logger.warning(
+                    f'Requested price {requested_price_cents} for {request.course_id} '
+                    f'outside of acceptable interval on canonical course price of {canonical_price_cents}.'
+                )
+                failed_requests.append(request)
+            else:
+                valid_requests.append(request)
+
+        return valid_requests, failed_requests
+
+    def can_allocate_all(self, learner_credit_requests):
+        """
+        Determines which requests in a batch can be allocated. It separates requests
+        into 'valid' and 'failed' groups.
+
+        Global checks (e.g., budget) will cause all requests to fail.
+        Per-request checks (e.g., catalog inclusion) will only fail the specific requests.
+
+        Returns:
+            A dict with 'valid_requests' and 'failed_requests_by_reason' or with error_reason.
+            Example:
+            {
+                "valid_requests": [<LCR1>, <LCR2>],
+                "failed_requests_by_reason": {
+                    "content_not_in_catalog": [<LCR3>],
+                    "price_validation_error": [<LCR4>]
+                }
+            }
+        """
+        logger.info(f"Validating batch of {len(learner_credit_requests)} learner credit requests.")
+        failed_requests_by_reason = {}
+
+        # inactive policy
+        if not self.is_redemption_enabled:
+            return {
+                "error_reason": REASON_POLICY_EXPIRED
+            }
+
+        # inactive subsidy
+        if not self.is_subsidy_active:
+            return {
+                "error_reason": REASON_SUBSIDY_EXPIRED
+            }
+
+        # 1. Bulk fetch all necessary metadata in one efficient operation.
+        all_content_keys = list(set(req.course_id for req in learner_credit_requests))
+        all_metadata = {
+            meta['key']: meta
+            for meta in get_and_cache_catalog_content_metadata(self.catalog_uuid, all_content_keys)
+        }
+
+        requests_in_catalog = []
+        requests_not_in_catalog = []
+        for req in learner_credit_requests:
+            if req.course_id in all_metadata:
+                requests_in_catalog.append(req)
+            else:
+                requests_not_in_catalog.append(req)
+
+        if requests_not_in_catalog:
+            failed_requests_by_reason[REASON_CONTENT_NOT_IN_CATALOG] = requests_not_in_catalog
+
+        # Verifies that the price on each LearnerCreditRequest is within the
+        # acceptable tolerance range of its canonical price.
+        valid_requests, failed_price_requests = self.validate_learner_credit_requests_allocation_prices(
+            requests_in_catalog, all_metadata
+        )
+
+        if failed_price_requests:
+            failed_requests_by_reason[PriceValidationError.__name__] = failed_price_requests
+
+        if not valid_requests:
+            return {"valid_requests": [], "failed_requests_by_reason": failed_requests_by_reason}
+
+        # Determine total cost, in cents, of content to potentially allocated
+        positive_total_price_cents = sum(lcr.course_price for lcr in valid_requests)
+
+        # Determine total amount, in cents, already transacted via this policy.
+        # This is a number <= 0
+        spent_amount_cents = self.aggregates_for_policy().get('total_quantity') or 0
+
+        # Determine total amount, in cents, of assignments already
+        # allocated via this policy. This is a number <= 0
+        total_allocated_assignments_cents = assignments_api.get_allocated_quantity_for_configuration(
+            self.assignment_configuration,
+        )
+        total_allocated_and_spent_cents = spent_amount_cents + total_allocated_assignments_cents
+
+        # Use all of these pieces to ensure that the assignments to potentially
+        # allocate won't exceed the remaining balance of the related subsidy.
+        subsidy_balance = self.subsidy_balance()
+        if self.content_would_exceed_limit(
+            total_allocated_assignments_cents,
+            subsidy_balance,
+            positive_total_price_cents,
+        ):
+            logger.info(
+                f'content_would_exceed_limit function: '
+                f'subsidy_uuid={self.subsidy_uuid}, '
+                f'policy_uuid={self.uuid},'
+                f'total_allocated_assignments_cents={total_allocated_assignments_cents}, '
+                f'subsidy_balance={subsidy_balance}, '
+                f'positive_total_price_cents={positive_total_price_cents}, '
+            )
+            return {
+                "error_reason": REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY
+            }
+
+        # Lastly, use all of these pieces to ensure that the assignments to potentially
+        # allocate won't exceed the spend limit of this policy
+        if self.content_would_exceed_limit(
+            total_allocated_and_spent_cents,
+            self.spend_limit,
+            positive_total_price_cents,
+        ):
+            logger.info(
+                f'content_would_exceed_limit function: '
+                f'subsidy_uuid={self.subsidy_uuid}, '
+                f'policy_uuid={self.uuid}, '
+                f'total_allocated_and_spent_centers={total_allocated_and_spent_cents}, '
+                f'spend_limit={self.spend_limit}, '
+                f'positive_total_price_cents={positive_total_price_cents}, '
+            )
+            return {
+                "error_reason": REASON_POLICY_SPEND_LIMIT_REACHED
+            }
+
+        return {"valid_requests": valid_requests, "failed_requests_by_reason": failed_requests_by_reason}
 
     def allocate(self, learner_emails, content_key, content_price_cents):
         """
