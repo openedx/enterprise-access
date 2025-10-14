@@ -58,6 +58,7 @@ class LmsApiClient(BaseOAuthClient):
     pending_enterprise_learner_endpoint = enterprise_api_v1_base_url + 'pending-enterprise-learner/'
     enterprise_group_membership_endpoint = enterprise_api_v1_base_url + 'enterprise-group/'
     pending_enterprise_admin_endpoint = enterprise_api_v1_base_url + 'pending-enterprise-admin/'
+    create_enterprise_admin_endpoint = enterprise_api_v1_base_url + 'enterprise-customer-admin/create_admin_by_email/'
     enterprise_flex_membership_endpoint = enterprise_api_v1_base_url + 'enterprise-group-membership/'
     enterprise_course_enrollment_admin_endpoint = enterprise_api_v1_base_url + 'enterprise-course-enrollment-admin/'
     user_accounts_endpoint = settings.LMS_URL + '/api/user/v1/accounts'
@@ -321,7 +322,7 @@ class LmsApiClient(BaseOAuthClient):
 
         return results
 
-    def create_enterprise_admin_user(self, enterprise_customer_uuid, user_email):
+    def create_enterprise_pending_admin_user(self, enterprise_customer_uuid, user_email):
         """
         Creates a new enterprise pending admin record.
 
@@ -355,6 +356,43 @@ class LmsApiClient(BaseOAuthClient):
             )
             raise APIClientException(
                 f'Failed to create pending enterprise admin users for {enterprise_customer_uuid}',
+                exc,
+            ) from exc
+
+    def create_enterprise_admin_user(self, enterprise_customer_uuid, user_email):
+        """
+        Creates a new enterprise admin record (not a pending one).
+
+        Arguments:
+            enterprise_customer_uuid (UUID): UUID of the enterprise customer.
+            user_email (string): The email address of the admin.
+        Returns:
+            dictionary describing the created admin record.
+        """
+        payload = {
+            'enterprise_customer_uuid': enterprise_customer_uuid,
+            'email': user_email,
+        }
+        response = self.client.post(
+            self.create_enterprise_admin_endpoint,
+            json=payload,
+            timeout=settings.LMS_CLIENT_TIMEOUT,
+        )
+        try:
+            response.raise_for_status()
+            logger.info(
+                'Successfully created admin record for customer %s, email %s',
+                enterprise_customer_uuid, user_email,
+            )
+            payload = response.json()
+            return payload
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Failed to create admin record for customer %s, email %s: %s',
+                enterprise_customer_uuid, user_email, safe_error_response_content(exc),
+            )
+            raise APIClientException(
+                f'Failed to create enterprise admin users for {enterprise_customer_uuid}',
                 exc,
             ) from exc
 

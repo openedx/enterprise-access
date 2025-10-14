@@ -258,7 +258,6 @@ class TestProvisioningEndToEnd(APITest):
         mock_client = mock_lms_api_client.return_value
         mock_client.get_enterprise_customer_data.return_value = test_data['existing_customer_data']
         mock_client.get_enterprise_admin_users.return_value = []
-        mock_client.get_enterprise_pending_admin_users.return_value = []
 
         if test_data['created_customer_data']:
             mock_client.create_enterprise_customer.return_value = test_data['created_customer_data']
@@ -305,7 +304,6 @@ class TestProvisioningEndToEnd(APITest):
             self.assertFalse(mock_client.create_enterprise_customer.called)
 
         mock_client.get_enterprise_admin_users.assert_called_once_with(str(TEST_ENTERPRISE_UUID))
-        mock_client.get_enterprise_pending_admin_users.assert_called_once_with(str(TEST_ENTERPRISE_UUID))
         mock_client.create_enterprise_admin_user.assert_has_calls([
             mock.call(str(TEST_ENTERPRISE_UUID), 'alice@foo.com'),
             mock.call(str(TEST_ENTERPRISE_UUID), 'bob@foo.com'),
@@ -334,59 +332,43 @@ class TestProvisioningEndToEnd(APITest):
         )
 
     @ddt.data(
-        # No admin users exist, two pending admins created.
+        # No admin users exist, two admins created.
         {
             'existing_admin_users': [],
-            'existing_pending_admin_users': [],
-            'create_pending_admins_called': True,
+            'create_admins_called': True,
             'create_admin_user_side_effect': [
                 {'user_email': 'alice@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
                 {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
             ],
-            'expected_create_pending_admin_calls': [
+            'expected_create_admin_calls': [
                 mock.call(str(TEST_ENTERPRISE_UUID), 'alice@foo.com'),
                 mock.call(str(TEST_ENTERPRISE_UUID), 'bob@foo.com'),
             ],
         },
-        # One pending admin exists, one new one created.
+        # One admin exists, one new one created.
         {
-            'existing_admin_users': [],
-            'existing_pending_admin_users': [
-                {'user_email': 'alice@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
+            'existing_admin_users': [
+                # Note the different in the 'email' key here
+                {'email': 'alice@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
             ],
-            'create_pending_admins_called': True,
+            'create_admins_called': True,
             'create_admin_user_side_effect': [
                 {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
             ],
-            'expected_create_pending_admin_calls': [
+            'expected_create_admin_calls': [
                 mock.call(str(TEST_ENTERPRISE_UUID), 'bob@foo.com'),
             ],
         },
-        # One full admin exists, one new pending admin created.
+        # Two admins exists, none created.
         {
             'existing_admin_users': [
                 {'email': 'alice@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
+                {'email': 'bob@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
             ],
-            'existing_pending_admin_users': [],
-            'create_pending_admins_called': True,
-            'create_admin_user_side_effect': [
-                {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
-            ],
-            'expected_create_pending_admin_calls': [
-                mock.call(str(TEST_ENTERPRISE_UUID), 'bob@foo.com'),
-            ],
-        },
-        # One full admin exists, one pending exists, none created.
-        {
-            'existing_admin_users': [
-                {'email': 'alice@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
-            ],
-            'existing_pending_admin_users': [
-                {'user_email': 'bob@foo.com', 'enterprise_customer_uuid': str(TEST_ENTERPRISE_UUID)},
-            ],
-            'create_pending_admins_called': False,
+            'created_admin_users': [],
+            'create_admins_called': False,
             'create_admin_user_side_effect': [],
-            'expected_create_pending_admin_calls': [],
+            'expected_create_admin_calls': [],
         },
     )
     @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
@@ -401,7 +383,6 @@ class TestProvisioningEndToEnd(APITest):
         mock_client = mock_lms_api_client.return_value
         mock_client.get_enterprise_customer_data.return_value = DEFAULT_CUSTOMER_RECORD
         mock_client.get_enterprise_admin_users.return_value = test_data['existing_admin_users']
-        mock_client.get_enterprise_pending_admin_users.return_value = test_data['existing_pending_admin_users']
         mock_client.create_enterprise_admin_user.side_effect = test_data['create_admin_user_side_effect']
         mock_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
         mock_license_client = mock_license_manager_client.return_value
@@ -416,8 +397,7 @@ class TestProvisioningEndToEnd(APITest):
         assert response.status_code == status.HTTP_201_CREATED
 
         existing_emails = sorted(
-            [record['email'] for record in test_data['existing_admin_users']] +
-            [record['user_email'] for record in test_data['existing_pending_admin_users']]
+            [record['email'] for record in test_data['existing_admin_users']]
         )
         expected_existing_admins = [{'user_email': email} for email in existing_emails]
         expected_created_admins = [
@@ -440,10 +420,9 @@ class TestProvisioningEndToEnd(APITest):
         self.assertFalse(mock_client.create_enterprise_customer.called)
 
         mock_client.get_enterprise_admin_users.assert_called_once_with(str(TEST_ENTERPRISE_UUID))
-        mock_client.get_enterprise_pending_admin_users.assert_called_once_with(str(TEST_ENTERPRISE_UUID))
-        if test_data['create_pending_admins_called']:
+        if test_data['create_admins_called']:
             mock_client.create_enterprise_admin_user.assert_has_calls(
-                test_data['expected_create_pending_admin_calls'],
+                test_data['expected_create_admin_calls'],
                 any_order=True,
             )
         else:

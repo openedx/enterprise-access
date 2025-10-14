@@ -3,8 +3,11 @@ Unit tests for the ``provisioning.api`` module.
 """
 from unittest import mock
 
+import requests
 from django.test import TestCase
+from rest_framework import status
 
+from enterprise_access.apps.api_client.exceptions import APIClientException
 from enterprise_access.apps.provisioning import api as provisioning_api
 from test_utils import TEST_ENTERPRISE_UUID
 
@@ -125,17 +128,13 @@ class TestGetCreateAdmins(TestCase):
         mock_client.get_enterprise_admin_users.return_value = [
             {'email': 'existing-admin@example.com'},
         ]
-        mock_client.get_enterprise_pending_admin_users.return_value = [
-            {'user_email': 'existing-pending-admin@example.com'},
-        ]
         mock_client.create_enterprise_admin_user.side_effect = [
-            {'user_email': 'new-admin-1@example.com'},
-            {'user_email': 'new-admin-2@example.com'},
+            {'admin_user_id': 123},
+            {'admin_user_id': 456},
         ]
 
         requested_user_emails = [
             'existing-admin@example.com',
-            'existing-pending-admin@example.com',
             'new-admin-1@example.com',
             'new-admin-2@example.com',
         ]
@@ -152,12 +151,10 @@ class TestGetCreateAdmins(TestCase):
             ],
             'existing_admins': [
                 {'user_email': 'existing-admin@example.com'},
-                {'user_email': 'existing-pending-admin@example.com'},
             ],
         })
 
         mock_client.get_enterprise_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
-        mock_client.get_enterprise_pending_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
         mock_client.create_enterprise_admin_user.assert_has_calls([
             mock.call(TEST_ENTERPRISE_UUID, 'new-admin-1@example.com'),
             mock.call(TEST_ENTERPRISE_UUID, 'new-admin-2@example.com'),
@@ -168,14 +165,12 @@ class TestGetCreateAdmins(TestCase):
         mock_client = mock_client_class.return_value
         mock_client.get_enterprise_admin_users.return_value = [
             {'email': 'existing-admin@example.com'},
-        ]
-        mock_client.get_enterprise_pending_admin_users.return_value = [
-            {'user_email': 'existing-pending-admin@example.com'},
+            {'email': 'other-existing-admin@example.com'},
         ]
 
         requested_user_emails = [
             'existing-admin@example.com',
-            'existing-pending-admin@example.com',
+            'other-existing-admin@example.com',
         ]
 
         result = provisioning_api.get_or_create_enterprise_admin_users(
@@ -187,11 +182,10 @@ class TestGetCreateAdmins(TestCase):
             'created_admins': [],
             'existing_admins': [
                 {'user_email': 'existing-admin@example.com'},
-                {'user_email': 'existing-pending-admin@example.com'},
+                {'user_email': 'other-existing-admin@example.com'},
             ],
         })
         mock_client.get_enterprise_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
-        mock_client.get_enterprise_pending_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
         self.assertFalse(mock_client.create_enterprise_admin_user.called)
 
     @mock.patch.object(provisioning_api, 'LmsApiClient', autospec=True)
@@ -211,27 +205,9 @@ class TestGetCreateAdmins(TestCase):
         self.assertFalse(mock_client.create_enterprise_admin_user.called)
 
     @mock.patch.object(provisioning_api, 'LmsApiClient', autospec=True)
-    def test_get_pending_admin_error_raised(self, mock_client_class):
-        mock_client = mock_client_class.return_value
-        mock_client.get_enterprise_admin_users.return_value = []
-        mock_client.get_enterprise_pending_admin_users.side_effect = Exception('get pending admins error')
-
-        requested_user_emails = ['existing-admin@example.com']
-        with self.assertRaisesRegex(Exception, 'get pending admins error'):
-            provisioning_api.get_or_create_enterprise_admin_users(
-                TEST_ENTERPRISE_UUID,
-                requested_user_emails,
-            )
-
-        mock_client.get_enterprise_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
-        mock_client.get_enterprise_pending_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
-        self.assertFalse(mock_client.create_enterprise_admin_user.called)
-
-    @mock.patch.object(provisioning_api, 'LmsApiClient', autospec=True)
     def test_create_admin_error_raised(self, mock_client_class):
         mock_client = mock_client_class.return_value
         mock_client.get_enterprise_admin_users.return_value = []
-        mock_client.get_enterprise_pending_admin_users.return_value = []
         mock_client.create_enterprise_admin_user.side_effect = Exception('create admin error')
 
         requested_user_emails = ['new-admin@example.com']
@@ -242,9 +218,38 @@ class TestGetCreateAdmins(TestCase):
             )
 
         mock_client.get_enterprise_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
-        mock_client.get_enterprise_pending_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
         mock_client.create_enterprise_admin_user.assert_called_once_with(
             TEST_ENTERPRISE_UUID, 'new-admin@example.com'
+        )
+
+    @mock.patch.object(provisioning_api, 'LmsApiClient', autospec=True)
+    def test_create_admin_not_found_error_handled(self, mock_client_class):
+        """
+        Tests that we try to create a pending admin record if a 404 is returned
+        when attempting to create the *concrete* admin record.
+        """
+        mock_client = mock_client_class.return_value
+        mock_client.get_enterprise_admin_users.return_value = []
+
+        def raise_api_client_exception(*args, **kwargs):
+            exc = requests.exceptions.HTTPError('no user found')
+            exc.response = mock.MagicMock(status_code=status.HTTP_404_NOT_FOUND)
+            raise APIClientException('Failed to create admin user', exc) from exc
+
+        mock_client.create_enterprise_admin_user.side_effect = raise_api_client_exception
+
+        requested_user_emails = ['new-admin@example.com']
+        provisioning_api.get_or_create_enterprise_admin_users(
+            TEST_ENTERPRISE_UUID,
+            requested_user_emails,
+        )
+
+        mock_client.get_enterprise_admin_users.assert_called_once_with(TEST_ENTERPRISE_UUID)
+        mock_client.create_enterprise_admin_user.assert_called_once_with(
+            TEST_ENTERPRISE_UUID, 'new-admin@example.com',
+        )
+        mock_client.create_enterprise_pending_admin_user.assert_called_once_with(
+            TEST_ENTERPRISE_UUID, 'new-admin@example.com',
         )
 
 
