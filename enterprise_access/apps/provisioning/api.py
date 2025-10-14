@@ -4,6 +4,9 @@ Python API for provisioning operations.
 import logging
 from operator import itemgetter
 
+from rest_framework import status
+
+from ..api_client.exceptions import APIClientException
 from ..api_client.license_manager_client import LicenseManagerApiClient
 from ..api_client.lms_client import LmsApiClient
 
@@ -43,8 +46,10 @@ def _warn_if_fields_mismatch(existing_customer, name, slug, country):
 
 def get_or_create_enterprise_admin_users(enterprise_customer_uuid, user_emails):
     """
-    Creates pending admin records from the given ``user_email`` for the customer
+    Creates admin records from the given ``user_email`` for the customer
     identified by ``enterprise_customer_uuid``.
+    If a user record corresponding to the provided email(s) does not exist,
+    we attempt to create a pending enterprise admin record for that email.
     """
     client = LmsApiClient()
     existing_admins = client.get_enterprise_admin_users(enterprise_customer_uuid)
@@ -55,37 +60,56 @@ def get_or_create_enterprise_admin_users(enterprise_customer_uuid, user_emails):
         existing_admin_emails,
     )
 
-    existing_pending_admins = client.get_enterprise_pending_admin_users(enterprise_customer_uuid)
-    existing_pending_admin_emails = {record['user_email'] for record in existing_pending_admins}
-    logger.info(
-        'Provisioning: customer %s has existing pending admin emails %s',
-        enterprise_customer_uuid,
-        existing_pending_admin_emails,
-    )
-
     user_emails_to_create = list(
-        (set(user_emails) - existing_admin_emails) - existing_pending_admin_emails
+        set(user_emails) - existing_admin_emails
     )
 
     created_admins = []
     for user_email in user_emails_to_create:
-        result = client.create_enterprise_admin_user(enterprise_customer_uuid, user_email)
-        created_admins.append(result)
-        logger.info(
-            'Provisioning: created admin %s for customer %s',
-            user_email,
-            enterprise_customer_uuid,
-        )
+        try:
+            result = client.create_enterprise_admin_user(enterprise_customer_uuid, user_email)
+            # The endpoint to create real admins doesn't currently return the email address in the
+            # response payload. Since we know it succeeds, just add the requested email to the created list.
+            # Structure it as a dict in case we need to add additional fields from the response payload later.
+            created_admins.append({'user_email': user_email})
+            logger.info(
+                'Provisioning: created admin %s for customer %s', user_email, enterprise_customer_uuid,
+            )
+        except APIClientException as exc:
+            if exc.__cause__.response.status_code == status.HTTP_404_NOT_FOUND:  # pylint: disable=no-member
+                result = _try_create_pending_admin(client, enterprise_customer_uuid, user_email)
+                if result:
+                    created_admins.append({'user_email': user_email})
+                    logger.info(
+                        'Provisioning: created pending admin %s for customer %s',
+                        user_email, enterprise_customer_uuid,
+                    )
 
     existing_admin_result = [{'user_email': email} for email in existing_admin_emails]
-    existing_pending_admin_result = [{'user_email': email} for email in existing_pending_admin_emails]
+
     return {
         'created_admins': sorted(created_admins, key=itemgetter('user_email')),
-        'existing_admins': sorted(
-            existing_pending_admin_result + existing_admin_result,
-            key=itemgetter('user_email'),
-        ),
+        'existing_admins': sorted(existing_admin_result, key=itemgetter('user_email')),
     }
+
+
+def _try_create_pending_admin(client, enterprise_customer_uuid, user_email):
+    """
+    Helper to safely attempt creation of a *pending* admin user.
+    """
+    try:
+        result = client.create_enterprise_pending_admin_user(
+            enterprise_customer_uuid, user_email,
+        )
+        return result
+    except APIClientException as exc:
+        logger.warning(
+            'Provisioning: could not create concrete or pending admin %s for customer %s because %s',
+            user_email,
+            enterprise_customer_uuid,
+            exc,
+        )
+        return None
 
 
 def get_or_create_enterprise_catalog(enterprise_customer_uuid, catalog_title, catalog_query_id, **kwargs):

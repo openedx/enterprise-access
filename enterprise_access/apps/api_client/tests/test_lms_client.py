@@ -609,10 +609,12 @@ class TestLmsApiClient(TestCase):
         )
 
         self.assertEqual(response_payload, mock_created_admin_payload)
-        expected_url = 'http://edx-platform.example.com/enterprise/api/v1/pending-enterprise-admin/'
+        expected_url = (
+            'http://edx-platform.example.com/enterprise/api/v1/enterprise-customer-admin/create_admin_by_email/'
+        )
         expected_input = {
-            'enterprise_customer': customer_uuid,
-            'user_email': 'test-admin@example.com',
+            'enterprise_customer_uuid': customer_uuid,
+            'email': 'test-admin@example.com',
         }
         mock_post.assert_called_once_with(
             expected_url,
@@ -674,10 +676,12 @@ class TestLmsApiClient(TestCase):
                 customer_uuid, 'test-admin@example.com',
             )
 
-        expected_url = 'http://edx-platform.example.com/enterprise/api/v1/pending-enterprise-admin/'
+        expected_url = (
+            'http://edx-platform.example.com/enterprise/api/v1/enterprise-customer-admin/create_admin_by_email/'
+        )
         expected_input = {
-            'enterprise_customer': customer_uuid,
-            'user_email': 'test-admin@example.com',
+            'enterprise_customer_uuid': customer_uuid,
+            'email': 'test-admin@example.com',
         }
         mock_post.assert_called_once_with(
             expected_url,
