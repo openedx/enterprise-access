@@ -13,6 +13,7 @@ from django.test import RequestFactory, TestCase
 from faker import Faker
 from rest_framework import status
 
+from enterprise_access.apps.api_client.exceptions import APIClientException
 from enterprise_access.apps.api_client.lms_client import LmsApiClient, LmsUserApiClient
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
 from enterprise_access.apps.core.tests.factories import UserFactory
@@ -697,7 +698,7 @@ class TestLmsApiClient(TestCase):
         mock_get.return_value.status_code = 400
 
         client = LmsApiClient()
-        with self.assertRaises(requests.exceptions.HTTPError):
+        with self.assertRaises(APIClientException):
             client.get_enterprise_pending_admin_users(customer_uuid)
 
         expected_url = (
