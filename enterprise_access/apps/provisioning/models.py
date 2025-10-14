@@ -433,15 +433,15 @@ class GetCreateSubscriptionPlanStep(AbstractWorkflowStep):
                 desired_num_licenses=self.input_object.desired_num_licenses,
                 product_id=self.input_object.product_id,
             )
-            self.synchronize_checkout_intent()
+            self.synchronize_checkout_intent(accumulated_output=accumulated_output)
             return self.output_class.from_dict(result_dict)
         except Exception as exc:
-            self.synchronize_checkout_intent(exc)
+            self.synchronize_checkout_intent(accumulated_output=accumulated_output, exc=exc)
             raise GetCreateSubscriptionPlanException(
                 f'Failed to get/create subscription plan for customer agreement uuid {customer_agreement_uuid}'
             ) from exc
 
-    def synchronize_checkout_intent(self, exc=None):
+    def synchronize_checkout_intent(self, accumulated_output=None, exc=None):
         """
         Links this step's workflow to the related CheckoutIntent, if any.
         If found, also updates the CheckoutIntent's state.
@@ -457,6 +457,8 @@ class GetCreateSubscriptionPlanStep(AbstractWorkflowStep):
             return
 
         checkout_intent.workflow = workflow
+        enterprise_uuid = accumulated_output.create_customer_output.uuid
+        checkout_intent.enterprise_uuid = enterprise_uuid
 
         if exc:
             checkout_intent.last_provisioning_error = str(exc)

@@ -769,6 +769,7 @@ class TestCheckoutIntentSynchronization(APITest):
         self.assertEqual(checkout_intent.state, CheckoutIntentState.FULFILLED)
         self.assertIsNotNone(checkout_intent.workflow)
         self.assertIsNone(checkout_intent.last_provisioning_error)
+        self.assertEqual(str(checkout_intent.enterprise_uuid), str(TEST_ENTERPRISE_UUID))
 
         # Verify workflow was created and linked
         workflow = ProvisionNewCustomerWorkflow.objects.first()
@@ -812,6 +813,7 @@ class TestCheckoutIntentSynchronization(APITest):
         self.assertEqual(checkout_intent.state, CheckoutIntentState.ERRORED_PROVISIONING)
         self.assertIsNotNone(checkout_intent.workflow)
         self.assertEqual(checkout_intent.last_provisioning_error, error_message)
+        self.assertEqual(str(checkout_intent.enterprise_uuid), str(TEST_ENTERPRISE_UUID))
 
     @ddt.data(
         CheckoutIntentState.CREATED,
@@ -858,6 +860,7 @@ class TestCheckoutIntentSynchronization(APITest):
         self.assertEqual(checkout_intent.state, original_state)
         self.assertEqual(checkout_intent.workflow, original_workflow)
         self.assertIsNone(checkout_intent.last_provisioning_error)
+        self.assertIsNone(checkout_intent.enterprise_uuid)
 
         # Verify workflow was still created successfully
         workflow = ProvisionNewCustomerWorkflow.objects.first()
@@ -902,6 +905,7 @@ class TestCheckoutIntentSynchronization(APITest):
         self.assertEqual(checkout_intent.state, CheckoutIntentState.PAID)
         self.assertIsNone(checkout_intent.workflow)
         self.assertIsNone(checkout_intent.last_provisioning_error)
+        self.assertIsNone(checkout_intent.enterprise_uuid)
 
         # Verify workflow was still created successfully
         workflow = ProvisionNewCustomerWorkflow.objects.first()
