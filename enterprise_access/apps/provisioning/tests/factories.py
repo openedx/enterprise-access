@@ -88,6 +88,7 @@ class ProvisionNewCustomerWorkflowFactory(DjangoModelFactory):
                 'is_current': True,
                 'plan_type': 'subscription',
                 'enterprise_catalog_uuid': str(uuid.uuid4()),
+                'product': 1,
             },
         }
 

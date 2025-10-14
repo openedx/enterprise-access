@@ -156,15 +156,23 @@ def get_or_create_customer_agreement(enterprise_customer_uuid, customer_slug, de
 
 
 def get_or_create_subscription_plan(
-    customer_agreement_uuid, existing_subscription_list, plan_title, catalog_uuid, opp_line_item,
-    start_date, expiration_date, desired_num_licenses, product_id, **kwargs
+    customer_agreement_uuid: str,
+    existing_subscription_list: list[dict],
+    plan_title: str,
+    catalog_uuid: str | None,
+    opp_line_item: str,
+    start_date: str,
+    expiration_date: str,
+    desired_num_licenses: int,
+    product_id: int | None,
+    **kwargs
 ):
     """
     Get or create a new subscription plan, provided an existing customer agreement dictionary.
     """
     matching_subscription = next((
         _sub for _sub in existing_subscription_list
-        if _sub.get('salesforce_opportunity_line_item') == opp_line_item
+        if _sub.get('salesforce_opportunity_line_item') == opp_line_item and _sub.get('product') == product_id
     ), None)
     if matching_subscription:
         logger.info(
@@ -186,7 +194,12 @@ def get_or_create_subscription_plan(
         **kwargs,
     )
     logger.info(
-        'Provisioning: created new subscription plan with uuid %s and salesforce_opportunity_line_item %s',
-        created_subscription['uuid'], created_subscription['salesforce_opportunity_line_item'],
+        (
+            'Provisioning: created new subscription plan with '
+            'uuid %s and salesforce_opportunity_line_item %s and product_id %s'
+        ),
+        created_subscription['uuid'],
+        created_subscription['salesforce_opportunity_line_item'],
+        created_subscription['product'],
     )
     return created_subscription

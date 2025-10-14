@@ -67,6 +67,7 @@ DEFAULT_SUBSCRIPTION_PLAN_RECORD = {
     "is_current": False,
     "plan_type": "Standard Paid",
     "enterprise_catalog_uuid": str(TEST_CATALOG_UUID),
+    "product": 1,
 }
 
 DEFAULT_AGREEMENT_RECORD = {
