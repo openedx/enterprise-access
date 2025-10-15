@@ -641,3 +641,16 @@ DEFAULT_STRIPE_CACHE_TIMEOUT = 60
 STRIPE_PRICE_DATA_CACHE_TIMEOUT = 300
 
 ################# End Self-Service Purchasing (SSP) settings #################
+
+
+################### Embargo Settings ###################
+
+# List of 2-letter ISO country codes that are embargoed
+# Can be overridden via EMBARGOED_COUNTRY_CODES environment variable
+# Expected format: comma-separated string like "RU,IR,KP,SY,CU"
+EMBARGOED_COUNTRY_CODES = os.environ.get(
+    'EMBARGOED_COUNTRY_CODES',
+    'RU,IR,KP,SY,CU'
+).split(',')
+
+################# End Embargo Settings #################
