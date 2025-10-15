@@ -3,7 +3,9 @@ Unit tests for the ``provisioning.api`` module.
 """
 from unittest import mock
 
+import ddt
 import requests
+from django.conf import settings
 from django.test import TestCase
 from rest_framework import status
 
@@ -382,6 +384,7 @@ class TestGetOrCreateCustomerAgreement(TestCase):
         )
 
 
+@ddt.ddt
 class TestGetOrCreateSubscriptionPlan(TestCase):
     """
     Tests for the get_or_create_subscription_plan() function.
@@ -393,11 +396,12 @@ class TestGetOrCreateSubscriptionPlan(TestCase):
                 'uuid': 'sub-uuid',
                 'title': 'Test Plan',
                 'salesforce_opportunity_line_item': 'opp-line-item',
+                'product': 1,
             },
         ]
 
         result = provisioning_api.get_or_create_subscription_plan(
-            customer_agreement_uuid=None,
+            customer_agreement_uuid='customer-agreement-uuid',
             existing_subscription_list=existing_subscriptions,
             plan_title='Test Plan',
             catalog_uuid='catalog-uuid',
@@ -405,33 +409,74 @@ class TestGetOrCreateSubscriptionPlan(TestCase):
             start_date='2025-05-01',
             expiration_date='2026-05-01',
             desired_num_licenses=100,
-            product_id=None,
+            product_id=1,
         )
 
         self.assertEqual(result, existing_subscriptions[0])
         mock_license_manager_client.assert_not_called()
 
+    @ddt.data(
+        # Same prodcut_id, different opp_line_item.
+        {
+            'existing_opp_line_item': 'opp-line-item-1',
+            'existing_product_id': 1,
+            'requesting_opp_line_item': 'opp-line-item-2',
+            'requesting_product_id': 1,
+        },
+        # Same opp_line_item, different prodcut_id.
+        {
+            'existing_opp_line_item': 'opp-line-item-1',
+            'existing_product_id': 1,
+            'requesting_opp_line_item': 'opp-line-item-1',
+            'requesting_product_id': 2,
+        },
+        # Make sure requesting product_id=None falls back to a default which does not conflict.
+        {
+            'existing_opp_line_item': 'opp-line-item-1',
+            'existing_product_id': settings.PROVISIONING_DEFAULTS['subscription']['product_id'] + 1,
+            'requesting_opp_line_item': 'opp-line-item-1',
+            'requesting_product_id': None,  # fallback to settings.PROVISIONING_DEFAULTS['subscription']['product_id']
+        },
+    )
+    @ddt.unpack
     @mock.patch.object(provisioning_api, 'LicenseManagerApiClient', autospec=True)
-    def test_create_new_subscription_plan(self, mock_license_manager_client):
+    def test_create_new_subscription_plan(
+        self,
+        mock_license_manager_client,
+        existing_opp_line_item,
+        existing_product_id,
+        requesting_opp_line_item,
+        requesting_product_id,
+    ):
+        existing_subscriptions = [
+            {
+                'uuid': 'sub-uuid',
+                'title': 'Test Plan',
+                'salesforce_opportunity_line_item': existing_opp_line_item,
+                'product': existing_product_id,
+            },
+        ]
         created_subscription = {
             'uuid': 'new-sub-uuid',
-            'salesforce_opportunity_line_item': 'opp-line-item',
+            'salesforce_opportunity_line_item': requesting_opp_line_item,
             'title': 'New Plan',
+            # Simulate the fallback logic within LicenseManagerApiClient.create_subscription_plan().
+            'product': requesting_product_id or settings.PROVISIONING_DEFAULTS['subscription']['product_id'],
         }
         mock_client = mock_license_manager_client.return_value
         mock_client.create_subscription_plan.return_value = created_subscription
 
         result = provisioning_api.get_or_create_subscription_plan(
             customer_agreement_uuid='agreement-uuid',
-            existing_subscription_list=[],
+            existing_subscription_list=existing_subscriptions,
             plan_title='New Plan',
             catalog_uuid='catalog-uuid',
-            opp_line_item='opp-line-item',
+            opp_line_item=requesting_opp_line_item,
             start_date='2025-05-01',
             expiration_date='2026-05-01',
             desired_num_licenses=50,
             extra_field='extra-value',
-            product_id='the-product',
+            product_id=requesting_product_id,
         )
 
         self.assertEqual(result, created_subscription)
@@ -439,11 +484,11 @@ class TestGetOrCreateSubscriptionPlan(TestCase):
             customer_agreement_uuid='agreement-uuid',
             enterprise_catalog_uuid='catalog-uuid',
             title='New Plan',
-            salesforce_opportunity_line_item='opp-line-item',
+            salesforce_opportunity_line_item=requesting_opp_line_item,
             start_date='2025-05-01',
             expiration_date='2026-05-01',
             desired_num_licenses=50,
-            product_id='the-product',
+            product_id=requesting_product_id,
             extra_field='extra-value'
         )
 

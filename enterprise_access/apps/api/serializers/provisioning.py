@@ -188,6 +188,7 @@ class SubscriptionPlanResponseSerializer(BaseSerializer):
     is_current = serializers.BooleanField()
     plan_type = serializers.CharField()
     enterprise_catalog_uuid = serializers.UUIDField()
+    product = serializers.IntegerField()
 
 
 class CustomerAgreementResponseSerializer(BaseSerializer):

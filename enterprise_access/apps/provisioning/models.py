@@ -391,6 +391,7 @@ class GetCreateSubscriptionPlanStepOutput(BaseInputOutput):
     is_current: bool = field(validator=is_bool)
     plan_type: str = field(validator=is_str)
     enterprise_catalog_uuid: UUID = field(validator=is_uuid)
+    product: int = field(validator=is_int)
 
 
 class GetCreateSubscriptionPlanStep(AbstractWorkflowStep):
