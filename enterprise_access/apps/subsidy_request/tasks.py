@@ -396,6 +396,9 @@ def send_reminder_email_for_pending_learner_credit_request(assignment_uuid):
         braze_trigger_properties,
         campaign_uuid,
     )
+
+    if hasattr(assignment, 'credit_request') and assignment.credit_request:
+        assignment.credit_request.add_successful_reminded_action()
     logger.info(f'Sent braze campaign reminder uuid={campaign_uuid} message for assignment {assignment}')
 
 
