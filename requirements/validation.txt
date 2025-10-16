@@ -26,7 +26,7 @@ astroid==3.3.11
     #   -r requirements/test.txt
     #   pylint
     #   pylint-celery
-attrs==25.3.0
+attrs==25.4.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -49,12 +49,12 @@ billiard==4.2.2
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   celery
-cachetools==6.2.0
+cachetools==6.2.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   tox
-cattrs==25.2.0
+cattrs==25.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -158,7 +158,6 @@ cryptography==46.0.2
     #   -r requirements/test.txt
     #   pyjwt
     #   secretstorage
-    #   social-auth-core
 ddt==1.7.2
     # via
     #   -r requirements/quality.txt
@@ -363,7 +362,7 @@ edx-drf-extensions==10.6.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.16
+edx-enterprise-subsidy-client==2.0.18
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -401,18 +400,18 @@ factory-boy==3.3.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==37.8.0
+faker==37.11.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   factory-boy
-fastavro==1.12.0
+fastavro==1.12.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   confluent-kafka
     #   openedx-events
-filelock==3.19.1
+filelock==3.20.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -426,7 +425,7 @@ id==1.5.0
     # via
     #   -r requirements/quality.txt
     #   twine
-idna==3.10
+idna==3.11
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -535,7 +534,7 @@ mysqlclient==2.2.7
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-nh3==0.3.0
+nh3==0.3.1
     # via
     #   -r requirements/quality.txt
     #   readme-renderer
@@ -565,7 +564,7 @@ packaging==25.0
     #   pytest
     #   tox
     #   twine
-platformdirs==4.4.0
+platformdirs==4.5.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -647,7 +646,7 @@ pymemcache==4.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-pymongo==4.15.2
+pymongo==4.15.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -657,7 +656,7 @@ pynacl==1.6.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-django-utils
-pyproject-api==1.9.1
+pyproject-api==1.10.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -752,7 +751,7 @@ rfc3986==2.0.0
     # via
     #   -r requirements/quality.txt
     #   twine
-rich==14.1.0
+rich==14.2.0
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -800,7 +799,7 @@ social-auth-app-django==5.4.3
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-auth-backends
-social-auth-core==4.7.0
+social-auth-core==4.8.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -832,7 +831,7 @@ tomlkit==0.13.3
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pylint
-tox==4.30.3
+tox==4.31.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -873,7 +872,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.34.0
+virtualenv==20.35.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt

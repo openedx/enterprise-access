@@ -13,7 +13,7 @@ asgiref==3.10.0
     #   django
     #   django-cors-headers
     #   django-countries
-attrs==25.3.0
+attrs==25.4.0
     # via
     #   cattrs
     #   jsonschema
@@ -25,7 +25,7 @@ backoff==1.10.0
     # via analytics-python
 billiard==4.2.2
     # via celery
-cattrs==25.2.0
+cattrs==25.3.0
     # via -r requirements/base.in
 celery==5.5.3
     # via
@@ -69,9 +69,7 @@ coreschema==0.0.4
 crispy-bootstrap5==2025.6
     # via -r requirements/base.in
 cryptography==46.0.2
-    # via
-    #   pyjwt
-    #   social-auth-core
+    # via pyjwt
 defusedxml==0.7.1
     # via
     #   python3-openid
@@ -195,7 +193,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/base.in
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.16
+edx-enterprise-subsidy-client==2.0.18
     # via -r requirements/base.in
 edx-event-bus-kafka==6.1.0
     # via -r requirements/base.in
@@ -214,12 +212,12 @@ edx-toggles==5.4.1
     # via
     #   edx-auth-backends
     #   edx-event-bus-kafka
-fastavro==1.12.0
+fastavro==1.12.1
     # via
     #   -r requirements/base.in
     #   confluent-kafka
     #   openedx-events
-idna==3.10
+idna==3.11
     # via requests
 inflection==0.5.1
     # via
@@ -280,7 +278,7 @@ pyjwt[crypto]==2.10.1
     #   social-auth-core
 pymemcache==4.0.0
     # via -r requirements/base.in
-pymongo==4.15.2
+pymongo==4.15.3
     # via edx-opaque-keys
 pynacl==1.6.0
     # via edx-django-utils
@@ -340,7 +338,7 @@ six==1.17.0
     #   python-dateutil
 social-auth-app-django==5.4.3
     # via edx-auth-backends
-social-auth-core==4.7.0
+social-auth-core==4.8.1
     # via
     #   edx-auth-backends
     #   social-auth-app-django

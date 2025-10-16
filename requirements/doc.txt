@@ -25,7 +25,7 @@ astroid==3.3.11
     #   -r requirements/test.txt
     #   pylint
     #   pylint-celery
-attrs==25.3.0
+attrs==25.4.0
     # via
     #   -r requirements/test.txt
     #   cattrs
@@ -50,11 +50,11 @@ billiard==4.2.2
     # via
     #   -r requirements/test.txt
     #   celery
-cachetools==6.2.0
+cachetools==6.2.1
     # via
     #   -r requirements/test.txt
     #   tox
-cattrs==25.2.0
+cattrs==25.3.0
     # via -r requirements/test.txt
 celery==5.5.3
     # via
@@ -137,7 +137,6 @@ cryptography==46.0.2
     # via
     #   -r requirements/test.txt
     #   pyjwt
-    #   social-auth-core
 ddt==1.7.2
     # via -r requirements/test.txt
 defusedxml==0.7.1
@@ -296,7 +295,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.16
+edx-enterprise-subsidy-client==2.0.18
     # via -r requirements/test.txt
 edx-event-bus-kafka==6.1.0
     # via -r requirements/test.txt
@@ -321,23 +320,23 @@ edx-toggles==5.4.1
     #   edx-event-bus-kafka
 factory-boy==3.3.3
     # via -r requirements/test.txt
-faker==37.8.0
+faker==37.11.0
     # via
     #   -r requirements/test.txt
     #   factory-boy
-fastavro==1.12.0
+fastavro==1.12.1
     # via
     #   -r requirements/test.txt
     #   confluent-kafka
     #   openedx-events
-filelock==3.19.1
+filelock==3.20.0
     # via
     #   -r requirements/test.txt
     #   tox
     #   virtualenv
 freezegun==1.5.5
     # via -r requirements/test.txt
-idna==3.10
+idna==3.11
     # via
     #   -r requirements/test.txt
     #   requests
@@ -398,7 +397,7 @@ monotonic==1.6
     #   analytics-python
 mysqlclient==2.2.7
     # via -r requirements/test.txt
-nh3==0.3.0
+nh3==0.3.1
     # via readme-renderer
 oauthlib==3.3.1
     # via
@@ -423,7 +422,7 @@ packaging==25.0
     #   pytest
     #   sphinx
     #   tox
-platformdirs==4.4.0
+platformdirs==4.5.0
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -492,7 +491,7 @@ pylint-plugin-utils==0.9.0
     #   pylint-django
 pymemcache==4.0.0
     # via -r requirements/test.txt
-pymongo==4.15.2
+pymongo==4.15.3
     # via
     #   -r requirements/test.txt
     #   edx-opaque-keys
@@ -500,7 +499,7 @@ pynacl==1.6.0
     # via
     #   -r requirements/test.txt
     #   edx-django-utils
-pyproject-api==1.9.1
+pyproject-api==1.10.0
     # via
     #   -r requirements/test.txt
     #   tox
@@ -600,7 +599,7 @@ social-auth-app-django==5.4.3
     # via
     #   -r requirements/test.txt
     #   edx-auth-backends
-social-auth-core==4.7.0
+social-auth-core==4.8.1
     # via
     #   -r requirements/test.txt
     #   edx-auth-backends
@@ -647,7 +646,7 @@ tomlkit==0.13.3
     # via
     #   -r requirements/test.txt
     #   pylint
-tox==4.30.3
+tox==4.31.0
     # via -r requirements/test.txt
 typing-extensions==4.15.0
     # via
@@ -680,7 +679,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.34.0
+virtualenv==20.35.3
     # via
     #   -r requirements/test.txt
     #   tox
