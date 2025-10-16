@@ -10,7 +10,12 @@ from faker import Faker
 
 from enterprise_access.apps.content_assignments.tests.factories import LearnerContentAssignmentFactory
 from enterprise_access.apps.core.tests.factories import UserFactory
-from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates, SubsidyTypeChoices
+from enterprise_access.apps.subsidy_request.constants import (
+    LearnerCreditRequestActionTypes,
+    LearnerCreditRequestUserMessages,
+    SubsidyRequestStates,
+    SubsidyTypeChoices
+)
 from enterprise_access.apps.subsidy_request.models import (
     CouponCodeRequest,
     LearnerCreditRequest,
@@ -105,8 +110,8 @@ class LearnerCreditRequestActionsFactory(factory.django.DjangoModelFactory):
     Test factory for the `LearnerCreditRequestActions` model.
     """
     uuid = factory.LazyFunction(uuid4)
-    recent_action = get_action_choice(SubsidyRequestStates.REQUESTED)
-    status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
+    recent_action = LearnerCreditRequestActionTypes.REQUESTED
+    status = LearnerCreditRequestUserMessages.REQUESTED
     learner_credit_request = factory.SubFactory(LearnerCreditRequestFactory)
     error_reason = None
     traceback = None

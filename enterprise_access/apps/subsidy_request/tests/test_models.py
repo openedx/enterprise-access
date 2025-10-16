@@ -13,8 +13,8 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory
 )
 from enterprise_access.apps.subsidy_request.constants import (
-    LearnerCreditAdditionalActionStates,
     LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestActionTypes,
     LearnerCreditRequestUserMessages,
     SubsidyRequestStates,
     SubsidyTypeChoices
@@ -307,8 +307,8 @@ class LearnerCreditRequestActionsTests(TestCase):
         self.learner_credit_request = LearnerCreditRequestFactory(user=self.user)
         self.action = LearnerCreditRequestActionsFactory(
             learner_credit_request=self.learner_credit_request,
-            recent_action=SubsidyRequestStates.REQUESTED,
-            status=SubsidyRequestStates.REQUESTED,
+            recent_action=LearnerCreditRequestActionTypes.REQUESTED,
+            status=LearnerCreditRequestUserMessages.REQUESTED,
         )
         self.enterprise_customer_uuid = uuid4()
 
@@ -327,8 +327,8 @@ class LearnerCreditRequestActionsTests(TestCase):
         Test that a LearnerCreditRequestActions instance is created successfully.
         """
         self.assertIsNotNone(self.action.uuid)
-        self.assertEqual(self.action.recent_action, SubsidyRequestStates.REQUESTED)
-        self.assertEqual(self.action.status, SubsidyRequestStates.REQUESTED)
+        self.assertEqual(self.action.recent_action, LearnerCreditRequestActionTypes.REQUESTED)
+        self.assertEqual(self.action.status, LearnerCreditRequestUserMessages.REQUESTED)
         self.assertIsNone(self.action.error_reason)
         self.assertIsNone(self.action.traceback)
 
@@ -338,11 +338,11 @@ class LearnerCreditRequestActionsTests(TestCase):
         """
         reminded_action = LearnerCreditRequestActionsFactory(
             learner_credit_request=self.learner_credit_request,
-            recent_action=LearnerCreditAdditionalActionStates.REMINDED,
-            status=LearnerCreditAdditionalActionStates.REMINDED,
+            recent_action=LearnerCreditRequestActionTypes.REMINDED,
+            status=LearnerCreditRequestUserMessages.REMINDED,
         )
-        self.assertEqual(reminded_action.recent_action, LearnerCreditAdditionalActionStates.REMINDED)
-        self.assertEqual(reminded_action.status, LearnerCreditAdditionalActionStates.REMINDED)
+        self.assertEqual(reminded_action.recent_action, LearnerCreditRequestActionTypes.REMINDED)
+        self.assertEqual(reminded_action.status, LearnerCreditRequestUserMessages.REMINDED)
 
     def test_error_action(self):
         """
@@ -350,13 +350,13 @@ class LearnerCreditRequestActionsTests(TestCase):
         """
         error_action = LearnerCreditRequestActionsFactory(
             learner_credit_request=self.learner_credit_request,
-            recent_action=SubsidyRequestStates.ERROR,
-            status=SubsidyRequestStates.ERROR,
+            recent_action=LearnerCreditRequestActionTypes.ERROR,
+            status=LearnerCreditRequestUserMessages.REQUESTED,
             error_reason=LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL,
             traceback="An error occurred",
         )
-        self.assertEqual(error_action.recent_action, SubsidyRequestStates.ERROR)
-        self.assertEqual(error_action.status, SubsidyRequestStates.ERROR)
+        self.assertEqual(error_action.recent_action, LearnerCreditRequestActionTypes.ERROR)
+        self.assertEqual(error_action.status, LearnerCreditRequestUserMessages.REQUESTED)
         self.assertEqual(error_action.error_reason, LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL)
         self.assertEqual(error_action.traceback, "An error occurred")
 
@@ -364,20 +364,18 @@ class LearnerCreditRequestActionsTests(TestCase):
         """
         Test updating a LearnerCreditRequestActions instance.
         """
-        self.action.recent_action = SubsidyRequestStates.APPROVED
-        self.action.status = LearnerCreditRequestUserMessages.CHOICES[3][
-            0
-        ]  # APPROVED choice
+        self.action.recent_action = LearnerCreditRequestActionTypes.APPROVED
+        self.action.status = LearnerCreditRequestUserMessages.APPROVED
         self.action.save()
         updated_action = LearnerCreditRequestActions.objects.get(
             uuid=self.action.uuid
         )
         self.assertEqual(
-            updated_action.recent_action, SubsidyRequestStates.APPROVED
+            updated_action.recent_action, LearnerCreditRequestActionTypes.APPROVED
         )
         self.assertEqual(
             updated_action.status,
-            LearnerCreditRequestUserMessages.CHOICES[3][0],
+            LearnerCreditRequestUserMessages.APPROVED,
         )
 
     def test_clean_success_when_learner_credit_config_inactive(self):
