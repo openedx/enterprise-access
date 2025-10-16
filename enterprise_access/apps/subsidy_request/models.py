@@ -21,9 +21,8 @@ from simple_history.utils import bulk_update_with_history
 
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
-    LearnerCreditAdditionalActionStates,
-    LearnerCreditRequestActionChoices,
     LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestActionTypes,
     LearnerCreditRequestUserMessages,
     SubsidyRequestStates,
     SubsidyTypeChoices
@@ -487,19 +486,19 @@ class LearnerCreditRequest(SubsidyRequest):
                 ),
                 When(
                     Q(state=SubsidyRequestStates.REQUESTED),
-                    then=Value(SubsidyRequestStates.REQUESTED)
+                    then=Value(LearnerCreditRequestUserMessages.REQUESTED)
                 ),
                 When(
                     Q(state=SubsidyRequestStates.DECLINED),
-                    then=Value(SubsidyRequestStates.DECLINED)
+                    then=Value(LearnerCreditRequestUserMessages.DECLINED)
                 ),
                 When(
                     Q(state=SubsidyRequestStates.CANCELLED),
-                    then=Value(SubsidyRequestStates.CANCELLED)
+                    then=Value(LearnerCreditRequestUserMessages.CANCELLED)
                 ),
                 When(
                     Q(state=SubsidyRequestStates.ERROR),
-                    then=Value(SubsidyRequestStates.ERROR)
+                    then=Value(LearnerCreditRequestUserMessages.ERROR)
                 ),
                 When(
                     Q(state=SubsidyRequestStates.APPROVED),
@@ -560,7 +559,7 @@ class LearnerCreditRequestActions(TimeStampedModel):
         blank=False,
         null=False,
         db_index=True,
-        choices=LearnerCreditRequestActionChoices,
+        choices=LearnerCreditRequestActionTypes.CHOICES,
         help_text="The type of action taken on the learner credit request.",
     )
 
@@ -615,7 +614,7 @@ class LearnerCreditRequestActions(TimeStampedModel):
         Args:
             learner_credit_request (LearnerCreditRequest): The associated learner credit request.
             recent_action (str): The type of action taken (must be a valid choice from
-                LearnerCreditRequestActionChoices).
+                LearnerCreditRequestActionTypes).
             status (str): The status message (must be a valid choice from LearnerCreditRequestUserMessages.CHOICES).
             error_reason (str, optional): The error reason if applicable (must be a valid choice
                 from LearnerCreditRequestActionErrorReasons.CHOICES).

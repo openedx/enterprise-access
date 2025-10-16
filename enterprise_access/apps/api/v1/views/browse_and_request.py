@@ -51,8 +51,9 @@ from enterprise_access.apps.subsidy_access_policy.exceptions import SubisidyAcce
 from enterprise_access.apps.subsidy_access_policy.models import SubsidyAccessPolicy
 from enterprise_access.apps.subsidy_request.constants import (
     REUSABLE_REQUEST_STATES,
-    LearnerCreditAdditionalActionStates,
     LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestActionTypes,
+    LearnerCreditRequestUserMessages,
     SegmentEvents,
     SubsidyRequestStates,
     SubsidyTypeChoices
@@ -71,11 +72,7 @@ from enterprise_access.apps.subsidy_request.tasks import (
     send_learner_credit_bnr_request_approve_task,
     send_reminder_email_for_pending_learner_credit_request
 )
-from enterprise_access.apps.subsidy_request.utils import (
-    get_action_choice,
-    get_error_reason_choice,
-    get_user_message_choice
-)
+from enterprise_access.apps.subsidy_request.utils import get_error_reason_choice
 from enterprise_access.apps.track.segment import track_event
 from enterprise_access.utils import format_traceback, get_subsidy_model
 
@@ -898,8 +895,8 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
                 self._reuse_existing_request(existing_request, course_price)
                 LearnerCreditRequestActions.create_action(
                     learner_credit_request=existing_request,
-                    recent_action=get_action_choice(SubsidyRequestStates.REQUESTED),
-                    status=get_user_message_choice(SubsidyRequestStates.REQUESTED),
+                    recent_action=LearnerCreditRequestActionTypes.REQUESTED,
+                    status=LearnerCreditRequestUserMessages.REQUESTED,
                 )
                 # Trigger admin email notification with the latest request
                 send_learner_credit_bnr_admins_email_with_new_requests_task.delay(
@@ -941,8 +938,8 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
                     lcr = LearnerCreditRequest.objects.get(uuid=lcr_uuid)
                     LearnerCreditRequestActions.create_action(
                         learner_credit_request=lcr,
-                        recent_action=get_action_choice(SubsidyRequestStates.REQUESTED),
-                        status=get_user_message_choice(SubsidyRequestStates.REQUESTED),
+                        recent_action=LearnerCreditRequestActionTypes.REQUESTED,
+                        status=LearnerCreditRequestUserMessages.REQUESTED,
                     )
 
                     # Trigger admin email notification with the latest request
@@ -982,8 +979,8 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         # Log "approve" as recent action in the Request Action model.
         lc_request_action = LearnerCreditRequestActions.create_action(
             learner_credit_request=lc_request,
-            recent_action=get_action_choice(SubsidyRequestStates.APPROVED),
-            status=get_user_message_choice(SubsidyRequestStates.APPROVED),
+            recent_action=LearnerCreditRequestActionTypes.APPROVED,
+            status=LearnerCreditRequestUserMessages.APPROVED,
         )
 
         try:
@@ -1014,7 +1011,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
             logger.exception(error_msg)
 
             # Update approve action with error reason.
-            lc_request_action.status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
+            lc_request_action.status = LearnerCreditRequestUserMessages.REQUESTED
             lc_request_action.error_reason = get_error_reason_choice(
                 LearnerCreditRequestActionErrorReasons.FAILED_APPROVAL
             )
@@ -1044,8 +1041,8 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         error_msg = None
         lc_action = LearnerCreditRequestActions.create_action(
             learner_credit_request=learner_credit_request,
-            recent_action=get_action_choice(SubsidyRequestStates.CANCELLED),
-            status=get_user_message_choice(SubsidyRequestStates.CANCELLED),
+            recent_action=LearnerCreditRequestActionTypes.CANCELLED,
+            status=LearnerCreditRequestUserMessages.CANCELLED,
         )
 
         try:
@@ -1059,7 +1056,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
                     lc_action.error_reason = get_error_reason_choice(
                         LearnerCreditRequestActionErrorReasons.FAILED_CANCELLATION
                     )
-                    lc_action.status = get_user_message_choice(SubsidyRequestStates.APPROVED)
+                    lc_action.status = LearnerCreditRequestUserMessages.APPROVED
                     lc_action.traceback = error_msg
                     lc_action.save()
                     return Response(error_msg, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
@@ -1081,7 +1078,7 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
             lc_action.error_reason = get_error_reason_choice(
                 LearnerCreditRequestActionErrorReasons.FAILED_CANCELLATION
             )
-            lc_action.status = get_user_message_choice(SubsidyRequestStates.APPROVED)
+            lc_action.status = LearnerCreditRequestUserMessages.APPROVED
             lc_action.traceback = error_msg
             lc_action.save()
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
@@ -1102,8 +1099,8 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
 
         action_instance = LearnerCreditRequestActions.create_action(
             learner_credit_request=learner_credit_request,
-            recent_action=get_action_choice(LearnerCreditAdditionalActionStates.REMINDED),
-            status=get_user_message_choice(LearnerCreditAdditionalActionStates.REMINDED),
+            recent_action=LearnerCreditRequestActionTypes.REMINDED,
+            status=LearnerCreditRequestUserMessages.REMINDED,
         )
 
         try:
@@ -1111,8 +1108,11 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
             return Response(status=status.HTTP_200_OK)
         except Exception as exc:  # pylint: disable=broad-except
             # Optionally log an errored action here if the task couldn't be queued
-            action_instance.status = get_user_message_choice(LearnerCreditRequestActionErrorReasons.EMAIL_ERROR)
-            action_instance.error_reason = str(exc)
+            action_instance.status = LearnerCreditRequestUserMessages.APPROVED
+            action_instance.error_reason = get_error_reason_choice(
+                LearnerCreditRequestActionErrorReasons.EMAIL_ERROR
+            )
+            action_instance.traceback = format_traceback(exc)
             action_instance.save()
             return Response(status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
@@ -1142,19 +1142,19 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
         # Create the action instance before attempting the decline operation
         action_instance = LearnerCreditRequestActions.create_action(
             learner_credit_request=learner_credit_request,
-            recent_action=get_action_choice(SubsidyRequestStates.DECLINED),
-            status=get_user_message_choice(SubsidyRequestStates.DECLINED),
+            recent_action=LearnerCreditRequestActionTypes.DECLINED,
+            status=LearnerCreditRequestUserMessages.DECLINED,
         )
 
         try:
             with transaction.atomic():
                 learner_credit_request.decline(self.user)
         except (ValidationError, IntegrityError, DatabaseError) as exc:
-            action_instance.status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
+            action_instance.status = LearnerCreditRequestActionTypes.REQUESTED
             action_instance.error_reason = get_error_reason_choice(
                 LearnerCreditRequestActionErrorReasons.FAILED_DECLINE
             )
-            action_instance.traceback = str(exc)
+            action_instance.traceback = format_traceback(exc)
             action_instance.save()
 
             logger.exception(f"Error declining learner credit request {learner_credit_request_uuid}: {exc}")
@@ -1178,11 +1178,11 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
             try:
                 unlink_users_from_enterprise_task.delay(enterprise_customer_uuid, [lms_user_id])
             except (ConnectionError, TimeoutError, OSError) as exc:
-                action_instance.status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
+                action_instance.status = LearnerCreditRequestActionTypes.REQUESTED
                 action_instance.error_reason = get_error_reason_choice(
                     LearnerCreditRequestActionErrorReasons.FAILED_DECLINE
                 )
-                action_instance.traceback = str(exc)
+                action_instance.traceback = format_traceback(exc)
                 action_instance.save()
 
                 logger.exception(

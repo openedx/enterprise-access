@@ -35,6 +35,9 @@ class SubsidyRequestStates:
     CHOICES = COMMON_STATES + LC_REQUEST_STATES
 
 
+# DEPRECATED: This class was used to add 'reminded' to the list of possible
+# actions. Its functionality has been consolidated into the self-contained
+# `LearnerCreditRequestActionTypes` class.
 class LearnerCreditAdditionalActionStates:
     """ Additional states specifically for LearnerCreditRequestActions. """
 
@@ -44,7 +47,8 @@ class LearnerCreditAdditionalActionStates:
     )
 
 
-# Combined choices for LearnerCreditRequestAction model
+# DEPRECATED: This variable combined states from multiple classes in a way that
+# was confusing and brittle. Use `LearnerCreditRequestActionTypes.CHOICES` instead.
 LearnerCreditRequestActionChoices = SubsidyRequestStates.CHOICES + LearnerCreditAdditionalActionStates.CHOICES
 
 
@@ -85,20 +89,61 @@ SUBSIDY_TYPE_CHANGE_DECLINATION = (
 SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE = 100
 
 
+class LearnerCreditRequestActionTypes:
+    """
+    Defines the set of possible values for the `recent_action` field on the
+    `LearnerCreditRequestActions` model. This represents the specific event
+    or operation that occurred (e.g., an approval, a reminder).
+    """
+    REQUESTED = 'requested'
+    APPROVED = 'approved'
+    DECLINED = 'declined'
+    ERROR = 'error'
+    ACCEPTED = 'accepted'
+    CANCELLED = 'cancelled'
+    EXPIRED = 'expired'
+    REVERSED = 'reversed'
+    REMINDED = 'reminded'
+
+    CHOICES = (
+        (REQUESTED, "Requested"),
+        (APPROVED, "Approved"),
+        (DECLINED, "Declined"),
+        (ERROR, "Error"),
+        (ACCEPTED, "Accepted"),
+        (CANCELLED, "Cancelled"),
+        (EXPIRED, "Expired"),
+        (REVERSED, "Reversed"),
+        (REMINDED, "Reminded"),
+    )
+
+
 class LearnerCreditRequestUserMessages:
     """
-    User-facing messages for LearnerCreditRequestActions status field.
-    Reusing the state keys from SubsidyRequestStates but with different display messages.
+    Defines the set of possible values for the `status` field on the
+    `LearnerCreditRequestActions` model. This represents the user-facing
+    status label that is displayed in the UI as a result of an action.
     """
+    REQUESTED = 'requested'
+    REMINDED = 'reminded'
+    APPROVED = 'approved'
+    ACCEPTED = 'accepted'
+    DECLINED = 'declined'
+    REVERSED = 'reversed'
+    CANCELLED = 'cancelled'
+    EXPIRED = 'expired'
+    ERROR = 'error'
+
     CHOICES = (
-        (SubsidyRequestStates.REQUESTED, "Requested"),
-        (LearnerCreditAdditionalActionStates.REMINDED, "Waiting For Learner"),
-        (SubsidyRequestStates.APPROVED, "Waiting For Learner"),
-        (SubsidyRequestStates.ACCEPTED, "Redeemed By Learner"),
-        (SubsidyRequestStates.DECLINED, "Declined"),
-        (SubsidyRequestStates.REVERSED, "Refunded"),
-        (SubsidyRequestStates.CANCELLED, "Cancelled"),
-        (SubsidyRequestStates.EXPIRED, "Expired"),
+        (REQUESTED, "Requested"),
+        (REMINDED, "Waiting For Learner"),
+        (APPROVED, "Waiting For Learner"),
+        (ACCEPTED, "Redeemed By Learner"),
+        (DECLINED, "Declined"),
+        (REVERSED, "Refunded"),
+        (CANCELLED, "Cancelled"),
+        (EXPIRED, "Expired"),
+        (ERROR, "Error"),
     )
 
 
