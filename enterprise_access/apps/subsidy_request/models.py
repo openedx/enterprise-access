@@ -4,7 +4,6 @@
 # pylint: skip-file
 
 import collections
-from datetime import datetime
 from uuid import uuid4
 
 from django.conf import settings
@@ -12,18 +11,18 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Case, CharField, F, IntegerField, OuterRef, Q, Subquery, Value, When
 from django.dispatch import receiver
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from jsonfield.encoder import JSONEncoder
 from jsonfield.fields import JSONField
 from model_utils.models import SoftDeletableModel, TimeStampedModel
 from simple_history.models import HistoricalRecords
-from simple_history.utils import bulk_update_with_history
+from simple_history.utils import bulk_create_with_history, bulk_update_with_history
 
 from enterprise_access.apps.subsidy_request.constants import (
     SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
-    LearnerCreditAdditionalActionStates,
-    LearnerCreditRequestActionChoices,
     LearnerCreditRequestActionErrorReasons,
+    LearnerCreditRequestActionTypes,
     LearnerCreditRequestUserMessages,
     SubsidyRequestStates,
     SubsidyTypeChoices
@@ -429,12 +428,6 @@ class LearnerCreditRequest(SubsidyRequest):
             return f'<LearnerCreditRequest for user {self.user} and course {self.course_id}>'
         return f'<LearnerCreditRequest for user {self.user}>'
 
-    def approve(self, reviewer):
-        self.reviewer = reviewer
-        self.state = SubsidyRequestStates.APPROVED
-        self.reviewed_at = localized_utcnow()
-        self.save()
-
     @classmethod
     def annotate_dynamic_fields_onto_queryset(cls, queryset):
         """
@@ -521,6 +514,12 @@ class LearnerCreditRequest(SubsidyRequest):
 
         return new_queryset
 
+    def approve(self, reviewer):
+        self.reviewer = reviewer
+        self.state = SubsidyRequestStates.APPROVED
+        self.reviewed_at = localized_utcnow()
+        self.save()
+
     def decline(self, reviewer, reason=None):
         self.reviewer = reviewer
         self.state = SubsidyRequestStates.DECLINED
@@ -534,6 +533,28 @@ class LearnerCreditRequest(SubsidyRequest):
         self.reviewed_at = localized_utcnow()
         self.save()
 
+    @classmethod
+    def bulk_update(cls, lcr_records, updated_field_names):
+        """
+        Updates and saves the given ``lcr_records`` in bulk,
+        while saving their history:
+        https://django-simple-history.readthedocs.io/en/latest/common_issues.html#bulk-updating-a-model-with-history-new
+
+        Note that the simple-history utility function uses Django's bulk_update() under the hood:
+        https://docs.djangoproject.com/en/3.2/ref/models/querysets/#bulk-update
+
+        which does *not* call save(), so we have to manually update the `modified` field
+        during this bulk operation in order for that field's value to be updated.
+        """
+        for record in lcr_records:
+            record.modified = timezone.now()
+
+        return bulk_update_with_history(
+            lcr_records,
+            cls,
+            updated_field_names + ['modified'],
+            batch_size=SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
+        )
 
 class LearnerCreditRequestActions(TimeStampedModel):
     """
@@ -560,7 +581,7 @@ class LearnerCreditRequestActions(TimeStampedModel):
         blank=False,
         null=False,
         db_index=True,
-        choices=LearnerCreditRequestActionChoices,
+        choices=LearnerCreditRequestActionTypes.CHOICES,
         help_text="The type of action taken on the learner credit request.",
     )
 
@@ -601,6 +622,19 @@ class LearnerCreditRequestActions(TimeStampedModel):
                 f" with action {self.recent_action}>")
 
     @classmethod
+    def bulk_create(cls, lcr_action_records):
+        """
+        Creates new ``LearnerCreditRequestActions`` records in bulk,
+        while saving their history:
+        https://django-simple-history.readthedocs.io/en/latest/common_issues.html#bulk-creating-a-model-with-history
+        """
+        return bulk_create_with_history(
+            lcr_action_records,
+            cls,
+            batch_size=SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE,
+        )
+
+    @classmethod
     def create_action(
         cls,
         learner_credit_request,
@@ -615,7 +649,7 @@ class LearnerCreditRequestActions(TimeStampedModel):
         Args:
             learner_credit_request (LearnerCreditRequest): The associated learner credit request.
             recent_action (str): The type of action taken (must be a valid choice from
-                LearnerCreditRequestActionChoices).
+                LearnerCreditRequestActionTypes.CHOICES).
             status (str): The status message (must be a valid choice from LearnerCreditRequestUserMessages.CHOICES).
             error_reason (str, optional): The error reason if applicable (must be a valid choice
                 from LearnerCreditRequestActionErrorReasons.CHOICES).
