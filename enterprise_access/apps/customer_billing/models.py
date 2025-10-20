@@ -1,10 +1,14 @@
 """
 Models for customer billing app.
 """
+import datetime
 import logging
 from datetime import timedelta
+from decimal import Decimal
 from typing import Self
 
+import stripe
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
@@ -583,3 +587,211 @@ class StripeEventData(TimeStampedModel):
 
     def __str__(self):
         return f"<StripeEventData id={self.event_id}, event_type={self.event_type}>"
+
+
+class StripeEventSummary(TimeStampedModel):
+    """
+    Normalized view of StripeEventData with extracted fields for easier querying.
+    Populated when StripeEventData records are created/updated.
+
+    .. no_pii: This model has no PII
+    """
+    # Base StripeEventData fields
+    stripe_event_data = models.OneToOneField(
+        StripeEventData,
+        on_delete=models.CASCADE,
+        related_name='summary',
+        help_text='Reference to the original StripeEventData record'
+    )
+    event_id = models.CharField(
+        max_length=255,
+        db_index=True,
+        help_text='The unique Stripe event identifier'
+    )
+    event_type = models.CharField(
+        max_length=255,
+        db_index=True,
+        help_text='The Stripe event type'
+    )
+    checkout_intent = models.ForeignKey(
+        CheckoutIntent,
+        null=True,
+        on_delete=models.CASCADE,
+        help_text='The related CheckoutIntent'
+    )
+
+    # Normalized fields from provisioning workflow
+    subscription_plan_uuid = models.UUIDField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='UUID of the SubscriptionPlan from License Manager'
+    )
+
+    # Stripe object identification
+    stripe_object_type = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='Type of the main Stripe object (invoice, subscription, etc.)'
+    )
+    stripe_subscription_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='Stripe subscription ID extracted from event data'
+    )
+    stripe_invoice_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='Stripe invoice ID extracted from event data'
+    )
+
+    # Subscription-related fields
+    subscription_status = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text='Status of the Stripe subscription (active, canceled, etc.)'
+    )
+    subscription_period_start = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Start date of the subscription period'
+    )
+    subscription_period_end = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='End date of the subscription period'
+    )
+
+    # Invoice-related fields
+    invoice_amount_paid = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Amount paid on the invoice in cents'
+    )
+    # Invoice unit amount in an integer number of cents
+    invoice_unit_amount = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Unit amount from the primary invoice line item as integer cents'
+    )
+    # Stripe provides an invoice unit_amount_decimal field
+    # representing the unit price in cents as a decimal string
+    # with up to 12 decimal places of precision.
+    invoice_unit_amount_decimal = models.DecimalField(
+        max_digits=20,
+        decimal_places=12,
+        null=True,
+        blank=True,
+        help_text='Unit amount from the primary invoice line item in decimal cents'
+    )
+    invoice_quantity = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Quantity from the primary invoice line item'
+    )
+    invoice_currency = models.CharField(
+        max_length=3,
+        null=True,
+        blank=True,
+        help_text='Currency of the invoice'
+    )
+
+    class Meta:
+        db_table = 'customer_billing_stripe_event_summary'
+        verbose_name = 'Stripe Event Summary'
+        verbose_name_plural = 'Stripe Event Summaries'
+        indexes = [
+            models.Index(fields=['subscription_plan_uuid']),
+            models.Index(fields=['stripe_subscription_id']),
+            models.Index(fields=['stripe_invoice_id']),
+            models.Index(fields=['event_type', 'checkout_intent']),
+            models.Index(fields=['stripe_object_type']),
+        ]
+
+    def __str__(self):
+        return f"Summary of {self.event_type} - {self.event_id}"
+
+    def populate_with_summary_data(self):
+        """
+        Extract and populate normalized fields from the related StripeEventData.
+        """
+        stripe_event_data = self.stripe_event_data
+
+        # Copy base fields
+        self.event_id = stripe_event_data.event_id
+        self.event_type = stripe_event_data.event_type
+        self.checkout_intent = stripe_event_data.checkout_intent
+
+        # Get subscription plan UUID from related workflow
+        if stripe_event_data.checkout_intent and stripe_event_data.checkout_intent.workflow:
+            try:
+                # Fetch model from the Django app registry to avoid
+                # a circular import.
+                subs_output_model = apps.get_model(
+                    'enterprise_access.apps.provisioning', 'GetCreateSubscriptionPlanStepOutput',
+                )
+                plan_output = subs_output_model.objects.filter(
+                    workflow=stripe_event_data.checkout_intent.workflow
+                ).first()
+
+                if plan_output and plan_output.output_object:
+                    self.subscription_plan_uuid = plan_output.output_object.get('subscription_plan_uuid')
+            except ImportError:
+                logger.warning("Could not import GetCreateSubscriptionPlanStepOutput")
+
+        # Extract data from the Stripe event payload
+        event_data = stripe_event_data.data
+        stripe_object_data = event_data.get('data', {}).get('object', {})
+        self.stripe_object_type = stripe_object_data['object']
+        # pylint: disable=protected-access
+        stripe_object = stripe._util.convert_to_stripe_object(event_data['data']['object'])
+
+        # Extract subscription-specific fields
+        if self.stripe_object_type == 'subscription' or self.event_type.startswith('customer.subscription'):
+            subscription_obj = stripe_object
+            if not subscription_obj['items'].data:
+                return
+            first_item = subscription_obj['items'].data[0]
+            self.stripe_subscription_id = subscription_obj.id
+            self.subscription_status = subscription_obj.status
+            self.subscription_period_start = self._timestamp_to_datetime(
+                first_item.get('current_period_start')
+            )
+            self.subscription_period_end = self._timestamp_to_datetime(
+                first_item.get('current_period_end')
+            )
+
+        # Extract invoice-specific fields
+        elif self.stripe_object_type == 'invoice' or self.event_type.startswith('invoice'):
+            invoice_obj = stripe_object
+            self.stripe_invoice_id = invoice_obj.id
+            try:
+                self.stripe_subscription_id = invoice_obj.parent.subscription_details.subscription
+            except AttributeError:
+                pass
+            self.invoice_amount_paid = invoice_obj.amount_paid
+            self.invoice_currency = invoice_obj.currency
+
+            # Extract unit amount and quantity from line items
+            lines = invoice_obj.lines.data
+            if lines:
+                primary_line = lines[0]
+                self.invoice_unit_amount = getattr(primary_line.pricing, 'unit_amount', None)
+                self.invoice_unit_amount_decimal = Decimal(primary_line.pricing.unit_amount_decimal)
+                self.invoice_quantity = primary_line.quantity
+                if self.invoice_unit_amount is None:
+                    self.invoice_unit_amount = int(self.invoice_unit_amount_decimal)
+
+    @staticmethod
+    def _timestamp_to_datetime(timestamp):
+        """Convert Unix timestamp to Django datetime."""
+        if timestamp:
+            return timezone.make_aware(datetime.datetime.fromtimestamp(timestamp))
+        return None
