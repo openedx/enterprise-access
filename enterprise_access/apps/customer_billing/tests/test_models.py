@@ -2,6 +2,7 @@
 Tests for the ``enterprise_access.customer_billing.models`` module.
 """
 from datetime import timedelta
+from decimal import Decimal
 from typing import cast
 from unittest import mock
 
@@ -16,7 +17,9 @@ from enterprise_access.apps.customer_billing.constants import CheckoutIntentStat
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
     FailedCheckoutIntentConflict,
-    SlugReservationConflict
+    SlugReservationConflict,
+    StripeEventData,
+    StripeEventSummary
 )
 from enterprise_access.apps.provisioning.tests.factories import ProvisionNewCustomerWorkflowFactory
 
@@ -704,3 +707,124 @@ class TestCheckoutIntentModel(TestCase):
                 name=name,
             )
         self.assertIn("slug and name must either both be given or neither be given", str(exc.exception))
+
+
+class TestStripeEventSummary(TestCase):
+    """Test cases for StripeEventSummary model and populate_with_summary_data method."""
+
+    def setUp(self):
+        self.user = UserFactory()
+        self.checkout_intent = CheckoutIntent.create_intent(
+            user=self.user,
+            slug='test-enterprise',
+            name='Test Enterprise',
+            quantity=10
+        )
+
+    def test_populate_with_summary_data_invoice_event(self):
+        """Test populating summary from invoice.paid event with full invoice data."""
+        # Create mock invoice event data
+        invoice_event_data = {
+            'id': 'evt_test_invoice',
+            'type': 'invoice.paid',
+            'data': {
+                'object': {
+                    'object': 'invoice',
+                    'id': 'in_test_123',
+                    'subscription': 'sub_test_456',
+                    'amount_paid': 2500,  # $25.00 in cents
+                    'currency': 'usd',
+                    'lines': {
+                        'data': [
+                            {
+                                'quantity': 10,
+                                'pricing': {
+                                    'unit_amount_decimal': '250.0'  # $2.50 per unit
+                                }
+                            }
+                        ]
+                    },
+                    'parent': {
+                        'subscription_details': {
+                            'subscription': 'sub_test_456'
+                        }
+                    }
+                }
+            }
+        }
+
+        # Create StripeEventData
+        stripe_event_data = StripeEventData.objects.create(
+            event_id='evt_test_invoice',
+            event_type='invoice.paid',
+            checkout_intent=self.checkout_intent,
+            data=invoice_event_data
+        )
+
+        # Create and populate summary
+        summary = StripeEventSummary(stripe_event_data=stripe_event_data)
+        summary.populate_with_summary_data()
+
+        # Verify invoice-specific fields are populated
+        self.assertEqual(summary.event_id, 'evt_test_invoice')
+        self.assertEqual(summary.event_type, 'invoice.paid')
+        self.assertEqual(summary.checkout_intent, self.checkout_intent)
+        self.assertEqual(summary.stripe_object_type, 'invoice')
+        self.assertEqual(summary.stripe_invoice_id, 'in_test_123')
+        self.assertEqual(summary.stripe_subscription_id, 'sub_test_456')
+        self.assertEqual(summary.invoice_amount_paid, 2500)
+        self.assertEqual(summary.invoice_currency, 'usd')
+        self.assertIsNone(summary.invoice_unit_amount)
+        self.assertEqual(summary.invoice_unit_amount_decimal, Decimal(250.0))
+        self.assertEqual(summary.invoice_quantity, 10)
+
+    def test_populate_with_summary_data_subscription_created_event(self):
+        """Test populating summary from customer.subscription.created event."""
+        # Create mock subscription event data
+        subscription_event_data = {
+            'id': 'evt_test_sub_created',
+            'type': 'customer.subscription.created',
+            'data': {
+                'object': {
+                    'object': 'subscription',
+                    'id': 'sub_test_789',
+                    'status': 'active',
+                    'items': {
+                        'data': [
+                            {
+                                'current_period_start': 1609459200,  # 2021-01-01 00:00:00 UTC
+                                'current_period_end': 1640995200,    # 2022-01-01 00:00:00 UTC
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+        # Create StripeEventData
+        stripe_event_data = StripeEventData.objects.create(
+            event_id='evt_test_sub_created',
+            event_type='customer.subscription.created',
+            checkout_intent=self.checkout_intent,
+            data=subscription_event_data
+        )
+
+        # Create and populate summary
+        summary = StripeEventSummary(stripe_event_data=stripe_event_data)
+        summary.populate_with_summary_data()
+
+        # Verify subscription-specific fields are populated
+        self.assertEqual(summary.event_id, 'evt_test_sub_created')
+        self.assertEqual(summary.event_type, 'customer.subscription.created')
+        self.assertEqual(summary.checkout_intent, self.checkout_intent)
+        self.assertEqual(summary.stripe_object_type, 'subscription')
+        self.assertEqual(summary.stripe_subscription_id, 'sub_test_789')
+        self.assertEqual(summary.subscription_status, 'active')
+
+        # Verify datetime conversion
+        self.assertIsNotNone(summary.subscription_period_start)
+        self.assertIsNotNone(summary.subscription_period_end)
+
+        # Check that the converted dates are reasonable (2021-2022)
+        self.assertEqual(summary.subscription_period_start.year, 2021)
+        self.assertEqual(summary.subscription_period_end.year, 2022)
