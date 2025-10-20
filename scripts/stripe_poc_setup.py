@@ -10,7 +10,7 @@ stripe.api_key = STRIPE_API_KEY
 
 try:
     product_quarterly = stripe.Product.retrieve("prod_RnxwBMaYC6Dp4W")
-except stripe.error.InvalidRequestError:
+except stripe.InvalidRequestError:
     product_quarterly = stripe.Product.create(
         id="prod_RnxwBMaYC6Dp4W",
         name="Subscription License Quarterly Plan",
@@ -20,7 +20,7 @@ print(product_quarterly)
 
 try:
     product_yearly = stripe.Product.retrieve("prod_RnxwVyZDvZvkyi")
-except stripe.error.InvalidRequestError:
+except stripe.InvalidRequestError:
     product_yearly = stripe.Product.create(
         id="prod_RnxwVyZDvZvkyi",
         name="Subscription License Yearly Plan",
@@ -30,7 +30,7 @@ print(product_yearly)
 
 try:
     price_quarterly = stripe.Price.search(query="lookup_key:'price_quarterly_0002'")['data'][0]
-except (stripe.error.InvalidRequestError, IndexError):
+except (stripe.InvalidRequestError, IndexError):
     price_quarterly = stripe.Price.create(
         lookup_key="price_quarterly_0002",
         currency="usd",
@@ -47,7 +47,7 @@ print(price_quarterly)
 
 try:
     price_yearly = stripe.Price.search(query="lookup_key:'price_yearly_0001'")['data'][0]
-except (stripe.error.InvalidRequestError, IndexError):
+except (stripe.InvalidRequestError, IndexError):
     price_yearly = stripe.Price.create(
         lookup_key="price_yearly_0001",
         currency="usd",
@@ -107,7 +107,7 @@ try:
         billing_portal_config.id,
         features=billing_portal_features,
     )
-except (stripe.error.InvalidRequestError, IndexError):
+except (stripe.InvalidRequestError, IndexError):
     billing_portal_config = stripe.billing_portal.Configuration.create(
         features=billing_portal_features,
     )

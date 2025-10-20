@@ -1,7 +1,6 @@
 """
 REST API views for the billing provider (Stripe) integration.
 """
-import json
 import logging
 
 import stripe
@@ -16,6 +15,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from enterprise_access.apps.api import serializers
+from enterprise_access.apps.api.authentication import StripeWebhookAuthentication
 from enterprise_access.apps.core.constants import CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION
 from enterprise_access.apps.customer_billing.api import (
     CreateCheckoutSessionFailedConflict,
@@ -69,13 +69,7 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         detail=False,
         methods=['post'],
         url_path='stripe-webhook',
-        # Authentication performed via signature validation.
-        # TODO: Move inline authentication logic to custom authentication class which returns a
-        # configured Stripe system user.
-        authentication_classes=(),
-        # TODO: After adopting a custom authentication class, replace this permission class with one
-        # that reads the request.user and validates it against the configured system user representing
-        # Stripe.
+        authentication_classes=(StripeWebhookAuthentication,),
         permission_classes=(permissions.AllowAny,),
     )
     @csrf_exempt
@@ -83,24 +77,22 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         """
         Listen for events from Stripe, and take specific actions. Typically the action is to send a confirmation email.
 
+        Authentication is performed via Stripe signature validation in StripeWebhookAuthentication.
+
         TODO:
         * For a real production implementation we should implement event de-duplication:
           - https://docs.stripe.com/webhooks/process-undelivered-events
           - This is a safeguard against the remote possibility that an event is sent twice. This could happen if the
             network connection cuts out at the exact moment between successfully processing an event and responding with
-            HTTP 200, in which case Stripe will attemt to re-send the event since it does not know we successfully
+            HTTP 200, in which case Stripe will attempt to re-send the event since it does not know we successfully
             received it.
         """
-        payload = request.body
-        event = None
-
-        # TODO: move inline authentication logic into a custom authentication class.
-        try:
-            # TODO: migrate deprecated `construct_from()` call to newer `construct_event()`.
-            event = stripe.Event.construct_from(json.loads(payload), stripe.api_key)
-        except ValueError:
+        # Event must be parsed and verified by the authentication class.
+        event = getattr(request, '_stripe_event', None)
+        if event is None:
+            # This should not occur if StripeWebhookAuthentication is applied.
             return Response(
-                'Stripe WebHook event payload was invalid.',
+                'Stripe WebHook event missing after authentication.',
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
