@@ -3,7 +3,6 @@ Python API for customer_billing app.
 """
 import logging
 from collections.abc import Mapping
-from functools import cache
 from typing import TypedDict, Unpack, cast
 
 import stripe
@@ -56,8 +55,6 @@ class FieldValidationResult(TypedDict):
     developer_message: str | None
 
 
-# Basic in-memory cache to prevent multiple API calls within a single request.
-@cache
 def _get_lms_user_id(email: str | None) -> int | None:
     """
     Return the LMS user ID for an existing user with a specific email, or None if no user with that email exists.
@@ -79,6 +76,11 @@ class CheckoutSessionInputValidator():
     Loosely modeled after RegistrationValidationView:
     https://github.com/openedx/edx-platform/blob/f90e59e5/openedx/core/djangoapps/user_authn/views/register.py#L727
     """
+
+    def get_lms_user_id(self, email):
+        if not hasattr(self, '_cached_lms_user_id'):
+            self._cached_lms_user_id = _get_lms_user_id(email)  # pylint: disable=attribute-defined-outside-init
+        return self._cached_lms_user_id
 
     def handle_admin_email(self, input_data: CheckoutSessionInputValidatorData) -> FieldValidationResult:
         """
@@ -103,7 +105,7 @@ class CheckoutSessionInputValidator():
             return {'error_code': error_code, 'developer_message': developer_message}
 
         # Given email must be registered.
-        lms_user_id = _get_lms_user_id(email=admin_email)
+        lms_user_id = self.get_lms_user_id(email=admin_email)
         if not lms_user_id:
             error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['admin_email']['NOT_REGISTERED']
             logger.info(f'admin_email invalid: "{admin_email}". {developer_message}')
@@ -276,7 +278,7 @@ class CheckoutSessionInputValidator():
           **and** the lms_user_id is known and present in the User table.
         """
         if not (user_record := input_data.get('user')):
-            lms_user_id = _get_lms_user_id(input_data.get('admin_email'))
+            lms_user_id = self.get_lms_user_id(input_data.get('admin_email'))
             user_record = User.objects.filter(lms_user_id=lms_user_id).first()
             if not user_record:
                 error_code, developer_message = CHECKOUT_SESSION_ERROR_CODES['user']['IS_NULL']
