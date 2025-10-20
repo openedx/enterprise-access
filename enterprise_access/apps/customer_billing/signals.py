@@ -8,7 +8,7 @@ from django.dispatch import receiver
 
 from enterprise_access.apps.api.serializers import CheckoutIntentReadOnlySerializer
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentSegmentEvents
-from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData, StripeEventSummary
 from enterprise_access.apps.track.segment import track_event
 
 logger = logging.getLogger(__name__)
@@ -45,3 +45,40 @@ def track_checkout_intent_changes(sender, instance, created, **kwargs):  # pylin
             event_name=CheckoutIntentSegmentEvents.LIFECYCLE_EVENT,
             properties=properties,
         )
+
+
+@receiver(post_save, sender=StripeEventData)
+def create_stripe_event_summary(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
+    """
+    Automatically create/update StripeEventSummary when StripeEventData is saved.
+    """
+    if created or not hasattr(instance, 'summary'):
+        try:
+            # Create new summary record
+            summary = StripeEventSummary(stripe_event_data=instance)
+            summary.populate_with_summary_data()
+            summary.save()
+
+            logger.info(
+                f"Created StripeEventSummary for event {instance.event_id} "
+                f"(type: {instance.event_type})"
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error(
+                f"Failed to create StripeEventSummary for event {instance.event_id}: {e}"
+            )
+    else:
+        try:
+            # Update existing summary record
+            summary = instance.summary
+            summary.populate_with_summary_data()
+            summary.save()
+
+            logger.info(
+                f"Updated StripeEventSummary for event {instance.event_id} "
+                f"(type: {instance.event_type})"
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error(
+                f"Failed to update StripeEventSummary for event {instance.event_id}: {e}"
+            )
