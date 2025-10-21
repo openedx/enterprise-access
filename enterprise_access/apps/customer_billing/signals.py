@@ -3,6 +3,7 @@ Signal handlers for customer billing models.
 """
 import logging
 
+from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=CheckoutIntent)
-def track_checkout_intent_changes(instance, created, **kwargs):
+def track_checkout_intent_changes(sender, instance, created, **kwargs):
     """Automatically track events after save."""
     # Get the previous record from the history
     latest_history = instance.history.latest()
@@ -52,6 +53,12 @@ def create_stripe_event_summary(sender, instance, created, **kwargs):  # pylint:
     """
     Automatically create/update StripeEventSummary when StripeEventData is saved.
     """
+    if not settings.ENABLE_STRIPE_EVENT_SUMMARIES:
+        logger.info('Event summaries not enabled')
+        return
+
+    logger.info('processing summary for stripe event %s', instance)
+
     if created or not hasattr(instance, 'summary'):
         try:
             # Create new summary record
