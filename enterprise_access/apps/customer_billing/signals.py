@@ -3,20 +3,19 @@ Signal handlers for customer billing models.
 """
 import logging
 
-from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from enterprise_access.apps.api.serializers import CheckoutIntentReadOnlySerializer
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentSegmentEvents
-from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData, StripeEventSummary
+from enterprise_access.apps.customer_billing.models import CheckoutIntent
 from enterprise_access.apps.track.segment import track_event
 
 logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=CheckoutIntent)
-def track_checkout_intent_changes(sender, instance, created, **kwargs):
+def track_checkout_intent_changes(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
     """Automatically track events after save."""
     # Get the previous record from the history
     latest_history = instance.history.latest()
@@ -46,46 +45,3 @@ def track_checkout_intent_changes(sender, instance, created, **kwargs):
             event_name=CheckoutIntentSegmentEvents.LIFECYCLE_EVENT,
             properties=properties,
         )
-
-
-@receiver(post_save, sender=StripeEventData)
-def create_stripe_event_summary(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
-    """
-    Automatically create/update StripeEventSummary when StripeEventData is saved.
-    """
-    if not settings.ENABLE_STRIPE_EVENT_SUMMARIES:
-        logger.info('Event summaries not enabled')
-        return
-
-    logger.info('processing summary for stripe event %s', instance)
-
-    if created or not hasattr(instance, 'summary'):
-        try:
-            # Create new summary record
-            summary = StripeEventSummary(stripe_event_data=instance)
-            summary.populate_with_summary_data()
-            summary.save()
-
-            logger.info(
-                f"Created StripeEventSummary for event {instance.event_id} "
-                f"(type: {instance.event_type})"
-            )
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error(
-                f"Failed to create StripeEventSummary for event {instance.event_id}: {e}"
-            )
-    else:
-        try:
-            # Update existing summary record
-            summary = instance.summary
-            summary.populate_with_summary_data()
-            summary.save()
-
-            logger.info(
-                f"Updated StripeEventSummary for event {instance.event_id} "
-                f"(type: {instance.event_type})"
-            )
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error(
-                f"Failed to update StripeEventSummary for event {instance.event_id}: {e}"
-            )

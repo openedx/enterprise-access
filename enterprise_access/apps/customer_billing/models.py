@@ -1,14 +1,10 @@
 """
 Models for customer billing app.
 """
-import datetime
 import logging
 from datetime import timedelta
-from decimal import Decimal
 from typing import Self
 
-import stripe
-from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
@@ -717,77 +713,3 @@ class StripeEventSummary(TimeStampedModel):
 
     def __str__(self):
         return f"Summary of {self.event_type} - {self.event_id}"
-
-    def populate_with_summary_data(self):
-        """
-        Extract and populate normalized fields from the related StripeEventData.
-        """
-        stripe_event_data = self.stripe_event_data
-
-        # Copy base fields
-        self.event_id = stripe_event_data.event_id
-        self.event_type = stripe_event_data.event_type
-        self.checkout_intent = stripe_event_data.checkout_intent
-
-        # Get subscription plan UUID from related workflow
-        if stripe_event_data.checkout_intent and stripe_event_data.checkout_intent.workflow:
-            try:
-                # pylint: disable=import-outside-toplevel
-                from enterprise_access.apps.provisioning.models import GetCreateSubscriptionPlanStepOutput
-
-                plan_output = GetCreateSubscriptionPlanStepOutput.objects.filter(
-                    workflow=stripe_event_data.checkout_intent.workflow
-                ).first()
-
-                if plan_output and plan_output.output_object:
-                    self.subscription_plan_uuid = plan_output.output_object.get('subscription_plan_uuid')
-            except ImportError:
-                logger.warning("Could not import GetCreateSubscriptionPlanStepOutput")
-
-        # Extract data from the Stripe event payload
-        event_data = stripe_event_data.data
-        stripe_object_data = event_data.get('data', {}).get('object', {})
-        self.stripe_object_type = stripe_object_data['object']
-        # pylint: disable=protected-access
-        stripe_object = stripe._util.convert_to_stripe_object(event_data['data']['object'])
-
-        # Extract subscription-specific fields
-        if self.stripe_object_type == 'subscription' or self.event_type.startswith('customer.subscription'):
-            subscription_obj = stripe_object
-            if not subscription_obj['items'].data:
-                return
-            first_item = subscription_obj['items'].data[0]
-            self.stripe_subscription_id = subscription_obj.id
-            self.subscription_status = subscription_obj.status
-            self.subscription_period_start = self._timestamp_to_datetime(
-                first_item.get('current_period_start')
-            )
-            self.subscription_period_end = self._timestamp_to_datetime(
-                first_item.get('current_period_end')
-            )
-
-        # Extract invoice-specific fields
-        elif self.stripe_object_type == 'invoice' or self.event_type.startswith('invoice'):
-            invoice_obj = stripe_object
-            self.stripe_invoice_id = invoice_obj.id
-            try:
-                self.stripe_subscription_id = invoice_obj.parent.subscription_details.subscription
-            except AttributeError:
-                pass
-            self.invoice_amount_paid = invoice_obj.amount_paid
-            self.invoice_currency = invoice_obj.currency
-
-            # Extract unit amount and quantity from line items
-            lines = invoice_obj.lines.data
-            if lines:
-                primary_line = lines[0]
-                self.invoice_unit_amount = getattr(primary_line.pricing, 'unit_amount', None)
-                self.invoice_unit_amount_decimal = Decimal(primary_line.pricing.unit_amount_decimal)
-                self.invoice_quantity = primary_line.quantity
-
-    @staticmethod
-    def _timestamp_to_datetime(timestamp):
-        """Convert Unix timestamp to Django datetime."""
-        if timestamp:
-            return timezone.make_aware(datetime.datetime.fromtimestamp(timestamp))
-        return None
