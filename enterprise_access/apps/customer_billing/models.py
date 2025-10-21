@@ -732,12 +732,10 @@ class StripeEventSummary(TimeStampedModel):
         # Get subscription plan UUID from related workflow
         if stripe_event_data.checkout_intent and stripe_event_data.checkout_intent.workflow:
             try:
-                # Fetch model from the Django app registry to avoid
-                # a circular import.
-                subs_output_model = apps.get_model(
-                    'enterprise_access.apps.provisioning', 'GetCreateSubscriptionPlanStepOutput',
-                )
-                plan_output = subs_output_model.objects.filter(
+                # pylint: disable=import-outside-toplevel
+                from enterprise_access.apps.provisioning.models import GetCreateSubscriptionPlanStepOutput
+
+                plan_output = GetCreateSubscriptionPlanStepOutput.objects.filter(
                     workflow=stripe_event_data.checkout_intent.workflow
                 ).first()
 
