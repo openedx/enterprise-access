@@ -2,7 +2,8 @@
 
 ## Overview
 
-Enterprise Access acts as the **billing orchestrator** in the edX enterprise ecosystem, translating Stripe payment events into business actions across multiple services.
+Enterprise Access acts as the **billing orchestrator** in the edX enterprise ecosystem,
+translating Stripe payment events into business actions across multiple services.
 
 ## Architecture Flow
 
