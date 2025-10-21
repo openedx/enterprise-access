@@ -640,6 +640,8 @@ DEFAULT_STRIPE_CACHE_TIMEOUT = 60
 # How long we consider Stripe prices valid for
 STRIPE_PRICE_DATA_CACHE_TIMEOUT = 300
 
+ENABLE_STRIPE_EVENT_SUMMARIES = False
+
 ################# End Self-Service Purchasing (SSP) settings #################
 
 
