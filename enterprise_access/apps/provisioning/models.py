@@ -11,6 +11,7 @@ from django_countries import countries
 
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.tasks import send_enterprise_provision_signup_confirmation_email
 from enterprise_access.apps.workflow.exceptions import UnitOfWorkException
 from enterprise_access.apps.workflow.models import AbstractWorkflow, AbstractWorkflowStep
 from enterprise_access.apps.workflow.serialization import BaseInputOutput
@@ -434,6 +435,14 @@ class GetCreateSubscriptionPlanStep(AbstractWorkflowStep):
                 product_id=self.input_object.product_id,
             )
             self.synchronize_checkout_intent(accumulated_output=accumulated_output)
+            send_enterprise_provision_signup_confirmation_email.delay(
+                self.input_object.start_date,
+                self.input_object.expiration_date,
+                self.input_object.desired_num_licenses,
+                accumulated_output.create_customer_output.name,
+                accumulated_output.create_customer_output.slug
+            )
+
             return self.output_class.from_dict(result_dict)
         except Exception as exc:
             self.synchronize_checkout_intent(accumulated_output=accumulated_output, exc=exc)
