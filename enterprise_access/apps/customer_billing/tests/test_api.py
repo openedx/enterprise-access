@@ -76,6 +76,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         self.other_user = UserFactory()
 
     def tearDown(self):
+        customer_billing_api._get_lms_user_id.cache_clear()  # pylint: disable=protected-access
         # Clean up any intents created during tests
         CheckoutIntent.objects.all().delete()
 
