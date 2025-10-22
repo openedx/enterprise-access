@@ -576,7 +576,7 @@ class StripeEventData(TimeStampedModel):
     )
     data = models.JSONField(
         null=False,
-        default={},
+        default=dict,
         help_text='The event payload data',
         encoder=DjangoJSONEncoder,
     )
@@ -703,13 +703,6 @@ class StripeEventSummary(TimeStampedModel):
         db_table = 'customer_billing_stripe_event_summary'
         verbose_name = 'Stripe Event Summary'
         verbose_name_plural = 'Stripe Event Summaries'
-        indexes = [
-            models.Index(fields=['subscription_plan_uuid']),
-            models.Index(fields=['stripe_subscription_id']),
-            models.Index(fields=['stripe_invoice_id']),
-            models.Index(fields=['event_type', 'checkout_intent']),
-            models.Index(fields=['stripe_object_type']),
-        ]
 
     def __str__(self):
         return f"Summary of {self.event_type} - {self.event_id}"
