@@ -92,6 +92,32 @@ class BrazeApiClient(BrazeClient):
             'user_alias': {
                 'alias_label': ENTERPRISE_BRAZE_ALIAS_LABEL,
                 'alias_name': user_email,
-
             },
         }
+
+    def create_braze_recipient(self, user_email: str, lms_user_id: int = None) -> dict:
+        """
+        Creates a Braze recipient with appropriate handling for both LMS users and email-only users.
+
+        For users with an LMS ID, creates a recipient with external ID and identifies the user.
+        For users without an LMS ID, creates a recipient with email alias and ensures alias exists.
+
+        Args:
+            user_email (str): Email address of the recipient
+            lms_user_id (int, optional): LMS user ID if available
+
+        Returns:
+            dict: Braze recipient object suitable for campaign sending
+        """
+        if lms_user_id:
+            recipient = self.create_recipient(
+                user_email=user_email,
+                lms_user_id=lms_user_id,
+            )
+        else:
+            recipient = self.create_recipient_no_external_id(user_email)
+            self.create_braze_alias(
+                [user_email],
+                ENTERPRISE_BRAZE_ALIAS_LABEL,
+            )
+        return recipient
