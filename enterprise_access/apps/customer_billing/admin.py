@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 
 from .constants import CheckoutIntentState
-from .models import CheckoutIntent, StripeEventData, StripeEventSummary
+from .models import CheckoutIntent, StripeEventData
 from .stripe_event_handlers import StripeEventHandler
 
 
@@ -294,33 +294,3 @@ class StripeEventDataAdmin(admin.ModelAdmin):
         for obj in queryset:
             event = stripe.Event.construct_from(obj.data, stripe.api_key)
             StripeEventHandler.dispatch(event)
-
-
-@admin.register(StripeEventSummary)
-class StripeEventSummaryAdmin(admin.ModelAdmin):
-    """
-    The admin class for StripeEventSummary.
-    """
-    list_display = [
-        'event_id',
-        'event_type',
-        'created',
-        'checkout_intent_id',
-        'subscription_plan_uuid',
-    ]
-    list_filter = [
-        'event_type',
-    ]
-    search_fields = [
-        'event_id',
-    ]
-    select_related = [
-        'checkout_intent',
-        'stripe_event_data',
-    ]
-    readonly_fields = [
-        'stripe_event_data',
-    ]
-
-    def checkout_intent_id(self, obj):
-        return obj.checkout_intent.id if obj.checkout_intent else None
