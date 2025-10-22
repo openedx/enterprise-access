@@ -280,10 +280,6 @@ class StripeEventDataAdmin(admin.ModelAdmin):
     actions = ['handle_event']
     select_related = [
         'checkout_intent',
-        'summary',
-    ]
-    readonly_fields = [
-        'summary',
     ]
 
     def checkout_intent_id(self, obj):
