@@ -735,7 +735,7 @@ class StripeEventSummary(TimeStampedModel):
                 # Fetch model from the Django app registry to avoid
                 # a circular import.
                 subs_output_model = apps.get_model(
-                    'enterprise_access.apps.provisioning', 'GetCreateSubscriptionPlanStepOutput',
+                    'provisioning', 'GetCreateSubscriptionPlanStepOutput',
                 )
                 plan_output = subs_output_model.objects.filter(
                     workflow=stripe_event_data.checkout_intent.workflow
