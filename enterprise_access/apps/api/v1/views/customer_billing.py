@@ -463,7 +463,7 @@ class StripeEventSummaryViewSet(viewsets.ModelViewSet):
     """
     authentication_classes = (JwtAuthentication,)
     permission_classes = (permissions.IsAuthenticated,)
-    lookup_field = 'event_id'
+    lookup_field = 'subscription_plan_uuid'
 
     # Only allow GET operation
     http_method_names = ['get']

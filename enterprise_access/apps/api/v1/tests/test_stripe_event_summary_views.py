@@ -156,7 +156,7 @@ class StripeEventSummaryTests(APITest):
             'context': self.enterprise_uuid,  # implicit access to this enterprise
         }])
 
-        url = reverse("api:v1:stripe-event-summary-detail", args=[self.stripe_event_data.event_id])
+        url = reverse("api:v1:stripe-event-summary-detail", args=['sub_test_123'])
         response = self.client.get(url)
         assert response.status_code == 200
         assert response.data['invoice_quantity'] == 10
