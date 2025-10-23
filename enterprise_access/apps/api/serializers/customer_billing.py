@@ -10,7 +10,8 @@ from enterprise_access.apps.customer_billing.embargo import get_embargoed_countr
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
     FailedCheckoutIntentConflict,
-    SlugReservationConflict
+    SlugReservationConflict,
+    StripeEventSummary
 )
 
 
@@ -259,3 +260,13 @@ class CheckoutIntentCreateRequestSerializer(CountryFieldMixin, serializers.Model
             raise RecordConflictError('Requesting user already has a failed CheckoutIntent.') from exc
 
         # All other exceptions should return 5xx.
+
+
+class StripeEventSummaryReadOnlySerializer(serializers.ModelSerializer):
+    """
+    Serializer for reading StripeEventSummary model instances.
+    """
+    class Meta:
+        model = StripeEventSummary
+        fields = '__all__'
+        read_only_fields = [field.name for field in StripeEventSummary._meta.get_fields()]
