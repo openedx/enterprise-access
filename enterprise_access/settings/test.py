@@ -76,7 +76,11 @@ KAFKA_TOPICS = [
 ]
 ################### End Kafka Related Settings ##############################
 
+### SSP Tests ###
 PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING = {
     '1': 42,
 }
 ENABLE_CUSTOMER_BILLING_API = True
+
+ENABLE_STRIPE_EVENT_SUMMARIES = True
+### End SSP Tests ###

@@ -580,7 +580,7 @@ class StripeEventData(TimeStampedModel):
     )
     data = models.JSONField(
         null=False,
-        default={},
+        default=dict,
         help_text='The event payload data',
         encoder=DjangoJSONEncoder,
     )
@@ -735,7 +735,7 @@ class StripeEventSummary(TimeStampedModel):
                 # Fetch model from the Django app registry to avoid
                 # a circular import.
                 subs_output_model = apps.get_model(
-                    'enterprise_access.apps.provisioning', 'GetCreateSubscriptionPlanStepOutput',
+                    'provisioning', 'GetCreateSubscriptionPlanStepOutput',
                 )
                 plan_output = subs_output_model.objects.filter(
                     workflow=stripe_event_data.checkout_intent.workflow
@@ -786,6 +786,8 @@ class StripeEventSummary(TimeStampedModel):
                 self.invoice_unit_amount = getattr(primary_line.pricing, 'unit_amount', None)
                 self.invoice_unit_amount_decimal = Decimal(primary_line.pricing.unit_amount_decimal)
                 self.invoice_quantity = primary_line.quantity
+                if self.invoice_unit_amount is None:
+                    self.invoice_unit_amount = int(self.invoice_unit_amount_decimal)
 
     @staticmethod
     def _timestamp_to_datetime(timestamp):

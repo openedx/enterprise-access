@@ -774,7 +774,7 @@ class TestStripeEventSummary(TestCase):
         self.assertEqual(summary.stripe_subscription_id, 'sub_test_456')
         self.assertEqual(summary.invoice_amount_paid, 2500)
         self.assertEqual(summary.invoice_currency, 'usd')
-        self.assertIsNone(summary.invoice_unit_amount)
+        self.assertEqual(summary.invoice_unit_amount, 250)
         self.assertEqual(summary.invoice_unit_amount_decimal, Decimal(250.0))
         self.assertEqual(summary.invoice_quantity, 10)
 

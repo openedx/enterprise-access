@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @receiver(post_save, sender=CheckoutIntent)
-def track_checkout_intent_changes(instance, created, **kwargs):
+def track_checkout_intent_changes(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
     """Automatically track events after save."""
     # Get the previous record from the history
     latest_history = instance.history.latest()
