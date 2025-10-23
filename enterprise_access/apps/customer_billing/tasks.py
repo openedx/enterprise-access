@@ -253,7 +253,6 @@ def send_trial_cancellation_email_task(
                 lms_user_id=admin.get("lms_user_id"),
             )
             recipients.append(recipient)
-
         except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning(
                 "Failed to create Braze recipient for admin email %s: %s",

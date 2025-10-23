@@ -2,6 +2,7 @@
 Unit tests for Stripe event handlers.
 """
 from contextlib import nullcontext
+from datetime import timedelta
 from random import randint
 from typing import Type, cast
 from unittest import mock
@@ -10,6 +11,7 @@ import ddt
 import stripe
 from django.contrib.auth.models import AbstractUser
 from django.test import TestCase
+from django.utils import timezone
 
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
@@ -66,6 +68,8 @@ class TestStripeEventHandler(TestCase):
     def _create_mock_stripe_event(self, event_type, event_data):
         """Helper to create a mock Stripe event."""
         mock_event = mock.MagicMock(spec=stripe.Event)
+        created_at = timezone.now() - timedelta(seconds=randint(1, 30))
+        mock_event.created = int(created_at.timestamp())
         mock_event.type = event_type
         numeric_id = str(randint(1, 100000)).zfill(6)
         mock_event.id = f'evt_test_{event_type.replace(".", "_")}_{numeric_id}'

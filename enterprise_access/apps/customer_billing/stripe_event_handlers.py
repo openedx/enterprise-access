@@ -240,25 +240,31 @@ class StripeEventHandler:
             )
 
         # Handle trial subscription cancellation
-        # TODO: Check that status wasn't already canceled to avoid duplicate emails.
-        # This will be easier to implement once StripeEventSummary changes land,
-        # which will provide easier querying of prior subscription states.
-        if subscription.get("status") == "canceled":
-            trial_end = subscription.get("trial_end")
-            if trial_end:
-                logger.info(
-                    f"Queuing trial cancellation email for subscription {subscription.id}, "
-                    f"checkout_intent_id={checkout_intent_id}"
-                )
+        # Check if status changed to canceled to avoid duplicate emails
+        current_status = subscription.get("status")
+        if current_status == "canceled":
+            prior_status = getattr(checkout_intent.previous_summary(event), 'subscription_status', None)
 
-                # Queue the async task to send the email
-                send_trial_cancellation_email_task.delay(
-                    checkout_intent_id=checkout_intent.id,
-                    trial_end_timestamp=trial_end,
-                )
+            # Only send email if status changed from non-canceled to canceled
+            if prior_status != 'canceled':
+                trial_end = subscription.get("trial_end")
+                if trial_end:
+                    logger.info(
+                        f"Subscription {subscription.id} status changed from '{prior_status}' to 'canceled'. "
+                        f"Queuing trial cancellation email for checkout_intent_id={checkout_intent_id}"
+                    )
+
+                    send_trial_cancellation_email_task.delay(
+                        checkout_intent_id=checkout_intent.id,
+                        trial_end_timestamp=trial_end,
+                    )
+                else:
+                    logger.info(
+                        f"Subscription {subscription.id} canceled but has no trial_end, skipping cancellation email"
+                    )
             else:
                 logger.info(
-                    f"Subscription {subscription.id} canceled but has no trial_end, skipping cancellation email"
+                    f"Subscription {subscription.id} already canceled (status unchanged), skipping cancellation email"
                 )
 
     @on_stripe_event("customer.subscription.deleted")
