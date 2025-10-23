@@ -623,9 +623,12 @@ class TestProvisioningEndToEnd(APITest):
         else:
             self.assertFalse(mock_license_client.create_customer_agreement.called)
 
+    @ddt.data(True, False)
     @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
     @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
-    def test_new_subscription_plan_created(self, mock_lms_api_client, mock_license_manager_client):
+    def test_new_subscription_plan_created(
+        self, response_has_product, mock_lms_api_client, mock_license_manager_client,
+    ):
         # Setup mocks for prior workflow steps
         mock_lms_client = mock_lms_api_client.return_value
         mock_lms_client.get_enterprise_customer_data.return_value = DEFAULT_CUSTOMER_RECORD
@@ -639,7 +642,10 @@ class TestProvisioningEndToEnd(APITest):
         mock_license_client.create_customer_agreement.return_value = {
             **DEFAULT_AGREEMENT_RECORD, "subscriptions": []
         }
-        mock_license_client.create_subscription_plan.return_value = DEFAULT_SUBSCRIPTION_PLAN_RECORD
+        plan_record = dict(DEFAULT_SUBSCRIPTION_PLAN_RECORD)
+        if not response_has_product:
+            plan_record.pop('product')
+        mock_license_client.create_subscription_plan.return_value = plan_record
 
         # Make the provisioning request
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=DEFAULT_REQUEST_PAYLOAD)
@@ -650,17 +656,24 @@ class TestProvisioningEndToEnd(APITest):
         self.assertIn('subscription_plan', actual_response)
         self.assertEqual(
             actual_response['subscription_plan']['uuid'],
-            DEFAULT_SUBSCRIPTION_PLAN_RECORD['uuid'],
+            plan_record['uuid'],
         )
         self.assertEqual(
             actual_response['subscription_plan']['title'],
-            DEFAULT_SUBSCRIPTION_PLAN_RECORD['title'],
+            plan_record['title'],
         )
         self.assertEqual(
             actual_response['subscription_plan']['salesforce_opportunity_line_item'],
-            DEFAULT_SUBSCRIPTION_PLAN_RECORD['salesforce_opportunity_line_item'],
+            plan_record['salesforce_opportunity_line_item'],
         )
         self.assertTrue(actual_response['subscription_plan']['is_active'])
+        if response_has_product:
+            self.assertEqual(
+                actual_response['subscription_plan']['product'],
+                plan_record['product'],
+            )
+        else:
+            self.assertIsNone(actual_response['subscription_plan']['product'])
 
         # Workflow record/step assertions
         workflow = ProvisionNewCustomerWorkflow.objects.all()[0]
