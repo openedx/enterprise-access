@@ -5,6 +5,7 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import cast
 from unittest import mock
+from uuid import uuid4
 
 import ddt
 from django.contrib.auth import get_user_model
@@ -21,6 +22,7 @@ from enterprise_access.apps.customer_billing.models import (
     StripeEventData,
     StripeEventSummary
 )
+from enterprise_access.apps.provisioning.models import GetCreateSubscriptionPlanStep
 from enterprise_access.apps.provisioning.tests.factories import ProvisionNewCustomerWorkflowFactory
 
 User = get_user_model()
@@ -828,3 +830,87 @@ class TestStripeEventSummary(TestCase):
         # Check that the converted dates are reasonable (2021-2022)
         self.assertEqual(summary.subscription_period_start.year, 2021)
         self.assertEqual(summary.subscription_period_end.year, 2022)
+
+    def test_populate_with_summary_data_with_subscription_plan_uuid(self):
+        """Test that subscription_plan_uuid is extracted from related workflow."""
+        # Create a workflow
+        workflow = ProvisionNewCustomerWorkflowFactory()
+
+        # Create checkout intent linked to the workflow
+        checkout_intent = CheckoutIntent.create_intent(
+            user=self.user,
+            slug='test-enterprise-workflow',
+            name='Test Enterprise Workflow',
+            quantity=5
+        )
+        checkout_intent.workflow = workflow
+        checkout_intent.save()
+
+        # Create a subscription plan step with output containing subscription_plan_uuid
+        subscription_plan_uuid = uuid4()
+        _ = GetCreateSubscriptionPlanStep.objects.create(
+            workflow_record_uuid=workflow.uuid,
+            input_data={
+                'title': 'Test Plan',
+                'salesforce_opportunity_line_item': 'test-oli-123',
+                'start_date': '2024-01-01T00:00:00Z',
+                'expiration_date': '2025-01-01T00:00:00Z',
+                'desired_num_licenses': 5,
+                'product_id': 123
+            },
+            output_data={
+                'uuid': str(subscription_plan_uuid),
+                'title': 'Test Plan',
+                'salesforce_opportunity_line_item': 'test-oli-123',
+                'created': '2024-01-01T00:00:00Z',
+                'start_date': '2024-01-01T00:00:00Z',
+                'expiration_date': '2025-01-01T00:00:00Z',
+                'is_active': True,
+                'is_current': True,
+                'plan_type': 'Subscription',
+                'enterprise_catalog_uuid': str(uuid4()),
+                'product': 123,
+                'subscription_plan_uuid': str(subscription_plan_uuid)  # This is what we're testing
+            }
+        )
+
+        # Create mock subscription event data
+        subscription_event_data = {
+            'id': 'evt_test_with_plan_uuid',
+            'type': 'customer.subscription.created',
+            'data': {
+                'object': {
+                    'object': 'subscription',
+                    'id': 'sub_test_with_uuid',
+                    'status': 'active',
+                    'items': {
+                        'data': [
+                            {
+                                'current_period_start': 1609459200,
+                                'current_period_end': 1640995200,
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+        # Create StripeEventData linked to the checkout intent with workflow
+        stripe_event_data = StripeEventData.objects.create(
+            event_id='evt_test_with_plan_uuid',
+            event_type='customer.subscription.created',
+            checkout_intent=checkout_intent,
+            data=subscription_event_data
+        )
+
+        # Create and populate summary
+        summary = StripeEventSummary(stripe_event_data=stripe_event_data)
+        summary.populate_with_summary_data()
+
+        # Verify that subscription_plan_uuid was extracted from the workflow
+        self.assertEqual(summary.subscription_plan_uuid, subscription_plan_uuid)
+        self.assertEqual(summary.event_id, 'evt_test_with_plan_uuid')
+        self.assertEqual(summary.event_type, 'customer.subscription.created')
+        self.assertEqual(summary.checkout_intent, checkout_intent)
+        self.assertEqual(summary.stripe_subscription_id, 'sub_test_with_uuid')
+        self.assertEqual(summary.subscription_status, 'active')

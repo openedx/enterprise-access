@@ -727,24 +727,22 @@ class StripeEventSummary(TimeStampedModel):
         # Copy base fields
         self.event_id = stripe_event_data.event_id
         self.event_type = stripe_event_data.event_type
-        self.checkout_intent = stripe_event_data.checkout_intent
+        checkout_intent = stripe_event_data.checkout_intent
+        self.checkout_intent = checkout_intent
 
         # Get subscription plan UUID from related workflow
-        if stripe_event_data.checkout_intent and stripe_event_data.checkout_intent.workflow:
-            try:
-                # Fetch model from the Django app registry to avoid
-                # a circular import.
-                subs_output_model = apps.get_model(
-                    'provisioning', 'GetCreateSubscriptionPlanStepOutput',
-                )
-                plan_output = subs_output_model.objects.filter(
-                    workflow=stripe_event_data.checkout_intent.workflow
-                ).first()
+        if checkout_intent and checkout_intent.workflow:
+            # Fetch model from the Django app registry to avoid
+            # a circular import.
+            subscription_step_model = apps.get_model(
+                'provisioning', 'GetCreateSubscriptionPlanStep',
+            )
+            subscription_step = subscription_step_model.objects.filter(
+                workflow_record_uuid=checkout_intent.workflow.uuid,
+            ).first()
 
-                if plan_output and plan_output.output_object:
-                    self.subscription_plan_uuid = plan_output.output_object.get('subscription_plan_uuid')
-            except ImportError:
-                logger.warning("Could not import GetCreateSubscriptionPlanStepOutput")
+            if subscription_step and subscription_step.output_object:
+                self.subscription_plan_uuid = subscription_step.output_object.uuid
 
         # Extract data from the Stripe event payload
         event_data = stripe_event_data.data
