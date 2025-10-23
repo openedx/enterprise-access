@@ -82,7 +82,7 @@ def validate_trial_subscription(enterprise_slug: str) -> Tuple[bool, Optional[di
 
         return True, subscription
 
-    except Exception as exc:
+    except Exception as exc:  # pylint: disable=broad-exception-caught
         logger.exception(
             'Error validating trial subscription for enterprise %s: %s',
             enterprise_slug,

@@ -560,8 +560,6 @@ class CheckoutIntent(TimeStampedModel):
         Returns:
             The most recent StripeEventSummary before the given event, or None if none exists
         """
-        from enterprise_access.apps.customer_billing.models import StripeEventSummary
-
         # Convert Stripe event timestamp to datetime
         event_timestamp = _datetime_from_timestamp(stripe_event.created)
 
