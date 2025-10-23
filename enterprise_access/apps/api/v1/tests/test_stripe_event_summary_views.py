@@ -147,7 +147,6 @@ class StripeEventSummaryTests(APITest):
 
         url = reverse('api:v1:stripe-event-summary-list')
         response = self.client.get(url)
-        print('list ', response.data)
         assert response.status_code == 200
         assert response.data['count'] == 2
 
@@ -159,6 +158,5 @@ class StripeEventSummaryTests(APITest):
 
         url = reverse("api:v1:stripe-event-summary-detail", args=[self.stripe_event_data.event_id])
         response = self.client.get(url)
-        print('detail ', response.data)
         assert response.status_code == 200
         assert response.data['invoice_quantity'] == 10
