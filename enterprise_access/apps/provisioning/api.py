@@ -199,7 +199,7 @@ def get_or_create_subscription_plan(
             'uuid %s and salesforce_opportunity_line_item %s and product_id %s'
         ),
         created_subscription['uuid'],
-        created_subscription['salesforce_opportunity_line_item'],
-        created_subscription['product'],
+        created_subscription.get('salesforce_opportunity_line_item'),
+        created_subscription.get('product'),
     )
     return created_subscription
