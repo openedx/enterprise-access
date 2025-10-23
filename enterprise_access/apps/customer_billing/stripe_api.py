@@ -3,6 +3,7 @@ Python API for interacting with Stripe (aside from functions contained in ``pric
 """
 import logging
 from functools import wraps
+from typing import Optional
 
 import stripe
 from django.conf import settings
@@ -211,3 +212,30 @@ def get_stripe_subscription(subscription_id) -> stripe.Subscription:
     Docs: https://stripe.com/docs/api/subscriptions/retrieve
     """
     return stripe.Subscription.retrieve(subscription_id)
+
+
+@stripe_cache()
+def get_stripe_trialing_subscription(
+        stripe_customer_id: str, status: str = 'trialing'
+) -> Optional[stripe.Subscription]:
+    """
+    Retrieve the most recent subscription with given status for a Stripe customer.
+
+    Args:
+        stripe_customer_id (str): The Stripe Customer ID to search subscriptions for.
+        status (str): The subscription status to filter by, defaults to 'trialing'.
+                     See https://stripe.com/docs/api/subscriptions/list#list_subscriptions-status
+                     for possible values.
+
+    Returns:
+        Optional[stripe.Subscription]: The most recent subscription matching the criteria,
+                                     or None if no matching subscription is found.
+
+    Docs: https://stripe.com/docs/api/subscriptions/list
+    """
+    subscription_list = stripe.Subscription.list(
+        customer=stripe_customer_id,
+        status=status,
+        limit=1,
+    )
+    return subscription_list.data[0] if subscription_list.data else None
