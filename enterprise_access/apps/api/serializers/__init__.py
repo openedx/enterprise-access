@@ -22,7 +22,8 @@ from .customer_billing import (
     CheckoutIntentUpdateRequestSerializer,
     CustomerBillingCreateCheckoutSessionRequestSerializer,
     CustomerBillingCreateCheckoutSessionSuccessResponseSerializer,
-    CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer
+    CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer,
+    StripeEventSummaryReadOnlySerializer,
 )
 from .provisioning import ProvisioningRequestSerializer, ProvisioningResponseSerializer
 from .subsidy_access_policy import (
