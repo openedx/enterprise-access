@@ -223,3 +223,53 @@ class TestStripeEventHandler(TestCase):
         self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)
         event_data = StripeEventData.objects.get(event_id=mock_event.id)
         self.assertEqual(event_data.checkout_intent, self.checkout_intent)
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_cancellation_email_task"
+    )
+    def test_subscription_updated_sends_cancellation_email_for_canceled_trial(
+        self, mock_email_task
+    ):
+        """Test that subscription_updated sends email when trial is canceled."""
+        trial_end_timestamp = 1234567890
+        subscription_data = {
+            "id": "sub_test_canceled_123",
+            "status": "canceled",
+            "trial_end": trial_end_timestamp,
+            "metadata": self._create_mock_stripe_subscription(
+                self.checkout_intent.id
+            ),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        # Verify the email task was queued
+        mock_email_task.delay.assert_called_once_with(
+            checkout_intent_id=self.checkout_intent.id,
+            trial_end_timestamp=trial_end_timestamp,
+        )
+
+    def test_subscription_updated_skips_email_when_no_trial_end(self):
+        """Test that subscription_updated skips email when trial_end is missing."""
+        subscription_data = {
+            "id": "sub_test_no_trial_123",
+            "status": "canceled",
+            "trial_end": None,  # No trial
+            "metadata": self._create_mock_stripe_subscription(
+                self.checkout_intent.id
+            ),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+
+        with mock.patch(
+            "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_cancellation_email_task"
+        ) as mock_task:
+            StripeEventHandler.dispatch(mock_event)
+            mock_task.delay.assert_not_called()

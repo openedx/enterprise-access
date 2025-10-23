@@ -9,6 +9,7 @@ import stripe
 
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData
 from enterprise_access.apps.customer_billing.stripe_event_types import StripeEventType
+from enterprise_access.apps.customer_billing.tasks import send_trial_cancellation_email_task
 
 logger = logging.getLogger(__name__)
 
@@ -215,29 +216,54 @@ class StripeEventHandler:
         """
         Handle customer.subscription.updated events.
         Track when subscriptions have pending updates and update related CheckoutIntent state.
+        Send cancellation notification email when a trial subscription is canceled.
         """
         subscription = event.data.object
-        pending_update = getattr(subscription, 'pending_update', None)
+        pending_update = getattr(subscription, "pending_update", None)
+
+        checkout_intent_id = get_checkout_intent_id_from_subscription(
+            subscription
+        )
+        checkout_intent = get_checkout_intent_or_raise(
+            checkout_intent_id, event.id
+        )
+        link_event_data_to_checkout_intent(event, checkout_intent)
 
         if pending_update:
             # TODO: take necessary action on the actual SubscriptionPlan
             # and update the CheckoutIntent.
             logger.warning(
-                'Subscription %s has pending update: %s. checkout_intent_id: %s',
+                "Subscription %s has pending update: %s. checkout_intent_id: %s",
                 subscription.id,
                 pending_update,
                 get_checkout_intent_id_from_subscription(subscription),
             )
 
-        checkout_intent_id = get_checkout_intent_id_from_subscription(subscription)
-        try:
-            checkout_intent = get_checkout_intent_or_raise(checkout_intent_id, event.id)
-        except CheckoutIntent.DoesNotExist:
-            return
+        # Handle trial subscription cancellation
+        # TODO: Check that status wasn't already canceled to avoid duplicate emails.
+        # This will be easier to implement once StripeEventSummary changes land,
+        # which will provide easier querying of prior subscription states.
+        if subscription.get("status") == "canceled":
+            trial_end = subscription.get("trial_end")
+            if trial_end:
+                logger.info(
+                    f"Queuing trial cancellation email for subscription {subscription.id}, "
+                    f"checkout_intent_id={checkout_intent_id}"
+                )
 
-        link_event_data_to_checkout_intent(event, checkout_intent)
+                # Queue the async task to send the email
+                send_trial_cancellation_email_task.delay(
+                    checkout_intent_id=checkout_intent.id,
+                    trial_end_timestamp=trial_end,
+                )
+            else:
+                logger.info(
+                    f"Subscription {subscription.id} canceled but has no trial_end, skipping cancellation email"
+                )
 
-    @on_stripe_event('customer.subscription.deleted')
+    @on_stripe_event("customer.subscription.deleted")
     @staticmethod
     def subscription_deleted(event: stripe.Event) -> None:
-        pass
+        """
+        Handle customer.subscription.deleted events.
+        """

@@ -51,6 +51,7 @@ BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_25_CAMPAIGN = 'test-day-25-reminder-campaig
 BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_50_CAMPAIGN = 'test-day-50-reminder-campaign'
 BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_65_CAMPAIGN = 'test-day-65-reminder-campaign'
 BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_85_CAMPAIGN = 'test-day-85-reminder-campaign'
+BRAZE_TRIAL_CANCELLATION_CAMPAIGN = 'test-trial-cancellation-campaign'
 
 # SEGMENT CONFIGURATION
 SEGMENT_KEY = 'test-key'

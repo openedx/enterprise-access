@@ -450,3 +450,43 @@ def create_free_trial_checkout_session(
     logger.info(f'Updated checkout intent {intent.id} with Stripe session {checkout_session["id"]}')
 
     return checkout_session
+
+
+def create_stripe_billing_portal_session(
+    checkout_intent: CheckoutIntent, return_url: str
+) -> stripe.billing_portal.Session:
+    """
+    Create a Stripe billing portal session for a given CheckoutIntent.
+
+    Args:
+        checkout_intent: The CheckoutIntent record containing the stripe customer ID
+        return_url: The URL to redirect the user to after they're done in the portal
+
+    Returns:
+        A Stripe billing portal Session object with a 'url' attribute
+
+    Raises:
+        ValueError: If the checkout intent has no stripe_customer_id
+        stripe.StripeError: If the Stripe API call fails
+    """
+    if not checkout_intent.stripe_customer_id:
+        raise ValueError(
+            f"CheckoutIntent {checkout_intent.id} has no stripe_customer_id. "
+            "Cannot create billing portal session."
+        )
+
+    try:
+        portal_session = stripe.billing_portal.Session.create(
+            customer=checkout_intent.stripe_customer_id,
+            return_url=return_url,
+        )
+        logger.info(
+            f"Created Stripe billing portal session {portal_session.id} "
+            f"for CheckoutIntent {checkout_intent.id}, customer {checkout_intent.stripe_customer_id}"
+        )
+        return portal_session
+    except stripe.StripeError as exc:
+        logger.exception(
+            f"StripeError creating billing portal session for CheckoutIntent {checkout_intent.id}: {exc}"
+        )
+        raise
