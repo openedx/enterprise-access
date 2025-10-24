@@ -36,6 +36,7 @@ router.register(
 if settings.ENABLE_CUSTOMER_BILLING_API:
     router.register('customer-billing', views.CustomerBillingViewSet, 'customer-billing')
     router.register('checkout-intent', views.CheckoutIntentViewSet, basename='checkout-intent')
+    router.register('stripe-event-summary', views.StripeEventSummaryViewSet, basename='stripe-event-summary')
 
 
 # BFFs

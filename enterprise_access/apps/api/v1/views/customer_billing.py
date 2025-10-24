@@ -23,7 +23,7 @@ from enterprise_access.apps.customer_billing.api import (
     CreateCheckoutSessionValidationError,
     create_free_trial_checkout_session
 )
-from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventSummary
 from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
 
 from .constants import CHECKOUT_INTENT_EXAMPLES, ERROR_RESPONSES, PATCH_REQUEST_EXAMPLES
@@ -453,3 +453,33 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
         """
         user = self.request.user
         return CheckoutIntent.objects.filter(user=user).select_related('user')
+
+
+class StripeEventSummaryViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for StripeEventSummary model.
+
+    Provides retrieve action for StripeEventSummary records.
+    """
+    authentication_classes = (JwtAuthentication,)
+    permission_classes = (permissions.IsAuthenticated,)
+
+    # Only allow GET operation
+    http_method_names = ['get']
+
+    def get_serializer_class(self):
+        """
+        Return read only serializer.
+        """
+        return serializers.StripeEventSummaryReadOnlySerializer
+
+    def get_queryset(self):
+        """
+        Either return full queryset, or filter by all objects associated with
+        a subscription_plan_uuid
+        """
+        queryset = StripeEventSummary.objects.all()
+        subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
+        if subscription_plan_uuid:
+            queryset = StripeEventSummary.objects.filter(subscription_plan_uuid=subscription_plan_uuid)
+        return queryset
