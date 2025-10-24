@@ -104,13 +104,14 @@ class TestStripeEventHandler(TestCase):
         # Sad Test case: CheckoutIntent not found
         {
             'intent_id_override': '99999',  # certainly does not exist.
-            'expected_exception': CheckoutIntent.DoesNotExist,
             'expected_final_state': CheckoutIntentState.CREATED,  # Unchanged.
+            'expect_matching_intent': False,
         },
         # Sad Test case: invalid checkout_intent_id format
         {
             'intent_id_override': 'not_an_integer',
             'expected_exception': ValueError,
+            'expect_matching_intent': False,
             'expected_final_state': CheckoutIntentState.CREATED,  # Unchanged.
         },
     )
@@ -120,6 +121,7 @@ class TestStripeEventHandler(TestCase):
         checkout_intent_state=CheckoutIntentState.CREATED,
         intent_id_override=None,
         expected_exception=None,
+        expect_matching_intent=True,
         expected_final_state=CheckoutIntentState.PAID,
     ):
         """Test various scenarios for the invoice.paid event handler."""
@@ -151,7 +153,7 @@ class TestStripeEventHandler(TestCase):
         self.checkout_intent.refresh_from_db()
         self.assertEqual(self.checkout_intent.state, expected_final_state)
 
-        if not expected_exception:
+        if expect_matching_intent:
             event_data = StripeEventData.objects.get(event_id=mock_event.id)
             self.assertEqual(event_data.checkout_intent, self.checkout_intent)
 

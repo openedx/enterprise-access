@@ -92,7 +92,10 @@ def get_checkout_intent_or_raise(checkout_intent_id, event_id) -> CheckoutIntent
     try:
         checkout_intent = CheckoutIntent.objects.get(id=checkout_intent_id)
     except CheckoutIntent.DoesNotExist:
-        logger.exception('Could not find CheckoutIntent record for event %s', event_id)
+        logger.warning(
+            'Could not find CheckoutIntent record with id %s for event %s',
+            checkout_intent_id, event_id,
+        )
         raise
 
     logger.info(
@@ -156,7 +159,15 @@ class StripeEventHandler:
         stripe_customer_id = invoice['customer']
 
         checkout_intent_id = get_checkout_intent_id_from_subscription(subscription_details)
-        checkout_intent = get_checkout_intent_or_raise(checkout_intent_id, event.id)
+        try:
+            checkout_intent = get_checkout_intent_or_raise(checkout_intent_id, event.id)
+        except CheckoutIntent.DoesNotExist:
+            logger.error(
+                '[StripeEventHandler] invoice.paid event %s could not find Checkout Intent id=%s to mark as paid',
+                event.id, checkout_intent_id,
+            )
+            return
+
         logger.info(
             'Marking checkout_intent_id=%s as paid via invoice=%s',
             checkout_intent_id, invoice.id,
@@ -208,10 +219,6 @@ class StripeEventHandler:
         subscription = event.data.object
         pending_update = getattr(subscription, 'pending_update', None)
 
-        checkout_intent_id = get_checkout_intent_id_from_subscription(subscription)
-        checkout_intent = get_checkout_intent_or_raise(checkout_intent_id, event.id)
-        link_event_data_to_checkout_intent(event, checkout_intent)
-
         if pending_update:
             # TODO: take necessary action on the actual SubscriptionPlan
             # and update the CheckoutIntent.
@@ -221,6 +228,14 @@ class StripeEventHandler:
                 pending_update,
                 get_checkout_intent_id_from_subscription(subscription),
             )
+
+        checkout_intent_id = get_checkout_intent_id_from_subscription(subscription)
+        try:
+            checkout_intent = get_checkout_intent_or_raise(checkout_intent_id, event.id)
+        except CheckoutIntent.DoesNotExist:
+            return
+
+        link_event_data_to_checkout_intent(event, checkout_intent)
 
     @on_stripe_event('customer.subscription.deleted')
     @staticmethod
