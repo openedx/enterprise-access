@@ -2,10 +2,11 @@
 Management command to fetch and handle Stripe events.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import stripe
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
@@ -25,9 +26,10 @@ class Command(BaseCommand):
     For example:
 
     ./manage.py fetch_and_handle_stripe_events \
-      --event-type="invoice.paid" \
+      --event-type="customer.subscription.*" \
       --limit=10 \
       --created-since="2025-10-07T14:00" \
+      --created-since-hours-ago=24 \
       --dry-run
     """
     help = 'Fetch and handle recent Stripe events'
@@ -51,12 +53,18 @@ class Command(BaseCommand):
             help='Fetch only events created since this datetime',
         )
         parser.add_argument(
+            '--created-since-hours-ago',
+            type=int,
+            default=None,
+            help='Fetch only events created in the past number of hours',
+        )
+        parser.add_argument(
             '--dry-run',
             action='store_true',
             help='Show events that would be processed without actually processing them',
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args, **options):  # pylint: disable=too-many-statements
         event_type = options.get('event_type')
         limit = options['limit']
         dry_run = options['dry_run']
@@ -64,6 +72,11 @@ class Command(BaseCommand):
 
         if (created_val := options['created_since']):
             created_since = parse_datetime(created_val)
+
+        if (created_since_hours_ago := options['created_since_hours_ago']):
+            created_since = timezone.now() - timedelta(hours=created_since_hours_ago)
+
+        self.stdout.write(f'Fetching events since: {created_since}')
 
         # Validate limit
         if limit < 1 or limit > 100:
@@ -112,6 +125,7 @@ class Command(BaseCommand):
             # Process each event
             processed_count = 0
             error_count = 0
+            skipped_count = 0
 
             for event in events.data:
                 try:
@@ -119,8 +133,11 @@ class Command(BaseCommand):
                     StripeEventHandler.dispatch(event)
                     processed_count += 1
                     self.stdout.write(
-                        self.style.SUCCESS(f'Successfully processed event {event.id}')
+                        self.style.SUCCESS(f'Successfully processed event {event.id} with type {event.type}')
                     )
+                except KeyError:
+                    self.stdout.write(f'No handler for event type {event.type}, skipping event {event.id}')
+                    skipped_count += 1
                 except Exception as e:  # pylint: disable=broad-exception-caught
                     error_count += 1
                     self.stdout.write(
@@ -129,7 +146,8 @@ class Command(BaseCommand):
 
             # Summary
             self.stdout.write('\nProcessing complete:')
-            self.stdout.write(f'  Successfully processed: {processed_count}')
+            self.stdout.write(self.style.SUCCESS(f'  Successfully processed: {processed_count}'))
+            self.stdout.write(f'  Skipped: {skipped_count}')
             if error_count > 0:
                 self.stdout.write(self.style.WARNING(f'  Errors: {error_count}'))
 

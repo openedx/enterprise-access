@@ -320,7 +320,11 @@ class StripeEventSummaryAdmin(admin.ModelAdmin):
     ]
     readonly_fields = [
         'stripe_event_data',
+        'checkout_intent_state',
     ]
 
     def checkout_intent_id(self, obj):
         return obj.checkout_intent.id if obj.checkout_intent else None
+
+    def checkout_intent_state(self, obj):
+        return obj.checkout_intent.state if obj.checkout_intent else None
