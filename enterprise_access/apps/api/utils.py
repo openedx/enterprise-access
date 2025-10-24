@@ -116,3 +116,21 @@ def get_or_fetch_enterprise_uuid_for_bff_request(request):
 
     # Could not derive enterprise_customer_uuid for the BFF request.
     return None
+
+
+def add_bulk_approve_operation_result(
+    results_dict, category, uuid, state, detail
+):
+    """
+    Add a standardized result entry to a bulk operation results dictionary.
+
+    Args:
+        results_dict (dict): Dictionary containing categorized results
+        category (str): Result category (e.g., 'approved', 'failed', 'skipped', 'not_found')
+        uuid (str): UUID of the request being processed
+        state (str|None): Current state of the request, or None if not applicable
+        detail (str): Descriptive message about the operation result
+    """
+    results_dict[category].append(
+        {"uuid": str(uuid), "state": state, "detail": detail}
+    )
