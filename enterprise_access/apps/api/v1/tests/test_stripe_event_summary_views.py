@@ -1,9 +1,10 @@
 """
 Tests for StripEventSummary viewset.
 """
+import json
 import uuid
 from datetime import timedelta
-from unittest import mock
+from urllib.parse import urlencode
 
 from django.urls import reverse
 from django.utils import timezone
@@ -27,6 +28,8 @@ class StripeEventSummaryTests(APITest):
         self.enterprise_uuid_2 = str(uuid.uuid4())
         self.stripe_customer_id = 'cus_test_123'
         self.stripe_customer_id_2 = 'cus_test_321'
+        self.subscription_plan_uuid = str(uuid.uuid4())
+        self.subscription_plan_uuid_2 = str(uuid.uuid4())
 
         invoice_event_data = {
             'id': 'evt_test_invoice',
@@ -108,7 +111,7 @@ class StripeEventSummaryTests(APITest):
             expires_at=timezone.now() + timedelta(hours=1),
         )
 
-        # Create two StripeEventData objects, will each create StripeEventSummary on create
+        # Create twp StripeEventData objects, will each create StripeEventSummary on create
         self.stripe_event_data = StripeEventData.objects.create(
             event_id='evt_test_invoice',
             event_type='invoice.paid',
@@ -122,9 +125,16 @@ class StripeEventSummaryTests(APITest):
             data=invoice_event_data_2,
         )
 
+        # manually populating subscription_plan_uuid
+        summary1 = StripeEventSummary.objects.get(event_id="evt_test_invoice")
+        summary1.subscription_plan_uuid = self.subscription_plan_uuid
+        summary1.save()
+
+        summary2 = StripeEventSummary.objects.get(event_id="evt_test_invoice_2")
+        summary2.subscription_plan_uuid = self.subscription_plan_uuid_2
+        summary2.save()
+
     def tearDown(self):
-        CheckoutIntent.objects.all().delete()
-        StripeEventData.objects.all().delete()
         StripeEventSummary.objects.all().delete()
         super().tearDown()
 
@@ -150,13 +160,21 @@ class StripeEventSummaryTests(APITest):
         assert response.status_code == 200
         assert response.data['count'] == 2
 
-    def test_get_stripe_event_summary_single(self):
+    def test_get_stripe_event_summary_by_subscription_uuid(self):
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
             'context': self.enterprise_uuid,  # implicit access to this enterprise
         }])
 
-        url = reverse("api:v1:stripe-event-summary-detail", args=['sub_test_123'])
+        query_params = {
+            'subscription_plan_uuid': self.subscription_plan_uuid,
+        }
+        url = reverse('api:v1:stripe-event-summary-list')
+        url += f"?{urlencode(query_params)}"
+
         response = self.client.get(url)
         assert response.status_code == 200
-        assert response.data['invoice_quantity'] == 10
+        assert response.data['count'] == 1
+        results = response.data['results']
+
+        assert results[0]['subscription_plan_uuid'] == self.subscription_plan_uuid

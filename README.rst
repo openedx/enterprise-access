@@ -98,7 +98,7 @@ Every time you want to contribute something in this repo
 
   # Run your new tests
   make app-shell
-  pytest ./path/to/new/tests
+  pytest -c pytest.local.ini ./path/to/new/tests
 
   # Run all the tests and quality checks
   make validate
