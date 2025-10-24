@@ -463,7 +463,6 @@ class StripeEventSummaryViewSet(viewsets.ModelViewSet):
     """
     authentication_classes = (JwtAuthentication,)
     permission_classes = (permissions.IsAuthenticated,)
-    lookup_field = 'subscription_plan_uuid'
 
     # Only allow GET operation
     http_method_names = ['get']
@@ -476,8 +475,11 @@ class StripeEventSummaryViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Filter queryset to only include CheckoutIntent records
-        belonging to the authenticated user.
+        Either return full queryset, or filter by all objects associated with
+        a subscription_plan_uuid
         """
-        user = self.request.user
-        return StripeEventSummary.objects.all()
+        queryset = StripeEventSummary.objects.all()
+        subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
+        if subscription_plan_uuid:
+            queryset = StripeEventSummary.objects.filter(subscription_plan_uuid=subscription_plan_uuid)
+        return queryset
