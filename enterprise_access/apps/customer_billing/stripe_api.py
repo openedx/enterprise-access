@@ -45,8 +45,9 @@ def create_subscription_checkout_session(input_data, lms_user_id, checkout_inten
                 'enterprise_customer_slug': input_data['enterprise_slug'],
                 # Store the lms_user_id for improved debugging experience.
                 'lms_user_id': str(lms_user_id),
-                # Store the checkout_intent ID
+                # Store the checkout_intent ID for cross-service reference
                 'checkout_intent_id': str(checkout_intent.id),
+                'checkout_intent_uuid': str(checkout_intent.uuid),
             }
         },
         # Always collect payment method, not just when the amount is greater than zero.  This is influential for

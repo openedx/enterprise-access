@@ -58,6 +58,7 @@ class CheckoutIntentAdmin(admin.ModelAdmin):
     form = CheckoutIntentAdminForm
 
     list_display = (
+        'uuid',
         'enterprise_name',
         'enterprise_slug',
         'user_email',
@@ -76,6 +77,7 @@ class CheckoutIntentAdmin(admin.ModelAdmin):
     )
 
     search_fields = (
+        'uuid',
         'enterprise_slug',
         'enterprise_name',
         'stripe_checkout_session_id',
@@ -109,6 +111,7 @@ class CheckoutIntentAdmin(admin.ModelAdmin):
         }),
         ('Status', {
             'fields': (
+                'uuid',
                 'user',
                 'state',
                 'state_display',

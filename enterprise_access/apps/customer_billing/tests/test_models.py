@@ -714,14 +714,18 @@ class TestCheckoutIntentModel(TestCase):
 class TestStripeEventSummary(TestCase):
     """Test cases for StripeEventSummary model and populate_with_summary_data method."""
 
-    def setUp(self):
-        self.user = UserFactory()
-        self.checkout_intent = CheckoutIntent.create_intent(
-            user=self.user,
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = UserFactory()
+        cls.checkout_intent = CheckoutIntent.create_intent(
+            user=cls.user,
             slug='test-enterprise',
             name='Test Enterprise',
-            quantity=10
+            quantity=10,
         )
+        cls.checkout_intent.uuid = uuid4()
+        cls.checkout_intent.save(update_fields=['uuid'])
 
     def test_populate_with_summary_data_invoice_event(self):
         """Test populating summary from invoice.paid event with full invoice data."""
@@ -756,16 +760,16 @@ class TestStripeEventSummary(TestCase):
         }
 
         # Create StripeEventData
+        # The connected signal receiver will create the related summary record
         stripe_event_data = StripeEventData.objects.create(
             event_id='evt_test_invoice',
             event_type='invoice.paid',
             checkout_intent=self.checkout_intent,
             data=invoice_event_data
         )
-
-        # Create and populate summary
-        summary = StripeEventSummary(stripe_event_data=stripe_event_data)
+        summary = stripe_event_data.summary
         summary.populate_with_summary_data()
+        summary.save()
 
         # Verify invoice-specific fields are populated
         self.assertEqual(summary.event_id, 'evt_test_invoice')
