@@ -30,6 +30,10 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+def _datetime_from_timestamp(timestamp):
+    return timezone.make_aware(datetime.datetime.fromtimestamp(timestamp))
+
+
 class FailedCheckoutIntentConflict(Exception):
     pass
 
@@ -544,6 +548,27 @@ class CheckoutIntent(TimeStampedModel):
         self.stripe_checkout_session_id = session_id
         self.save(update_fields=['stripe_checkout_session_id', 'modified'])
 
+    def previous_summary(self, stripe_event: stripe.Event) -> 'StripeEventSummary':
+        """
+        Return the most recent StripeEventSummary for this CheckoutIntent prior to the given event.
+
+        Args:
+            stripe_event: The Stripe event to use as the cutoff point
+
+        Returns:
+            The most recent StripeEventSummary before the given event, or None if none exists
+        """
+        from enterprise_access.apps.customer_billing.models import StripeEventSummary
+
+        # Convert Stripe event timestamp to datetime
+        event_timestamp = _datetime_from_timestamp(stripe_event.created)
+
+        # Find the most recent summary before this event
+        return StripeEventSummary.objects.filter(
+            checkout_intent=self,
+            stripe_event_created_at__lt=event_timestamp
+        ).order_by('-stripe_event_created_at').first()
+
     def update_stripe_identifiers(self, session_id=None, customer_id=None):
         """
         Updates stripe identifiers related to this checkout intent record.
@@ -615,6 +640,12 @@ class StripeEventSummary(TimeStampedModel):
         max_length=255,
         db_index=True,
         help_text='The Stripe event type'
+    )
+    stripe_event_created_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='Timestamp when the Stripe event was created'
     )
     checkout_intent = models.ForeignKey(
         CheckoutIntent,
@@ -729,6 +760,13 @@ class StripeEventSummary(TimeStampedModel):
         checkout_intent = stripe_event_data.checkout_intent
         self.checkout_intent = checkout_intent
 
+        # Extract Stripe event timestamp
+        event_data = stripe_event_data.data
+        if 'created' in event_data:
+            self.stripe_event_created_at = self._timestamp_to_datetime(event_data['created'])
+        else:
+            logger.warning(f"No 'created' timestamp found in event {stripe_event_data.event_id}")
+
         # Get subscription plan UUID from related workflow
         if checkout_intent and checkout_intent.workflow:
             # Fetch model from the Django app registry to avoid
@@ -790,5 +828,5 @@ class StripeEventSummary(TimeStampedModel):
     def _timestamp_to_datetime(timestamp):
         """Convert Unix timestamp to Django datetime."""
         if timestamp:
-            return timezone.make_aware(datetime.datetime.fromtimestamp(timestamp))
+            return _datetime_from_timestamp(timestamp)
         return None

@@ -8,6 +8,7 @@ from unittest import mock
 from uuid import uuid4
 
 import ddt
+import stripe
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.test import TestCase, override_settings
@@ -918,3 +919,85 @@ class TestStripeEventSummary(TestCase):
         self.assertEqual(summary.checkout_intent, checkout_intent)
         self.assertEqual(summary.stripe_subscription_id, 'sub_test_with_uuid')
         self.assertEqual(summary.subscription_status, 'active')
+
+    def test_checkout_intent_previous_summary(self):
+        """
+        Test CheckoutIntent.previous_summary() method returns most recent
+        summary before given event.
+        """
+        # Create multiple StripeEventData and StripeEventSummary records with different timestamps
+        event_times = [
+            1609459200,  # 2021-01-01 00:00:00 UTC - earliest
+            1609462800,  # 2021-01-01 01:00:00 UTC - middle
+            1609466400,  # 2021-01-01 02:00:00 UTC - latest
+            1609470000,  # 2021-01-01 03:00:00 UTC - current event (not in summaries)
+        ]
+
+        summaries = []
+        for i, event_time in enumerate(event_times[:3]):  # Create 3 summaries
+            # Create StripeEventData
+            event_data = {
+                'id': f'evt_test_{i}',
+                'type': 'invoice.paid',
+                'created': event_time,
+                'data': {
+                    'object': {
+                        'object': 'invoice',
+                        'id': f'in_test_{i}',
+                        'amount_paid': 1000 + i,
+                        'currency': 'usd',
+                        'lines': {'data': []},
+                        'parent': {'subscription_details': {'subscription': 'sub_test'}}
+                    }
+                }
+            }
+
+            # The post_save signal receiver automatically populates
+            # a related StripeEventSummary.
+            stripe_event_data = StripeEventData.objects.create(
+                event_id=f'evt_test_{i}',
+                event_type='invoice.paid',
+                checkout_intent=self.checkout_intent,
+                data=event_data
+            )
+            summary = stripe_event_data.summary
+            summary.populate_with_summary_data()
+            summary.save()
+            summaries.append(summary)
+
+        # Verify summaries have correct timestamps
+        self.assertEqual(summaries[0].stripe_event_created_at.timestamp(), event_times[0])
+        self.assertEqual(summaries[1].stripe_event_created_at.timestamp(), event_times[1])
+        self.assertEqual(summaries[2].stripe_event_created_at.timestamp(), event_times[2])
+
+        # Create a mock Stripe event with timestamp after all summaries
+        current_event = mock.Mock(spec=stripe.Event)
+        current_event.created = event_times[3]  # 2021-01-01 03:00:00 UTC
+
+        # Test: previous_summary should return the most recent summary (index 2)
+        previous = self.checkout_intent.previous_summary(current_event)
+        self.assertEqual(previous, summaries[2])
+        self.assertEqual(previous.event_id, 'evt_test_2')
+
+        # Test: event between first and second summary should return first summary
+        middle_event = mock.Mock(spec=stripe.Event)
+        middle_event.created = event_times[1] - 1  # Just before second event
+        previous = self.checkout_intent.previous_summary(middle_event)
+        self.assertEqual(previous, summaries[0])
+
+        # Test: event before all summaries should return None
+        early_event = mock.Mock(spec=stripe.Event)
+        early_event.created = event_times[0] - 1  # Before any summaries
+        previous = self.checkout_intent.previous_summary(early_event)
+        self.assertIsNone(previous)
+
+        # Test: with different checkout intent should return None
+        other_user = UserFactory()
+        other_checkout_intent = CheckoutIntent.create_intent(
+            user=other_user,
+            slug='other-enterprise',
+            name='Other Enterprise',
+            quantity=5
+        )
+        previous = other_checkout_intent.previous_summary(current_event)
+        self.assertIsNone(previous)
