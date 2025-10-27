@@ -101,6 +101,11 @@ class CheckoutIntent(TimeStampedModel):
         User,
         on_delete=models.CASCADE,
     )
+    uuid = models.UUIDField(
+        unique=True,
+        null=True,
+        help_text="Unique identifier for this record, can be used for cross-service references",
+    )
     state = models.CharField(
         db_index=True,
         choices=StateChoices.choices,
@@ -174,6 +179,7 @@ class CheckoutIntent(TimeStampedModel):
         return (
             "<CheckoutIntent "
             f"id={self.id}, "
+            f"uuid={self.uuid}, "
             f"email={self.user.email}, "
             f"enterprise_slug={self.enterprise_slug}, "
             f"enterprise_name={self.enterprise_name}, "
