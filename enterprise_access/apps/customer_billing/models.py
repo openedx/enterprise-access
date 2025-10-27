@@ -71,13 +71,6 @@ class CheckoutIntent(TimeStampedModel):
     class Meta:
         verbose_name = "Enterprise Checkout Intent"
         verbose_name_plural = "Enterprise Checkout Intents"
-        indexes = [
-            models.Index(fields=['state']),
-            models.Index(fields=['enterprise_slug']),
-            models.Index(fields=['enterprise_name']),
-            models.Index(fields=['expires_at']),
-            models.Index(fields=['stripe_checkout_session_id']),
-        ]
 
     class StateChoices(models.TextChoices):
         """
@@ -109,17 +102,20 @@ class CheckoutIntent(TimeStampedModel):
         on_delete=models.CASCADE,
     )
     state = models.CharField(
+        db_index=True,
         choices=StateChoices.choices,
         default=StateChoices.CREATED,
         max_length=255,
     )
     enterprise_name = models.CharField(
+        db_index=True,
         null=True,
         blank=True,
         max_length=255,
         help_text="Checkout intent enterprise customer name",
     )
     enterprise_slug = models.SlugField(
+        db_index=True,
         null=True,
         blank=True,
         max_length=255,
@@ -127,6 +123,7 @@ class CheckoutIntent(TimeStampedModel):
         help_text="Checkout intent enterprise customer slug"
     )
     enterprise_uuid = models.UUIDField(
+        db_index=True,
         null=True,
         blank=True,
         help_text="The uuid of the EnterpriseCustomer, once successfully provisioned",
@@ -708,11 +705,7 @@ class StripeEventSummary(TimeStampedModel):
         verbose_name = 'Stripe Event Summary'
         verbose_name_plural = 'Stripe Event Summaries'
         indexes = [
-            models.Index(fields=['subscription_plan_uuid']),
-            models.Index(fields=['stripe_subscription_id']),
-            models.Index(fields=['stripe_invoice_id']),
             models.Index(fields=['event_type', 'checkout_intent']),
-            models.Index(fields=['stripe_object_type']),
         ]
 
     def __str__(self):
