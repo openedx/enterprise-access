@@ -365,6 +365,29 @@ def has_explicit_access_to_admin_learner_profile_admin(user, enterprise_customer
     return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.ADMIN_LEARNER_PROFILE_ADMIN_ROLE)
 
 
+@rules.predicate
+def has_implicit_access_to_stripe_event_summary_admin(_, enterprise_customer_uuid):
+    """
+    Check that if request user has implicit access to the given enterprise UUID for the
+    `STRIPE_EVENT_SUMMARY_ADMIN_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_implicit_access_to_role(_, enterprise_customer_uuid, constants.STRIPE_EVENT_SUMMARY_ADMIN_ROLE)
+
+
+@rules.predicate
+def has_explicit_access_to_stripe_event_summary_admin(user, enterprise_customer_uuid):
+    """
+    Check that if request user has explicit access to `STRIPE_EVENT_SUMMARY_ADMIN_ROLE` feature role.
+
+    Returns:
+        boolean: whether the request user has access.
+    """
+    return _has_explicit_access_to_role(user, enterprise_customer_uuid, constants.STRIPE_EVENT_SUMMARY_ADMIN_ROLE)
+
+
 ######################################################
 # Consolidate implicit and explicit rule predicates. #
 ######################################################
@@ -431,6 +454,9 @@ has_admin_learner_profile_admin_access = (
     has_implicit_access_to_admin_learner_profile_admin | has_explicit_access_to_admin_learner_profile_admin
 )
 
+has_stripe_event_summary_admin_access = (
+    has_implicit_access_to_requests_admin | has_explicit_access_to_requests_admin
+)
 
 ###############################################
 # Map permissions to consolidated predicates. #
@@ -553,4 +579,10 @@ rules.add_perm(
 rules.add_perm(
     constants.ADMIN_LEARNER_PROFILE_READ_PERMISSION,
     has_admin_learner_profile_admin_access,
+)
+
+# Grants permission to read StripeEventSummary information
+rules.add_perm(
+    constants.STRIPE_EVENT_SUMMARY_READ_PERMISSION,
+    has_stripe_event_summary_admin_access,
 )

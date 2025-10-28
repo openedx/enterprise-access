@@ -15,8 +15,11 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from enterprise_access.apps.api import serializers
-from enterprise_access.apps.core.constants import CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION
+from enterprise_access.apps.api import serializers, utils
+from enterprise_access.apps.core.constants import (
+    CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,
+    STRIPE_EVENT_SUMMARY_READ_PERMISSION,
+)
 from enterprise_access.apps.customer_billing.api import (
     CreateCheckoutSessionFailedConflict,
     CreateCheckoutSessionSlugReservationConflict,
@@ -32,6 +35,7 @@ stripe.api_key = settings.STRIPE_API_KEY
 logger = logging.getLogger(__name__)
 
 CUSTOMER_BILLING_API_TAG = 'Customer Billing'
+STRIPE_EVENT_API_TAG = 'Stripe Event Summary'
 
 
 class CheckoutIntentPermission(permissions.BasePermission):
@@ -455,6 +459,16 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
         return CheckoutIntent.objects.filter(user=user).select_related('user')
 
 
+def stripe_event_summary_permission_detail_fn(request, *args, uuid=None, **kwargs):
+    """
+    Helper to use with @permission_required on retrieve endpoint.
+
+    Args:
+        uuid (str): UUID representing an SubscriptionPlan object.
+    """
+    return utils.get_enterprise_customer_uuid(uuid)
+
+
 class StripeEventSummaryViewSet(viewsets.ModelViewSet):
     """
     ViewSet for StripeEventSummary model.
@@ -473,13 +487,34 @@ class StripeEventSummaryViewSet(viewsets.ModelViewSet):
         """
         return serializers.StripeEventSummaryReadOnlySerializer
 
-    def get_queryset(self):
+    # def get_queryset(self):
+    #     """
+    #     Either return full queryset, or filter by all objects associated with
+    #     a subscription_plan_uuid
+    #     """
+    #     queryset = StripeEventSummary.objects.all()
+    #     subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
+    #     if subscription_plan_uuid:
+    #         queryset = StripeEventSummary.objects.filter(subscription_plan_uuid=subscription_plan_uuid)
+    #     return queryset
+
+    @extend_schema(
+        tags=[STRIPE_EVENT_API_TAG],
+        summary='Retrieves stripe event summaries.',
+        responses={
+            status.HTTP_200_OK: serializers.StripeEventSummaryReadOnlySerializer,
+            status.HTTP_403_FORBIDDEN: None,
+        },
+    )
+    @permission_required(
+        STRIPE_EVENT_SUMMARY_READ_PERMISSION,
+        fn=stripe_event_summary_permission_detail_fn,
+    )
+    def list(self, request, *args, uuid=None, **kwargs):
         """
-        Either return full queryset, or filter by all objects associated with
-        a subscription_plan_uuid
+        Lists ``StripeEventSummary`` records, filtered by given subscription plan uuid.
         """
-        queryset = StripeEventSummary.objects.all()
-        subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
-        if subscription_plan_uuid:
-            queryset = StripeEventSummary.objects.filter(subscription_plan_uuid=subscription_plan_uuid)
+        # TODO: filter by just the summaries where the subscription plan's are associated with enterprises
+        # the requestor has access to
+        queryset = StripeEventSummary.objects.filter(subscription_plan_uuid=uuid)
         return queryset
