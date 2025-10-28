@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.utils import timezone
 from django.utils.html import format_html
+from djangoql.admin import DjangoQLSearchMixin
 
 from .constants import CheckoutIntentState
 from .models import CheckoutIntent, StripeEventData, StripeEventSummary
@@ -51,7 +52,7 @@ class CheckoutIntentAdminForm(forms.ModelForm):
 
 
 @admin.register(CheckoutIntent)
-class CheckoutIntentAdmin(admin.ModelAdmin):
+class CheckoutIntentAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     """
     Admin interface for managing checkout intents.
     """
@@ -263,7 +264,7 @@ class CheckoutIntentAdmin(admin.ModelAdmin):
 
 
 @admin.register(StripeEventData)
-class StripeEventDataAdmin(admin.ModelAdmin):
+class StripeEventDataAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     """
     The admin class for StripeEventData.
     """
@@ -300,7 +301,7 @@ class StripeEventDataAdmin(admin.ModelAdmin):
 
 
 @admin.register(StripeEventSummary)
-class StripeEventSummaryAdmin(admin.ModelAdmin):
+class StripeEventSummaryAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     """
     The admin class for StripeEventSummary.
     """

@@ -711,6 +711,49 @@ class TestCheckoutIntentModel(TestCase):
             )
         self.assertIn("slug and name must either both be given or neither be given", str(exc.exception))
 
+    def test_uuid_field_not_null_and_has_default(self):
+        """
+        Test that the uuid field is not nullable and automatically generates a UUID.
+        """
+        user = UserFactory()
+
+        # Create an intent without explicitly setting uuid
+        intent = CheckoutIntent.create_intent(
+            user=user,
+            slug='test-uuid-slug',
+            name='Test UUID Enterprise',
+            quantity=5
+        )
+
+        # Verify uuid was automatically generated
+        self.assertIsNotNone(intent.uuid)
+        self.assertEqual(len(str(intent.uuid)), 36)  # Standard UUID string length
+
+        # Create another intent and verify it gets a different UUID
+        user2 = UserFactory()
+        intent2 = CheckoutIntent.create_intent(
+            user=user2,
+            slug='test-uuid-slug-2',
+            name='Test UUID Enterprise 2',
+            quantity=10
+        )
+
+        self.assertIsNotNone(intent2.uuid)
+        self.assertNotEqual(intent.uuid, intent2.uuid)
+
+        # Verify we can still manually set a UUID if needed
+        custom_uuid = uuid4()
+        intent3 = CheckoutIntent.objects.create(
+            user=UserFactory(),
+            enterprise_name="Manual UUID Enterprise",
+            enterprise_slug="manual-uuid-enterprise",
+            state=CheckoutIntentState.CREATED,
+            quantity=15,
+            expires_at=timezone.now() + timedelta(minutes=30),
+            uuid=custom_uuid
+        )
+        self.assertEqual(intent3.uuid, custom_uuid)
+
 
 class TestStripeEventSummary(TestCase):
     """Test cases for StripeEventSummary model and populate_with_summary_data method."""
