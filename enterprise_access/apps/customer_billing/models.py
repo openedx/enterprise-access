@@ -6,6 +6,7 @@ import logging
 from datetime import timedelta
 from decimal import Decimal
 from typing import Self
+from uuid import uuid4
 
 import stripe
 from django.apps import apps
@@ -107,7 +108,8 @@ class CheckoutIntent(TimeStampedModel):
     )
     uuid = models.UUIDField(
         unique=True,
-        null=True,
+        null=False,
+        default=uuid4,
         help_text="Unique identifier for this record, can be used for cross-service references",
     )
     state = models.CharField(
