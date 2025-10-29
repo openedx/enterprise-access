@@ -146,20 +146,6 @@ class StripeEventSummaryTests(APITest):
         response = self.client.get(url)
         assert response.status_code == 401
 
-    def test_get_stripe_event_summary_list(self):
-        """
-        Successful retrieval of StripeEventSummary object
-        """
-        self.set_jwt_cookie([{
-            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
-            'context': self.enterprise_uuid,  # implicit access to this enterprise
-        }])
-
-        url = reverse('api:v1:stripe-event-summary-list')
-        response = self.client.get(url)
-        assert response.status_code == 200
-        assert response.data['count'] == 2
-
     def test_get_stripe_event_summary_by_subscription_uuid(self):
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -176,5 +162,20 @@ class StripeEventSummaryTests(APITest):
         assert response.status_code == 200
         assert response.data['count'] == 1
         results = response.data['results']
-
         assert results[0]['subscription_plan_uuid'] == self.subscription_plan_uuid
+
+    def test_get_stripe_event_summary_by_subscription_uuid_no_auth(self):
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': self.enterprise_uuid_2,  # access to a different enterprise than the sub plan
+        }])
+
+        query_params = {
+            'subscription_plan_uuid': self.subscription_plan_uuid,
+        }
+        url = reverse('api:v1:stripe-event-summary-list')
+        url += f"?{urlencode(query_params)}"
+
+        response = self.client.get(url)
+        # trying to fetch a subscription plan for an enterprise customer they are not associated with
+        assert response.status_code == 403

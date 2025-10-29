@@ -18,7 +18,7 @@ from rest_framework.response import Response
 from enterprise_access.apps.api import serializers, utils
 from enterprise_access.apps.core.constants import (
     CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,
-    STRIPE_EVENT_SUMMARY_READ_PERMISSION,
+    STRIPE_EVENT_SUMMARY_READ_PERMISSION
 )
 from enterprise_access.apps.customer_billing.api import (
     CreateCheckoutSessionFailedConflict,

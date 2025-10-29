@@ -5,9 +5,9 @@ Utility functions for Enterprise Access API.
 import logging
 from uuid import UUID
 
-from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from rest_framework.exceptions import ParseError
 
+from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.bffs.api import (
     get_and_cache_enterprise_customer_users,
     transform_enterprise_customer_users_data
@@ -117,21 +117,3 @@ def get_or_fetch_enterprise_uuid_for_bff_request(request):
 
     # Could not derive enterprise_customer_uuid for the BFF request.
     return None
-
-
-def get_enterprise_customer_uuid(subscription_plan_uuid):
-    """
-    Given an SubscriptionPlan uuid, returns the corresponding enterprise customer uuid
-    associated with that plan, if found.
-    """
-    try:
-        client = LicenseManagerApiClient()
-        response = client.get_subscription_overview(subscription_plan_uuid)
-        return response.enterprise_customer_uuid
-    except Exception as e:  # pylint: disable=broad-except
-        msg = (
-            'Error fetching enterprise_customer_uuid from SubscriptionPlan '
-            f'{subscription_plan_uuid} in license-manager: {e}.'
-        )
-        logger.exception(msg)
-        return None
