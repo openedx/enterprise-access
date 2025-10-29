@@ -45,7 +45,7 @@ class ProvisionSubscriptionTrialWorkflowAdminForm(forms.Form):
     plan_product_id = forms.ChoiceField(
         label='Product ID',
         required=True,
-        choices=settings.PROVISIONING_DEFAULTS['subscription']['trial_product_choices'],
+        choices=settings.PROVISIONING_DEFAULTS['subscription']['all_product_choices'],
     )
     plan_desired_num_licenses = forms.IntegerField(label='Number of licenses in plan', required=True)
     plan_enterprise_catalog_uuid = forms.UUIDField(label='Catalog UUID (optional)', required=False)

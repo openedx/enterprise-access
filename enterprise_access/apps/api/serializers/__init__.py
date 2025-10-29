@@ -25,7 +25,12 @@ from .customer_billing import (
     CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer,
     StripeEventSummaryReadOnlySerializer
 )
-from .provisioning import ProvisioningRequestSerializer, ProvisioningResponseSerializer
+from .provisioning import (
+    ProvisioningRequestSerializer,
+    ProvisioningResponseSerializer,
+    SubscriptionPlanOLIUpdateResponseSerializer,
+    SubscriptionPlanOLIUpdateSerializer
+)
 from .subsidy_access_policy import (
     GroupMemberWithAggregatesRequestSerializer,
     GroupMemberWithAggregatesResponseSerializer,
