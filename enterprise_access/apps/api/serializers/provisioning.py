@@ -210,3 +210,62 @@ class ProvisioningResponseSerializer(BaseSerializer):
     enterprise_catalog = EnterpriseCatalogResponseSerializer()
     customer_agreement = CustomerAgreementResponseSerializer()
     subscription_plan = SubscriptionPlanResponseSerializer()
+
+
+class SubscriptionPlanOLIUpdateSerializer(BaseSerializer):
+    """
+    Request serializer for updating a SubscriptionPlan's Salesforce OLI.
+    """
+    checkout_intent_id = serializers.IntegerField(
+        help_text='The integer ID of the CheckoutIntent associated with this subscription.',
+        required=False,
+        allow_null=True,
+    )
+    checkout_intent_uuid = serializers.UUIDField(
+        help_text='The UUID of the CheckoutIntent associated with this subscription.',
+        required=False,
+        allow_null=True,
+    )
+    salesforce_opportunity_line_item = serializers.CharField(
+        help_text='The Salesforce Opportunity Line Item ID to associate with the subscription plan.'
+    )
+    is_trial = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text='Whether this OLI is for the trial plan (True) or paid plan (False).'
+    )
+
+    def validate(self, data):
+        """
+        Validates that exactly one of CheckoutIntent ``id`` and ``uuid`` is provided.
+        """
+        if not (data.get('checkout_intent_id') or data.get('checkout_intent_uuid')):
+            raise serializers.ValidationError('One of CheckoutIntent id or uuid is required')
+        if data.get('checkout_intent_id') and data.get('checkout_intent_uuid'):
+            raise serializers.ValidationError('Only one of CheckoutIntent id or uuid can be provided')
+        return data
+
+
+class SubscriptionPlanOLIUpdateResponseSerializer(BaseSerializer):
+    """
+    Response serializer for SubscriptionPlan OLI update.
+    """
+    success = serializers.BooleanField(
+        help_text='Whether the update was successful',
+    )
+    subscription_plan_uuid = serializers.UUIDField(
+        help_text='The UUID identifier of the future plan (which receives the updated OLI value)',
+    )
+    salesforce_opportunity_line_item = serializers.CharField(
+        help_text='The Salesforce Opportunity Line Item ID to associate with the subscription plan.'
+    )
+    checkout_intent_uuid = serializers.UUIDField(
+        help_text='The UUID of the CheckoutIntent associated with this subscription.',
+        required=False,
+        allow_null=True,
+    )
+    checkout_intent_id = serializers.IntegerField(
+        help_text='The integer ID of the CheckoutIntent associated with this subscription.',
+        required=False,
+        allow_null=True,
+    )

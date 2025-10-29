@@ -211,6 +211,46 @@ class LicenseManagerApiClient(BaseOAuthClient):
                 exc,
             ) from exc
 
+    def update_subscription_plan(self, subscription_uuid, salesforce_opportunity_line_item):
+        """
+        Update a SubscriptionPlan's Salesforce Opportunity Line Item.
+
+        Arguments:
+            subscription_uuid (str): UUID of the SubscriptionPlan to update
+            salesforce_opportunity_line_item (str): Salesforce OLI to associate with the plan
+
+        Returns:
+            dict: Updated subscription plan data from the API
+
+        Raises:
+            APIClientException: If the API call fails
+        """
+        endpoint = f"{self.api_base_url}subscription-plans/{subscription_uuid}/"
+        payload = {
+            'salesforce_opportunity_line_item': salesforce_opportunity_line_item
+        }
+
+        try:
+            response = self.client.patch(
+                endpoint,
+                json=payload,
+                timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Failed to update subscription plan %s with OLI %s, response %s, exception: %s',
+                subscription_uuid,
+                salesforce_opportunity_line_item,
+                safe_error_response_content(exc),
+                exc,
+            )
+            raise APIClientException(
+                f'Could not update subscription plan {subscription_uuid}',
+                exc,
+            ) from exc
+
 
 class LicenseManagerUserApiClient(BaseUserApiClient):
     """
