@@ -27,6 +27,56 @@ class LicenseManagerApiClient(BaseOAuthClient):
     customer_agreement_provisioning_endpoint = api_base_url + 'provisioning-admins/customer-agreement/'
     subscription_provisioning_endpoint = api_base_url + 'provisioning-admins/subscriptions/'
 
+    def list_subscriptions(self, enterprise_customer_uuid, current=None):
+        """
+        List subscription plans for an enterprise.
+
+        Returns a paginated DRF list response: { count, next, previous, results: [...] }
+        If current is True, returns only the current plan (results length 0 or 1).
+        """
+        try:
+            params = {
+                'enterprise_customer_uuid': enterprise_customer_uuid,
+            }
+            if current is not None:
+                params['current'] = 'true' if current else 'false'
+
+            response = self.client.get(
+                self.subscriptions_endpoint,
+                params=params,
+                timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Failed to list subscriptions for enterprise %s, response: %s, exc: %s',
+                enterprise_customer_uuid, safe_error_response_content(exc), exc,
+            )
+            raise
+
+    def update_subscription_plan(self, subscription_uuid, **payload):
+        """
+        Partially update a subscription plan by UUID.
+
+        Example payload: { 'is_active': False, 'change_reason': 'delayed_payment' }
+        """
+        endpoint = f"{self.subscription_provisioning_endpoint}{subscription_uuid}/"
+        try:
+            response = self.client.patch(
+                endpoint,
+                json=payload,
+                timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Failed to update subscription %s, payload=%s, response: %s, exc: %s',
+                subscription_uuid, payload, safe_error_response_content(exc), exc,
+            )
+            raise
+
     def get_subscription_overview(self, subscription_uuid):
         """
         Call license-manager API for data about a SubscriptionPlan.

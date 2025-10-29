@@ -115,6 +115,117 @@ def link_event_data_to_checkout_intent(event, checkout_intent):
     event_data.save()
 
 
+def handle_pending_update(subscription_id: str, checkout_intent_id: int, pending_update):
+    """
+    Log pending update information for visibility.
+    Assumes a pending_update is present.
+    """
+    # TODO: take necessary action on the actual SubscriptionPlan and update the CheckoutIntent.
+    logger.warning(
+        "Subscription %s has pending update: %s. checkout_intent_id: %s",
+        subscription_id,
+        pending_update,
+        checkout_intent_id,
+    )
+
+
+def handle_trial_cancellation(checkout_intent: CheckoutIntent, checkout_intent_id: int, subscription_id: str, trial_end):
+    """
+    Send cancellation email for a trial subscription that has just transitioned to canceled.
+    Assumes caller validated status transition and presence of trial_end.
+    """
+    logger.info(
+        f"Subscription {subscription_id} transitioned to 'canceled'. "
+        f"Queuing trial cancellation email for checkout_intent_id={checkout_intent_id}"
+    )
+
+    send_trial_cancellation_email_task.delay(
+        checkout_intent_id=checkout_intent.id,
+        trial_end_timestamp=trial_end,
+    )
+
+
+def future_plans_of_current(current_plan_uuid: str, plans: list[dict]) -> list[dict]:
+    """
+    Return plans that are future renewals of the current plan, based on prior_renewals linkage.
+    """
+    def is_future_of_current(plan_dict):
+        if str(plan_dict.get('uuid')) == current_plan_uuid:
+            return False
+        for renewal in plan_dict.get('prior_renewals', []) or []:
+            if str(renewal.get('prior_subscription_plan_id')) == current_plan_uuid:
+                return True
+        return False
+
+    return [p for p in plans if is_future_of_current(p)]
+
+
+def cancel_all_future_plans(enterprise_uuid: str, reason: str = 'delayed_payment', subscription_id_for_logs: str | None = None) -> list[str]:
+    """
+    Deactivate (cancel) all future plans for the current plan of the given enterprise.
+
+    Returns list of deactivated plan UUIDs. Logs warnings/info for observability.
+    """
+    from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
+
+    client = LicenseManagerApiClient()
+    deactivated = []
+    try:
+        current_list = client.list_subscriptions(enterprise_uuid, current=True)
+        current_results = (current_list or {}).get('results', [])
+        current_plan = current_results[0] if current_results else None
+        if not current_plan:
+            logger.warning(
+                "No current subscription plan found for enterprise %s when canceling future plans (subscription %s)",
+                enterprise_uuid, subscription_id_for_logs,
+            )
+            return deactivated
+
+        current_plan_uuid = str(current_plan.get('uuid'))
+
+        # Fetch all active plans for enterprise
+        all_list = client.list_subscriptions(enterprise_uuid)
+        all_plans = (all_list or {}).get('results', [])
+
+        future_plans = future_plans_of_current(current_plan_uuid, all_plans)
+        if not future_plans:
+            logger.info(
+                "No future plans to deactivate for enterprise %s (current plan %s) (subscription %s)",
+                enterprise_uuid, current_plan_uuid, subscription_id_for_logs,
+            )
+            return deactivated
+
+        # Deactivate all future plans
+        for future in future_plans:
+            future_uuid = future.get('uuid')
+            try:
+                client.update_subscription_plan(
+                    future_uuid,
+                    is_active=False,
+                    change_reason=reason,
+                )
+                deactivated.append(str(future_uuid))
+                logger.info(
+                    "Deactivated future plan %s for enterprise %s (reason=%s) (subscription %s)",
+                    future_uuid, enterprise_uuid, reason, subscription_id_for_logs,
+                )
+            except Exception as exc: # pylint: disable=broad-except
+                logger.exception(
+                    "Failed to deactivate future plan %s for enterprise %s (reason=%s): %s",
+                    future_uuid, enterprise_uuid, reason, exc,
+                )
+    except Exception as exc: # pylint: disable=broad-except
+        logger.exception(
+            "Unexpected error canceling future plans for enterprise %s (subscription %s): %s",
+            enterprise_uuid, subscription_id_for_logs, exc,
+        )
+
+    return deactivated
+
+
+
+
+
 class StripeEventHandler:
     """
     Container for Stripe event handler logic.
@@ -219,53 +330,39 @@ class StripeEventHandler:
         Send cancellation notification email when a trial subscription is canceled.
         """
         subscription = event.data.object
-        pending_update = getattr(subscription, "pending_update", None)
-
-        checkout_intent_id = get_checkout_intent_id_from_subscription(
-            subscription
-        )
-        checkout_intent = get_checkout_intent_or_raise(
-            checkout_intent_id, event.id
-        )
+        checkout_intent_id = get_checkout_intent_id_from_subscription(subscription)
+        checkout_intent = get_checkout_intent_or_raise(checkout_intent_id, event.id)
         link_event_data_to_checkout_intent(event, checkout_intent)
 
+        # Pending update
+        pending_update = getattr(subscription, "pending_update", None)
         if pending_update:
-            # TODO: take necessary action on the actual SubscriptionPlan
-            # and update the CheckoutIntent.
-            logger.warning(
-                "Subscription %s has pending update: %s. checkout_intent_id: %s",
-                subscription.id,
-                pending_update,
-                get_checkout_intent_id_from_subscription(subscription),
-            )
+            handle_pending_update(subscription.id, checkout_intent_id, pending_update)
 
-        # Handle trial subscription cancellation
-        # Check if status changed to canceled to avoid duplicate emails
+        # Trial cancellation transition
         current_status = subscription.get("status")
-        if current_status == "canceled":
-            prior_status = getattr(checkout_intent.previous_summary(event), 'subscription_status', None)
+        prior_status = getattr(checkout_intent.previous_summary(event), 'subscription_status', None)
+        if current_status == "canceled" and prior_status != "canceled":
+            trial_end = subscription.get("trial_end")
+            if trial_end:
+                handle_trial_cancellation(checkout_intent, checkout_intent_id, subscription.id, trial_end)
 
-            # Only send email if status changed from non-canceled to canceled
-            if prior_status != 'canceled':
-                trial_end = subscription.get("trial_end")
-                if trial_end:
-                    logger.info(
-                        f"Subscription {subscription.id} status changed from '{prior_status}' to 'canceled'. "
-                        f"Queuing trial cancellation email for checkout_intent_id={checkout_intent_id}"
-                    )
-
-                    send_trial_cancellation_email_task.delay(
-                        checkout_intent_id=checkout_intent.id,
-                        trial_end_timestamp=trial_end,
-                    )
-                else:
-                    logger.info(
-                        f"Subscription {subscription.id} canceled but has no trial_end, skipping cancellation email"
-                    )
-            else:
-                logger.info(
-                    f"Subscription {subscription.id} already canceled (status unchanged), skipping cancellation email"
+        # Past due transition
+        if current_status == "past_due" and prior_status != "past_due":
+            enterprise_uuid = checkout_intent.enterprise_uuid
+            if enterprise_uuid:
+                cancel_all_future_plans(
+                    enterprise_uuid=enterprise_uuid,
+                    reason='delayed_payment',
+                    subscription_id_for_logs=subscription.id,
                 )
+            else:
+                logger.error(
+                    "Cannot deactivate future plans for subscription %s: missing enterprise_uuid on CheckoutIntent %s",
+                    subscription.id, checkout_intent.id,
+                )
+
+
 
     @on_stripe_event("customer.subscription.deleted")
     @staticmethod
