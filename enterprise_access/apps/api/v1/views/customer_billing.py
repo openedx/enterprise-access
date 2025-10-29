@@ -11,7 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, OpenApiTypes, extend_schema, extend_schema_view
 from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
-from rest_framework import permissions, status, viewsets
+from rest_framework import exceptions, mixins, permissions, status, views, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -459,17 +459,27 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
         return CheckoutIntent.objects.filter(user=user).select_related('user')
 
 
-def stripe_event_summary_permission_detail_fn(request, *args, uuid=None, **kwargs):
+def stripe_event_summary_permission_detail_fn(request, *args, **kwargs):
     """
     Helper to use with @permission_required on retrieve endpoint.
 
     Args:
         uuid (str): UUID representing an SubscriptionPlan object.
     """
-    return utils.get_enterprise_customer_uuid(uuid)
+    if not (subs_plan_uuid := request.query_params.get('subscription_plan_uuid')):
+        raise exceptions.ValidationError(detail='subscription_plan_uuid query param is required')
+
+    summary = StripeEventSummary.objects.filter(
+        subscription_plan_uuid=subs_plan_uuid,
+    ).select_related(
+        'checkout_intent',
+    ).first()
+    if not (summary and summary.checkout_intent):
+        return None
+    return summary.checkout_intent.enterprise_uuid
 
 
-class StripeEventSummaryViewSet(viewsets.ModelViewSet):
+class StripeEventSummaryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     """
     ViewSet for StripeEventSummary model.
 
@@ -478,25 +488,25 @@ class StripeEventSummaryViewSet(viewsets.ModelViewSet):
     authentication_classes = (JwtAuthentication,)
     permission_classes = (permissions.IsAuthenticated,)
 
-    # Only allow GET operation
-    http_method_names = ['get']
-
     def get_serializer_class(self):
         """
         Return read only serializer.
         """
         return serializers.StripeEventSummaryReadOnlySerializer
 
-    # def get_queryset(self):
-    #     """
-    #     Either return full queryset, or filter by all objects associated with
-    #     a subscription_plan_uuid
-    #     """
-    #     queryset = StripeEventSummary.objects.all()
-    #     subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
-    #     if subscription_plan_uuid:
-    #         queryset = StripeEventSummary.objects.filter(subscription_plan_uuid=subscription_plan_uuid)
-    #     return queryset
+    def get_queryset(self):
+        """
+        Either return full queryset, or filter by all objects associated with
+        a subscription_plan_uuid
+        """
+        subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
+        if not subscription_plan_uuid:
+            raise exceptions.ValidationError(detail='subscription_plan_uuid query param is required')
+        return StripeEventSummary.objects.filter(
+            subscription_plan_uuid=subscription_plan_uuid,
+        ).select_related(
+            'checkout_intent',
+        )
 
     @extend_schema(
         tags=[STRIPE_EVENT_API_TAG],
@@ -510,11 +520,8 @@ class StripeEventSummaryViewSet(viewsets.ModelViewSet):
         STRIPE_EVENT_SUMMARY_READ_PERMISSION,
         fn=stripe_event_summary_permission_detail_fn,
     )
-    def list(self, request, *args, uuid=None, **kwargs):
+    def list(self, request, *args, **kwargs):
         """
         Lists ``StripeEventSummary`` records, filtered by given subscription plan uuid.
         """
-        # TODO: filter by just the summaries where the subscription plan's are associated with enterprises
-        # the requestor has access to
-        queryset = StripeEventSummary.objects.filter(subscription_plan_uuid=uuid)
-        return queryset
+        return super().list(request, *args, **kwargs)
