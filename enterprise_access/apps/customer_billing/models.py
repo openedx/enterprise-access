@@ -170,6 +170,16 @@ class CheckoutIntent(TimeStampedModel):
         blank=True,
         help_text="Metadata relating to the terms and conditions accepted by the user.",
     )
+    subscription_canceled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when the Stripe subscription was canceled (cancel_at_period_end=True)",
+    )
+    subscription_deleted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when the Stripe subscription was deleted",
+    )
 
     history = HistoricalRecords()
 

@@ -26,6 +26,8 @@ class LicenseManagerApiClient(BaseOAuthClient):
     customer_agreement_endpoint = api_base_url + 'customer-agreement/'
     customer_agreement_provisioning_endpoint = api_base_url + 'provisioning-admins/customer-agreement/'
     subscription_provisioning_endpoint = api_base_url + 'provisioning-admins/subscriptions/'
+    subscription_plan_renewal_endpoint = api_base_url + 'provisioning-admins/subscription-plan-renewals/'
+    subscription_plan_renewal_endpoint = api_base_url + 'provisioning-admins/subscription-plan-renewals/'
 
     def get_subscription_overview(self, subscription_uuid):
         """
@@ -208,6 +210,64 @@ class LicenseManagerApiClient(BaseOAuthClient):
             )
             raise APIClientException(
                 f'Could not create subscription plan for customer agreement {customer_agreement_uuid}',
+                exc,
+            ) from exc
+
+    def update_subscription_plan(self, subscription_plan_uuid, **kwargs):
+        """
+        Updates a Subscription Plan via PATCH request to the provisioning endpoint.
+
+        Args:
+            subscription_plan_uuid (str): The UUID of the SubscriptionPlan to update
+            **kwargs: Fields to update (e.g., is_active=False)
+
+        Returns:
+            dict: Updated subscription plan data
+
+        Raises:
+            APIClientException: If the update request fails
+        """
+        endpoint = f'{self.subscription_provisioning_endpoint}{subscription_plan_uuid}/'
+        response = self.client.patch(endpoint, json=kwargs)
+        try:
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Failed to update subscription plan %s, response %s, exception: %s',
+                subscription_plan_uuid,
+                safe_error_response_content(exc),
+                exc,
+            )
+            raise APIClientException(
+                f'Could not update subscription plan {subscription_plan_uuid}',
+                exc,
+            ) from exc
+
+    def delete_subscription_plan_renewal(self, renewal_uuid):
+        """
+        Deletes a SubscriptionPlanRenewal record.
+
+        Args:
+            renewal_uuid (str): The UUID of the SubscriptionPlanRenewal to delete
+
+        Raises:
+            APIClientException: If the delete request fails
+        """
+        endpoint = f'{self.subscription_plan_renewal_endpoint}{renewal_uuid}/'
+        response = self.client.delete(endpoint)
+        try:
+            response.raise_for_status()
+            logger.info('Successfully deleted subscription plan renewal %s', renewal_uuid)
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Failed to delete subscription plan renewal %s, response %s, exception: %s',
+                renewal_uuid,
+                safe_error_response_content(exc),
+                exc,
+            )
+            raise APIClientException(
+                f'Could not delete subscription plan renewal {renewal_uuid}',
                 exc,
             ) from exc
 

@@ -203,14 +203,57 @@ class StripeEventHandler:
     def subscription_updated(event: stripe.Event) -> None:
         """
         Handle customer.subscription.updated events.
-        Track when subscriptions have pending updates and update related CheckoutIntent state.
+        Track when subscriptions have pending updates, cancellations, and update related CheckoutIntent state.
         """
+        from enterprise_access.apps.customer_billing.api import handle_subscription_cancellation
+        
         subscription = event.data.object
+        previous_attributes = event.data.get('previous_attributes', {})
         pending_update = getattr(subscription, 'pending_update', None)
 
         checkout_intent_id = get_checkout_intent_id_from_subscription(subscription)
         checkout_intent = get_checkout_intent_or_raise(checkout_intent_id, event.id)
         link_event_data_to_checkout_intent(event, checkout_intent)
+
+        # Check if subscription was just canceled (cancel_at_period_end changed to True)
+        cancel_at_period_end = getattr(subscription, 'cancel_at_period_end', False)
+        previous_cancel_at_period_end = previous_attributes.get('cancel_at_period_end', False)
+        
+        # Also check if the subscription status changed to 'canceled'
+        subscription_status = getattr(subscription, 'status', None)
+        previous_status = previous_attributes.get('status', None)
+        
+        if cancel_at_period_end and not previous_cancel_at_period_end:
+            logger.info(
+                'Subscription %s cancel_at_period_end changed to True. checkout_intent_id: %s',
+                subscription.id,
+                checkout_intent_id,
+            )
+            try:
+                handle_subscription_cancellation(checkout_intent, subscription.id)
+            except Exception as exc:
+                logger.exception(
+                    'Failed to handle subscription cancellation for subscription %s, checkout_intent %s: %s',
+                    subscription.id,
+                    checkout_intent_id,
+                    exc,
+                )
+        elif subscription_status == 'canceled' and previous_status and previous_status != 'canceled':
+            logger.info(
+                'Subscription %s status changed to canceled (from %s). checkout_intent_id: %s',
+                subscription.id,
+                previous_status,
+                checkout_intent_id,
+            )
+            try:
+                handle_subscription_cancellation(checkout_intent, subscription.id)
+            except Exception as exc:
+                logger.exception(
+                    'Failed to handle subscription cancellation for subscription %s, checkout_intent %s: %s',
+                    subscription.id,
+                    checkout_intent_id,
+                    exc,
+                )
 
         if pending_update:
             # TODO: take necessary action on the actual SubscriptionPlan
@@ -225,4 +268,30 @@ class StripeEventHandler:
     @on_stripe_event('customer.subscription.deleted')
     @staticmethod
     def subscription_deleted(event: stripe.Event) -> None:
-        pass
+        """
+        Handle customer.subscription.deleted events.
+        Delete the renewal and deactivate both trial and future plans.
+        """
+        from enterprise_access.apps.customer_billing.api import handle_subscription_deletion
+        
+        subscription = event.data.object
+        
+        checkout_intent_id = get_checkout_intent_id_from_subscription(subscription)
+        checkout_intent = get_checkout_intent_or_raise(checkout_intent_id, event.id)
+        link_event_data_to_checkout_intent(event, checkout_intent)
+        
+        logger.info(
+            'Subscription %s was deleted. checkout_intent_id: %s',
+            subscription.id,
+            checkout_intent_id,
+        )
+        
+        try:
+            handle_subscription_deletion(checkout_intent, subscription.id)
+        except Exception as exc:
+            logger.exception(
+                'Failed to handle subscription deletion for subscription %s, checkout_intent %s: %s',
+                subscription.id,
+                checkout_intent_id,
+                exc,
+            )

@@ -450,3 +450,161 @@ def create_free_trial_checkout_session(
     logger.info(f'Updated checkout intent {intent.id} with Stripe session {checkout_session["id"]}')
 
     return checkout_session
+
+
+def handle_subscription_cancellation(checkout_intent: CheckoutIntent, stripe_subscription_id: str):
+    """
+    Handle Stripe subscription cancellation (cancel_at_period_end=True).
+    
+    This should:
+    - Delete the renewal record in license-manager (when ENT-11009 is complete)
+    - Deactivate the future (paid) plan in license-manager
+    - Log the cancellation in the CheckoutIntent
+    
+    Args:
+        checkout_intent: The CheckoutIntent associated with the subscription
+        stripe_subscription_id: The Stripe subscription ID that was canceled
+        
+    Raises:
+        APIClientException: If license-manager API calls fail
+    """
+    from django.utils import timezone
+    from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
+    
+    logger.info(
+        'Handling subscription cancellation for CheckoutIntent %s (stripe_subscription_id=%s)',
+        checkout_intent.id,
+        stripe_subscription_id,
+    )
+    
+    # Record the cancellation timestamp
+    checkout_intent.subscription_canceled_at = timezone.now()
+    checkout_intent.save(update_fields=['subscription_canceled_at', 'modified'])
+    
+    # Get the subscription plan UUID from the workflow
+    if not checkout_intent.workflow:
+        logger.warning(
+            'No workflow found for CheckoutIntent %s, cannot retrieve subscription plan UUID',
+            checkout_intent.id,
+        )
+        return
+    
+    try:
+        subscription_plan_output = checkout_intent.workflow.subscription_plan_output_dict()
+        subscription_plan_uuid = subscription_plan_output.get('uuid')
+        
+        if not subscription_plan_uuid:
+            logger.warning(
+                'No subscription plan UUID found in workflow output for CheckoutIntent %s',
+                checkout_intent.id,
+            )
+            return
+        
+        logger.info(
+            'Found subscription plan UUID %s for CheckoutIntent %s',
+            subscription_plan_uuid,
+            checkout_intent.id,
+        )
+        
+        # Deactivate the subscription plan
+        # Note: Once ENT-11009 is complete and trial/future plans are separate,
+        # this logic should only deactivate the future plan, not the trial plan.
+        license_manager_client = LicenseManagerApiClient()
+        license_manager_client.update_subscription_plan(subscription_plan_uuid, is_active=False)
+        logger.info(
+            'Deactivated subscription plan %s for CheckoutIntent %s',
+            subscription_plan_uuid,
+            checkout_intent.id,
+        )
+        
+        # TODO (ENT-11009): Once renewal records are implemented:
+        # 1. Get renewal_uuid from the workflow or checkout_intent
+        # 2. Call license_manager_client.delete_subscription_plan_renewal(renewal_uuid)
+        
+    except Exception as exc:
+        logger.exception(
+            'Failed to handle subscription cancellation for CheckoutIntent %s: %s',
+            checkout_intent.id,
+            exc,
+        )
+        raise
+
+
+def handle_subscription_deletion(checkout_intent: CheckoutIntent, stripe_subscription_id: str):
+    """
+    Handle Stripe subscription deletion.
+    
+    This should:
+    - Delete the renewal record in license-manager (when ENT-11009 is complete)
+    - Deactivate the subscription plan(s) in license-manager
+    - Log the deletion in the CheckoutIntent
+    
+    Args:
+        checkout_intent: The CheckoutIntent associated with the subscription
+        stripe_subscription_id: The Stripe subscription ID that was deleted
+        
+    Raises:
+        APIClientException: If license-manager API calls fail
+    """
+    from django.utils import timezone
+    from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
+    
+    logger.info(
+        'Handling subscription deletion for CheckoutIntent %s (stripe_subscription_id=%s)',
+        checkout_intent.id,
+        stripe_subscription_id,
+    )
+    
+    # Record the deletion timestamp
+    checkout_intent.subscription_deleted_at = timezone.now()
+    checkout_intent.save(update_fields=['subscription_deleted_at', 'modified'])
+    
+    # Get the subscription plan UUID from the workflow
+    if not checkout_intent.workflow:
+        logger.warning(
+            'No workflow found for CheckoutIntent %s, cannot retrieve subscription plan UUID',
+            checkout_intent.id,
+        )
+        return
+    
+    try:
+        subscription_plan_output = checkout_intent.workflow.subscription_plan_output_dict()
+        subscription_plan_uuid = subscription_plan_output.get('uuid')
+        
+        if not subscription_plan_uuid:
+            logger.warning(
+                'No subscription plan UUID found in workflow output for CheckoutIntent %s',
+                checkout_intent.id,
+            )
+            return
+        
+        logger.info(
+            'Found subscription plan UUID %s for CheckoutIntent %s',
+            subscription_plan_uuid,
+            checkout_intent.id,
+        )
+        
+        # Deactivate the subscription plan
+        # Note: Once ENT-11009 is complete and trial/future plans are separate,
+        # this logic should deactivate both the trial and future plans.
+        license_manager_client = LicenseManagerApiClient()
+        license_manager_client.update_subscription_plan(subscription_plan_uuid, is_active=False)
+        logger.info(
+            'Deactivated subscription plan %s for CheckoutIntent %s',
+            subscription_plan_uuid,
+            checkout_intent.id,
+        )
+        
+        # TODO (ENT-11009): Once renewal records and separate trial/future plans are implemented:
+        # 1. Get trial_plan_uuid and future_plan_uuid from the workflow or checkout_intent
+        # 2. Get renewal_uuid from the workflow or checkout_intent
+        # 3. Call license_manager_client.delete_subscription_plan_renewal(renewal_uuid)
+        # 4. Call license_manager_client.update_subscription_plan() for both trial and future plans
+        
+    except Exception as exc:
+        logger.exception(
+            'Failed to handle subscription deletion for CheckoutIntent %s: %s',
+            checkout_intent.id,
+            exc,
+        )
+        raise
