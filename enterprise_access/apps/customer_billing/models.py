@@ -661,6 +661,21 @@ class StripeEventSummary(TimeStampedModel):
         db_index=True,
         help_text='UUID of the SubscriptionPlan from License Manager'
     )
+    future_subscription_plan_uuid = models.UUIDField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='UUID of the future SubscriptionPlan from License Manager'
+    )
+    subscription_plan_renewal_uuid = models.UUIDField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            'UUID of the SubscriptionPlanRenewal from License Manager, '
+            'it related the (current) plan to the future plan'
+        ),
+    )
 
     # Stripe object identification
     stripe_object_type = models.CharField(

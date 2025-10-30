@@ -311,12 +311,17 @@ class StripeEventSummaryAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
         'created',
         'checkout_intent_id',
         'subscription_plan_uuid',
+        'future_subscription_plan_uuid',
+        'subscription_plan_renewal_uuid',
     ]
     list_filter = [
         'event_type',
     ]
     search_fields = [
         'event_id',
+        'subscription_plan_uuid',
+        'future_subscription_plan_uuid',
+        'subscription_plan_renewal_uuid',
     ]
     select_related = [
         'checkout_intent',
