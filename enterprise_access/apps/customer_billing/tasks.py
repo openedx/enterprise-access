@@ -288,3 +288,110 @@ def send_trial_cancellation_email_task(
             str(exc),
         )
         raise
+
+
+@shared_task(base=LoggedTaskWithRetry)
+def send_billing_error_email_task(checkout_intent_id: int):
+    """
+    Send Braze email notification when a subscription encounters a billing error
+    (e.g., transitions to past_due).
+
+    The email includes a link to the Stripe billing portal so admins can fix their
+    payment method and restart the subscription.
+
+    Args:
+        checkout_intent_id (int): ID of the CheckoutIntent record
+    """
+    try:
+        checkout_intent = CheckoutIntent.objects.get(id=checkout_intent_id)
+    except CheckoutIntent.DoesNotExist:
+        logger.error(
+            "Billing error email not sent: CheckoutIntent %s not found",
+            checkout_intent_id,
+        )
+        return
+
+    enterprise_slug = checkout_intent.enterprise_slug
+    logger.info(
+        "Sending billing error email for CheckoutIntent %s (enterprise slug: %s)",
+        checkout_intent_id,
+        enterprise_slug,
+    )
+
+    braze_client = BrazeApiClient()
+    lms_client = LmsApiClient()
+
+    # Fetch enterprise customer data to get admin users
+    try:
+        enterprise_data = lms_client.get_enterprise_customer_data(
+            enterprise_customer_slug=enterprise_slug
+        )
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        logger.error(
+            "Failed to fetch enterprise data for slug %s: %s. Cannot send billing error email.",
+            enterprise_slug,
+            str(exc),
+        )
+        return
+
+    admin_users = enterprise_data.get("admin_users", [])
+
+    if not admin_users:
+        logger.error(
+            "Billing error email not sent: No admin users found for enterprise slug %s. "
+            "Verify admin setup in LMS.",
+            enterprise_slug,
+        )
+        return
+
+    # Generate Stripe billing portal URL for fixing payment method
+    portal_url = _get_billing_portal_url(checkout_intent)
+
+    braze_trigger_properties = {
+        "restart_subscription_url": portal_url,
+    }
+
+    # Create Braze recipients for all admin users
+    recipients = []
+    for admin in admin_users:
+        try:
+            admin_email = admin["email"]
+            recipient = braze_client.create_braze_recipient(
+                user_email=admin_email,
+                lms_user_id=admin.get("lms_user_id"),
+            )
+            recipients.append(recipient)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning(
+                "Failed to create Braze recipient for admin email %s: %s",
+                admin_email,
+                str(exc),
+            )
+
+    if not recipients:
+        logger.error(
+            "Billing error email not sent: No valid Braze recipients created for enterprise slug %s. "
+            "Check admin email errors above.",
+            enterprise_slug,
+        )
+        return
+
+    # Send the campaign message to all admin recipients
+    try:
+        braze_client.send_campaign_message(
+            settings.BRAZE_BILLING_ERROR_CAMPAIGN,
+            recipients=recipients,
+            trigger_properties=braze_trigger_properties,
+        )
+        logger.info(
+            "Successfully sent billing error emails for CheckoutIntent %s to %d recipients",
+            checkout_intent_id,
+            len(recipients),
+        )
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        logger.exception(
+            "Braze API error: Failed to send billing error email for CheckoutIntent %s. Error: %s",
+            checkout_intent_id,
+            str(exc),
+        )
+        raise

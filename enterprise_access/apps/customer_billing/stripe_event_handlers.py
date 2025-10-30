@@ -9,7 +9,10 @@ import stripe
 
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData
 from enterprise_access.apps.customer_billing.stripe_event_types import StripeEventType
-from enterprise_access.apps.customer_billing.tasks import send_trial_cancellation_email_task
+from enterprise_access.apps.customer_billing.tasks import (
+    send_trial_cancellation_email_task,
+    send_billing_error_email_task,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -349,6 +352,16 @@ class StripeEventHandler:
 
         # Past due transition
         if current_status == "past_due" and prior_status != "past_due":
+            # Fire billing error email to enterprise admins
+            try:
+                send_billing_error_email_task.delay(checkout_intent_id=checkout_intent.id)
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                logger.exception(
+                    "Failed to enqueue billing error email for CheckoutIntent %s: %s",
+                    checkout_intent.id,
+                    str(exc),
+                )
+
             enterprise_uuid = checkout_intent.enterprise_uuid
             if enterprise_uuid:
                 cancel_all_future_plans(
