@@ -16,7 +16,11 @@ from django.utils import timezone
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData
-from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
+from enterprise_access.apps.customer_billing.stripe_event_handlers import (
+    StripeEventHandler,
+    future_plans_of_current,
+    cancel_all_future_plans,
+)
 
 
 class AttrDict(dict):
@@ -277,3 +281,81 @@ class TestStripeEventHandler(TestCase):
         ) as mock_task:
             StripeEventHandler.dispatch(mock_event)
             mock_task.delay.assert_not_called()
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.cancel_all_future_plans"
+    )
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_billing_error_email_task"
+    )
+    @mock.patch.object(CheckoutIntent, "previous_summary")
+    def test_subscription_updated_past_due_cancels_future_plans(
+        self, mock_prev_summary, mock_send_billing_error, mock_cancel
+    ):
+        """Past-due transition triggers cancel_all_future_plans with expected args."""
+        subscription_id = "sub_test_past_due_123"
+        subscription_data = {
+            "id": subscription_id,
+            "status": "past_due",
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        # Simulate prior status was not past_due
+        mock_prev_summary.return_value = AttrDict({"subscription_status": "active"})
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        mock_cancel.assert_called_once()
+        mock_send_billing_error.delay.assert_called_once_with(checkout_intent_id=self.checkout_intent.id)
+        _, kwargs = mock_cancel.call_args
+        self.assertEqual(
+            kwargs["enterprise_uuid"], self.checkout_intent.enterprise_uuid
+        )
+        self.assertEqual(kwargs["reason"], "delayed_payment")
+        self.assertEqual(
+            kwargs["subscription_id_for_logs"], subscription_id
+        )
+
+    def test_future_plans_of_current_selects_children(self):
+        """future_plans_of_current returns plans whose prior_renewals link to current plan."""
+        current_uuid = "1111-aaaa"
+        plans = [
+            {"uuid": current_uuid, "prior_renewals": []},
+            {"uuid": "2222-bbbb", "prior_renewals": [{"prior_subscription_plan_id": current_uuid}]},
+            {"uuid": "3333-cccc", "prior_renewals": [{"prior_subscription_plan_id": current_uuid}]},
+            {"uuid": "4444-dddd", "prior_renewals": []},
+        ]
+
+        result = future_plans_of_current(current_uuid, plans)
+        self.assertEqual({p["uuid"] for p in result}, {"2222-bbbb", "3333-cccc"})
+
+    @mock.patch("enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient")
+    def test_cancel_all_future_plans_deactivates_all(self, MockClient):
+        """cancel_all_future_plans patches all future plans and returns their uuids."""
+        enterprise_uuid = "ent-123"
+        current_uuid = "1111-aaaa"
+        future1 = {"uuid": "2222-bbbb", "prior_renewals": [{"prior_subscription_plan_id": current_uuid}]}
+        future2 = {"uuid": "3333-cccc", "prior_renewals": [{"prior_subscription_plan_id": current_uuid}]}
+
+        mock_client = MockClient.return_value
+        # list_subscriptions(current=True)
+        mock_client.list_subscriptions.side_effect = [
+            {"results": [{"uuid": current_uuid}]},  # current=True response
+            {"results": [
+                {"uuid": current_uuid, "prior_renewals": []},
+                future1,
+                future2,
+            ]},  # all plans response
+        ]
+
+        deactivated = cancel_all_future_plans(enterprise_uuid, reason="delayed_payment", subscription_id_for_logs="sub-1")
+
+        # Should have patched both future plans
+        self.assertEqual(set(deactivated), {"2222-bbbb", "3333-cccc"})
+        self.assertEqual(mock_client.update_subscription_plan.call_count, 2)
+        mock_client.update_subscription_plan.assert_any_call("2222-bbbb", is_active=False, change_reason="delayed_payment")
+        mock_client.update_subscription_plan.assert_any_call("3333-cccc", is_active=False, change_reason="delayed_payment")
