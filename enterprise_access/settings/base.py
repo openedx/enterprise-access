@@ -621,6 +621,10 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 # Stripe API key used for privileged read/write operations from a system user.
 STRIPE_API_KEY = None
 
+# Stripe webhook endpoint secret used to verify webhook request signatures.
+# This should be obtained from the Stripe dashboard when configuring the webhook endpoint.
+STRIPE_WEBHOOK_ENDPOINT_SECRET = None
+
 # Duration of trial period.
 SSP_TRIAL_PERIOD_DAYS = 14
 
