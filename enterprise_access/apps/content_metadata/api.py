@@ -4,6 +4,7 @@ TODO: refactor subsidy_access_policy/content_metadata_api.py
 into this module.
 """
 import logging
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.cache import cache
@@ -12,8 +13,15 @@ from edx_django_utils.cache import TieredCache
 from enterprise_access.cache_utils import versioned_cache_key
 
 from ..api_client.enterprise_catalog_client import EnterpriseCatalogApiClient, EnterpriseCatalogApiV1Client
+from .constants import CENTS_PER_DOLLAR, DEFAULT_CONTENT_PRICE, CourseModes, ProductSources
 
 logger = logging.getLogger(__name__)
+
+CONTENT_MODES_BY_PRODUCT_SOURCE = {
+    ProductSources.EDX.value: CourseModes.EDX_VERIFIED.value,
+    # TODO: additionally support other course modes/types beyond Executive Education for the 2U product source
+    ProductSources.TWOU.value: CourseModes.EXECUTIVE_EDUCATION.value,
+}
 
 
 def get_and_cache_catalog_content_metadata(
@@ -139,3 +147,115 @@ def get_and_cache_content_metadata(
     else:
         logger.warning('Could not fetch metadata for content %s', content_identifier)
     return content_metadata
+
+
+def product_source_for_content(content_data):
+    """
+    Helps get the product source string, given a dict of ``content_data``.
+    """
+    if product_source := content_data.get('product_source'):
+        source_name = product_source.get('slug')
+        if source_name in CONTENT_MODES_BY_PRODUCT_SOURCE:
+            return source_name
+    return ProductSources.EDX.value
+
+
+def mode_for_content(content_data):
+    """
+    Helper to extract the relevant enrollment mode for a piece of content metadata.
+    """
+    product_source = product_source_for_content(content_data)
+    return CONTENT_MODES_BY_PRODUCT_SOURCE.get(product_source, CourseModes.EDX_VERIFIED.value)
+
+
+def get_course_run(content_identifier, content_data):
+    """
+    Given a content_identifier (key, run key, uuid) extract the appropriate course_run.
+    When given a run key or uuid for a run, extract that. When given a course key or
+    course uuid, extract the advertised course_run.
+    """
+    if content_data.get('content_type') == 'courserun':
+        return content_data
+
+    course_run_identifier = content_identifier
+    # if the supplied content_identifer refers to the course, look for an advertised run
+    if content_identifier == content_data.get('key') or content_identifier == content_data.get('uuid'):
+        course_run_identifier = content_data.get('advertised_course_run_uuid')
+    for course_run in content_data.get('course_runs', []):
+        if course_run_identifier == course_run.get('key') or course_run_identifier == course_run.get('uuid'):
+            return course_run
+    return {}
+
+
+def price_for_content_fallback(content_data, course_run_data):
+    """
+    Fallback logic for `price_for_content` logic if the `normalized_metadata_by_run` field is None.
+    The fallback logic is the original logic for determining the `content_price` before
+    using normalized metadata as the first source of truth for `content_price`.
+    """
+    content_price = None
+
+    product_source = product_source_for_content(content_data)
+    if product_source == ProductSources.TWOU.value:
+        enrollment_mode_for_content = mode_for_content(content_data)
+        for entitlement in content_data.get('entitlements', []):
+            if entitlement.get('mode') == enrollment_mode_for_content:
+                content_price = entitlement.get('price')
+    else:
+        content_price = course_run_data.get('first_enrollable_paid_seat_price')
+
+    if not content_price:
+        logger.info(
+            f"Could not determine price for content key {content_data.get('key')} "
+            f"and course run key {course_run_data.get('key')}, setting to default."
+        )
+        content_price = DEFAULT_CONTENT_PRICE
+
+    return content_price
+
+
+def price_for_content(content_data, course_run_data):
+    """
+    Helper to return the "official" price for content.
+    The endpoint at ``self.content_metadata_url`` will always return price fields
+    as USD (dollars), possibly as a string or a float.  This method converts
+    those values to USD cents as an integer.
+    """
+    content_price = None
+    course_run_key = course_run_data.get('key')
+
+    if course_run_key in content_data.get('normalized_metadata_by_run', {}):
+        if normalized_price := content_data['normalized_metadata_by_run'][course_run_key].get('content_price'):
+            content_price = normalized_price
+
+    if not content_price:
+        content_price = price_for_content_fallback(content_data, course_run_data)
+
+    return int(Decimal(content_price) * CENTS_PER_DOLLAR)
+
+
+def summary_data_for_content(content_identifier, content_data):
+    """
+    Returns a summary dict specifying the content_uuid, content_key, source, and content_price
+    for a dict of content metadata.
+    """
+    course_run_content = get_course_run(content_identifier, content_data)
+    content_mode = mode_for_content(content_data)
+    return {
+        'content_title': content_data.get('title'),
+        'content_uuid': content_data.get('uuid'),
+        'content_key': content_data.get('key'),
+        'course_run_uuid': course_run_content.get('uuid'),
+        'course_run_key': course_run_content.get('key'),
+        'source': product_source_for_content(content_data),
+        'mode': content_mode,
+        'content_price': price_for_content(content_data, course_run_content),
+    }
+
+
+def get_canonical_content_price_from_metadata(content_identifier, content_data):
+    """
+    Main entry point: returns price in cents for the given content.
+    """
+    content_metadata = summary_data_for_content(content_identifier, content_data)
+    return content_metadata['content_price']

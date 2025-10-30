@@ -3,6 +3,7 @@ Tests for the ``api.py`` module of the content_assignments app.
 """
 import re
 from unittest import mock
+from uuid import uuid4
 
 import ddt
 from django.test import TestCase
@@ -11,11 +12,14 @@ from django.utils import timezone
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
-from enterprise_access.apps.subsidy_request.tests.factories import LearnerCreditRequestFactory
+from enterprise_access.apps.subsidy_request.tests.factories import (
+    LearnerCreditRequestConfigurationFactory,
+    LearnerCreditRequestFactory
+)
 
 from ..api import (
     AllocationException,
-    allocate_assignment_for_request,
+    allocate_assignment_for_requests,
     allocate_assignments,
     cancel_assignments,
     expire_assignment,
@@ -29,7 +33,7 @@ from ..constants import (
     LearnerContentAssignmentStateChoices
 )
 from ..models import AssignmentConfiguration, LearnerContentAssignment
-from .factories import LearnerContentAssignmentFactory
+from .factories import AssignmentConfigurationFactory, LearnerContentAssignmentFactory
 
 # This is normally much larger (350), but that blows up the test duration.
 TEST_USER_EMAIL_READ_BATCH_SIZE = 4
@@ -331,25 +335,6 @@ class TestContentAssignmentApi(TestCase):
         with self.assertNumQueries(1):
             actual_amount = get_allocated_quantity_for_configuration(other_config)
             self.assertEqual(actual_amount, 0)
-
-    def test_allocate_assignment_for_request_negative_quantity(self):
-        """
-        Tests the allocation of new assignment for a price < 0
-        raises an exception.
-        """
-        content_key = 'edX+demoX'
-        content_price_cents = -1
-        learners_to_assign = 'test@email.com'
-        lms_user_id = 12345
-
-        with self.assertRaisesRegex(AllocationException, 'price must be >= 0'):
-            allocate_assignment_for_request(
-                self.assignment_configuration,
-                learners_to_assign,
-                content_key,
-                content_price_cents,
-                lms_user_id
-            )
 
     def test_allocate_assignments_negative_quantity(self):
         """
@@ -656,48 +641,6 @@ class TestContentAssignmentApi(TestCase):
                 created_assignment,
             )
         ], any_order=True)
-
-    @mock.patch(
-        'enterprise_access.apps.content_assignments.api.get_and_cache_content_metadata',
-        return_value=mock.MagicMock(),
-    )
-    @ddt.unpack
-    def test_allocate_assignment_for_request_happy_path(
-        self,
-        mock_get_and_cache_content_metadata,
-    ):
-        """
-        Tests allocate_assignment_for_request retuns a newly created assignment.
-        """
-        course_key = 'edX+DemoX'
-        course_run_key = 'course-v1:edX+DemoX+2T2023'
-        content_title = 'Test Demo Course'
-        content_price_cents = 100
-
-        mock_get_and_cache_content_metadata.return_value = {
-            'content_title': content_title,
-            'content_key': course_key,
-            'course_run_key': course_run_key,
-        }
-
-        learner_to_assign = 'test@email.com'
-        lms_user_id = 12345
-
-        created_assignment = allocate_assignment_for_request(
-            self.assignment_configuration,
-            learner_to_assign,
-            course_key,
-            content_price_cents,
-            lms_user_id
-        )
-        self.assertEqual(created_assignment.assignment_configuration, self.assignment_configuration)
-        self.assertEqual(created_assignment.learner_email, learner_to_assign)
-        self.assertEqual(created_assignment.lms_user_id, lms_user_id)
-        self.assertEqual(created_assignment.content_key, course_key)
-        self.assertEqual(created_assignment.preferred_course_run_key, course_run_key)
-        self.assertEqual(created_assignment.content_title, content_title)
-        self.assertEqual(created_assignment.content_quantity, -1 * content_price_cents)
-        self.assertEqual(created_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
 
     @mock.patch('enterprise_access.apps.content_assignments.tasks.send_cancel_email_for_pending_assignment')
     def test_cancel_assignments_happy_path(self, mock_notify):
@@ -1179,3 +1122,207 @@ class TestAssignmentExpiration(TestCase):
         self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.EXPIRED)
         self.assertEqual(credit_request.state, SubsidyRequestStates.EXPIRED)
         mock_expired_email.delay.assert_not_called()
+
+
+class AllocateAssignmentForRequestsTests(TestCase):
+    """
+    Unit tests for allocate_assignment_for_requests.
+
+    These tests verify that assignments are correctly created or reallocated
+    for valid LearnerCreditRequest objects, using mocked catalog metadata.
+    """
+
+    def setUp(self):
+        self.enterprise_customer_uuid = uuid4()
+        self.learner_credit_config = LearnerCreditRequestConfigurationFactory(active=True)
+        self.assignment_config = AssignmentConfigurationFactory(
+            enterprise_customer_uuid=self.enterprise_customer_uuid
+        )
+        self.policy = AssignedLearnerCreditAccessPolicyFactory(
+            learner_credit_request_config=self.learner_credit_config,
+            assignment_configuration=self.assignment_config,
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+            retired=False,
+            per_learner_spend_limit=None,
+            spend_limit=100000,
+            active=True,
+        )
+        self.user = UserFactory(email='testuser@example.com', lms_user_id=123)
+        self.course_id = 'edX+DemoX'
+        self.course_price = 1000
+
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
+    )
+    def test_allocate_assignment_for_requests_happy_path(self, mock_catalog_content_metadata):
+        mock_catalog_content_metadata.return_value = {
+            'results': [{
+                'key': self.course_id,
+                'title': 'Demo Course',
+                'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+                'parent_content_key': None,
+                'content_price': self.course_price,
+                'uuid': 'mock-uuid',
+                'content_type': 'courserun',
+            }]
+        }
+        request = LearnerCreditRequestFactory(
+            learner_credit_request_config=self.learner_credit_config,
+            user=self.user,
+            course_id=self.course_id,
+            course_price=self.course_price,
+            assignment=None,
+            state=SubsidyRequestStates.REQUESTED,
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            result = allocate_assignment_for_requests(self.assignment_config, [request])
+        assignment = result[request.uuid]
+        self.assertIsNotNone(assignment)
+        self.assertEqual(assignment.learner_email, self.user.email)
+        self.assertEqual(assignment.lms_user_id, self.user.lms_user_id)
+        self.assertEqual(assignment.content_key, self.course_id)
+        self.assertEqual(assignment.content_quantity, -self.course_price)
+        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertEqual(assignment.content_title, 'Demo Course')
+        self.assertEqual(assignment.assignment_configuration, self.assignment_config)
+        self.assertIsNotNone(assignment.allocation_batch_id)
+
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
+    )
+    def test_reallocate_existing_assignment(self, mock_catalog_content_metadata):
+        mock_catalog_content_metadata.return_value = {
+            'results': [{
+                'key': self.course_id,
+                'title': 'Demo Course',
+                'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+                'parent_content_key': None,
+                'content_price': self.course_price,
+                'uuid': 'mock-uuid',
+                'content_type': 'courserun',
+            }]
+        }
+        existing_assignment = LearnerContentAssignmentFactory(
+            assignment_configuration=self.assignment_config,
+            learner_email=self.user.email,
+            lms_user_id=self.user.lms_user_id,
+            content_key=self.course_id,
+            content_quantity=-500,
+            state=LearnerContentAssignmentStateChoices.CANCELLED,
+        )
+        request = LearnerCreditRequestFactory(
+            learner_credit_request_config=self.learner_credit_config,
+            user=self.user,
+            course_id=self.course_id,
+            course_price=self.course_price,
+            assignment=None,
+            state=SubsidyRequestStates.REQUESTED,
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            result = allocate_assignment_for_requests(self.assignment_config, [request])
+        assignment = result[request.uuid]
+        self.assertEqual(assignment.uuid, existing_assignment.uuid)
+        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertEqual(assignment.content_quantity, -self.course_price)
+        self.assertEqual(assignment.content_key, self.course_id)
+
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
+    )
+    def test_allocate_multiple_requests_mixed(self, mock_catalog_content_metadata):
+        mock_catalog_content_metadata.return_value = {
+            'results': [{
+                'key': self.course_id,
+                'title': 'Demo Course',
+                'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+                'parent_content_key': None,
+                'content_price': self.course_price,
+                'uuid': 'mock-uuid',
+                'content_type': 'courserun',
+            }]
+        }
+        user2 = UserFactory(email='user2@example.com', lms_user_id=456)
+        existing_assignment = LearnerContentAssignmentFactory(
+            assignment_configuration=self.assignment_config,
+            learner_email=self.user.email,
+            lms_user_id=self.user.lms_user_id,
+            content_key=self.course_id,
+            content_quantity=-500,
+            state=LearnerContentAssignmentStateChoices.CANCELLED,
+        )
+        request1 = LearnerCreditRequestFactory(
+            learner_credit_request_config=self.learner_credit_config,
+            user=self.user,
+            course_id=self.course_id,
+            course_price=self.course_price,
+            assignment=None,
+            state=SubsidyRequestStates.REQUESTED,
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+        )
+        request2 = LearnerCreditRequestFactory(
+            learner_credit_request_config=self.learner_credit_config,
+            user=user2,
+            course_id=self.course_id,
+            course_price=self.course_price,
+            assignment=None,
+            state=SubsidyRequestStates.REQUESTED,
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            result = allocate_assignment_for_requests(self.assignment_config, [request1, request2])
+        assignment1 = result[request1.uuid]
+        assignment2 = result[request2.uuid]
+        self.assertEqual(assignment1.uuid, existing_assignment.uuid)
+        self.assertEqual(assignment2.learner_email, user2.email)
+        self.assertEqual(assignment2.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertEqual(assignment2.content_quantity, -self.course_price)
+
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
+    )
+    def test_allocate_assignment_no_requests(self, mock_catalog_content_metadata):
+        mock_catalog_content_metadata.return_value = {'results': []}
+        with self.captureOnCommitCallbacks(execute=True):
+            result = allocate_assignment_for_requests(self.assignment_config, [])
+        self.assertEqual(result, {})
+
+    @mock.patch(
+        'enterprise_access.apps.api_client.enterprise_catalog_client.'
+        'EnterpriseCatalogApiClient.catalog_content_metadata'
+    )
+    def test_allocate_assignment_user_without_lms_id(self, mock_catalog_content_metadata):
+        mock_catalog_content_metadata.return_value = {
+            'results': [{
+                'key': self.course_id,
+                'title': 'Demo Course',
+                'course_run_key': 'course-v1:edX+DemoX+Demo_Course',
+                'parent_content_key': None,
+                'content_price': self.course_price,
+                'uuid': 'mock-uuid',
+                'content_type': 'courserun',
+            }]
+        }
+        user_no_lms = UserFactory(email='nolms@example.com', lms_user_id=None)
+        request = LearnerCreditRequestFactory(
+            learner_credit_request_config=self.learner_credit_config,
+            user=user_no_lms,
+            course_id=self.course_id,
+            course_price=self.course_price,
+            assignment=None,
+            state=SubsidyRequestStates.REQUESTED,
+            enterprise_customer_uuid=self.enterprise_customer_uuid,
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            result = allocate_assignment_for_requests(self.assignment_config, [request])
+        assignment = result[request.uuid]
+        self.assertIsNotNone(assignment)
+        self.assertEqual(assignment.learner_email, user_no_lms.email)
+        self.assertIsNone(assignment.lms_user_id)
+        self.assertEqual(assignment.content_quantity, -self.course_price)
+        self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)

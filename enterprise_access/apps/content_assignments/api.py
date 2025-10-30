@@ -22,6 +22,7 @@ from enterprise_access.apps.content_assignments.tasks import (
     send_exec_ed_enrollment_warmer,
     send_reminder_email_for_pending_assignment
 )
+from enterprise_access.apps.content_metadata.api import get_and_cache_catalog_content_metadata, summary_data_for_content
 from enterprise_access.apps.core.models import User
 from enterprise_access.apps.subsidy_access_policy.content_metadata_api import get_and_cache_content_metadata
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
@@ -452,84 +453,88 @@ def _do_async_tasks_after_assignment_writes(updated_assignments, created_assignm
         send_email_for_new_assignment.delay(assignment.uuid)
 
 
-def allocate_assignment_for_request(
+def allocate_assignment_for_requests(
     assignment_configuration,
-    learner_email,
-    content_key,
-    content_price_cents,
-    lms_user_id,
+    learner_credit_requests,
 ):
     """
-    Creates or reallocates an assignment record for the given ``content_key`` in the given ``assignment_configuration``,
-      and the provided ``learner_email``.
+    Creates or reallocates LearnerContentAssignment records in bulk for a batch
+    of LearnerCreditRequests.
 
-    Params:
-      - ``assignment_configuration``: The AssignmentConfiguration record under which assignments should be allocated.
-      - ``learner_email``: The email address of the learner to whom the assignment should be allocated.
-      - ``content_key``: Either a course or course run key, representing the content to be allocated.
-      - ``content_price_cents``: The cost of redeeming the content, in USD cents, at the time of allocation. Should
-        always be an integer >= 0.
-      - ``lms_user_id``: lms user id of the user.
+    Args:
+        assignment_configuration (AssignmentConfiguration): The config to use.
+        learner_credit_requests (list[LearnerCreditRequest]): The requests to process.
 
-    Returns: A LearnerContentAssignment record that was created or None.
+    Returns:
+        dict: A map of {request.uuid: assignment_object}.
     """
     # Set a batch ID to track assignments updated and/or created together.
     allocation_batch_id = uuid4()
+    assignments_to_update = []
+    requests_for_new_assignments = []
 
-    message = (
-        'Allocating assignments: assignment_configuration=%s, batch_id=%s, '
-        'learner_email=%s, content_key=%s, content_price_cents=%s'
-    )
-    logger.info(
-        message, assignment_configuration.uuid, allocation_batch_id,
-        learner_email, content_key, content_price_cents
-    )
-
-    if content_price_cents < 0:
-        raise AllocationException('Allocation price must be >= 0')
-
-    # We store the allocated quantity as a (future) debit
-    # against a store of value, so we negate the provided non-negative
-    # content_price_cents, and then persist that in the assignment records.
-    content_quantity = content_price_cents * -1
-    lms_user_ids_by_email = {learner_email.lower(): lms_user_id}
-    existing_assignments = _get_existing_assignments_for_allocation(
+    # Fetch all unique course metadata in a single API call.
+    all_content_keys = list(set(req.course_id for req in learner_credit_requests))
+    metadata_by_key = {
+        meta['key']: summary_data_for_content(meta['key'], meta)
+        for meta in get_and_cache_catalog_content_metadata(
+            assignment_configuration.subsidy_access_policy.catalog_uuid,
+            all_content_keys
+        )
+    }
+    # Find all existing, re-allocatable assignments for the entire batch of requests.
+    existing_assignments_map = _get_existing_assignments_for_requests(
         assignment_configuration,
-        [learner_email],
-        content_key,
-        lms_user_ids_by_email,
+        learner_credit_requests,
     )
 
-    # Re-allocate existing assignment
-    if len(existing_assignments) > 0:
-        assignment = next(iter(existing_assignments), None)
-        if assignment and assignment.state in LearnerContentAssignmentStateChoices.REALLOCATE_STATES:
-            preferred_course_run_key = _get_preferred_course_run_key(assignment_configuration, content_key)
-            parent_content_key = _get_parent_content_key(assignment_configuration, content_key)
-            is_assigned_course_run = bool(parent_content_key)
+    # Separate requests into "update" vs "create" paths.
+    for request in learner_credit_requests:
+        lookup_key = (request.user.email.lower(), request.course_id)
+        existing_assignment = existing_assignments_map.get(lookup_key)
+
+        if existing_assignment:
+            # This request corresponds to an existing assignment that can be re-used.
+            # We prepare it for reallocation by updating its state and price.
+            metadata = metadata_by_key.get(request.course_id, {})
             _reallocate_assignment(
-                assignment,
-                content_quantity,
-                allocation_batch_id,
-                preferred_course_run_key,
-                parent_content_key,
-                is_assigned_course_run,
+                assignment=existing_assignment,
+                content_quantity=request.course_price * -1,
+                allocation_batch_id=allocation_batch_id,
+                preferred_course_run_key=metadata.get('course_run_key'),
+                parent_content_key=metadata.get('parent_content_key'),
+                is_assigned_course_run=bool(metadata.get('parent_content_key')),
             )
-            assignment.save()
-            return assignment
+            assignments_to_update.append(existing_assignment)
+        else:
+            # This request requires a brand new assignment.
+            requests_for_new_assignments.append(request)
 
-    assignment = _create_new_assignments(
-        assignment_configuration,
-        [learner_email],
-        content_key,
-        content_quantity,
-        lms_user_ids_by_email,
-        allocation_batch_id,
-    )
-    # If the assignment was created, it will be a list with one item.
-    if assignment:
-        return assignment[0]
-    return None
+    with transaction.atomic():
+        # Bulk update and get a list of refreshed objects
+        updated_assignments = _update_and_refresh_assignments(
+            assignments_to_update,
+            ASSIGNMENT_REALLOCATION_FIELDS
+        )
+
+        created_assignments = _create_new_assignments_for_requests(
+            assignment_configuration,
+            requests_for_new_assignments,
+            allocation_batch_id,
+            metadata_by_key
+        )
+
+    # Map all affected assignments back to their original requests
+    all_affected_assignments = list(updated_assignments) + created_assignments
+    assignments_by_learner_and_course = {
+        (asg.lms_user_id, asg.content_key): asg for asg in all_affected_assignments
+    }
+
+    request_to_assignment_map = {
+        req.uuid: assignments_by_learner_and_course.get((req.user.lms_user_id, req.course_id))
+        for req in learner_credit_requests
+    }
+    return request_to_assignment_map
 
 
 def _deduplicate_learner_emails_to_allocate(learner_emails):
@@ -634,6 +639,52 @@ def _get_existing_assignments_for_allocation(
     existing_assignments.update(assignments_for_lms_user_ids_queryset)
 
     return existing_assignments
+
+
+def _get_existing_assignments_for_requests(assignment_configuration, learner_credit_requests):
+    """
+    Finds all existing, re-allocatable assignments for a heterogeneous batch
+    of learner credit requests in a single, efficient query.
+
+    This correctly checks for matches on both (email, content_key) and
+    (lms_user_id, content_key).
+
+    Args:
+        assignment_configuration (AssignmentConfiguration): The configuration to search within.
+        learner_credit_requests (list[LearnerCreditRequest]): The list of requests.
+
+    Returns:
+        dict: A mapping of (learner_email, content_key) to the existing assignment object.
+    """
+    if not learner_credit_requests:
+        return {}
+
+    # Build a complex Q object to find all matches in one query.
+    # For each request, we look for an assignment that matches either the email/course
+    # combination OR the lms_user_id/course combination.
+    query = Q()
+    for request in learner_credit_requests:
+        # Always check for a match on the email and course key.
+        sub_query = Q(learner_email__iexact=request.user.email, content_key=request.course_id)
+
+        # If the request has a valid lms_user_id, also check for a match on that.
+        if request.user.lms_user_id:
+            sub_query |= Q(lms_user_id=request.user.lms_user_id, content_key=request.course_id)
+
+        query |= sub_query
+
+    # Execute a single query to get all potentially matching assignments.
+    existing_assignments = LearnerContentAssignment.objects.filter(
+        query,
+        assignment_configuration=assignment_configuration,
+        state__in=LearnerContentAssignmentStateChoices.REALLOCATE_STATES
+    )
+
+    # Returns a dictionary keyed by (email, content_key) for fast lookups.
+    return {
+        (assignment.learner_email.lower(), assignment.content_key): assignment
+        for assignment in existing_assignments
+    }
 
 
 def _reallocate_assignment(
@@ -784,6 +835,51 @@ def _create_new_assignments(
     created_assignments = LearnerContentAssignment.bulk_create(assignments_to_create)
 
     # Return a list of refreshed objects that we just created, along with their prefetched action records
+    return list(
+        LearnerContentAssignment.objects.prefetch_related('actions').filter(
+            uuid__in=[record.uuid for record in created_assignments],
+        )
+    )
+
+
+def _create_new_assignments_for_requests(
+    assignment_configuration,
+    learner_credit_requests,
+    allocation_batch_id,
+    metadata_by_key
+):
+    """
+    Helper to bulk save new LearnerContentAssignment instances from a list of
+    heterogeneous LearnerCreditRequest objects.
+    """
+    if not learner_credit_requests:
+        return []
+
+    # 2. Prepare all assignment objects in memory.
+    assignments_to_create = []
+    for request in learner_credit_requests:
+        metadata = metadata_by_key.get(request.course_id, {})
+        assignment = LearnerContentAssignment(
+            assignment_configuration=assignment_configuration,
+            learner_email=request.user.email,
+            lms_user_id=request.user.lms_user_id,
+            content_key=request.course_id,
+            content_quantity=request.course_price * -1,
+            content_title=metadata.get('content_title'),
+            parent_content_key=metadata.get('parent_content_key'),
+            preferred_course_run_key=metadata.get('course_run_key'),
+            is_assigned_course_run=bool(metadata.get('parent_content_key')),
+            state=LearnerContentAssignmentStateChoices.ALLOCATED,
+            allocation_batch_id=allocation_batch_id,
+            allocated_at=localized_utcnow(),
+        )
+        assignments_to_create.append(assignment)
+
+    # 3. Validate and bulk create all at once.
+    for assignment in assignments_to_create:
+        assignment.clean()
+    created_assignments = LearnerContentAssignment.objects.bulk_create(assignments_to_create)
+
     return list(
         LearnerContentAssignment.objects.prefetch_related('actions').filter(
             uuid__in=[record.uuid for record in created_assignments],

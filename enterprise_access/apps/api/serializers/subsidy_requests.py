@@ -283,30 +283,26 @@ class LearnerCreditRequestApproveRequestSerializer(serializers.Serializer):
 
     For view: LearnerCreditRequestViewSet.approve
     """
+    learner_credit_request_uuids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=True,
+        allow_empty=False,
+        help_text="A list of LearnerCreditRequest UUIDs to be approved."
+    )
     policy_uuid = serializers.UUIDField(
         required=True,
-        help_text='The UUID of the policy to which the request belongs.',
-    )
-    enterprise_customer_uuid = serializers.UUIDField(
-        required=True,
-        help_text='The UUID of the Enterprise Customer.',
-    )
-    learner_credit_request_uuid = serializers.UUIDField(
-        required=True,
-        help_text='The UUID of the LearnerCreditRequest to be approved.',
+        help_text="The UUID of the SubsidyAccessPolicy to use for this approval."
     )
 
-    def create(self, validated_data):
-        """
-        Not implemented - this serializer is for validation only
-        """
-        raise NotImplementedError("This serializer is for validation only")
 
-    def update(self, instance, validated_data):
-        """
-        Not implemented - this serializer is for validation only
-        """
-        raise NotImplementedError("This serializer is for validation only")
+class LearnerCreditRequestApproveAllSerializer(serializers.Serializer):
+    """
+    Request serializer to validate the approve-all action.
+    """
+    policy_uuid = serializers.UUIDField(
+        required=True,
+        help_text="The UUID of the SubsidyAccessPolicy to use for this approval."
+    )
 
 
 # pylint: disable=abstract-method
