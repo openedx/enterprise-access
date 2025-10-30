@@ -27,26 +27,6 @@ class LicenseManagerApiClient(BaseOAuthClient):
     customer_agreement_provisioning_endpoint = api_base_url + 'provisioning-admins/customer-agreement/'
     subscription_provisioning_endpoint = api_base_url + 'provisioning-admins/subscriptions/'
 
-    def get_subscription(self, subscription_uuid):
-        """
-        Retrieve information about SubscriptionPlan from license-manager
-
-        Arguments:
-            subscription_uuid (UUID): UUID of the SubscriptionPlan in license-manager
-        Returns:
-            dict: Information related to an enterprise SubscriptionsPlan purchase
-        """
-        try:
-            endpoint = self.subscriptions_endpoint + str(subscription_uuid) + '/'
-            response = self.client.get(endpoint, timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT)
-            return response.json()
-        except requests.exceptions.HTTPError as exc:
-            logger.exception(exc)
-            raise APIClientException(
-                f'Could not fetch SubscriptionPlan for {subscription_uuid}',
-                exc,
-            ) from exc
-
     def get_subscription_overview(self, subscription_uuid):
         """
         Call license-manager API for data about a SubscriptionPlan.
