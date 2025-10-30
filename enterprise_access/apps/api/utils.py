@@ -7,6 +7,7 @@ from uuid import UUID
 
 from rest_framework.exceptions import ParseError
 
+from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.bffs.api import (
     get_and_cache_enterprise_customer_users,
     transform_enterprise_customer_users_data

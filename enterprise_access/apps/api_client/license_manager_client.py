@@ -34,7 +34,7 @@ class LicenseManagerApiClient(BaseOAuthClient):
         Arguments:
             subscription_uuid (UUID): UUID of the SubscriptionPlan in license-manager
         Returns:
-            dict: Dictionary represention of json returned from API
+            dict: Dictionary representation of json returned from API
 
         Example response:
         [
