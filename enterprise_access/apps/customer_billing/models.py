@@ -845,3 +845,19 @@ class StripeEventSummary(TimeStampedModel):
         if timestamp:
             return _datetime_from_timestamp(timestamp)
         return None
+
+    @classmethod
+    def get_latest_invoice_paid(cls, invoice_id):
+        """
+        Retrieve the most recent invoice.paid event summary for a given invoice ID.
+
+        Args:
+            invoice_id (str): The Stripe invoice ID to look up
+
+        Returns:
+            StripeEventSummary: The most recent invoice.paid event summary, or None if not found
+        """
+        return cls.objects.filter(
+            stripe_invoice_id=invoice_id,
+            event_type='invoice.paid',
+        ).order_by('-stripe_event_created_at').first()
