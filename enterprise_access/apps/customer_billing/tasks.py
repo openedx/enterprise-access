@@ -8,15 +8,17 @@ from datetime import datetime
 import stripe
 from celery import shared_task
 from django.conf import settings
+from django.utils import timezone
 
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments.content_metadata_api import format_datetime_obj
 from enterprise_access.apps.customer_billing.api import create_stripe_billing_portal_session
-from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventSummary
+from enterprise_access.apps.customer_billing.stripe_api import get_stripe_trialing_subscription
 from enterprise_access.apps.provisioning.utils import validate_trial_subscription
 from enterprise_access.tasks import LoggedTaskWithRetry
-from enterprise_access.utils import cents_to_dollars
+from enterprise_access.utils import cents_to_dollars, format_cents_for_user_display
 
 logger = logging.getLogger(__name__)
 
@@ -407,6 +409,198 @@ def send_trial_cancellation_email_task(
     except Exception as exc:
         logger.exception(
             "Braze API error: Failed to send trial cancellation email for CheckoutIntent %s. Error: %s",
+            checkout_intent_id,
+            str(exc),
+        )
+        raise
+
+
+@shared_task(base=LoggedTaskWithRetry)
+def send_trial_ending_reminder_email_task(checkout_intent_id):
+    """
+    Send Braze email notification 72 hours before trial subscription ends.
+
+    This task handles sending a reminder email to enterprise admins when their
+    trial subscription is about to end. The email includes subscription details,
+    renewal information, and a link to manage their subscription.
+
+    Args:
+        checkout_intent_id (int): ID of the CheckoutIntent record
+
+    Raises:
+        BrazeClientError: If there's an error communicating with Braze
+        Exception: For any other unexpected errors during email sending
+    """
+    try:
+        checkout_intent = CheckoutIntent.objects.get(id=checkout_intent_id)
+    except CheckoutIntent.DoesNotExist:
+        logger.error(
+            "Email not sent: CheckoutIntent %s not found for trial ending reminder email",
+            checkout_intent_id,
+        )
+        return
+
+    enterprise_slug = checkout_intent.enterprise_slug
+    logger.info(
+        "Sending trial ending reminder email for CheckoutIntent %s (enterprise slug: %s)",
+        checkout_intent_id,
+        enterprise_slug,
+    )
+
+    braze_client = BrazeApiClient()
+    lms_client = LmsApiClient()
+
+    # Fetch enterprise customer data to get admin users
+    try:
+        enterprise_data = lms_client.get_enterprise_customer_data(
+            enterprise_customer_slug=enterprise_slug
+        )
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        logger.error(
+            "Failed to fetch enterprise data for slug %s: %s. Cannot send trial ending reminder email.",
+            enterprise_slug,
+            str(exc),
+        )
+        return
+
+    admin_users = enterprise_data.get("admin_users", [])
+
+    if not admin_users:
+        logger.error(
+            "Trial ending reminder email not sent: No admin users found for enterprise slug %s. "
+            "Verify admin setup in LMS.",
+            enterprise_slug,
+        )
+        return
+
+    # Retrieve subscription details from Stripe
+    try:
+        if not checkout_intent.stripe_customer_id:
+            logger.error(
+                "Trial ending reminder email not sent: No Stripe customer ID for CheckoutIntent %s",
+                checkout_intent_id,
+            )
+            return
+
+        # Get the trialing subscription using the existing utility method
+        subscription = get_stripe_trialing_subscription(
+            checkout_intent.stripe_customer_id
+        )
+
+        if not subscription:
+            logger.error(
+                "Trial ending reminder email not sent: No active trial subscription found for customer %s",
+                checkout_intent.stripe_customer_id,
+            )
+            return
+
+        if not subscription["items"].data:
+            logger.error(
+                "Trial ending reminder email not sent: Subscription %s has no items",
+                subscription.id,
+            )
+            return
+
+        first_item = subscription["items"].data[0]
+        renewal_date = timezone.make_aware(
+            datetime.fromtimestamp(first_item.current_period_end)
+        ).strftime("%B %d, %Y")
+        license_count = first_item.quantity
+
+        # Get payment method details with card brand
+        payment_method_info = ""
+        if subscription.default_payment_method:
+            payment_method = stripe.PaymentMethod.retrieve(
+                subscription.default_payment_method
+            )
+            if payment_method.type == "card":
+                brand = (
+                    payment_method.card.brand.capitalize()
+                )  # e.g., "Visa", "Mastercard"
+                last4 = payment_method.card.last4
+                payment_method_info = f"{brand} ending in {last4}"
+
+        total_paid_amount = "$0.00 USD"
+        if subscription.latest_invoice:
+            invoice_summary = StripeEventSummary.get_latest_invoice_paid(
+                subscription.latest_invoice
+            )
+
+            if invoice_summary and invoice_summary.invoice_amount_paid is not None:
+                total_paid_amount = format_cents_for_user_display(
+                    invoice_summary.invoice_amount_paid
+                )
+            else:
+                logger.warning(
+                    "No invoice summary found for invoice %s, falling back to $0.00 USD",
+                    subscription.latest_invoice,
+                )
+
+    except stripe.StripeError as exc:
+        logger.error(
+            "Stripe API error while fetching subscription details for CheckoutIntent %s: %s",
+            checkout_intent_id,
+            str(exc),
+        )
+        return
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        logger.error(
+            "Error retrieving subscription details for CheckoutIntent %s: %s",
+            checkout_intent_id,
+            str(exc),
+        )
+        return
+
+    subscription_management_url = _get_billing_portal_url(checkout_intent)
+
+    braze_trigger_properties = {
+        "renewal_date": renewal_date,
+        "subscription_management_url": subscription_management_url,
+        "license_count": license_count,
+        "payment_method": payment_method_info,
+        "total_paid_amount": total_paid_amount,
+    }
+
+    # Create Braze recipients for all admin users
+    recipients = []
+    for admin in admin_users:
+        try:
+            admin_email = admin["email"]
+            recipient = braze_client.create_braze_recipient(
+                user_email=admin_email,
+                lms_user_id=admin.get("lms_user_id"),
+            )
+            recipients.append(recipient)
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning(
+                "Failed to create Braze recipient for admin email %s: %s",
+                admin_email,
+                str(exc),
+            )
+
+    if not recipients:
+        logger.error(
+            "Trial ending reminder email not sent: No valid Braze recipients created for enterprise slug %s. "
+            "Check admin email errors above.",
+            enterprise_slug,
+        )
+        return
+
+    try:
+        braze_client.send_campaign_message(
+            settings.BRAZE_ENTERPRISE_PROVISION_TRIAL_ENDING_SOON_CAMPAIGN,
+            recipients=recipients,
+            trigger_properties=braze_trigger_properties,
+        )
+        logger.info(
+            "Successfully sent trial ending reminder emails for CheckoutIntent %s to %d recipients",
+            checkout_intent_id,
+            len(recipients),
+        )
+
+    except Exception as exc:
+        logger.exception(
+            "Braze API error: Failed to send trial ending reminder email for CheckoutIntent %s. Error: %s",
             checkout_intent_id,
             str(exc),
         )

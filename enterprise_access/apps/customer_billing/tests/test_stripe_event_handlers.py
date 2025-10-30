@@ -262,7 +262,7 @@ class TestStripeEventHandler(TestCase):
         subscription_data = {
             "id": "sub_test_no_trial_123",
             "status": "canceled",
-            "trial_end": None,  # No trial
+            "trial_end": None,
             "metadata": self._create_mock_stripe_subscription(
                 self.checkout_intent.id
             ),
@@ -277,3 +277,72 @@ class TestStripeEventHandler(TestCase):
         ) as mock_task:
             StripeEventHandler.dispatch(mock_event)
             mock_task.delay.assert_not_called()
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_ending_reminder_email_task"
+    )
+    def test_trial_will_end_handler_success(self, mock_email_task):
+        """Test successful trial_will_end event handling."""
+        trial_end_timestamp = 1640995200
+        subscription_data = {
+            "id": "sub_test_trial_will_end_123",
+            "trial_end": trial_end_timestamp,
+            "metadata": self._create_mock_stripe_subscription(
+                self.checkout_intent.id
+            ),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.trial_will_end", subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        mock_email_task.delay.assert_called_once_with(
+            checkout_intent_id=self.checkout_intent.id,
+        )
+
+        event_data = StripeEventData.objects.get(event_id=mock_event.id)
+        self.assertEqual(event_data.checkout_intent, self.checkout_intent)
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_ending_reminder_email_task"
+    )
+    def test_trial_will_end_handler_checkout_intent_not_found(
+        self, mock_email_task
+    ):
+        """Test trial_will_end when CheckoutIntent is not found."""
+        trial_end_timestamp = 1640995200
+        subscription_data = {
+            "id": "sub_test_not_found_123",
+            "trial_end": trial_end_timestamp,
+            "metadata": self._create_mock_stripe_subscription(99999),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.trial_will_end", subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        mock_email_task.delay.assert_not_called()
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_ending_reminder_email_task"
+    )
+    def test_trial_will_end_handler_no_checkout_intent_metadata(
+        self, mock_email_task
+    ):
+        """Test trial_will_end when subscription has no checkout_intent_id in metadata."""
+        subscription_data = {
+            "id": "sub_test_no_metadata_123",
+            "metadata": {},
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.trial_will_end", subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        mock_email_task.delay.assert_not_called()

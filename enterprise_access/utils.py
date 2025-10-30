@@ -299,3 +299,17 @@ def cents_to_dollars(value_in_cents):
       A Decimal representation of cents converted to dollars.
     """
     return Decimal(value_in_cents) / Decimal(100)
+
+
+def format_cents_for_user_display(amount_cents):
+    """
+    Formats a monetary amount in cents as a user-friendly string with USD currency.
+
+    Args:
+        amount_cents: The amount in cents (int or string)
+
+    Returns:
+        str: Formatted string like "$1,234.56 USD"
+    """
+    dollars = cents_to_dollars(amount_cents)
+    return f"${dollars:,.2f} USD"
