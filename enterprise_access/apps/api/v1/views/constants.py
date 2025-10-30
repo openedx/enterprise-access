@@ -70,20 +70,20 @@ CHECKOUT_INTENT_EXAMPLES = [
         response_only=True,
     ),
     OpenApiExample(
-        'Error State Example',
+        'Error State Example - Provisioning Failed',
         summary='CheckoutIntent in error state',
-        description='Failed during payment or provisioning',
+        description='Failed during provisioning after successful payment',
         value={
             'uuid': '123e4567-e89b-12d3-a456-426614174003',
             'user': 1,
-            'state': CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
+            'state': CheckoutIntentState.ERRORED_PROVISIONING,
             'stripe_checkout_session_id': 'cs_test_d4e5f6g7h8i9j0k1l2m3',
             'enterprise_customer_uuid': '987e6543-e21b-12d3-a456-426614174000',
             'created': '2025-01-15T10:30:00.000Z',
             'modified': '2025-01-15T10:35:00.000Z',
-            'error_message': 'Payment failed: Card declined',
+            'error_message': 'Provisioning failed: API timeout',
             'metadata': {
-                'failure_reason': 'card_declined',
+                'failure_reason': 'api_timeout',
                 'attempt_count': 1
             }
         },
@@ -103,11 +103,11 @@ PATCH_REQUEST_EXAMPLES = [
     ),
     OpenApiExample(
         'Update to Error State with Message',
-        summary='Transition to error state',
-        description='Updates state to error with descriptive message',
+        summary='Transition to provisioning error state',
+        description='Updates state to error with descriptive message after provisioning failure',
         value={
-            'state': CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
-            'error_message': 'Payment failed: Insufficient funds'
+            'state': CheckoutIntentState.ERRORED_PROVISIONING,
+            'error_message': 'Provisioning failed: Salesforce API error'
         },
         request_only=True,
     ),

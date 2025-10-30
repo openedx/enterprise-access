@@ -132,8 +132,8 @@ class TestCheckoutIntentSignals(TestCase):
         self.assertEqual(properties['workflow'], workflow.uuid)
 
     @mock.patch('enterprise_access.apps.customer_billing.signals.track_event')
-    def test_transition_to_errored_stripe_checkout_event(self, mock_track_event):
-        """Test that transition to errored_stripe_checkout event is emitted."""
+    def test_transition_to_errored_fulfillment_stalled_event(self, mock_track_event):
+        """Test that transition to errored_fulfillment_stalled event is emitted."""
         intent = CheckoutIntent.create_intent(
             user=cast(AbstractUser, self.user),
             slug=self.basic_data['enterprise_slug'],
@@ -141,12 +141,15 @@ class TestCheckoutIntentSignals(TestCase):
             quantity=self.basic_data['quantity']
         )
 
-        # Reset mock after creation
+        # Move to PAID state
+        intent.mark_as_paid('cs_test_123')
+
+        # Reset mock after paid transition
         mock_track_event.reset_mock()
 
-        # Transition to ERRORED_STRIPE_CHECKOUT
-        error_message = 'Payment failed: card declined'
-        intent.mark_checkout_error(error_message)
+        # Transition to ERRORED_FULFILLMENT_STALLED
+        error_message = 'Fulfillment stalled for 300 seconds'
+        intent.mark_fulfillment_stalled(error_message)
 
         # Verify track_event was called once
         mock_track_event.assert_called_once()
@@ -161,9 +164,9 @@ class TestCheckoutIntentSignals(TestCase):
 
         # Verify state transition properties
         properties = call_args.kwargs['properties']
-        self.assertEqual(properties['previous_state'], CheckoutIntentState.CREATED)
-        self.assertEqual(properties['new_state'], CheckoutIntentState.ERRORED_STRIPE_CHECKOUT)
-        self.assertEqual(properties['last_checkout_error'], error_message)
+        self.assertEqual(properties['previous_state'], CheckoutIntentState.PAID)
+        self.assertEqual(properties['new_state'], CheckoutIntentState.ERRORED_FULFILLMENT_STALLED)
+        self.assertEqual(properties['last_provisioning_error'], error_message)
 
     @mock.patch('enterprise_access.apps.customer_billing.signals.track_event')
     def test_transition_to_errored_provisioning_event(self, mock_track_event):
