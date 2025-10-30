@@ -44,6 +44,9 @@ ADMIN_LEARNER_PROFILE_READ_PERMISSION = 'admin_learner_profile.has_read_access'
 PROVISIONING_ADMIN_ROLE = 'provisioning_admin'
 PROVISIONING_CREATE_PERMISSION = 'provisioning.can_create'
 
+STRIPE_EVENT_SUMMARY_ADMIN_ROLE = 'enterprise_access_stripe_event_summary_admin'
+STRIPE_EVENT_SUMMARY_READ_PERMISSION = 'stripe_event_summary.has_read_access'
+
 ALL_ACCESS_CONTEXT = '*'
 
 

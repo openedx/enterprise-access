@@ -10,20 +10,23 @@ from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, OpenApiTypes, extend_schema, extend_schema_view
 from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
-from rest_framework import permissions, status, viewsets
+from rest_framework import exceptions, mixins, permissions, status, views, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from enterprise_access.apps.api import serializers
+from enterprise_access.apps.api import serializers, utils
 from enterprise_access.apps.api.authentication import StripeWebhookAuthentication
-from enterprise_access.apps.core.constants import CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION
+from enterprise_access.apps.core.constants import (
+    CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,
+    STRIPE_EVENT_SUMMARY_READ_PERMISSION
+)
 from enterprise_access.apps.customer_billing.api import (
     CreateCheckoutSessionFailedConflict,
     CreateCheckoutSessionSlugReservationConflict,
     CreateCheckoutSessionValidationError,
     create_free_trial_checkout_session
 )
-from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventSummary
 from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
 
 from .constants import CHECKOUT_INTENT_EXAMPLES, ERROR_RESPONSES, PATCH_REQUEST_EXAMPLES
@@ -32,6 +35,7 @@ stripe.api_key = settings.STRIPE_API_KEY
 logger = logging.getLogger(__name__)
 
 CUSTOMER_BILLING_API_TAG = 'Customer Billing'
+STRIPE_EVENT_API_TAG = 'Stripe Event Summary'
 
 
 class CheckoutIntentPermission(permissions.BasePermission):
@@ -445,3 +449,71 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
         """
         user = self.request.user
         return CheckoutIntent.objects.filter(user=user).select_related('user')
+
+
+def stripe_event_summary_permission_detail_fn(request, *args, **kwargs):
+    """
+    Helper to use with @permission_required on retrieve endpoint.
+
+    Args:
+        uuid (str): UUID representing an SubscriptionPlan object.
+    """
+    if not (subs_plan_uuid := request.query_params.get('subscription_plan_uuid')):
+        raise exceptions.ValidationError(detail='subscription_plan_uuid query param is required')
+
+    summary = StripeEventSummary.objects.filter(
+        subscription_plan_uuid=subs_plan_uuid,
+    ).select_related(
+        'checkout_intent',
+    ).first()
+    if not (summary and summary.checkout_intent):
+        return None
+    return summary.checkout_intent.enterprise_uuid
+
+
+class StripeEventSummaryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """
+    ViewSet for StripeEventSummary model.
+
+    Provides retrieve action for StripeEventSummary records.
+    """
+    authentication_classes = (JwtAuthentication,)
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get_serializer_class(self):
+        """
+        Return read only serializer.
+        """
+        return serializers.StripeEventSummaryReadOnlySerializer
+
+    def get_queryset(self):
+        """
+        Either return full queryset, or filter by all objects associated with
+        a subscription_plan_uuid
+        """
+        subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
+        if not subscription_plan_uuid:
+            raise exceptions.ValidationError(detail='subscription_plan_uuid query param is required')
+        return StripeEventSummary.objects.filter(
+            subscription_plan_uuid=subscription_plan_uuid,
+        ).select_related(
+            'checkout_intent',
+        )
+
+    @extend_schema(
+        tags=[STRIPE_EVENT_API_TAG],
+        summary='Retrieves stripe event summaries.',
+        responses={
+            status.HTTP_200_OK: serializers.StripeEventSummaryReadOnlySerializer,
+            status.HTTP_403_FORBIDDEN: None,
+        },
+    )
+    @permission_required(
+        STRIPE_EVENT_SUMMARY_READ_PERMISSION,
+        fn=stripe_event_summary_permission_detail_fn,
+    )
+    def list(self, request, *args, **kwargs):
+        """
+        Lists ``StripeEventSummary`` records, filtered by given subscription plan uuid.
+        """
+        return super().list(request, *args, **kwargs)
