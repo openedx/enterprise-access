@@ -61,6 +61,11 @@ urlpatterns = [
         views.ProvisioningCreateView.as_view(),
         name='provisioning-create',
     ),
+    path(
+        'provisioning/subscription-plan-oli-update',
+        views.SubscriptionPlanOLIUpdateView.as_view(),
+        name='subscription-plan-oli-update',
+    ),
 ]
 
 urlpatterns += router.urls

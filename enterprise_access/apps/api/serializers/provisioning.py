@@ -210,3 +210,30 @@ class ProvisioningResponseSerializer(BaseSerializer):
     enterprise_catalog = EnterpriseCatalogResponseSerializer()
     customer_agreement = CustomerAgreementResponseSerializer()
     subscription_plan = SubscriptionPlanResponseSerializer()
+
+
+class SubscriptionPlanOLIUpdateSerializer(BaseSerializer):
+    """
+    Request serializer for updating a SubscriptionPlan's Salesforce OLI.
+    """
+    checkout_intent_id = serializers.UUIDField(
+        help_text='The UUID of the CheckoutIntent associated with this subscription.'
+    )
+    salesforce_opportunity_line_item = serializers.CharField(
+        help_text='The Salesforce Opportunity Line Item ID to associate with the subscription plan.'
+    )
+    is_trial = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text='Whether this OLI is for the trial plan (True) or paid plan (False).'
+    )
+
+
+class SubscriptionPlanOLIUpdateResponseSerializer(BaseSerializer):
+    """
+    Response serializer for SubscriptionPlan OLI update.
+    """
+    success = serializers.BooleanField()
+    subscription_plan_uuid = serializers.UUIDField()
+    salesforce_opportunity_line_item = serializers.CharField()
+    checkout_intent_id = serializers.UUIDField()

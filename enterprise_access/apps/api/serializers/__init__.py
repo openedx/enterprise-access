@@ -24,7 +24,12 @@ from .customer_billing import (
     CustomerBillingCreateCheckoutSessionSuccessResponseSerializer,
     CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer
 )
-from .provisioning import ProvisioningRequestSerializer, ProvisioningResponseSerializer
+from .provisioning import (
+    ProvisioningRequestSerializer,
+    ProvisioningResponseSerializer,
+    SubscriptionPlanOLIUpdateResponseSerializer,
+    SubscriptionPlanOLIUpdateSerializer
+)
 from .subsidy_access_policy import (
     GroupMemberWithAggregatesRequestSerializer,
     GroupMemberWithAggregatesResponseSerializer,

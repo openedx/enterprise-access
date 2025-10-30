@@ -17,7 +17,7 @@ from .content_assignments.assignment_configuration import AssignmentConfiguratio
 from .content_assignments.assignments import LearnerContentAssignmentViewSet
 from .content_assignments.assignments_admin import LearnerContentAssignmentAdminViewSet
 from .customer_billing import CheckoutIntentViewSet, CustomerBillingViewSet
-from .provisioning import ProvisioningCreateView
+from .provisioning import ProvisioningCreateView, SubscriptionPlanOLIUpdateView
 from .subsidy_access_policy import (
     SubsidyAccessPolicyAllocateViewset,
     SubsidyAccessPolicyGroupViewset,

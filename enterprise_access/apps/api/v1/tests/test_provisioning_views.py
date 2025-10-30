@@ -923,3 +923,176 @@ class TestCheckoutIntentSynchronization(APITest):
         # Verify workflow was still created successfully
         workflow = ProvisionNewCustomerWorkflow.objects.first()
         self.assertIsNotNone(workflow)
+
+
+@ddt.ddt
+class TestSubscriptionPlanOLIUpdateView(APITest):
+    """
+    Tests for the SubscriptionPlan OLI update endpoint.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.user = UserFactory()
+        self.checkout_intent = CheckoutIntent.objects.create(
+            user=self.user,
+            enterprise_slug='test-enterprise',
+            enterprise_name='Test Enterprise',
+            quantity=10,
+            state=CheckoutIntentState.FULFILLED,
+            expires_at=timezone.now() + timedelta(hours=1),
+            enterprise_uuid=TEST_ENTERPRISE_UUID,
+        )
+        self.workflow = ProvisionNewCustomerWorkflow.objects.create(
+            input_data={'test': 'data'}
+        )
+        self.checkout_intent.workflow = self.workflow
+        self.checkout_intent.save()
+
+        self.subscription_plan_uuid = uuid.uuid4()
+        # Create a subscription plan step with complete output data
+        GetCreateSubscriptionPlanStep.objects.create(
+            workflow_record_uuid=self.workflow.uuid,
+            input_data={
+                'title': 'Paid Plan',
+                'is_trial': False,
+                'salesforce_opportunity_line_item': 'existing_oli_123',
+                'start_date': '2025-01-15T00:00:00Z',
+                'expiration_date': '2025-12-31T23:59:59Z',
+                'desired_num_licenses': 10,
+                'product_id': 1,
+            },
+            output_data={
+                'uuid': str(self.subscription_plan_uuid),
+                'title': 'Paid Plan',
+                'salesforce_opportunity_line_item': 'existing_oli_123',
+                'created': '2025-01-01T00:00:00Z',
+                'start_date': '2025-01-15T00:00:00Z',
+                'expiration_date': '2025-12-31T23:59:59Z',
+                'is_active': True,
+                'is_current': True,
+                'plan_type': 'Standard',
+                'enterprise_catalog_uuid': str(TEST_CATALOG_UUID),
+                'product': 1,
+            }
+        )
+
+        self.endpoint_url = reverse('api:v1:subscription-plan-oli-update')
+        self.set_jwt_cookie([
+            {
+                'system_wide_role': SYSTEM_ENTERPRISE_PROVISIONING_ADMIN_ROLE,
+                'context': ALL_ACCESS_CONTEXT,
+            },
+        ])
+
+    def tearDown(self):
+        super().tearDown()
+        CheckoutIntent.objects.all().delete()
+        ProvisionNewCustomerWorkflow.objects.all().delete()
+        GetCreateSubscriptionPlanStep.objects.all().delete()
+
+    @mock.patch('enterprise_access.apps.api.v1.views.provisioning.LicenseManagerApiClient')
+    def test_successful_oli_update(self, mock_license_manager_client):
+        """Test successful update of SubscriptionPlan OLI."""
+        mock_client = mock_license_manager_client.return_value
+        mock_client.update_subscription_plan.return_value = {
+            'uuid': str(self.subscription_plan_uuid),
+            'salesforce_opportunity_line_item': 'new_oli_456',
+        }
+
+        request_data = {
+            'checkout_intent_id': str(self.checkout_intent.uuid),
+            'salesforce_opportunity_line_item': 'new_oli_456',
+            'is_trial': False,
+        }
+
+        response = self.client.post(self.endpoint_url, data=request_data)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response_data = response.json()
+        self.assertTrue(response_data['success'])
+        self.assertEqual(str(response_data['subscription_plan_uuid']), str(self.subscription_plan_uuid))
+        self.assertEqual(response_data['salesforce_opportunity_line_item'], 'new_oli_456')
+        self.assertEqual(str(response_data['checkout_intent_id']), str(self.checkout_intent.uuid))
+
+        mock_client.update_subscription_plan.assert_called_once_with(
+            subscription_uuid=str(self.subscription_plan_uuid),
+            salesforce_opportunity_line_item='new_oli_456'
+        )
+
+    def test_checkout_intent_not_found(self):
+        """Test error when CheckoutIntent doesn't exist."""
+        request_data = {
+            'checkout_intent_id': str(uuid.uuid4()),  # Non-existent UUID
+            'salesforce_opportunity_line_item': 'new_oli_456',
+        }
+
+        response = self.client.post(self.endpoint_url, data=request_data)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        response_data = response.json()
+        if isinstance(response_data, dict):
+            self.assertIn('not found', response_data.get('detail', '').lower())
+        else:
+            self.assertTrue(any('not found' in str(item).lower() for item in response_data))
+
+    def test_no_workflow_associated(self):
+        """Test error when CheckoutIntent has no workflow."""
+        checkout_intent_no_workflow = CheckoutIntent.objects.create(
+            user=UserFactory(),
+            enterprise_slug='test-no-workflow',
+            enterprise_name='Test No Workflow',
+            quantity=5,
+            state=CheckoutIntentState.PAID,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        request_data = {
+            'checkout_intent_id': str(checkout_intent_no_workflow.uuid),
+            'salesforce_opportunity_line_item': 'new_oli_456',
+        }
+
+        response = self.client.post(self.endpoint_url, data=request_data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        response_data = response.json()
+        # Handle both dict and list response formats
+        if isinstance(response_data, dict):
+            self.assertIn('no associated workflow', response_data.get('detail', '').lower())
+        else:
+            # If it's a list (field errors), check the first item
+            self.assertTrue(any('no associated workflow' in str(item).lower() for item in response_data))
+
+    @mock.patch('enterprise_access.apps.api.v1.views.provisioning.LicenseManagerApiClient')
+    def test_license_manager_api_error(self, mock_license_manager_client):
+        """Test error handling when License Manager API fails."""
+        mock_client = mock_license_manager_client.return_value
+        mock_client.update_subscription_plan.side_effect = Exception('License Manager API Error')
+
+        request_data = {
+            'checkout_intent_id': str(self.checkout_intent.uuid),
+            'salesforce_opportunity_line_item': 'new_oli_456',
+            'is_trial': False,
+        }
+
+        response = self.client.post(self.endpoint_url, data=request_data)
+
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        response_data = response.json()
+        if isinstance(response_data, dict):
+            self.assertIn('failed to update subscription plan', response_data.get('detail', '').lower())
+        else:
+            self.assertTrue(any('failed to update subscription plan' in str(item).lower() for item in response_data))
+
+    def test_unauthorized_access(self):
+        """Test that unauthorized users cannot access the endpoint."""
+        self.set_jwt_cookie([])  # Remove authorization
+
+        request_data = {
+            'checkout_intent_id': str(self.checkout_intent.uuid),
+            'salesforce_opportunity_line_item': 'new_oli_456',
+        }
+
+        response = self.client.post(self.endpoint_url, data=request_data)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

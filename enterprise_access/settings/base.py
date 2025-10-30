@@ -586,7 +586,7 @@ PROVISIONING_DEFAULTS = {
             (2, 'Trial'),
         ],
         'trial_product_choices': [
-            (1, 'Standard Paid'),
+            (2, 'Trial'),
         ],
         'trial_catalog_query_choices': [
             (2, 'All open courses'),
@@ -610,6 +610,8 @@ PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING = {
     '2': 2,
     # Add more mappings as needed
 }
+PROVISIONING_PAID_SUBSCRIPTION_PRODUCT_ID = 1
+PROVISIONING_TRIAL_SUBSCRIPTION_PRODUCT_ID = 2
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
