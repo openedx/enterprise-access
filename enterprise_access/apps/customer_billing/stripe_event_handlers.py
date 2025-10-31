@@ -9,7 +9,10 @@ import stripe
 
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData
 from enterprise_access.apps.customer_billing.stripe_event_types import StripeEventType
-from enterprise_access.apps.customer_billing.tasks import send_trial_cancellation_email_task
+from enterprise_access.apps.customer_billing.tasks import (
+    send_trial_cancellation_email_task,
+    send_trial_ending_reminder_email_task
+)
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +182,38 @@ class StripeEventHandler:
     @on_stripe_event('customer.subscription.trial_will_end')
     @staticmethod
     def trial_will_end(event: stripe.Event) -> None:
-        pass
+        """
+        Handle customer.subscription.trial_will_end events.
+        Send reminder email 72 hours before trial ends.
+        """
+        subscription = event.data.object
+        checkout_intent_id = get_checkout_intent_id_from_subscription(
+            subscription
+        )
+        try:
+            checkout_intent = get_checkout_intent_or_raise(
+                checkout_intent_id, event.id
+            )
+        except CheckoutIntent.DoesNotExist:
+            logger.error(
+                "[StripeEventHandler] trial_will_end event %s could not find CheckoutIntent id=%s",
+                event.id,
+                checkout_intent_id,
+            )
+            return
+
+        link_event_data_to_checkout_intent(event, checkout_intent)
+
+        logger.info(
+            "Subscription %s trial ending in 72 hours. Queuing trial ending reminder email for checkout_intent_id=%s",
+            subscription.id,
+            checkout_intent_id,
+        )
+
+        # Queue the trial ending reminder email task
+        send_trial_ending_reminder_email_task.delay(
+            checkout_intent_id=checkout_intent.id,
+        )
 
     @on_stripe_event('payment_method.attached')
     @staticmethod
