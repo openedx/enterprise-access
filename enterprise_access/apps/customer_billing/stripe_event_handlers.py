@@ -7,7 +7,13 @@ from functools import wraps
 
 import stripe
 
-from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData
+from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
+from enterprise_access.apps.customer_billing.models import (
+    CheckoutIntent,
+    CheckoutIntentRenewal,
+    StripeEventData,
+    StripeEventSummary,
+)
 from enterprise_access.apps.customer_billing.stripe_event_types import StripeEventType
 from enterprise_access.apps.customer_billing.tasks import send_trial_cancellation_email_task
 
@@ -266,6 +272,65 @@ class StripeEventHandler:
                 logger.info(
                     f"Subscription {subscription.id} already canceled (status unchanged), skipping cancellation email"
                 )
+        
+        # Handle trial to paid transition
+        # Check if status changed from trialing to active
+        if current_status == "active":
+            prior_status = getattr(checkout_intent.previous_summary(event), 'subscription_status', None)
+            
+            if prior_status == "trialing":
+                logger.info(
+                    f"Subscription {subscription.id} transitioned from trial to paid "
+                    f"(trialing -> active) for checkout_intent_id={checkout_intent_id}"
+                )
+                
+                # Get the trial subscription plan UUID from StripeEventSummary
+                trial_plan_summary = StripeEventSummary.objects.filter(
+                    checkout_intent=checkout_intent,
+                    subscription_plan_uuid__isnull=False,
+                ).order_by('-created').first()
+                
+                if not trial_plan_summary or not trial_plan_summary.subscription_plan_uuid:
+                    logger.error(
+                        f"Could not find trial subscription plan UUID for checkout_intent {checkout_intent_id}"
+                    )
+                    return
+                
+                try:
+                    # Call License Manager to process the renewal
+                    license_manager_client = LicenseManagerApiClient()
+                    renewal_response = license_manager_client.process_subscription_plan_renewal(
+                        str(trial_plan_summary.subscription_plan_uuid)
+                    )
+                    
+                    # Get the renewal UUID from the response
+                    renewal_uuid = renewal_response.get('renewal_uuid')
+                    
+                    # Create CheckoutIntentRenewal record to track this processing
+                    stripe_event_data = StripeEventData.objects.get(event_id=event.id)
+                    renewal_record = CheckoutIntentRenewal.objects.create(
+                        checkout_intent=checkout_intent,
+                        subscription_plan_renewal_id=renewal_uuid,
+                        stripe_event_data=stripe_event_data,
+                        stripe_subscription_id=subscription.id,
+                        processed_at=None,  # Will be marked as processed after successful API call
+                    )
+                    
+                    # Mark as processed
+                    renewal_record.mark_as_processed()
+                    
+                    logger.info(
+                        f"Successfully processed trial-to-paid renewal for subscription {subscription.id}, "
+                        f"renewal_uuid={renewal_uuid}, checkout_intent_id={checkout_intent_id}"
+                    )
+                    
+                except Exception as e:
+                    logger.error(
+                        f"Failed to process trial-to-paid renewal for subscription {subscription.id}, "
+                        f"checkout_intent_id={checkout_intent_id}: {str(e)}"
+                    )
+                    # Re-raise to ensure the webhook returns an error status
+                    raise
 
     @on_stripe_event("customer.subscription.deleted")
     @staticmethod

@@ -211,6 +211,87 @@ class LicenseManagerApiClient(BaseOAuthClient):
                 exc,
             ) from exc
 
+    def update_subscription_plan(self, subscription_uuid, salesforce_opportunity_line_item):
+        """
+        Update a SubscriptionPlan's Salesforce Opportunity Line Item.
+
+        Arguments:
+            subscription_uuid (str): UUID of the SubscriptionPlan to update
+            salesforce_opportunity_line_item (str): Salesforce OLI to associate with the plan
+
+        Returns:
+            dict: Updated subscription plan data from the API
+
+        Raises:
+            APIClientException: If the API call fails
+        """
+        endpoint = f"{self.api_base_url}subscription-plans/{subscription_uuid}/"
+        payload = {
+            'salesforce_opportunity_line_item': salesforce_opportunity_line_item
+        }
+
+        try:
+            response = self.client.patch(
+                endpoint,
+                json=payload,
+                timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Failed to update subscription plan %s with OLI %s, response %s, exception: %s',
+                subscription_uuid,
+                salesforce_opportunity_line_item,
+                safe_error_response_content(exc),
+                exc,
+            )
+            raise APIClientException(
+                f'Could not update subscription plan {subscription_uuid}',
+                exc,
+            ) from exc
+
+    def process_subscription_plan_renewal(self, subscription_plan_uuid):
+        """
+        Process a renewal for a subscription plan that is transitioning from trial to paid.
+
+        This triggers License Manager to:
+        - Process the renewal record that was pre-created
+        - Assign new licenses in the paid plan to all learners who had trial licenses
+        - Mark the renewal as processed
+
+        Arguments:
+            subscription_plan_uuid (str): UUID of the trial subscription plan
+
+        Returns:
+            dict: Response from the License Manager API
+
+        Raises:
+            APIClientException: If the API call fails
+        """
+        # TODO: Update endpoint once License Manager API is implemented
+        endpoint = f"{self.api_base_url}subscription-plans/{subscription_plan_uuid}/process-renewal/"
+
+        try:
+            response = self.client.post(
+                endpoint,
+                json={},
+                timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Failed to process subscription plan renewal for %s, response %s, exception: %s',
+                subscription_plan_uuid,
+                safe_error_response_content(exc),
+                exc,
+            )
+            raise APIClientException(
+                f'Could not process renewal for subscription plan {subscription_plan_uuid}',
+                exc,
+            ) from exc
+
 
 class LicenseManagerUserApiClient(BaseUserApiClient):
     """
