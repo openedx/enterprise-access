@@ -436,6 +436,35 @@ class LearnerCreditRequest(SubsidyRequest):
         self.save()
 
     @classmethod
+    def bulk_approve_requests(cls, approved_requests, reviewer):
+        """
+        Efficiently bulk approve learner credit requests using batching.
+
+        Args:
+            approved_requests: List of LearnerCreditRequest instances to approve
+            reviewer: User instance who is approving the requests
+
+        Returns:
+            None - requests are updated in-place
+        """
+        # Prepare all requests for bulk update
+        for request in approved_requests:
+            request.state = SubsidyRequestStates.APPROVED
+            request.reviewer = reviewer
+            request.reviewed_at = localized_utcnow()
+
+        # Perform bulk update in batches
+        batch_size = SUBSIDY_REQUEST_BULK_OPERATION_BATCH_SIZE
+        total_requests = len(approved_requests)
+
+        for i in range(0, total_requests, batch_size):
+            batch_requests = approved_requests[i: i + batch_size]
+            cls.bulk_update(
+                batch_requests,
+                ["state", "assignment", "reviewer", "reviewed_at"],
+            )
+
+    @classmethod
     def annotate_dynamic_fields_onto_queryset(cls, queryset):
         """
         Annotate extra dynamic fields used by this viewset for DRF-supported ordering and filtering.
