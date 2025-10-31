@@ -54,8 +54,10 @@ class CheckoutIntent(TimeStampedModel):
 
     The model follows a state machine pattern with these key transitions:
     - CREATED → PAID → FULFILLED (happy path)
-    - CREATED → ERRORED_STRIPE_CHECKOUT (payment failures)
-    - PAID → ERRORED_PROVISIONING (provisioning failures)
+    - PAID → ERRORED_PROVISIONING (provisioning failures, can retry)
+    - PAID → ERRORED_FULFILLMENT_STALLED (stuck in paid state, needs investigation)
+    - ERRORED_PROVISIONING → ERRORED_BACKOFFICE (needs manual intervention)
+    - ERRORED_FULFILLMENT_STALLED → ERRORED_BACKOFFICE (escalation)
     - CREATED → EXPIRED (timeout)
 
     Example usage:
@@ -84,18 +86,27 @@ class CheckoutIntent(TimeStampedModel):
         CREATED = (CheckoutIntentState.CREATED, 'Created')
         PAID = (CheckoutIntentState.PAID, 'Paid')
         FULFILLED = (CheckoutIntentState.FULFILLED, 'Fulfilled')
-        ERRORED_STRIPE_CHECKOUT = (CheckoutIntentState.ERRORED_STRIPE_CHECKOUT, 'Errored (Stripe Checkout)')
         ERRORED_PROVISIONING = (CheckoutIntentState.ERRORED_PROVISIONING, 'Errored (Provisioning)')
+        ERRORED_FULFILLMENT_STALLED = (
+            CheckoutIntentState.ERRORED_FULFILLMENT_STALLED,
+            'Errored (Fulfillment Stalled)'
+        )
+        ERRORED_BACKOFFICE = (CheckoutIntentState.ERRORED_BACKOFFICE, 'Errored (Backoffice)')
         EXPIRED = (CheckoutIntentState.EXPIRED, 'Expired')
 
     SUCCESS_STATES = {CheckoutIntentState.PAID, CheckoutIntentState.FULFILLED}
-    FAILURE_STATES = {CheckoutIntentState.ERRORED_STRIPE_CHECKOUT, CheckoutIntentState.ERRORED_PROVISIONING}
+    FAILURE_STATES = {
+        CheckoutIntentState.ERRORED_PROVISIONING,
+        CheckoutIntentState.ERRORED_FULFILLMENT_STALLED,
+        CheckoutIntentState.ERRORED_BACKOFFICE,
+    }
     NON_EXPIRED_STATES = {
         CheckoutIntentState.CREATED,
         CheckoutIntentState.PAID,
         CheckoutIntentState.FULFILLED,
-        CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
         CheckoutIntentState.ERRORED_PROVISIONING,
+        CheckoutIntentState.ERRORED_FULFILLMENT_STALLED,
+        CheckoutIntentState.ERRORED_BACKOFFICE,
     }
     FULFILLABLE_STATES = {
         CheckoutIntentState.PAID,
@@ -249,20 +260,6 @@ class CheckoutIntent(TimeStampedModel):
         logger.info(f'CheckoutIntent {self} marked as {CheckoutIntentState.FULFILLED}.')
         return self
 
-    def mark_checkout_error(self, error_message):
-        """Record a checkout error."""
-        if not self.is_valid_state_transition(
-            CheckoutIntentState(self.state),
-            CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
-        ):
-            raise ValueError(f"Cannot transition from {self.state} to {CheckoutIntentState.ERRORED_STRIPE_CHECKOUT}.")
-
-        self.state = CheckoutIntentState.ERRORED_STRIPE_CHECKOUT
-        self.last_checkout_error = error_message
-        self.save(update_fields=['state', 'last_checkout_error', 'modified'])
-        logger.info(f'CheckoutIntent {self} marked as {CheckoutIntentState.ERRORED_STRIPE_CHECKOUT}.')
-        return self
-
     def mark_provisioning_error(self, error_message, workflow=None):
         """Record a provisioning error."""
         if not self.is_valid_state_transition(
@@ -277,6 +274,43 @@ class CheckoutIntent(TimeStampedModel):
             self.workflow = workflow
         self.save(update_fields=['state', 'last_provisioning_error', 'workflow', 'modified'])
         logger.info(f'CheckoutIntent {self} marked as {CheckoutIntentState.ERRORED_PROVISIONING}.')
+        return self
+
+    def mark_fulfillment_stalled(self, error_message=None):
+        """
+        Mark the intent as having stalled fulfillment.
+
+        This is called when a CheckoutIntent has been in 'paid' state for too long,
+        indicating that the provisioning workflow likely failed without proper error handling.
+
+        Args:
+            error_message (str): Optional descriptive error message
+        """
+        if not self.is_valid_state_transition(
+            CheckoutIntentState(self.state),
+            CheckoutIntentState.ERRORED_FULFILLMENT_STALLED,
+        ):
+            raise ValueError(
+                f'Cannot transition from {self.state} to {CheckoutIntentState.ERRORED_FULFILLMENT_STALLED}.'
+            )
+
+        self.state = CheckoutIntentState.ERRORED_FULFILLMENT_STALLED
+        if error_message:
+            self.last_provisioning_error = error_message
+        else:
+            self.last_provisioning_error = (
+                f'Fulfillment has been stalled since {self.modified.isoformat()}. '
+                f'The provisioning workflow may have failed without proper error handling.'
+            )
+
+        self.save(update_fields=['state', 'last_provisioning_error', 'modified'])
+        logger.warning(
+            'CheckoutIntent %s marked as ERRORED_FULFILLMENT_STALLED. '
+            'Last modified: %s, Error: %s',
+            self.pk,
+            self.modified,
+            self.last_provisioning_error,
+        )
         return self
 
     @property
@@ -298,6 +332,53 @@ class CheckoutIntent(TimeStampedModel):
         return bulk_update_with_history(
             expired_intent_records, cls, ['state', 'modified'], batch_size=100,
         )
+
+    @classmethod
+    def mark_stalled_fulfillment_intents(cls, stalled_threshold_seconds=180):
+        """
+        Find all CheckoutIntent records stuck in 'paid' state and transition them
+        to 'errored_fulfillment_stalled'.
+
+        Args:
+            stalled_threshold_seconds (int): Number of seconds after which a 'paid'
+                CheckoutIntent is considered stalled. Default: 180 (3 minutes)
+
+        Returns:
+            tuple: (updated_count, list_of_updated_uuids)
+        """
+        threshold_time = timezone.now() - timedelta(seconds=stalled_threshold_seconds)
+
+        with transaction.atomic():
+            # Use select_for_update() to prevent race conditions
+            stalled_intents = list(
+                cls.objects.select_for_update().filter(
+                    state=CheckoutIntentState.PAID,
+                    modified__lte=threshold_time,
+                ).order_by('modified')
+            )
+
+            updated_uuids = []
+            for intent in stalled_intents:
+                try:
+                    time_stalled = (timezone.now() - intent.modified).total_seconds()
+                    error_message = (
+                        f'Fulfillment stalled for {int(time_stalled)} seconds '
+                        f'(threshold: {stalled_threshold_seconds}s). '
+                        f'Last modified: {intent.modified.isoformat()}. '
+                        f'Provisioning workflow may have failed without proper error handling.'
+                    )
+                    intent.mark_fulfillment_stalled(error_message=error_message)
+                    updated_uuids.append(str(intent.pk))
+                except Exception as exc:  # pylint: disable=broad-except
+                    logger.exception(
+                        'Failed to mark CheckoutIntent %s as stalled: %s',
+                        intent.pk,
+                        exc,
+                    )
+                    # Continue processing other intents even if one fails
+                    continue
+
+            return len(updated_uuids), updated_uuids
 
     def is_expired(self):
         """Check if this checkout intent has expired."""

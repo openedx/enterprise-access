@@ -199,8 +199,9 @@ class TestCheckoutIntentModel(TestCase):
             quantity=5
         )
 
-        # Now put it in a failure state
-        intent.mark_checkout_error('Payment processing failed')
+        # Now put it in a failure state (mark as paid first, then provisioning error)
+        intent.mark_as_paid('stripe_session_123')
+        intent.mark_provisioning_error('Provisioning failed')
         self.assertIn(intent.state, CheckoutIntent.FAILURE_STATES)
 
         # Trying to create a new intent for the same user should fail
@@ -220,7 +221,7 @@ class TestCheckoutIntentModel(TestCase):
         self.assertEqual(intent.enterprise_slug, 'original-slug')
         self.assertEqual(intent.enterprise_name, 'Original Enterprise')
         self.assertEqual(intent.quantity, 5)
-        self.assertEqual(intent.state, CheckoutIntentState.ERRORED_STRIPE_CHECKOUT)
+        self.assertEqual(intent.state, CheckoutIntentState.ERRORED_PROVISIONING)
 
     def test_state_transitions_happy_path(self):
         """Test the state transitions for the happy path."""
@@ -256,20 +257,8 @@ class TestCheckoutIntentModel(TestCase):
             quantity=self.basic_data['quantity']
         )
 
-        # CREATED → ERRORED_STRIPE_CHECKOUT
-        intent.mark_checkout_error('Payment failed: card declined')
-        self.assertEqual(intent.state, CheckoutIntentState.ERRORED_STRIPE_CHECKOUT)
-        self.assertEqual(intent.last_checkout_error, 'Payment failed: card declined')
-
-        # Reset for testing PAID → ERRORED_PROVISIONING
-        intent = CheckoutIntent.create_intent(
-            user=cast(AbstractUser, self.user2),
-            slug='another-slug',
-            name='Another Enterprise',
-            quantity=7
-        )
-
-        intent.mark_as_paid('cs_test_456')
+        # Test PAID → ERRORED_PROVISIONING transition
+        intent.mark_as_paid('cs_test_123')
         workflow = ProvisionNewCustomerWorkflowFactory()
         intent.mark_provisioning_error('Provisioning failed: API error', workflow)
         self.assertEqual(intent.state, CheckoutIntentState.ERRORED_PROVISIONING)
