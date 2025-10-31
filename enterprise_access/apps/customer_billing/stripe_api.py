@@ -240,3 +240,15 @@ def get_stripe_trialing_subscription(
         limit=1,
     )
     return subscription_list.data[0] if subscription_list.data else None
+
+
+@stripe_cache()
+def upcoming_invoice(stripe_customer_id, stripe_subscription_id):
+    """
+    https://docs.stripe.com/changelog/basil/2025-03-31/invoice-preview-api-deprecations
+    https://docs.stripe.com/api/invoices/create_preview?architecture-style=resources
+    """
+    return stripe.Invoice.create_preview(
+        customer=stripe_customer_id,
+        subscription=stripe_subscription_id,
+    )

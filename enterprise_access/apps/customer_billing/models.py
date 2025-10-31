@@ -23,6 +23,7 @@ from django_extensions.db.models import TimeStampedModel
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_update_with_history
 
+from enterprise_access.apps.customer_billing import stripe_api
 from enterprise_access.apps.customer_billing.constants import ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS
 
 from .constants import INTENT_RESERVATION_DURATION_MINUTES, CheckoutIntentState
@@ -766,6 +767,11 @@ class StripeEventSummary(TimeStampedModel):
         blank=True,
         help_text='Currency of the invoice'
     )
+    upcoming_invoice_amount_due = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='Upcoming invoice amount due related to this event/subscription'
+    )
 
     class Meta:
         db_table = 'customer_billing_stripe_event_summary'
@@ -853,6 +859,33 @@ class StripeEventSummary(TimeStampedModel):
                 self.invoice_quantity = primary_line.quantity
                 if self.invoice_unit_amount is None:
                     self.invoice_unit_amount = int(self.invoice_unit_amount_decimal)
+
+    def update_upcoming_invoice_amount_due(self):
+        """
+        Updates the `amount_due` of this record from the first upcoming invoice
+        associated with this customer's subscription.
+        """
+        if not self.checkout_intent:
+            logger.warning(
+                'Cannot update with upcoming invoice for event %s, no checkout intent exists',
+                self.event_id,
+            )
+            return
+        stripe_subscription_id = self.stripe_subscription_id
+        stripe_customer_id = self.checkout_intent.stripe_customer_id
+
+        if not (stripe_subscription_id and stripe_customer_id):
+            logger.warning('Cannot update with upcoming invoice for event %s', self.event_id)
+            return
+
+        # Now call the stripe invoice upcoming API
+        upcoming_invoice = stripe_api.upcoming_invoice(stripe_customer_id, stripe_subscription_id)
+        if not upcoming_invoice:
+            logger.warning('No upcoming invoice exists for event %s', self.event_id)
+            return
+
+        self.upcoming_invoice_amount_due = upcoming_invoice.amount_due
+        self.save(update_fields=['upcoming_invoice_amount_due'])
 
     @staticmethod
     def _timestamp_to_datetime(timestamp):
