@@ -160,7 +160,7 @@ def get_or_create_subscription_plan(
     existing_subscription_list: list[dict],
     plan_title: str,
     catalog_uuid: str | None,
-    opp_line_item: str,
+    opp_line_item: str | None,
     start_date: str,
     expiration_date: str,
     desired_num_licenses: int,
@@ -172,13 +172,21 @@ def get_or_create_subscription_plan(
     """
     matching_subscription = next((
         _sub for _sub in existing_subscription_list
-        if _sub.get('salesforce_opportunity_line_item') == opp_line_item and _sub.get('product') == product_id
+        # Intentionally treat None == None as "matching".
+        if _sub.get('salesforce_opportunity_line_item') == opp_line_item
     ), None)
     if matching_subscription:
         logger.info(
             'Provisioning: subscription plan with uuid %s and salesforce_opportunity_line_item %s already exists',
             matching_subscription['uuid'], matching_subscription['salesforce_opportunity_line_item']
         )
+        if not opp_line_item:
+            logger.info(
+                "Provisioning: Existing subscription plan found with null salesforce_opportunity_line_item.  "
+                "This is normal as long as it has a reasonable start date.  "
+                "New plan start date: %s",
+                matching_subscription['start_date'],
+            )
         return matching_subscription
 
     client = LicenseManagerApiClient()
