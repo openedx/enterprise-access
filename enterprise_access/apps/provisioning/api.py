@@ -160,7 +160,7 @@ def get_or_create_subscription_plan(
     existing_subscription_list: list[dict],
     plan_title: str,
     catalog_uuid: str | None,
-    opp_line_item: str,
+    opp_line_item: str | None,
     start_date: str,
     expiration_date: str,
     desired_num_licenses: int,
@@ -172,13 +172,21 @@ def get_or_create_subscription_plan(
     """
     matching_subscription = next((
         _sub for _sub in existing_subscription_list
-        if _sub.get('salesforce_opportunity_line_item') == opp_line_item and _sub.get('product') == product_id
+        # Intentionally treat None == None as "matching".
+        if _sub.get('salesforce_opportunity_line_item') == opp_line_item
     ), None)
     if matching_subscription:
         logger.info(
             'Provisioning: subscription plan with uuid %s and salesforce_opportunity_line_item %s already exists',
             matching_subscription['uuid'], matching_subscription['salesforce_opportunity_line_item']
         )
+        if not opp_line_item:
+            logger.info(
+                "Provisioning: Existing subscription plan found with null salesforce_opportunity_line_item.  "
+                "This is normal as long as it has a reasonable start date.  "
+                "New plan start date: %s",
+                matching_subscription['start_date'],
+            )
         return matching_subscription
 
     client = LicenseManagerApiClient()
@@ -203,3 +211,44 @@ def get_or_create_subscription_plan(
         created_subscription.get('product'),
     )
     return created_subscription
+
+
+def get_or_create_subscription_plan_renewal(
+    prior_subscription_plan_uuid: str,
+    renewed_subscription_plan_uuid: str,
+    salesforce_opportunity_line_item_id: str | None,
+    effective_date: str,
+    renewed_expiration_date: str,
+    number_of_licenses: int,
+    **kwargs
+) -> dict:
+    """
+    Get or create a new subscription plan renewal.
+    """
+    client = LicenseManagerApiClient()
+    created_renewal = client.create_subscription_plan_renewal(
+        prior_subscription_plan_uuid=prior_subscription_plan_uuid,
+        renewed_subscription_plan_uuid=renewed_subscription_plan_uuid,
+        salesforce_opportunity_line_item_id=salesforce_opportunity_line_item_id,
+        effective_date=effective_date,
+        renewed_expiration_date=renewed_expiration_date,
+        number_of_licenses=number_of_licenses,
+        # Disable conventional batch processing. Self-Service Purchasing feature has its
+        # own processes for triggering renewal.
+        exempt_from_batch_processing=True,
+        **kwargs,
+    )
+    logger.info(
+        (
+            'Provisioning: created new renewal plan with '
+            'id=%s and '
+            'salesforce_opportunity_line_item_id=%s and '
+            'prior_subscription_plan_uuid=%s and '
+            'renewed_subscription_plan_uuid=%s'
+        ),
+        created_renewal['id'],
+        created_renewal['salesforce_opportunity_id'],
+        created_renewal['prior_subscription_plan_uuid'],
+        created_renewal['renewed_subscription_plan_uuid'],
+    )
+    return created_renewal

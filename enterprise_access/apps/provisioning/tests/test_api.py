@@ -416,26 +416,85 @@ class TestGetOrCreateSubscriptionPlan(TestCase):
         mock_license_manager_client.assert_not_called()
 
     @ddt.data(
-        # Same prodcut_id, different opp_line_item.
+        ###################################
+        # Base tests with non-null values #
+        ###################################
+
+        # Same opp_line_item, same product_id.
+        # This should cause the existing subscription plan to be returned.
         {
             'existing_opp_line_item': 'opp-line-item-1',
             'existing_product_id': 1,
-            'requesting_opp_line_item': 'opp-line-item-2',
+            'requesting_opp_line_item': 'opp-line-item-1',
             'requesting_product_id': 1,
+            'created': False,
         },
-        # Same opp_line_item, different prodcut_id.
+        # Same opp_line_item, different product_id.
+        # This should cause the existing subscription plan to be returned.
         {
             'existing_opp_line_item': 'opp-line-item-1',
             'existing_product_id': 1,
             'requesting_opp_line_item': 'opp-line-item-1',
             'requesting_product_id': 2,
+            'created': False,
         },
-        # Make sure requesting product_id=None falls back to a default which does not conflict.
+        # Different opp_line_item, same product_id.
+        # This should cause a new subscription plan to be created.
         {
             'existing_opp_line_item': 'opp-line-item-1',
-            'existing_product_id': settings.PROVISIONING_DEFAULTS['subscription']['product_id'] + 1,
-            'requesting_opp_line_item': 'opp-line-item-1',
+            'existing_product_id': 1,
+            'requesting_opp_line_item': 'opp-line-item-2',
+            'requesting_product_id': 1,
+            'created': True,
+        },
+        # Different opp_line_item, different product_id.
+        # This should cause a new subscription plan to be created.
+        {
+            'existing_opp_line_item': 'opp-line-item-1',
+            'existing_product_id': 1,
+            'requesting_opp_line_item': 'opp-line-item-2',
+            'requesting_product_id': 2,
+            'created': True,
+        },
+
+        ############################################################################
+        # Make sure requesting product_id=None falls back to a configured default. #
+        ############################################################################
+        {
+            'existing_opp_line_item': 'opp-line-item-1',
+            'existing_product_id': 999,
+            'requesting_opp_line_item': 'opp-line-item-2',
             'requesting_product_id': None,  # fallback to settings.PROVISIONING_DEFAULTS['subscription']['product_id']
+            'created': True,
+        },
+
+        ###########################################################################
+        # Make sure requesting opp_line_item=None is treated as a distinct value. #
+        ###########################################################################
+
+        # None == None should result in the existing subscription plan to be returned.
+        {
+            'existing_opp_line_item': None,
+            'existing_product_id': 1,
+            'requesting_opp_line_item': None,
+            'requesting_product_id': 1,
+            'created': False,
+        },
+        # non-None != None should result in creation.
+        {
+            'existing_opp_line_item': 'opp-line-item-1',
+            'existing_product_id': 1,
+            'requesting_opp_line_item': None,
+            'requesting_product_id': 1,
+            'created': True,
+        },
+        # None != non-None should result in creation.
+        {
+            'existing_opp_line_item': None,
+            'existing_product_id': 1,
+            'requesting_opp_line_item': 'opp-line-item-1',
+            'requesting_product_id': 1,
+            'created': True,
         },
     )
     @ddt.unpack
@@ -447,28 +506,29 @@ class TestGetOrCreateSubscriptionPlan(TestCase):
         existing_product_id,
         requesting_opp_line_item,
         requesting_product_id,
+        created,
     ):
-        existing_subscriptions = [
-            {
-                'uuid': 'sub-uuid',
-                'title': 'Test Plan',
-                'salesforce_opportunity_line_item': existing_opp_line_item,
-                'product': existing_product_id,
-            },
-        ]
+        existing_subscription = {
+            'uuid': 'sub-uuid',
+            'title': 'Test Plan',
+            'salesforce_opportunity_line_item': existing_opp_line_item,
+            'product': existing_product_id,
+            'start_date': '2026-01-01T00:00Z',
+        }
         created_subscription = {
             'uuid': 'new-sub-uuid',
             'salesforce_opportunity_line_item': requesting_opp_line_item,
             'title': 'New Plan',
             # Simulate the fallback logic within LicenseManagerApiClient.create_subscription_plan().
             'product': requesting_product_id or settings.PROVISIONING_DEFAULTS['subscription']['product_id'],
+            'start_date': '2026-01-01T00:00Z',
         }
         mock_client = mock_license_manager_client.return_value
         mock_client.create_subscription_plan.return_value = created_subscription
 
         result = provisioning_api.get_or_create_subscription_plan(
             customer_agreement_uuid='agreement-uuid',
-            existing_subscription_list=existing_subscriptions,
+            existing_subscription_list=[existing_subscription],
             plan_title='New Plan',
             catalog_uuid='catalog-uuid',
             opp_line_item=requesting_opp_line_item,
@@ -479,18 +539,21 @@ class TestGetOrCreateSubscriptionPlan(TestCase):
             product_id=requesting_product_id,
         )
 
-        self.assertEqual(result, created_subscription)
-        mock_client.create_subscription_plan.assert_called_once_with(
-            customer_agreement_uuid='agreement-uuid',
-            enterprise_catalog_uuid='catalog-uuid',
-            title='New Plan',
-            salesforce_opportunity_line_item=requesting_opp_line_item,
-            start_date='2025-05-01',
-            expiration_date='2026-05-01',
-            desired_num_licenses=50,
-            product_id=requesting_product_id,
-            extra_field='extra-value'
-        )
+        self.assertEqual(result, created_subscription if created else existing_subscription)
+        if created:
+            mock_client.create_subscription_plan.assert_called_once_with(
+                customer_agreement_uuid='agreement-uuid',
+                enterprise_catalog_uuid='catalog-uuid',
+                title='New Plan',
+                salesforce_opportunity_line_item=requesting_opp_line_item,
+                start_date='2025-05-01',
+                expiration_date='2026-05-01',
+                desired_num_licenses=50,
+                product_id=requesting_product_id,
+                extra_field='extra-value'
+            )
+        else:
+            mock_client.create_subscription_plan.assert_not_called()
 
     @mock.patch.object(provisioning_api, 'LicenseManagerApiClient', autospec=True)
     def test_create_subscription_plan_exception(self, mock_license_manager_client):
