@@ -211,11 +211,29 @@ class CheckoutContextHandler(CheckoutIntentAwareHandlerMixin, BaseHandler):
         return {
             'quantity': quantity_constraints,
             'enterprise_slug': {
-                'min_length': 3,
-                'max_length': 30,
+                'min_length': 1,
+                'max_length': 255,
                 'pattern': '^[a-z0-9-]+$'
             },
-            'embargoed_countries': get_embargoed_countries()
+            'embargoed_countries': get_embargoed_countries(),
+            'full_name': {
+                'min_length': 1,
+                'max_length': 150,
+            },
+            'admin_email': {
+                'min_length': 6,
+                'max_length': 253,
+                'pattern': '^[^\s@]+@[^\s@]+\.[^\s@]+$'
+            },
+            'country': {
+                'min_length': 2,
+                'max_length': 2,
+                'pattern': '^[A-Z]+$'
+            },
+            'company_name': {
+                'min_length': 1,
+                'max_length': 255,
+            }
         }
 
 
