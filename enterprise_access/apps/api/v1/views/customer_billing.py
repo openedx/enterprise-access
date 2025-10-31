@@ -517,3 +517,14 @@ class StripeEventSummaryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         Lists ``StripeEventSummary`` records, filtered by given subscription plan uuid.
         """
         return super().list(request, *args, **kwargs)
+
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path='first-invoice-upcoming-amount-due',
+    )
+    def first_invoice_upcoming_amount_due(self, request, *args, **kwargs):
+        summary = self.get_queryset().filter(event_type='customer.subscription.created').first()
+        return Response({
+            'upcoming_invoice_amount_due': summary.upcoming_invoice_amount_due,
+        }, content_type='application/json')

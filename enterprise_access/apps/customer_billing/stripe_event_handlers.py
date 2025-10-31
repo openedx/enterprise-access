@@ -7,7 +7,7 @@ from functools import wraps
 
 import stripe
 
-from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData
+from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData, StripeEventSummary
 from enterprise_access.apps.customer_billing.stripe_event_types import StripeEventType
 from enterprise_access.apps.customer_billing.tasks import send_trial_cancellation_email_task
 
@@ -209,6 +209,9 @@ class StripeEventHandler:
             logger.info(f'Successfully enabled pending updates for subscription {subscription.id}')
         except stripe.StripeError as e:
             logger.error(f'Failed to enable pending updates for subscription {subscription.id}: {e}')
+
+        summary = StripeEventSummary.objects.get(event_id=event.id)
+        summary.update_upcoming_invoice_amount_due()
 
     @on_stripe_event('customer.subscription.updated')
     @staticmethod
