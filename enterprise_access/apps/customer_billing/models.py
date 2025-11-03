@@ -697,6 +697,58 @@ class CheckoutIntent(TimeStampedModel):
         self.save(update_fields=['stripe_checkout_session_id', 'stripe_customer_id', 'modified'])
 
 
+class SelfServiceSubscriptionRenewal(TimeStampedModel):
+    """
+    Tracks renewal processing for self-service subscriptions, linking a CheckoutIntent
+    to the SubscriptionPlanRenewals that compose it.
+
+    This model records when subscription renewals are processed, particularly
+    the transition from trial to paid and subsequent annual renewals.
+
+    .. no_pii: This model has no PII
+    """
+    class Meta:
+        verbose_name = "Self Service Subscription Renewal"
+        verbose_name_plural = "Self Service Subscription Renewal"
+        ordering = ['-created']
+
+    checkout_intent = models.ForeignKey(
+        CheckoutIntent,
+        on_delete=models.CASCADE,
+        related_name='renewals',
+        help_text="The CheckoutIntent this renewal is associated with",
+    )
+    subscription_plan_renewal_id = models.UUIDField(
+        help_text="UUID of the SubscriptionPlanRenewal in License Manager",
+    )
+    stripe_event_data = models.OneToOneField(
+        'StripeEventData',
+        on_delete=models.CASCADE,
+        related_name='renewal_processing',
+        help_text="The Stripe event that triggered this renewal",
+    )
+    stripe_subscription_id = models.CharField(
+        max_length=255,
+        db_index=True,
+        help_text="The Stripe subscription ID for this renewal",
+    )
+    processed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the renewal was successfully processed in License Manager",
+    )
+
+    history = HistoricalRecords()
+
+    def __str__(self):
+        return f"Renewal for {self.checkout_intent.enterprise_slug} - {self.stripe_subscription_id}"
+
+    def mark_as_processed(self):
+        """Mark this renewal as successfully processed."""
+        self.processed_at = timezone.now()
+        self.save(update_fields=['processed_at', 'modified'])
+
+
 class StripeEventData(TimeStampedModel):
     """
     Persists stripe event payload data.
@@ -809,7 +861,7 @@ class StripeEventSummary(TimeStampedModel):
         blank=True,
         db_index=True,
         help_text=(
-            'Three-letter ISO currency code associated with the subscription..'
+            'Three-letter ISO currency code associated with the subscription.'
         ),
     )
 

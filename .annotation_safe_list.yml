@@ -67,3 +67,5 @@ content_assignments.HistoricalLearnerContentAssignmentAction:
   ".. no_pii:": "This model has no PII"
 customer_billing.HistoricalCheckoutIntent:
   ".. no_pii:": "This model has no PII"
+customer_billing.HistoricalSelfServiceSubscriptionRenewal:
+  ".. no_pii:": "This model has no PII"
