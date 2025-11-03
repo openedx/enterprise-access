@@ -2,6 +2,7 @@
 Tests for Checkout BFF handlers.
 """
 import random
+import re
 from datetime import datetime
 from decimal import Decimal
 from unittest import mock
@@ -223,6 +224,43 @@ class TestCheckoutContextHandler(APITest):
         self.assertIn('embargoed_countries', constraints)
         self.assertIsInstance(constraints['embargoed_countries'], list)
         self.assertEqual(constraints['embargoed_countries'], ['RU', 'IR', 'KP', 'SY', 'CU'])
+
+    @ddt.data(
+        {
+            'constraint_name': 'enterprise_slug',
+            'should_match': ['valid-slug', '123', '0kay-slug'],
+            'should_not_match': ['Capitalization-fail', 'b&d-symbol', '/-and-burn']
+        },
+        {
+            'constraint_name': 'admin_email',
+            'should_match': ['a@b.com', 'First.Last@name.org'],
+            'should_not_match': ['notanemail', 'too@many@ats.com']
+        },
+        {
+            'constraint_name': 'country',
+            'should_match': ['US', 'CN'],
+            'should_not_match': ['USA', 'CANADA']
+        },
+    )
+    @ddt.unpack
+    def test_get_field_constraints_regexes(self, constraint_name, should_match, should_not_match):
+        """
+        Test that _get_field_constraints includes embargoed countries list.
+        """
+        context = self._create_context()
+        handler = CheckoutContextHandler(context)
+
+        constraints = handler._get_field_constraints()
+
+        self.assertIn(constraint_name, constraints)
+        constraint_definition = constraints[constraint_name]
+        self.assertIn('pattern', constraint_definition)
+        pattern = constraint_definition['pattern']
+
+        for str in should_match:
+            self.assertTrue(re.match(pattern, str))
+        for str in should_not_match:
+            self.assertFalse(re.match(pattern, str))
 
     @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_ssp_product_pricing')
     def test_handler_adds_error_on_pricing_failure(self, mock_get_pricing):

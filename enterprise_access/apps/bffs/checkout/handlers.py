@@ -228,7 +228,7 @@ class CheckoutContextHandler(CheckoutIntentAwareHandlerMixin, BaseHandler):
             'country': {
                 'min_length': 2,
                 'max_length': 2,
-                'pattern': '^[A-Z]+$'
+                'pattern': '^[A-Z]{2}$'
             },
             'company_name': {
                 'min_length': 1,
