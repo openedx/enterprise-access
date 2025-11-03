@@ -9,7 +9,7 @@ import stripe
 
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData
 from enterprise_access.apps.customer_billing.stripe_event_types import StripeEventType
-from enterprise_access.apps.customer_billing.tasks import send_trial_cancellation_email_task
+from enterprise_access.apps.customer_billing.tasks import send_payment_receipt_email, send_trial_cancellation_email_task
 
 logger = logging.getLogger(__name__)
 
@@ -175,6 +175,13 @@ class StripeEventHandler:
         )
         checkout_intent.mark_as_paid(stripe_customer_id=stripe_customer_id)
         link_event_data_to_checkout_intent(event, checkout_intent)
+
+        send_payment_receipt_email.delay(
+            invoice_data=invoice,
+            subscription_data=subscription_details,
+            enterprise_customer_name=checkout_intent.enterprise_name,
+            enterprise_slug=checkout_intent.enterprise_slug,
+        )
 
     @on_stripe_event('customer.subscription.trial_will_end')
     @staticmethod
