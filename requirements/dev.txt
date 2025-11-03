@@ -203,7 +203,7 @@ django-crum==0.7.9
     #   edx-django-utils
     #   edx-rbac
     #   edx-toggles
-django-debug-toolbar==6.0.0
+django-debug-toolbar==6.1.0
     # via -r requirements/dev.in
 django-dynamic-fixture==4.0.1
     # via -r requirements/validation.txt
@@ -256,7 +256,7 @@ drf-jwt==1.19.2
     # via
     #   -r requirements/validation.txt
     #   edx-drf-extensions
-drf-spectacular==0.28.0
+drf-spectacular==0.29.0
     # via -r requirements/validation.txt
 drf-yasg==1.21.11
     # via
@@ -264,7 +264,7 @@ drf-yasg==1.21.11
     #   edx-api-doc-tools
 edx-api-doc-tools==2.1.0
     # via -r requirements/validation.txt
-edx-auth-backends==4.6.1
+edx-auth-backends==4.6.2
     # via -r requirements/validation.txt
 edx-braze-client==0.2.5
     # via -r requirements/validation.txt
@@ -289,7 +289,7 @@ edx-drf-extensions==10.6.0
     # via
     #   -r requirements/validation.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.18
+edx-enterprise-subsidy-client==2.0.19
     # via -r requirements/validation.txt
 edx-event-bus-kafka==6.1.0
     # via -r requirements/validation.txt
@@ -316,7 +316,7 @@ edx-toggles==5.4.1
     #   edx-event-bus-kafka
 factory-boy==3.3.3
     # via -r requirements/validation.txt
-faker==37.11.0
+faker==37.12.0
     # via
     #   -r requirements/validation.txt
     #   factory-boy
@@ -435,7 +435,7 @@ more-itertools==10.8.0
     #   jaraco-functools
 mysqlclient==2.2.7
     # via -r requirements/validation.txt
-nh3==0.3.1
+nh3==0.3.2
     # via
     #   -r requirements/validation.txt
     #   readme-renderer
@@ -490,7 +490,7 @@ prompt-toolkit==3.0.52
     # via
     #   -r requirements/validation.txt
     #   click-repl
-psutil==7.1.1
+psutil==7.1.3
     # via
     #   -r requirements/validation.txt
     #   edx-django-utils
@@ -597,7 +597,7 @@ readme-renderer==44.0
     # via
     #   -r requirements/validation.txt
     #   twine
-redis==6.4.0
+redis==7.0.1
     # via -r requirements/validation.txt
 referencing==0.37.0
     # via
@@ -634,7 +634,7 @@ rich==14.2.0
     # via
     #   -r requirements/validation.txt
     #   twine
-rpds-py==0.27.1
+rpds-py==0.28.0
     # via
     #   -r requirements/validation.txt
     #   jsonschema
@@ -687,7 +687,7 @@ stevedore==5.5.0
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
-stripe==13.0.1
+stripe==13.1.1
     # via -r requirements/validation.txt
 text-unidecode==1.3
     # via
@@ -697,7 +697,7 @@ tomlkit==0.13.3
     # via
     #   -r requirements/validation.txt
     #   pylint
-tox==4.31.0
+tox==4.32.0
     # via -r requirements/validation.txt
 twine==6.2.0
     # via -r requirements/validation.txt
@@ -731,7 +731,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.35.3
+virtualenv==20.35.4
     # via
     #   -r requirements/validation.txt
     #   tox
