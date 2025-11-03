@@ -84,7 +84,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         return_value=MOCK_SSP_PRICING_DATA,
     )
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
-    @mock.patch.object(stripe_api, 'stripe', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe')
     def test_create_free_trial_checkout_session_success(
         self, mock_stripe, mock_lms_client_class, mock_get_ssp_pricing,  # pylint: disable=unused-argument
     ):
@@ -146,7 +146,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         return_value=MOCK_SSP_PRICING_DATA,
     )
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
-    @mock.patch.object(stripe_api, 'stripe', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe')
     def test_create_free_trial_checkout_session_success_without_user(
         self, mock_stripe, mock_lms_client_class, mock_get_ssp_pricing,  # pylint: disable=unused-argument
     ):
@@ -179,7 +179,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         return_value=MOCK_SSP_PRICING_DATA,
     )
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
-    @mock.patch.object(stripe_api, 'stripe', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe')
     def test_create_free_trial_checkout_session_replaces_user_intent(
         self, mock_stripe, mock_lms_client_class, mock_get_ssp_pricing,  # pylint: disable=unused-argument
     ):
@@ -227,7 +227,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         return_value=MOCK_SSP_PRICING_DATA,
     )
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
-    @mock.patch.object(stripe_api, 'stripe', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe')
     def test_slug_reservation_conflict(
         self, mock_stripe, mock_lms_client_class, mock_get_ssp_pricing,   # pylint: disable=unused-argument
     ):
@@ -269,7 +269,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         return_value=MOCK_SSP_PRICING_DATA,
     )
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
-    @mock.patch.object(stripe_api, 'stripe', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe')
     def test_name_reservation_conflict(
         self, mock_stripe, mock_lms_client_class, mock_get_ssp_pricing,  # pylint: disable=unused-argument
     ):
@@ -311,7 +311,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         return_value=MOCK_SSP_PRICING_DATA,
     )
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
-    @mock.patch.object(stripe_api, 'stripe', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe')
     def test_expired_intent_allows_reuse(
         self, mock_stripe, mock_lms_client_class, mock_get_ssp_pricing,  # pylint: disable=unused-argument
     ):
@@ -445,7 +445,7 @@ class TestCreateFreeTrialCheckoutSession(TestCase):
         return_value=MOCK_SSP_PRICING_DATA,
     )
     @mock.patch.object(customer_billing_api, 'LmsApiClient', autospec=True)
-    @mock.patch.object(stripe_api, 'stripe', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe')
     def test_create_free_trial_checkout_session_errors(
         self,
         mock_stripe,
