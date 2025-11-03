@@ -223,7 +223,7 @@ class CheckoutContextHandler(CheckoutIntentAwareHandlerMixin, BaseHandler):
             'admin_email': {
                 'min_length': 6,
                 'max_length': 253,
-                'pattern': '^[^\s@]+@[^\s@]+\.[^\s@]+$'
+                'pattern': '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$'
             },
             'country': {
                 'min_length': 2,
