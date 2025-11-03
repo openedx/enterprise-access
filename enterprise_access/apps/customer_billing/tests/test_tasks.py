@@ -12,6 +12,7 @@ from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
 from enterprise_access.apps.customer_billing.tasks import (
     send_enterprise_provision_signup_confirmation_email,
+    send_payment_receipt_email,
     send_trial_cancellation_email_task
 )
 
@@ -245,3 +246,168 @@ class TestSendEnterpriseProvisionSignupConfirmationEmail(TestCase):
             send_enterprise_provision_signup_confirmation_email(**self.test_data)
 
         self.assertEqual(str(context.exception), "Braze Campaign Error")
+
+
+class TestSendPaymentReceiptEmail(TestCase):
+    """
+    Tests for send_payment_receipt_email task.
+    """
+    def setUp(self):
+        super().setUp()
+        self.mock_invoice_data = {
+            'id': 'in_1SNvVOQ60jNALKNUMk8TZucs',
+            'created': 1761829387,
+            'payment_intent': {
+                'payment_method': {
+                    'card': {
+                        'brand': 'visa',
+                        'last4': '4242'
+                    },
+                    'billing_details': {
+                        'name': 'Test User',
+                        'address': {
+                            'line1': '123 Test St',
+                            'line2': 'Suite 100',
+                            'city': 'Test City',
+                            'state': 'TS',
+                            'postal_code': '12345',
+                            'country': 'US'
+                        }
+                    }
+                }
+            }
+        }
+        self.mock_subscription_data = {
+            'quantity': 5,
+            'plan': {
+                'amount': 39600  # $396.00 in cents
+            }
+        }
+        self.mock_admin_users = [
+            {
+                'email': 'admin1@test.com',
+                'lms_user_id': 1,
+            },
+            {
+                'email': 'admin2@test.com',
+                'lms_user_id': 2,
+            }
+        ]
+        self.enterprise_customer_name = 'Test Enterprise'
+        self.enterprise_slug = 'test-enterprise'
+
+    @mock.patch('enterprise_access.apps.customer_billing.tasks.format_datetime_obj')
+    @mock.patch('enterprise_access.apps.customer_billing.tasks.BrazeApiClient')
+    @mock.patch('enterprise_access.apps.customer_billing.tasks.LmsApiClient')
+    def test_successful_payment_receipt_email(self, mock_lms_client, mock_braze_client, mock_format_datetime):
+        """
+        Test successful payment receipt email sending.
+        """
+        # Mock the date formatting function
+        mock_format_datetime.return_value = '03 November 2025'
+
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
+            'admin_users': self.mock_admin_users
+        }
+
+        mock_braze = mock_braze_client.return_value
+        braze_recipients = []
+        actual_calls = []
+
+        def create_recipient_side_effect(user_email, lms_user_id):
+            actual_calls.append(mock.call(user_email=user_email, lms_user_id=lms_user_id))
+            recipient = {'external_id': f'braze_{lms_user_id}'}
+            braze_recipients.append(recipient)
+            return recipient
+        mock_braze.create_braze_recipient.side_effect = create_recipient_side_effect
+
+        # Call the task
+        send_payment_receipt_email(
+            invoice_data=self.mock_invoice_data,
+            subscription_data=self.mock_subscription_data,
+            enterprise_customer_name=self.enterprise_customer_name,
+            enterprise_slug=self.enterprise_slug,
+        )
+
+        # Verify LMS API was called to get admin users
+        mock_lms_client.return_value.get_enterprise_customer_data.assert_called_once_with(
+            enterprise_customer_slug=self.enterprise_slug
+        )
+
+        # Verify Braze recipients were created for each admin
+        expected_recipient_calls = [
+            mock.call(user_email=admin['email'], lms_user_id=admin.get('lms_user_id'))
+            for admin in self.mock_admin_users
+        ]
+        mock_braze.create_braze_recipient.assert_has_calls(expected_recipient_calls, any_order=True)
+
+        # Verify the campaign was sent with correct properties
+        expected_properties = {
+            'total_paid_amount': Decimal('1980.00'),  # $396.00 * 5 licenses = $1,980.00
+            'date_paid': '03 November 2025',  # Based on mock timestamp
+            'payment_method': 'visa - 4242',
+            'license_count': 5,
+            'price_per_license': Decimal('396.00'),
+            'customer_name': 'Test User',
+            'organization': 'Test Enterprise',
+            'billing_address': '123 Test St\nSuite 100\nTest City, TS 12345\nUS',
+            'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/test-enterprise',
+            'receipt_number': 'in_1SNvVOQ60jNALKNUMk8TZucs',
+        }
+
+        mock_braze.send_campaign_message.assert_called_once_with(
+            settings.BRAZE_ENTERPRISE_PROVISION_PAYMENT_RECEIPT_CAMPAIGN,
+            recipients=braze_recipients,
+            trigger_properties=expected_properties,
+        )
+
+    @mock.patch('enterprise_access.apps.customer_billing.tasks.BrazeApiClient')
+    @mock.patch('enterprise_access.apps.customer_billing.tasks.LmsApiClient')
+    def test_payment_receipt_no_admin_users(self, mock_lms_client, mock_braze_client):
+        """
+        Test that email is not sent when no admin users are found.
+        """
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
+            'admin_users': []
+        }
+
+        send_payment_receipt_email(
+            invoice_data=self.mock_invoice_data,
+            subscription_data=self.mock_subscription_data,
+            enterprise_customer_name=self.enterprise_customer_name,
+            enterprise_slug=self.enterprise_slug,
+        )
+
+        # Verify LMS API was called but Braze API was not
+        mock_lms_client.return_value.get_enterprise_customer_data.assert_called_once()
+        mock_braze_client.return_value.send_campaign_message.assert_not_called()
+
+    @mock.patch('enterprise_access.apps.customer_billing.tasks.BrazeApiClient')
+    @mock.patch('enterprise_access.apps.customer_billing.tasks.LmsApiClient')
+    def test_payment_receipt_braze_recipient_error(self, mock_lms_client, mock_braze_client):
+        """
+        Test handling of Braze recipient creation errors.
+        """
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
+            'admin_users': self.mock_admin_users
+        }
+
+        # Make first recipient creation fail, second one succeed
+        mock_braze = mock_braze_client.return_value
+        mock_braze.create_braze_recipient.side_effect = [
+            Exception("Failed to create recipient"),
+            {'external_id': 'braze_2'}
+        ]
+
+        send_payment_receipt_email(
+            invoice_data=self.mock_invoice_data,
+            subscription_data=self.mock_subscription_data,
+            enterprise_customer_name=self.enterprise_customer_name,
+            enterprise_slug=self.enterprise_slug,
+        )
+
+        # Verify campaign was still sent for the successful recipient
+        mock_braze.send_campaign_message.assert_called_once()
+        actual_recipients = mock_braze.send_campaign_message.call_args[1]['recipients']
+        self.assertEqual(len(actual_recipients), 1)
+        self.assertEqual(actual_recipients[0]['external_id'], 'braze_2')

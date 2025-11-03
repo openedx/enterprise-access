@@ -508,6 +508,7 @@ BRAZE_LEARNER_CREDIT_BNR_NEW_REQUESTS_NOTIFICATION_CAMPAIGN = ''
 
 # Braze campaigns for enterprise provisioning (apps.provisioning)
 BRAZE_ENTERPRISE_PROVISION_SIGNUP_CONFIRMATION_CAMPAIGN = ''
+BRAZE_ENTERPRISE_PROVISION_PAYMENT_RECEIPT_CAMPAIGN = ''
 
 # Braze campaigns for browse and request (apps.subsidy_request)
 BRAZE_NEW_REQUESTS_NOTIFICATION_CAMPAIGN = ''
