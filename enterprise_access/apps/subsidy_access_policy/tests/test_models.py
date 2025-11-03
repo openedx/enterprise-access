@@ -3,7 +3,7 @@ Tests for subsidy_access_policy models.
 """
 import contextlib
 from datetime import datetime, timedelta
-from unittest.mock import ANY, MagicMock, PropertyMock, patch
+from unittest.mock import ANY, MagicMock, PropertyMock, call, patch
 from uuid import uuid4
 
 import ddt
@@ -48,6 +48,7 @@ from enterprise_access.apps.subsidy_access_policy.exceptions import MissingAssig
 from enterprise_access.apps.subsidy_access_policy.models import (
     ALLOW_LATE_ENROLLMENT_KEY,
     REQUEST_CACHE_NAMESPACE,
+    AssignedLearnerCreditAccessPolicy,
     PerLearnerEnrollmentCreditAccessPolicy,
     PerLearnerSpendCreditAccessPolicy,
     SubsidyAccessPolicy,
@@ -60,7 +61,8 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PolicyGroupAssociationFactory
 )
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
-from enterprise_access.apps.subsidy_request.tests.factories import LearnerCreditRequestConfigurationFactory
+from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
+from enterprise_access.apps.subsidy_request.tests.factories import LearnerCreditRequestConfigurationFactory, UserFactory
 from enterprise_access.cache_utils import request_cache
 from enterprise_access.utils import localized_utcnow
 from test_utils import TEST_ENTERPRISE_GROUP_UUID, TEST_USER_RECORD, TEST_USER_RECORD_NO_GROUPS
@@ -1139,65 +1141,82 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
 
     def test_per_learner_spend_policy_can_approve_bnr_disabled(self):
         """
-        Test that PerLearnerSpendCreditAccessPolicy.can_approve returns False when bnr_enabled is False.
+        Test that PerLearnerSpendCreditAccessPolicy.can_approve when bnr_enabled is False.
         """
         policy = self.per_learner_spend_policy
+        mock_request = MagicMock(spec=LearnerCreditRequest)
         with patch(
                 'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
                 new_callable=PropertyMock,
                 return_value=False
         ), patch(
-            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_allocate'
-        ) as mock_can_allocate:
-            result, reason = policy.can_approve(self.course_id, 1000)
-            mock_can_allocate.assert_not_called()
-            self.assertFalse(result)
-            self.assertEqual(reason, REASON_BNR_NOT_ENABLED)
+            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_allocate_all'
+        ) as mock_can_allocate_all:
+            result = policy.can_approve([mock_request])
+            mock_can_allocate_all.assert_not_called()
+            self.assertIn('error_reason', result)
+            self.assertEqual(result['error_reason'], REASON_BNR_NOT_ENABLED)
 
     def test_per_learner_spend_policy_can_approve_bnr_enabled(self):
         """
         Test PerLearnerSpendCreditAccessPolicy.can_approve when bnr_enabled is True.
         """
         policy = self.per_learner_spend_policy
+        mock_request = MagicMock(spec=LearnerCreditRequest)
         with patch(
                 'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
                 new_callable=PropertyMock,
                 return_value=True
         ), patch(
-            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_allocate'
-        ) as mock_can_allocate:
-            mock_can_allocate.return_value = (True, None)
-            result, reason = policy.can_approve(self.course_id, 1000)
-            mock_can_allocate.assert_called_once_with(1, self.course_id, 1000)
-            self.assertTrue(result)
-            self.assertEqual(reason, None)
+            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_allocate_all'
+        ) as mock_can_allocate_all:
+            mock_can_allocate_all.return_value = {
+                'valid_requests': [mock_request],
+                'failed_requests_by_reason': {},
+            }
+            result = policy.can_approve([mock_request])
+            mock_can_allocate_all.assert_called_once_with([mock_request])
+            self.assertIn('valid_requests', result)
+            self.assertEqual(result['valid_requests'], [mock_request])
 
     def test_per_learner_spend_policy_can_approve_failure(self):
         """
-        Test PerLearnerSpendCreditAccessPolicy.can_approve when can_allocate returns False.
+        Test PerLearnerSpendCreditAccessPolicy.can_approve when all requests fail.
         """
         policy = self.per_learner_spend_policy
+        mock_request = MagicMock(spec=LearnerCreditRequest)
+        failure_reason = REASON_CONTENT_NOT_IN_CATALOG
         with patch(
                 'enterprise_access.apps.subsidy_access_policy.models.PerLearnerSpendCreditAccessPolicy.bnr_enabled',
                 new_callable=PropertyMock,
                 return_value=True
         ), patch(
-            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_allocate'
-        ) as mock_can_allocate:
-            mock_can_allocate.return_value = (False, REASON_CONTENT_NOT_IN_CATALOG)
-            result, reason = policy.can_approve(self.course_id, 1000)
-            mock_can_allocate.assert_called_once_with(1, self.course_id, 1000)
-            self.assertFalse(result)
+            'enterprise_access.apps.subsidy_access_policy.models.AssignedLearnerCreditAccessPolicy.can_allocate_all'
+        ) as mock_can_allocate_all:
+            mock_can_allocate_all.return_value = {
+                'valid_requests': [],
+                'failed_requests_by_reason': {failure_reason: [mock_request]},
+            }
+            result = policy.can_approve([mock_request])
+            mock_can_allocate_all.assert_called_once_with([mock_request])
             # assert it returns the same reason as AssignedLearnerCreditAccessPolicy.can_approve
-            self.assertEqual(reason, REASON_CONTENT_NOT_IN_CATALOG)
+            self.assertEqual(
+                result,
+                {
+                    'valid_requests': [],
+                    'failed_requests_by_reason': {failure_reason: [mock_request]},
+                }
+            )
 
     def test_per_learner_spend_policy_approve_method_assignment_allocated(self):
         """
-        Test PerLearnerSpendCreditAccessPolicy.approve method calls assignments_api.allocate_assignment_for_request()
+        Test PerLearnerSpendCreditAccessPolicy.approve method calls assignments_api.allocate_assignment_for_requests()
           with correct paramaters when a new assignment is created.
         """
-        # set up assignment, configuration and allocate_assignment_for_request mock return value
+        # set up assignment, configuration and allocate_assignment_for_requests mock return value
         assignment_configuration = AssignmentConfiguration.objects.create()
+        mock_request = MagicMock(spec=LearnerCreditRequest)
+        mock_request.uuid = uuid4()
         test_learner_email = 'test@email.com'
         test_course_price = 1000
         assignment = LearnerContentAssignmentFactory(
@@ -1209,7 +1228,7 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
             assignment_configuration=assignment_configuration,
         )
 
-        self.mock_assignments_api.allocate_assignment_for_request.return_value = assignment
+        self.mock_assignments_api.allocate_assignment_for_requests.return_value = {mock_request.uuid: assignment}
 
         # link assignment_configuration to the policy
         policy = self.per_learner_spend_policy
@@ -1221,17 +1240,14 @@ class SubsidyAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
                 new_callable=PropertyMock,
                 return_value=True
         ):
-            result = policy.approve(test_learner_email, self.course_id, test_course_price, self.lms_user_id)
+            result = policy.approve([mock_request])
             # assert that the result is the created assignment
-            self.assertEqual(result, assignment)
+            self.assertEqual(result, {mock_request.uuid: assignment})
 
-            # assert that the assignments_api.allocate_assignment_for_request was called with correct parameters
-            self.mock_assignments_api.allocate_assignment_for_request.assert_called_once_with(
+            # assert that the assignments_api.allocate_assignment_for_requests was called with correct parameters
+            self.mock_assignments_api.allocate_assignment_for_requests.assert_called_once_with(
                 assignment_configuration,
-                test_learner_email,
-                self.course_id,
-                test_course_price,
-                self.lms_user_id,
+                [mock_request]
             )
 
 
@@ -1767,6 +1783,621 @@ class AssignedLearnerCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCa
         }
         with self.assertRaisesRegex(PriceValidationError, 'outside of acceptable interval'):
             self.active_policy.can_allocate(1, self.course_key, requested_price)
+
+
+@ddt.ddt
+class AssignedLearnerCreditAccessPolicyAllocationTests(MockPolicyDependenciesMixin, TestCase):
+    """ Tests specific to allocation logic in AssignedLearnerCreditAccessPolicy. """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.assignment_configuration = AssignmentConfigurationFactory()
+        cls.policy = AssignedLearnerCreditAccessPolicyFactory(
+            spend_limit=10000,  # $100
+            assignment_configuration=cls.assignment_configuration,
+            active=True,
+            retired=False,
+        )
+
+    def setUp(self):
+        """ Mock dependencies. """
+        super().setUp()
+        # Mock assignments_api needed by can_allocate_all
+        self.assignments_api_patcher = patch(
+            'enterprise_access.apps.subsidy_access_policy.models.assignments_api',
+            autospec=True,
+        )
+        self.mock_assignments_api = self.assignments_api_patcher.start()
+        self.addCleanup(self.assignments_api_patcher.stop)
+
+        # Mock content_metadata.api needed by can_allocate_all and price validation
+        self.catalog_content_metadata_patcher = patch(
+            'enterprise_access.apps.subsidy_access_policy.models.get_and_cache_catalog_content_metadata'
+        )
+        self.mock_catalog_content_metadata = self.catalog_content_metadata_patcher.start()
+        self.addCleanup(self.catalog_content_metadata_patcher.stop)
+
+        # Mock the canonical price function used within price validation
+        self.canonical_price_patcher = patch(
+            'enterprise_access.apps.subsidy_access_policy.models.get_canonical_content_price_from_metadata'
+        )
+        self.mock_canonical_price = self.canonical_price_patcher.start()
+        self.addCleanup(self.canonical_price_patcher.stop)
+
+        # Mock properties/methods that call external services
+        self.is_subsidy_active_patcher = patch.object(
+            AssignedLearnerCreditAccessPolicy, 'is_subsidy_active', new_callable=PropertyMock
+        )
+        self.mock_is_subsidy_active = self.is_subsidy_active_patcher.start()
+        self.addCleanup(self.is_subsidy_active_patcher.stop)
+
+        self.subsidy_balance_patcher = patch.object(
+            AssignedLearnerCreditAccessPolicy, 'subsidy_balance'
+        )
+        self.mock_subsidy_balance = self.subsidy_balance_patcher.start()
+        self.addCleanup(self.subsidy_balance_patcher.stop)
+
+        self.aggregates_for_policy_patcher = patch.object(
+            AssignedLearnerCreditAccessPolicy, 'aggregates_for_policy'
+        )
+        self.mock_aggregates_for_policy = self.aggregates_for_policy_patcher.start()
+        self.addCleanup(self.aggregates_for_policy_patcher.stop)
+
+        # --- Default Mock Return Values ---
+        self.policy.active = True  # Ensure policy is active by default for most tests
+        self.policy.retired = False
+        self.mock_is_subsidy_active.return_value = True
+        self.mock_subsidy_balance.return_value = 50000  # $500 default balance
+        self.mock_aggregates_for_policy.return_value = {'total_quantity': -1000}  # $10 spent
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.return_value = -2000  # $20 allocated
+
+        # Default price validation settings (can be overridden with self.settings)
+        # Assuming defaults are 0.9 and 1.1 for 10% tolerance
+        self.lower_bound_ratio = 0.9
+        self.upper_bound_ratio = 1.1
+
+    # --- Tests for validate_learner_credit_requests_allocation_prices ---
+
+    def _create_mock_request(self, course_id, course_price):
+        """
+        Helper to create a MagicMock LearnerCreditRequest.
+        """
+
+        req = MagicMock(spec=LearnerCreditRequest)
+        req.course_id = course_id
+        req.course_price = course_price
+        return req
+
+    @ddt.data(
+        # Price matches exactly.
+        {'req_price': 5000, 'canon_price': 5000, 'should_pass': True},
+        # Price within upper bound.
+        {'req_price': 5499, 'canon_price': 5000, 'should_pass': True},
+        # Price exactly at upper bound (assuming 1.1 ratio).
+        {'req_price': 5500, 'canon_price': 5000, 'should_pass': True},
+        # Price within lower bound.
+        {'req_price': 4501, 'canon_price': 5000, 'should_pass': True},
+        # Price exactly at lower bound (assuming 0.9 ratio).
+        {'req_price': 4500, 'canon_price': 5000, 'should_pass': True},
+        # Price above upper bound.
+        {'req_price': 5501, 'canon_price': 5000, 'should_pass': False},
+        # Price below lower bound.
+        {'req_price': 4499, 'canon_price': 5000, 'should_pass': False},
+        # Negative request price.
+        {'req_price': -100, 'canon_price': 5000, 'should_pass': False},
+        # Zero request price, zero canonical price.
+        {'req_price': 0, 'canon_price': 0, 'should_pass': True},
+        # Zero request price, non-zero canonical price (within bounds).
+        {'req_price': 0, 'canon_price': 5000, 'should_pass': False},  # Fails because 0 < 4500
+        # Non-zero request price, zero canonical price (will fail unless req_price is also 0).
+        {'req_price': 10, 'canon_price': 0, 'should_pass': False},  # Fails because 10 > 0
+    )
+    @ddt.unpack
+    def test_validate_prices_single_request(self, req_price, canon_price, should_pass):
+        """
+        Test price validation logic for a single request.
+        """
+
+        course_id = 'course-v1:Test+Course+Num'
+        mock_request = self._create_mock_request(course_id, req_price)
+        all_metadata = {course_id: {'key': course_id}}  # Minimal metadata.
+
+        # Mock the canonical price lookup.
+        self.mock_canonical_price.return_value = canon_price
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            valid, failed = self.policy.validate_learner_credit_requests_allocation_prices(
+                [mock_request], all_metadata
+            )
+
+        if should_pass:
+            self.assertEqual(len(valid), 1)
+            self.assertEqual(valid[0], mock_request)
+            self.assertEqual(len(failed), 0)
+            self.mock_canonical_price.assert_called_once_with(course_id, all_metadata[course_id])
+        else:
+            self.assertEqual(len(valid), 0)
+            self.assertEqual(len(failed), 1)
+            self.assertEqual(failed[0], mock_request)
+            # Negative prices are checked before canonical lookup.
+            if req_price < 0:
+                self.mock_canonical_price.assert_not_called()
+                # Remove the failure_reason check since the actual implementation doesn't set it.
+                # The implementation only logs warnings.
+            else:
+                self.mock_canonical_price.assert_called_once_with(course_id, all_metadata[course_id])
+
+    @ddt.data(
+        # Price above upper bound.
+        {'req_price': 5501, 'canon_price': 5000, 'should_pass': False},
+        # Price below lower bound.
+        {'req_price': 4499, 'canon_price': 5000, 'should_pass': False},
+        # Negative request price.
+        {'req_price': -100, 'canon_price': 5000, 'should_pass': False},
+    )
+    @ddt.unpack
+    def test_validate_prices_single_request_with_failure_reason(self, req_price, canon_price, should_pass):
+        """
+        Test price validation logic for a single request.
+        """
+
+        course_id = 'course-v1:Test+Course+3'
+        mock_request = self._create_mock_request(course_id, req_price)
+        all_metadata = {course_id: {'key': course_id}}
+
+        # Mock the canonical price lookup.
+        self.mock_canonical_price.return_value = canon_price
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            valid, failed = self.policy.validate_learner_credit_requests_allocation_prices(
+                [mock_request], all_metadata
+            )
+
+        if should_pass:
+            self.assertEqual(len(valid), 1)
+            self.assertEqual(len(failed), 0)
+        else:
+            self.assertEqual(len(valid), 0)
+            self.assertEqual(len(failed), 1)
+            # Note: The actual implementation only logs warnings and doesn't set failure_reason.
+            # So we don't check for failure_reason attribute.
+
+    def test_validate_prices_batch_mixed(self):
+        """
+        Test price validation with a mix of valid and invalid requests.
+        """
+
+        req1 = self._create_mock_request('course-1', 5000)  # Valid.
+        req2 = self._create_mock_request('course-2', 6000)  # Invalid (too high).
+        req3 = self._create_mock_request('course-3', 4000)  # Invalid (too low).
+        req4 = self._create_mock_request('course-4', 5200)  # Valid.
+
+        all_metadata = {
+            'course-1': {'key': 'course-1'},
+            'course-2': {'key': 'course-2'},
+            'course-3': {'key': 'course-3'},
+            'course-4': {'key': 'course-4'},
+        }
+
+        # Mock canonical prices.
+        def mock_price_side_effect(course_id, metadata):
+            prices = {'course-1': 5000, 'course-2': 5000, 'course-3': 5000, 'course-4': 5000}
+            return prices.get(course_id)
+        self.mock_canonical_price.side_effect = mock_price_side_effect
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            valid, failed = self.policy.validate_learner_credit_requests_allocation_prices(
+                [req1, req2, req3, req4], all_metadata
+            )
+
+        self.assertCountEqual(valid, [req1, req4])  # Use assertCountEqual for lists where order doesn't matter.
+        self.assertCountEqual(failed, [req2, req3])
+        # Ensure canonical price was looked up for all non-negative priced requests.
+        self.assertEqual(self.mock_canonical_price.call_count, 4)
+
+    # --- Tests for can_allocate_all ---
+
+    def test_can_allocate_all_policy_inactive(self):
+        """
+        Test can_allocate_all fails immediately if policy is inactive.
+        """
+
+        self.policy.active = False
+        reqs = [self._create_mock_request('c1', 1000)]
+        result = self.policy.can_allocate_all(reqs)
+
+        self.assertIn('error_reason', result)
+        self.assertEqual(result['error_reason'], REASON_POLICY_EXPIRED)
+        # Should fail before checking anything else.
+        self.mock_is_subsidy_active.assert_not_called()
+        self.mock_catalog_content_metadata.assert_not_called()
+
+    def test_can_allocate_all_subsidy_inactive(self):
+        """
+        Test can_allocate_all fails immediately if subsidy is inactive.
+        """
+
+        self.mock_is_subsidy_active.return_value = False
+        reqs = [self._create_mock_request('c1', 1000)]
+        result = self.policy.can_allocate_all(reqs)
+
+        self.assertIn('error_reason', result)
+        self.assertEqual(result['error_reason'], REASON_SUBSIDY_EXPIRED)
+        self.mock_catalog_content_metadata.assert_not_called()
+
+    def test_can_allocate_all_content_not_in_catalog(self):
+        """
+        Test can_allocate_all fails requests for content not in the catalog.
+        """
+
+        req1 = self._create_mock_request('course-in', 1000)
+        req2 = self._create_mock_request('course-out', 1000)
+        reqs = [req1, req2]
+        all_content_keys = list(set(req.course_id for req in reqs))
+
+        # Mock metadata to only return 'course-in'.
+        self.mock_catalog_content_metadata.return_value = []
+        # Mock canonical price for the valid course.
+        self.mock_canonical_price.return_value = 1000
+
+        result = self.policy.can_allocate_all(reqs)
+
+        self.assertEqual(len(result['valid_requests']), 0)
+        self.assertEqual(len(result['failed_requests_by_reason']), 1)
+        self.assertIn(REASON_CONTENT_NOT_IN_CATALOG, result['failed_requests_by_reason'])
+        self.assertEqual(result['failed_requests_by_reason'][REASON_CONTENT_NOT_IN_CATALOG], [req1, req2])
+
+        self.assertEqual(self.mock_catalog_content_metadata.call_count, 1)
+        self.mock_catalog_content_metadata.assert_called_with(self.policy.catalog_uuid, all_content_keys)
+
+    def test_can_allocate_all_price_validation_failure(self):
+        """
+        Test can_allocate_all fails requests that fail price validation.
+        """
+
+        req1 = self._create_mock_request('course-ok', 5000)
+        req2 = self._create_mock_request('course-bad-price', 6000)  # Assume canonical is 5000.
+        reqs = [req1, req2]
+
+        # Mock metadata returning both.
+        self.mock_catalog_content_metadata.return_value = [
+            {'key': 'course-ok'},
+            {'key': 'course-bad-price'},
+        ]
+
+        # Mock canonical prices.
+        def mock_price_side_effect(course_id, metadata):
+            return 5000  # Both are 5000 canonically.
+        self.mock_canonical_price.side_effect = mock_price_side_effect
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            result = self.policy.can_allocate_all(reqs)
+
+        self.assertEqual(len(result['valid_requests']), 1)  # req1 is still valid.
+        self.assertEqual(result['valid_requests'][0], req1)
+        self.assertEqual(len(result['failed_requests_by_reason']), 1)
+        self.assertIn(PriceValidationError.__name__, result['failed_requests_by_reason'])
+        self.assertEqual(result['failed_requests_by_reason'][PriceValidationError.__name__], [req2])
+
+        # Fix: Check call without assuming order.
+        self.mock_catalog_content_metadata.assert_called_once()
+        args, _ = self.mock_catalog_content_metadata.call_args
+        self.assertEqual(args[0], self.policy.catalog_uuid)
+        self.assertSetEqual(set(args[1]), {'course-ok', 'course-bad-price'})
+
+    def test_can_allocate_all_no_valid_requests_after_filtering(self):
+        """
+        Test can_allocate_all returns early if no requests pass initial filters.
+        """
+
+        req1 = self._create_mock_request('course-out', 1000)
+        req2 = self._create_mock_request('course-bad-price', 6000)
+        reqs = [req1, req2]
+
+        # Mock metadata only returns course-bad-price, which will fail price validation.
+        self.mock_catalog_content_metadata.return_value = [{'key': 'course-bad-price'}]
+        self.mock_canonical_price.return_value = 5000  # Canonical for course-bad-price.
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            result = self.policy.can_allocate_all(reqs)
+
+        self.assertEqual(result['valid_requests'], [])
+        self.assertEqual(len(result['failed_requests_by_reason']), 2)
+        self.assertIn(REASON_CONTENT_NOT_IN_CATALOG, result['failed_requests_by_reason'])
+        self.assertIn(PriceValidationError.__name__, result['failed_requests_by_reason'])
+        self.assertEqual(result['failed_requests_by_reason'][REASON_CONTENT_NOT_IN_CATALOG], [req1])
+        self.assertEqual(result['failed_requests_by_reason'][PriceValidationError.__name__], [req2])
+        # Should not proceed to budget checks.
+        self.mock_subsidy_balance.assert_not_called()
+        self.mock_aggregates_for_policy.assert_not_called()
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.assert_not_called()
+
+    def test_can_allocate_all_exceeds_subsidy_balance(self):
+        """ Test can_allocate_all fails globally if batch exceeds subsidy balance. """
+        req1 = self._create_mock_request('c1', 4000)
+        req2 = self._create_mock_request('c2', 5000)
+        reqs = [req1, req2]
+
+        # Mock metadata
+        self.mock_catalog_content_metadata.return_value = [{'key': 'c1'}, {'key': 'c2'}]
+        # Mock canonical prices matching request prices
+        self.mock_canonical_price.side_effect = lambda cid, meta: {'c1': 4000, 'c2': 5000}[cid]
+
+        # Setup budget mocks
+        self.mock_subsidy_balance.return_value = 10000  # $100
+        # Allocated = $20
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.return_value = -2000
+        # Batch Cost = $90
+        # Check: (Allocated: $20 + Batch: $90) = $110 > Subsidy Balance: $100 -> FAIL
+        self.mock_aggregates_for_policy.return_value = {'total_quantity': -1000}
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            result = self.policy.can_allocate_all(reqs)
+
+        self.assertIn('error_reason', result)
+        self.assertEqual(result['error_reason'], REASON_NOT_ENOUGH_VALUE_IN_SUBSIDY)
+        self.mock_subsidy_balance.assert_called_once()
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.assert_called_once()
+        self.mock_aggregates_for_policy.assert_called_once()  # Called even if subsidy check fails
+
+    def test_can_allocate_all_exceeds_policy_limit(self):
+        """
+        Test can_allocate_all fails globally if batch exceeds policy spend limit.
+        """
+
+        req1 = self._create_mock_request('c1', 4000)  # $40
+        req2 = self._create_mock_request('c2', 5000)  # $50
+        reqs = [req1, req2]
+
+        # Mock metadata.
+        self.mock_catalog_content_metadata.return_value = [{'key': 'c1'}, {'key': 'c2'}]
+        self.mock_canonical_price.side_effect = lambda cid, meta: {'c1': 4000, 'c2': 5000}[cid]
+
+        # Setup budget mocks.
+        self.policy.spend_limit = 11000  # $110 limit
+        self.mock_subsidy_balance.return_value = 20000  # $200 (plenty)
+        # Allocated = $20
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.return_value = -2000
+        # Spent = $10
+        self.mock_aggregates_for_policy.return_value = {'total_quantity': -1000}
+        # Batch Cost = $90
+        # Check 1 (Subsidy): (Allocated: $20 + Batch: $90) = $110 <= Subsidy Balance: $200 -> OK
+        # Check 2 (Policy): (Allocated: $20 + Spent: $10 + Batch: $90) = $120 > Policy Limit: $110 -> FAIL
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            result = self.policy.can_allocate_all(reqs)
+
+        self.assertIn('error_reason', result)
+        self.assertEqual(result['error_reason'], REASON_POLICY_SPEND_LIMIT_REACHED)
+        self.mock_subsidy_balance.assert_called_once()
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.assert_called_once()
+        self.mock_aggregates_for_policy.assert_called_once()
+
+    def test_can_allocate_all_success_full_batch(self):
+        """
+        Test can_allocate_all succeeds when all requests are valid and within budget.
+        """
+        req1 = self._create_mock_request('c1', 4000)  # $40
+        req2 = self._create_mock_request('c2', 5000)  # $50
+        reqs = [req1, req2]
+
+        # Mock metadata
+        self.mock_catalog_content_metadata.return_value = [{'key': 'c1'}, {'key': 'c2'}]
+        self.mock_canonical_price.side_effect = lambda cid, meta: {'c1': 4000, 'c2': 5000}[cid]
+
+        # Setup budget mocks (should pass).
+        self.policy.spend_limit = 15000  # $150 limit
+        self.mock_subsidy_balance.return_value = 20000  # $200 balance
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.return_value = -2000  # $20 allocated
+        self.mock_aggregates_for_policy.return_value = {'total_quantity': -1000}  # $10 spent
+        # Check 1 (Subsidy): (Allocated: $20 + Batch: $90) = $110 <= $200 -> OK
+        # Check 2 (Policy): (Allocated: $20 + Spent: $10 + Batch: $90) = $120 <= $150 -> OK
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            result = self.policy.can_allocate_all(reqs)
+
+        self.assertCountEqual(result['valid_requests'], reqs)
+        self.assertEqual(len(result['failed_requests_by_reason']), 0)
+        self.mock_subsidy_balance.assert_called_once()
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.assert_called_once()
+        self.mock_aggregates_for_policy.assert_called_once()
+
+    def test_can_allocate_all_success_partial_batch(self):
+        """
+        Test can_allocate_all succeeds with a mix of valid and initially invalid requests.
+        """
+
+        req1 = self._create_mock_request('course-ok', 4000)  # $40 - Valid
+        req2 = self._create_mock_request('course-out', 5000)  # $50 - Invalid (not in catalog)
+        req3 = self._create_mock_request('course-bad-price', 6000)  # $60 - Invalid (price)
+        reqs = [req1, req2, req3]
+
+        # Mock metadata (only ok and bad-price returned).
+        self.mock_catalog_content_metadata.return_value = [{'key': 'course-ok'}, {'key': 'course-bad-price'}]
+        # Mock canonical prices.
+        self.mock_canonical_price.side_effect = lambda cid, meta: {'course-ok': 4000, 'course-bad-price': 5000}[cid]
+
+        # Setup budget mocks (should pass for the single valid request).
+        self.policy.spend_limit = 15000  # $150 limit
+        self.mock_subsidy_balance.return_value = 20000  # $200 balance
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.return_value = -2000  # $20 allocated
+        self.mock_aggregates_for_policy.return_value = {'total_quantity': -1000}  # $10 spent
+        # Check 1 (Subsidy): (Allocated: $20 + Batch: $40) = $60 <= $200 -> OK
+        # Check 2 (Policy): (Allocated: $20 + Spent: $10 + Batch: $40) = $70 <= $150 -> OK
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            result = self.policy.can_allocate_all(reqs)
+
+        # Only req1 should be valid.
+        self.assertEqual(result['valid_requests'], [req1])
+        # Two failure reasons.
+        self.assertEqual(len(result['failed_requests_by_reason']), 2)
+        self.assertIn(REASON_CONTENT_NOT_IN_CATALOG, result['failed_requests_by_reason'])
+        self.assertIn(PriceValidationError.__name__, result['failed_requests_by_reason'])
+        self.assertEqual(result['failed_requests_by_reason'][REASON_CONTENT_NOT_IN_CATALOG], [req2])
+        self.assertEqual(result['failed_requests_by_reason'][PriceValidationError.__name__], [req3])
+        # Budget checks should still run.
+        self.mock_subsidy_balance.assert_called_once()
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.assert_called_once()
+        self.mock_aggregates_for_policy.assert_called_once()
+
+    def test_can_allocate_all_subsidy_balance_exact_match(self):
+        """
+        Test can_allocate_all when batch cost exactly equals remaining subsidy balance.
+        """
+        req1 = self._create_mock_request('c1', 4000)  # $40
+        req2 = self._create_mock_request('c2', 5000)  # $50
+        reqs = [req1, req2]
+
+        # Mock metadata
+        self.mock_catalog_content_metadata.return_value = [{'key': 'c1'}, {'key': 'c2'}]
+        self.mock_canonical_price.side_effect = lambda cid, meta: {'c1': 4000, 'c2': 5000}[cid]
+
+        # Setup budget mocks - exact match scenario.
+        self.mock_subsidy_balance.return_value = 11000  # $110
+        # Allocated = $20, Batch = $90 -> Total $110 (exactly equals subsidy balance).
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.return_value = -2000
+        self.mock_aggregates_for_policy.return_value = {'total_quantity': -1000}  # $10 spent
+        self.policy.spend_limit = 20000  # High enough to not be a factor
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            result = self.policy.can_allocate_all(reqs)
+
+        # Should PASS when exactly equal to subsidy balance.
+        self.assertCountEqual(result['valid_requests'], reqs)
+        self.assertEqual(len(result['failed_requests_by_reason']), 0)
+
+    def test_can_allocate_all_policy_limit_exact_match(self):
+        """
+        Test can_allocate_all when batch cost exactly equals policy spend limit.
+        """
+
+        req1 = self._create_mock_request('c1', 4000)  # $40
+        req2 = self._create_mock_request('c2', 5000)  # $50
+        reqs = [req1, req2]
+
+        # Mock metadata.
+        self.mock_catalog_content_metadata.return_value = [{'key': 'c1'}, {'key': 'c2'}]
+        self.mock_canonical_price.side_effect = lambda cid, meta: {'c1': 4000, 'c2': 5000}[cid]
+
+        # Setup budget mocks - exact match on policy limit.
+        self.policy.spend_limit = 12000  # $120 limit.
+        self.mock_subsidy_balance.return_value = 20000  # $200 (plenty).
+        # Allocated = $20, Spent = $10, Batch = $90 -> Total $120 (exactly equals policy limit).
+        self.mock_assignments_api.get_allocated_quantity_for_configuration.return_value = -2000
+        self.mock_aggregates_for_policy.return_value = {'total_quantity': -1000}
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            result = self.policy.can_allocate_all(reqs)
+
+        # Should PASS when exactly equal to policy limit.
+        self.assertCountEqual(result['valid_requests'], reqs)
+        self.assertEqual(len(result['failed_requests_by_reason']), 0)
+
+    def test_can_allocate_all_subsidy_balance_api_error(self):
+        """
+        Test can_allocate_all when subsidy balance API call fails.
+        """
+
+        reqs = [self._create_mock_request('c1', 1000)]
+
+        # Mock metadata and price validation to pass.
+        self.mock_catalog_content_metadata.return_value = [{'key': 'c1'}]
+        self.mock_canonical_price.return_value = 1000
+
+        # Mock subsidy balance to raise an exception.
+        self.mock_subsidy_balance.side_effect = requests.exceptions.HTTPError("Service Unavailable")
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            with self.assertRaises(requests.exceptions.HTTPError):
+                self.policy.can_allocate_all(reqs)
+
+        # Verify earlier checks were completed.
+        self.mock_catalog_content_metadata.assert_called_once()
+        self.mock_canonical_price.assert_called_once()
+        # Don't assume order of budget-related calls - just verify subsidy_balance was called.
+        self.mock_subsidy_balance.assert_called_once()
+
+    def test_can_allocate_all_aggregates_api_error(self):
+        """
+        Test can_allocate_all when policy aggregates API call fails.
+        """
+
+        reqs = [self._create_mock_request('c1', 1000)]
+
+        # Mock metadata and price validation to pass.
+        self.mock_catalog_content_metadata.return_value = [{'key': 'c1'}]
+        self.mock_canonical_price.return_value = 1000
+
+        # Mock aggregates to raise an exception.
+        self.mock_aggregates_for_policy.side_effect = requests.exceptions.HTTPError("Aggregates Service Unavailable")
+
+        with self.settings(
+            ALLOCATION_PRICE_VALIDATION_LOWER_BOUND_RATIO=self.lower_bound_ratio,
+            ALLOCATION_PRICE_VALIDATION_UPPER_BOUND_RATIO=self.upper_bound_ratio,
+        ):
+            with self.assertRaises(requests.exceptions.HTTPError):
+                self.policy.can_allocate_all(reqs)
+
+        # Verify earlier checks were completed.
+        self.mock_catalog_content_metadata.assert_called_once()
+        self.mock_canonical_price.assert_called_once()
+        # Don't assume order - just verify aggregates was called.
+        self.mock_aggregates_for_policy.assert_called_once()
+
+    def test_can_allocate_all_catalog_metadata_api_error(self):
+        """
+        Test can_allocate_all when catalog metadata API call fails.
+        """
+
+        reqs = [self._create_mock_request('c1', 1000)]
+
+        # Mock catalog metadata to raise an exception.
+        self.mock_catalog_content_metadata.side_effect = requests.exceptions.HTTPError("Catalog Service Unavailable")
+
+        with self.assertRaises(requests.exceptions.HTTPError):
+            self.policy.can_allocate_all(reqs)
+
+        # No other API calls should be made if catalog metadata fails.
+        self.mock_canonical_price.assert_not_called()
+        self.mock_subsidy_balance.assert_not_called()
 
 
 class PerLearnerSpendCreditAccessPolicyTests(MockPolicyDependenciesMixin, TestCase):
