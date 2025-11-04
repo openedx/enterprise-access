@@ -294,6 +294,18 @@ class LearnerCreditRequestApproveRequestSerializer(serializers.Serializer):
         help_text="The UUID of the SubsidyAccessPolicy to use for this approval."
     )
 
+    def create(self, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
+
+    def update(self, instance, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
+
 
 class LearnerCreditRequestApproveAllSerializer(serializers.Serializer):
     """
@@ -303,6 +315,18 @@ class LearnerCreditRequestApproveAllSerializer(serializers.Serializer):
         required=True,
         help_text="The UUID of the SubsidyAccessPolicy to use for this approval."
     )
+
+    def create(self, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
+
+    def update(self, instance, validated_data):
+        """
+        Not implemented - this serializer is for validation only
+        """
+        raise NotImplementedError("This serializer is for validation only")
 
 
 # pylint: disable=abstract-method

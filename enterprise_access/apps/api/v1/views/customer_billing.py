@@ -10,11 +10,11 @@ from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, OpenApiTypes, extend_schema, extend_schema_view
 from edx_rbac.decorators import permission_required
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
-from rest_framework import exceptions, mixins, permissions, status, views, viewsets
+from rest_framework import exceptions, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from enterprise_access.apps.api import serializers, utils
+from enterprise_access.apps.api import serializers
 from enterprise_access.apps.api.authentication import StripeWebhookAuthentication
 from enterprise_access.apps.core.constants import (
     CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,

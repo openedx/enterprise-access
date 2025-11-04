@@ -1,7 +1,6 @@
 """
 Tests for StripEventSummary viewset.
 """
-import json
 import uuid
 from datetime import timedelta
 from urllib.parse import urlencode

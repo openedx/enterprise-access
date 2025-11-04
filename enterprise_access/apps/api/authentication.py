@@ -63,7 +63,7 @@ class StripeWebhookAuthentication(authentication.BaseAuthentication):
             )
             # Make the constructed event available to the view to avoid
             # reconstructing it again there.
-            setattr(request, "_stripe_event", event)
+            request._stripe_event = event  # pylint: disable=protected-access
         except ValueError as e:
             logger.exception('Invalid payload in Stripe webhook request: %s', e)
             raise exceptions.AuthenticationFailed('Invalid payload')
@@ -76,4 +76,3 @@ class StripeWebhookAuthentication(authentication.BaseAuthentication):
 
         # Authentication succeeded - return None since webhooks don't have a user
         # The request is from Stripe's servers, not a logged-in user
-        return None
