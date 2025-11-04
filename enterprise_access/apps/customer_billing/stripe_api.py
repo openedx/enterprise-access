@@ -243,10 +243,17 @@ def get_stripe_trialing_subscription(
 
 
 @stripe_cache()
-def upcoming_invoice(stripe_customer_id, stripe_subscription_id):
+def get_upcoming_invoice(stripe_customer_id: str, stripe_subscription_id: str):
     """
-    https://docs.stripe.com/changelog/basil/2025-03-31/invoice-preview-api-deprecations
-    https://docs.stripe.com/api/invoices/create_preview?architecture-style=resources
+    Retrieve the upcoming invoice for a subscription in the trial period.
+
+    Args:
+        stripe_customer_id (str): The Stripe Customer ID to search subscriptions for.
+        stripe_subscription_id (str): The Stripe Subscription ID
+
+    Docs:
+        https://docs.stripe.com/changelog/basil/2025-03-31/invoice-preview-api-deprecations
+        https://docs.stripe.com/api/invoices/create_preview?architecture-style=resources
     """
     return stripe.Invoice.create_preview(
         customer=stripe_customer_id,

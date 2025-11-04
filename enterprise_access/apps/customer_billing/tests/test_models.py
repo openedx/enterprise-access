@@ -3,7 +3,8 @@ Tests for the ``enterprise_access.customer_billing.models`` module.
 """
 from datetime import timedelta
 from decimal import Decimal
-from typing import cast
+from random import randint
+from typing import Type, cast
 from unittest import mock
 from uuid import uuid4
 
@@ -15,6 +16,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from enterprise_access.apps.core.tests.factories import UserFactory
+from enterprise_access.apps.customer_billing import stripe_api
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
@@ -23,10 +25,33 @@ from enterprise_access.apps.customer_billing.models import (
     StripeEventData,
     StripeEventSummary
 )
+from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
 from enterprise_access.apps.provisioning.models import GetCreateSubscriptionPlanStep
 from enterprise_access.apps.provisioning.tests.factories import ProvisionNewCustomerWorkflowFactory
 
 User = get_user_model()
+
+
+class AttrDict(dict):
+    """
+    Minimal helper that allows both attribute (obj.foo) and item (obj['foo']) access.
+    Recursively converts nested dicts to AttrDicts, but leaves non-dict values as-is.
+    """
+    def __getattr__(self, name):
+        try:
+            value = self[name]
+        except KeyError as e:
+            raise AttributeError(name) from e
+        return value
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
+    @staticmethod
+    def wrap(value):
+        if isinstance(value, dict) and not isinstance(value, AttrDict):
+            return AttrDict({k: AttrDict.wrap(v) for k, v in value.items()})
+        return value
 
 
 @ddt.ddt
@@ -762,14 +787,15 @@ class TestStripeEventSummary(TestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.user = UserFactory()
-        cls.checkout_intent = CheckoutIntent.create_intent(
+        cls.checkout_intent = CheckoutIntent.objects.create(
+            uuid=uuid4(),
             user=cls.user,
-            slug='test-enterprise',
-            name='Test Enterprise',
+            enterprise_name='Test Enterprisee',
+            enterprise_slug='test-enterprisee',
+            stripe_customer_id='cus_test_456',
             quantity=10,
+            expires_at=timezone.now() + timedelta(minutes=30),
         )
-        cls.checkout_intent.uuid = uuid4()
-        cls.checkout_intent.save(update_fields=['uuid'])
 
     def test_populate_with_summary_data_invoice_event(self):
         """Test populating summary from invoice.paid event with full invoice data."""
@@ -856,7 +882,7 @@ class TestStripeEventSummary(TestCase):
             event_id='evt_test_sub_created',
             event_type='customer.subscription.created',
             checkout_intent=self.checkout_intent,
-            data=subscription_event_data
+            data=subscription_event_data,
         )
 
         # Create and populate summary
@@ -1044,3 +1070,71 @@ class TestStripeEventSummary(TestCase):
         )
         previous = other_checkout_intent.previous_summary(current_event)
         self.assertIsNone(previous)
+
+    def _create_mock_stripe_event(self, event_type, event_data):
+        """Helper to create a mock Stripe event."""
+        mock_event = mock.MagicMock(spec=stripe.Event)
+        created_at = timezone.now() - timedelta(seconds=randint(1, 30))
+        mock_event.created = int(created_at.timestamp())
+        mock_event.type = event_type
+        numeric_id = str(randint(1, 100000)).zfill(6)
+        mock_event.id = f'evt_test_{event_type.replace(".", "_")}_{numeric_id}'
+        mock_event.data = mock.Mock()
+        mock_event.data.object = AttrDict.wrap(event_data)
+        return mock_event
+
+    @mock.patch.object(stripe_api, 'stripe', autospec=True)
+    def test_upcoming_invoice_amount_due(self, mock_stripe):
+        """
+        Test that the `upcoming_invoice_amount_due` value in the StripeEventSummary model is populated
+        from the upcoming invoice
+        """
+        subscription_event_data = {
+            'id': 'evt_test_sub_created',
+            'type': 'customer.subscription.created',
+            'data': {
+                'object': {
+                    'object': 'subscription',
+                    'id': 'sub_test_789',
+                    'status': 'active',
+                    'items': {
+                        'data': [
+                            {
+                                'object': 'subscription_item',
+                                'current_period_start': 1609459200,  # 2021-01-01 00:00:00 UTC
+                                'current_period_end': 1640995200,    # 2022-01-01 00:00:00 UTC
+                            }
+                        ]
+                    },
+                }
+            },
+            'metadata': {
+                'checkout_intent_id': self.checkout_intent.id,
+                'enterprise_customer_name': 'Test Enterprise',
+                'enterprise_customer_slug': 'test-enterprise',
+            }
+        }
+
+        # Create subscription created stripe event
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.created", subscription_event_data
+        )
+        print('mock event ', mock_event)
+
+        # Create StripeEventData
+        stripe_event_data = StripeEventData.objects.create(
+            event_id=mock_event.id,
+            event_type='customer.subscription.created',
+            checkout_intent=self.checkout_intent,
+            data=subscription_event_data
+        )
+
+        # Mock out the 'preview invoice' stripe call
+        fake_invoice = {'amount_due': '200'}
+        mock_stripe.Invoice.create_preview.return_value = fake_invoice
+
+        # Dispatch creation event, which populates the upcoming_invoice_amount_due value
+        StripeEventHandler.dispatch(mock_event)
+
+        summary = StripeEventSummary.objects.get(event_id=stripe_event_data.event_id)
+        self.assertEqual(summary.upcoming_invoice_amount_due, 200)

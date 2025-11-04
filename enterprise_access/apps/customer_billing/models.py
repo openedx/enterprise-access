@@ -862,7 +862,7 @@ class StripeEventSummary(TimeStampedModel):
 
     def update_upcoming_invoice_amount_due(self):
         """
-        Updates the `amount_due` of this record from the first upcoming invoice
+        Updates the `amount_due` value of this record from the first upcoming invoice
         associated with this customer's subscription.
         """
         if not self.checkout_intent:
@@ -879,12 +879,12 @@ class StripeEventSummary(TimeStampedModel):
             return
 
         # Now call the stripe invoice upcoming API
-        upcoming_invoice = stripe_api.upcoming_invoice(stripe_customer_id, stripe_subscription_id)
+        upcoming_invoice = stripe_api.get_upcoming_invoice(stripe_customer_id, stripe_subscription_id)
         if not upcoming_invoice:
             logger.warning('No upcoming invoice exists for event %s', self.event_id)
             return
 
-        self.upcoming_invoice_amount_due = upcoming_invoice.amount_due
+        self.upcoming_invoice_amount_due = upcoming_invoice['amount_due']
         self.save(update_fields=['upcoming_invoice_amount_due'])
 
     @staticmethod
