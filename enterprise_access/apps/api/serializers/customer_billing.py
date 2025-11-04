@@ -125,6 +125,10 @@ class CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer(ser
         required=False,
         help_text='Validation results for stripe_price_id if validation failed. Absent otherwise.',
     )
+    company_name = FieldValidationSerializer(
+        required=False,
+        help_text='Validation results for company_name if validation failed. Absent otherwise.',
+    )
     errors = UnprocessableEntityErrorSerializer(
         required=False,
         many=True,

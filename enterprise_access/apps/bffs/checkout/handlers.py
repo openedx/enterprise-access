@@ -207,7 +207,6 @@ class CheckoutContextHandler(CheckoutIntentAwareHandlerMixin, BaseHandler):
                 min_val, max_val = product_config['quantity_range']
                 quantity_constraints = {'min': min_val, 'max': max_val}
                 break
-
         return {
             'quantity': quantity_constraints,
             'enterprise_slug': {
@@ -223,7 +222,7 @@ class CheckoutContextHandler(CheckoutIntentAwareHandlerMixin, BaseHandler):
             'admin_email': {
                 'min_length': 6,
                 'max_length': 253,
-                'pattern': '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$'
+                'pattern': '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',  # enforce the format of X@Y.Z without spaces
             },
             'country': {
                 'min_length': 2,

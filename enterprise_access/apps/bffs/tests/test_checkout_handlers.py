@@ -234,12 +234,12 @@ class TestCheckoutContextHandler(APITest):
         {
             'constraint_name': 'admin_email',
             'should_match': ['a@b.com', 'First.Last@name.org'],
-            'should_not_match': ['notanemail', 'too@many@ats.com']
+            'should_not_match': ['notanemail', 'too@many@ats.com', 'forbidden spaces@bad.com']
         },
         {
             'constraint_name': 'country',
             'should_match': ['US', 'CN'],
-            'should_not_match': ['USA', 'CANADA']
+            'should_not_match': ['us', 'CANADA']
         },
     )
     @ddt.unpack
