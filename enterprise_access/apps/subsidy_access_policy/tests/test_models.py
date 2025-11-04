@@ -3,7 +3,7 @@ Tests for subsidy_access_policy models.
 """
 import contextlib
 from datetime import datetime, timedelta
-from unittest.mock import ANY, MagicMock, PropertyMock, call, patch
+from unittest.mock import ANY, MagicMock, PropertyMock, patch
 from uuid import uuid4
 
 import ddt
@@ -62,7 +62,7 @@ from enterprise_access.apps.subsidy_access_policy.tests.factories import (
 )
 from enterprise_access.apps.subsidy_request.constants import SubsidyRequestStates
 from enterprise_access.apps.subsidy_request.models import LearnerCreditRequest
-from enterprise_access.apps.subsidy_request.tests.factories import LearnerCreditRequestConfigurationFactory, UserFactory
+from enterprise_access.apps.subsidy_request.tests.factories import LearnerCreditRequestConfigurationFactory
 from enterprise_access.cache_utils import request_cache
 from enterprise_access.utils import localized_utcnow
 from test_utils import TEST_ENTERPRISE_GROUP_UUID, TEST_USER_RECORD, TEST_USER_RECORD_NO_GROUPS
@@ -1987,7 +1987,7 @@ class AssignedLearnerCreditAccessPolicyAllocationTests(MockPolicyDependenciesMix
         }
 
         # Mock canonical prices.
-        def mock_price_side_effect(course_id, metadata):
+        def mock_price_side_effect(course_id, _metadata):
             prices = {'course-1': 5000, 'course-2': 5000, 'course-3': 5000, 'course-4': 5000}
             return prices.get(course_id)
         self.mock_canonical_price.side_effect = mock_price_side_effect
@@ -2076,7 +2076,7 @@ class AssignedLearnerCreditAccessPolicyAllocationTests(MockPolicyDependenciesMix
         ]
 
         # Mock canonical prices.
-        def mock_price_side_effect(course_id, metadata):
+        def mock_price_side_effect(_course_id, _metadata):
             return 5000  # Both are 5000 canonically.
         self.mock_canonical_price.side_effect = mock_price_side_effect
 

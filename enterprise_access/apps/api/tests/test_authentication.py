@@ -5,7 +5,6 @@ import json
 from unittest import mock
 
 import stripe
-from django.conf import settings
 from django.test import RequestFactory, TestCase, override_settings
 from rest_framework.exceptions import AuthenticationFailed
 

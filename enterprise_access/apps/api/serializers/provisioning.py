@@ -235,15 +235,15 @@ class SubscriptionPlanOLIUpdateSerializer(BaseSerializer):
         help_text='Whether this OLI is for the trial plan (True) or paid plan (False).'
     )
 
-    def validate(self, data):
+    def validate(self, attrs):
         """
         Validates that exactly one of CheckoutIntent ``id`` and ``uuid`` is provided.
         """
-        if not (data.get('checkout_intent_id') or data.get('checkout_intent_uuid')):
+        if not (attrs.get('checkout_intent_id') or attrs.get('checkout_intent_uuid')):
             raise serializers.ValidationError('One of CheckoutIntent id or uuid is required')
-        if data.get('checkout_intent_id') and data.get('checkout_intent_uuid'):
+        if attrs.get('checkout_intent_id') and attrs.get('checkout_intent_uuid'):
             raise serializers.ValidationError('Only one of CheckoutIntent id or uuid can be provided')
-        return data
+        return attrs
 
 
 class SubscriptionPlanOLIUpdateResponseSerializer(BaseSerializer):

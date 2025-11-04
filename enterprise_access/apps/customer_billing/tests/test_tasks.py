@@ -648,7 +648,7 @@ class TestSendTrialEndingReminderEmailTask(TestCase):
     @mock.patch("enterprise_access.apps.customer_billing.tasks.BrazeApiClient")
     @mock.patch("enterprise_access.apps.customer_billing.tasks.LmsApiClient")
     def test_stripe_error_during_subscription_retrieval(
-        self, mock_lms_client, mock_braze_client, mock_get_subscription, mock_payment_method
+        self, mock_lms_client, mock_braze_client, mock_get_subscription, _mock_payment_method
     ):
         """Test handling of Stripe API errors."""
         mock_lms_instance = mock_lms_client.return_value

@@ -109,7 +109,7 @@ def send_payment_receipt_email(
                 lms_user_id=admin.get('lms_user_id'),
             )
             recipients.append(recipient)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning(
                 'Failed to create Braze recipient for admin email %s: %s',
                 admin_email,
@@ -416,7 +416,7 @@ def send_trial_cancellation_email_task(
 
 
 @shared_task(base=LoggedTaskWithRetry)
-def send_trial_ending_reminder_email_task(checkout_intent_id):
+def send_trial_ending_reminder_email_task(checkout_intent_id):  # pylint: disable=too-many-statements
     """
     Send Braze email notification 72 hours before trial subscription ends.
 
