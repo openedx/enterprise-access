@@ -330,6 +330,92 @@ class CheckoutIntent(TimeStampedModel):
             expired_intent_records, cls, ['state', 'modified'], batch_size=100,
         )
 
+    @classmethod
+    def find_stalled_fulfillment_intents(cls, stalled_threshold_seconds=180, do_logging=False):
+        """
+        Find all CheckoutIntent records stuck in 'paid' state.
+
+        Args:
+            stalled_threshold_seconds (int): Number of seconds after which a 'paid'
+                CheckoutIntent is considered stalled. Default: 180 (3 minutes)
+            do_logging (bool): If True, log information about each stalled intent found.
+                Default: False
+
+        Returns:
+            tuple: (stalled_intents, list_of_uuids, current_time)
+                stalled_intents: List of CheckoutIntent objects that are stalled
+                list_of_uuids: List of string UUIDs for the stalled intents
+                current_time: The timestamp used for calculations
+        """
+        threshold_time = timezone.now() - timedelta(seconds=stalled_threshold_seconds)
+        current_time = timezone.now()
+
+        # Query stalled intents
+        stalled_intents = list(
+            cls.objects.filter(
+                state=CheckoutIntentState.PAID,
+                modified__lte=threshold_time,
+            ).order_by('modified')
+        )
+
+        if not stalled_intents:
+            return [], [], current_time
+
+        updated_uuids = [str(intent.pk) for intent in stalled_intents]
+
+        if do_logging:
+            for intent in stalled_intents:
+                time_stalled = (current_time - intent.modified).total_seconds()
+                logger.info(
+                    '[DRY RUN] Would mark CheckoutIntent %s as stalled (stalled for %s seconds)',
+                    intent.pk,
+                    int(time_stalled),
+                )
+
+        return stalled_intents, updated_uuids, current_time
+
+    @classmethod
+    def mark_stalled_fulfillment_intents(cls, stalled_threshold_seconds=180):
+        """
+        Find all CheckoutIntent records stuck in 'paid' state and transition them
+        to 'errored_fulfillment_stalled'.
+
+        Args:
+            stalled_threshold_seconds (int): Number of seconds after which a 'paid'
+                CheckoutIntent is considered stalled. Default: 180 (3 minutes)
+
+        Returns:
+            tuple: (updated_count, list_of_updated_uuids)
+        """
+        stalled_intents, updated_uuids, current_time = cls.find_stalled_fulfillment_intents(
+            stalled_threshold_seconds
+        )
+
+        if not stalled_intents:
+            return 0, []
+
+        # Update each intent and save individually (django-simple-history tracks via post-save signal)
+        updated_count = 0
+        for intent in stalled_intents:
+            time_stalled = (current_time - intent.modified).total_seconds()
+            intent.state = CheckoutIntentState.ERRORED_FULFILLMENT_STALLED
+            intent.last_provisioning_error = (
+                f'Fulfillment stalled for {int(time_stalled)} seconds '
+                f'(threshold: {stalled_threshold_seconds}s). '
+                f'Last modified: {intent.modified.isoformat()}. '
+                f'Provisioning workflow may have failed without proper error handling.'
+            )
+            logger.warning(
+                'Marking CheckoutIntent %s as ERRORED_FULFILLMENT_STALLED. '
+                'Stalled for %s seconds.',
+                intent.pk,
+                int(time_stalled),
+            )
+            intent.save(update_fields=['state', 'last_provisioning_error', 'modified'])
+            updated_count += 1
+
+        return updated_count, updated_uuids
+
     def is_expired(self):
         """Check if this checkout intent has expired."""
         if self.expires_at:
