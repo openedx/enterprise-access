@@ -38,6 +38,7 @@ from .models import AssignmentConfiguration, LearnerContentAssignment
 from .tasks import (
     create_pending_enterprise_learner_for_assignment_task,
     send_assignment_automatically_expired_email,
+    send_bnr_automatically_expired_email,
     send_email_for_new_assignment
 )
 
@@ -1143,7 +1144,12 @@ def expire_assignment(
 
         assignment.save()
 
-        if not credit_request:
+        # Send appropriate expiration email based on whether this is a B&R request or regular assignment
+        if credit_request:
+            # This is a Browse & Request - send B&R-specific expiration email
+            send_bnr_automatically_expired_email.delay(credit_request.uuid)
+        else:
+            # This is a regular assignment - send assignment expiration email
             send_assignment_automatically_expired_email.delay(assignment.uuid)
 
     return automatic_expiration_reason

@@ -94,7 +94,7 @@ class LearnerCreditRequestFactory(SubsidyRequestFactory):
     Test factory for the `LearnerCreditRequest` model.
     """
     learner_credit_request_config = factory.SubFactory(LearnerCreditRequestConfigurationFactory)
-    assignment = factory.SubFactory(LearnerContentAssignmentFactory)
+    assignment = None
 
     class Meta:
         model = LearnerCreditRequest
