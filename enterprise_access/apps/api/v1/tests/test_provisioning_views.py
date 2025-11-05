@@ -831,7 +831,8 @@ class TestCheckoutIntentSynchronization(APITest):
     @ddt.data(
         CheckoutIntentState.CREATED,
         CheckoutIntentState.FULFILLED,
-        CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
+        CheckoutIntentState.ERRORED_BACKOFFICE,
+        CheckoutIntentState.ERRORED_FULFILLMENT_STALLED,
         CheckoutIntentState.EXPIRED,
     )
     @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')

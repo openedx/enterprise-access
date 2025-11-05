@@ -57,7 +57,7 @@ class CheckoutIntentViewSetTestCase(APITest):
             user=cls.user_4,
             enterprise_name="Active Enterprise 4",
             enterprise_slug="active-enterprise-4",
-            state=CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
+            state=CheckoutIntentState.ERRORED_BACKOFFICE,
             quantity=25,
             expires_at=timezone.now() + timedelta(minutes=30),
             stripe_checkout_session_id='cs_test_987',
@@ -158,11 +158,11 @@ class CheckoutIntentViewSetTestCase(APITest):
 
     @ddt.data(
         {'current_state': CheckoutIntentState.CREATED, 'new_state': CheckoutIntentState.PAID},
-        {'current_state': CheckoutIntentState.CREATED, 'new_state': CheckoutIntentState.ERRORED_STRIPE_CHECKOUT},
         {'current_state': CheckoutIntentState.CREATED, 'new_state': CheckoutIntentState.EXPIRED},
         {'current_state': CheckoutIntentState.PAID, 'new_state': CheckoutIntentState.FULFILLED},
+        {'current_state': CheckoutIntentState.PAID, 'new_state': CheckoutIntentState.ERRORED_BACKOFFICE},
+        {'current_state': CheckoutIntentState.PAID, 'new_state': CheckoutIntentState.ERRORED_FULFILLMENT_STALLED},
         {'current_state': CheckoutIntentState.PAID, 'new_state': CheckoutIntentState.ERRORED_PROVISIONING},
-        {'current_state': CheckoutIntentState.ERRORED_STRIPE_CHECKOUT, 'new_state': CheckoutIntentState.PAID},
         {'current_state': CheckoutIntentState.ERRORED_PROVISIONING, 'new_state': CheckoutIntentState.FULFILLED},
         {'current_state': CheckoutIntentState.EXPIRED, 'new_state': CheckoutIntentState.CREATED},
     )
@@ -219,22 +219,30 @@ class CheckoutIntentViewSetTestCase(APITest):
             'context': str(uuid.uuid4()),
         }])
 
-        # First transition to error state
-        response = self.client.patch(
-            self.detail_url_1,
-            {'state': 'errored_stripe_checkout'},
-            format='json'
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        # Then recover to paid
+        # First transition to paid state
         response = self.client.patch(
             self.detail_url_1,
             {'state': 'paid'},
             format='json'
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['state'], 'paid')
+
+        # Then transition to error state
+        response = self.client.patch(
+            self.detail_url_1,
+            {'state': 'errored_provisioning'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Then recover to fulfilled
+        response = self.client.patch(
+            self.detail_url_1,
+            {'state': 'fulfilled'},
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['state'], 'fulfilled')
 
     def test_cannot_transition_from_fulfilled(self):
         """Test that fulfilled is a terminal state."""

@@ -384,16 +384,19 @@ class CustomerBillingViewSet(viewsets.ViewSet):
             '## Allowed State Transitions\n'
             '```\n'
             'created → paid\n'
-            'created → errored_stripe_checkout\n'
+            'created → expired\n'
             'paid → fulfilled\n'
+            'paid → errored_backoffice\n'
+            'paid → errored_fulfillment_stalled\n'
             'paid → errored_provisioning\n'
-            'errored_stripe_checkout → paid\n'
-            'errored_provisioning → paid\n'
+            'errored_provisioning → fulfilled\n'
+            'expired → created\n'
             '```\n'
             '## Integration Points\n'
             '- **Stripe Webhook**: Transitions from `created` to `paid` after successful payment\n'
             '- **Fulfillment Service**: Transitions from `paid` to `fulfilled` after provisioning\n'
-            '- **Error Recovery**: Allows retry from error states back to `paid`\n\n'
+            '- **Backoffice Integration**: Transitions to `errored_backoffice` on Salesforce failures\n'
+            '- **Error Recovery**: Allows retry from `errored_provisioning` to `fulfilled`\n\n'
         ),
         parameters=[
             OpenApiParameter(

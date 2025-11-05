@@ -162,7 +162,8 @@ class CheckoutIntentAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
             CheckoutIntentState.CREATED: 'blue',
             CheckoutIntentState.PAID: 'orange',
             CheckoutIntentState.FULFILLED: 'green',
-            CheckoutIntentState.ERRORED_STRIPE_CHECKOUT: 'red',
+            CheckoutIntentState.ERRORED_BACKOFFICE: 'red',
+            CheckoutIntentState.ERRORED_FULFILLMENT_STALLED: 'red',
             CheckoutIntentState.ERRORED_PROVISIONING: 'red',
             CheckoutIntentState.EXPIRED: 'gray',
         }

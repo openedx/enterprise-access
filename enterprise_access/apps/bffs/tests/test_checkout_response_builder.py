@@ -407,8 +407,8 @@ class TestCheckoutContextResponseBuilder(APITest):
         # Setup context with a checkout intent that has errors
         context = self._create_minimal_valid_context()
         error_intent = self.mock_checkout_intent
-        error_intent['state'] = 'errored_stripe_checkout'
-        error_intent['last_checkout_error'] = 'Payment processing failed'
+        error_intent['state'] = 'errored_backoffice'
+        error_intent['last_provisioning_error'] = 'Salesforce integration failed'
         context.checkout_intent = error_intent
 
         # Create and build response
@@ -421,8 +421,8 @@ class TestCheckoutContextResponseBuilder(APITest):
         # Assertions
         self.assertEqual(status_code, status.HTTP_200_OK)
         self.assertIn('checkout_intent', data)
-        self.assertEqual(data['checkout_intent']['state'], 'errored_stripe_checkout')
-        self.assertEqual(data['checkout_intent']['last_checkout_error'], 'Payment processing failed')
+        self.assertEqual(data['checkout_intent']['state'], 'errored_backoffice')
+        self.assertEqual(data['checkout_intent']['last_provisioning_error'], 'Salesforce integration failed')
 
 
 @ddt.ddt
