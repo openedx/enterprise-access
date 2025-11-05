@@ -1083,7 +1083,7 @@ class TestStripeEventSummary(TestCase):
         mock_event.data.object = AttrDict.wrap(event_data)
         return mock_event
 
-    @mock.patch.object(stripe_api, 'stripe', autospec=True)
+    @mock.patch.object(stripe_api, 'stripe')
     def test_upcoming_invoice_amount_due(self, mock_stripe):
         """
         Test that the `upcoming_invoice_amount_due` value in the StripeEventSummary model is populated
