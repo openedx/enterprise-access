@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('customer_billing', '0016_alter_checkoutintent_uuid_and_more'),
+        ('customer_billing', '0018_update_checkout_intent_error_states'),
     ]
 
     operations = [
