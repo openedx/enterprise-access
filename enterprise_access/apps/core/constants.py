@@ -37,6 +37,7 @@ BFF_READ_PERMISSION = 'bff.has_read_access'
 CUSTOMER_BILLING_OPERATOR_ROLE = 'enterprise_access_customer_billing_operator'
 CUSTOMER_BILLING_ADMIN_ROLE = 'enterprise_access_customer_billing_admin'
 CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION = 'customer_billing.create_portal_session'
+CHECKOUT_INTENT_READ_WRITE_ALL_PERMISSION = 'customer_billing.checkout_intent_read_write_all'
 
 ADMIN_LEARNER_PROFILE_ADMIN_ROLE = 'enterprise_access_admin_learner_profile_admin'
 ADMIN_LEARNER_PROFILE_READ_PERMISSION = 'admin_learner_profile.has_read_access'

@@ -51,7 +51,7 @@ class StripeWebhookAuthenticationTests(TestCase):
             't=1234567890,v1=valid_signature'
         )
 
-        result = self.auth.authenticate(request)
+        result = self.auth.authenticate(request)  # pylint: disable=assignment-from-no-return
 
         # Webhook authentication returns None (no user)
         self.assertIsNone(result)

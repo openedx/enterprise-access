@@ -574,6 +574,11 @@ rules.add_perm(
     constants.CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,
     has_customer_billing_operator_access | has_customer_billing_admin_access,
 )
+# Grant checkout intent read/write all to operators
+rules.add_perm(
+    constants.CHECKOUT_INTENT_READ_WRITE_ALL_PERMISSION,
+    has_customer_billing_operator_access,
+)
 
 # Grants admin learner profile read permission to admin learner profile admins.
 rules.add_perm(
