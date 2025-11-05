@@ -84,17 +84,32 @@ class CheckoutIntent(TimeStampedModel):
         CREATED = (CheckoutIntentState.CREATED, 'Created')
         PAID = (CheckoutIntentState.PAID, 'Paid')
         FULFILLED = (CheckoutIntentState.FULFILLED, 'Fulfilled')
-        ERRORED_STRIPE_CHECKOUT = (CheckoutIntentState.ERRORED_STRIPE_CHECKOUT, 'Errored (Stripe Checkout)')
-        ERRORED_PROVISIONING = (CheckoutIntentState.ERRORED_PROVISIONING, 'Errored (Provisioning)')
+        ERRORED_BACKOFFICE = (
+            CheckoutIntentState.ERRORED_BACKOFFICE,
+            'Errored (Backoffice) - Salesforce integration failed during checkout intent update'
+        )
+        ERRORED_FULFILLMENT_STALLED = (
+            CheckoutIntentState.ERRORED_FULFILLMENT_STALLED,
+            'Errored (Fulfillment Stalled) - Checkout intent stuck in paid state, fulfillment workflow may have failed'
+        )
+        ERRORED_PROVISIONING = (
+            CheckoutIntentState.ERRORED_PROVISIONING,
+            'Errored (Provisioning) - Enterprise provisioning workflow failed after payment'
+        )
         EXPIRED = (CheckoutIntentState.EXPIRED, 'Expired')
 
     SUCCESS_STATES = {CheckoutIntentState.PAID, CheckoutIntentState.FULFILLED}
-    FAILURE_STATES = {CheckoutIntentState.ERRORED_STRIPE_CHECKOUT, CheckoutIntentState.ERRORED_PROVISIONING}
+    FAILURE_STATES = {
+        CheckoutIntentState.ERRORED_BACKOFFICE,
+        CheckoutIntentState.ERRORED_FULFILLMENT_STALLED,
+        CheckoutIntentState.ERRORED_PROVISIONING,
+    }
     NON_EXPIRED_STATES = {
         CheckoutIntentState.CREATED,
         CheckoutIntentState.PAID,
         CheckoutIntentState.FULFILLED,
-        CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
+        CheckoutIntentState.ERRORED_BACKOFFICE,
+        CheckoutIntentState.ERRORED_FULFILLMENT_STALLED,
         CheckoutIntentState.ERRORED_PROVISIONING,
     }
     FULFILLABLE_STATES = {
@@ -249,18 +264,18 @@ class CheckoutIntent(TimeStampedModel):
         logger.info(f'CheckoutIntent {self} marked as {CheckoutIntentState.FULFILLED}.')
         return self
 
-    def mark_checkout_error(self, error_message):
-        """Record a checkout error."""
+    def mark_backoffice_error(self, error_message):
+        """Record a backoffice error (Salesforce integration failure)."""
         if not self.is_valid_state_transition(
             CheckoutIntentState(self.state),
-            CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
+            CheckoutIntentState.ERRORED_BACKOFFICE,
         ):
-            raise ValueError(f"Cannot transition from {self.state} to {CheckoutIntentState.ERRORED_STRIPE_CHECKOUT}.")
+            raise ValueError(f"Cannot transition from {self.state} to {CheckoutIntentState.ERRORED_BACKOFFICE}.")
 
-        self.state = CheckoutIntentState.ERRORED_STRIPE_CHECKOUT
-        self.last_checkout_error = error_message
-        self.save(update_fields=['state', 'last_checkout_error', 'modified'])
-        logger.info(f'CheckoutIntent {self} marked as {CheckoutIntentState.ERRORED_STRIPE_CHECKOUT}.')
+        self.state = CheckoutIntentState.ERRORED_BACKOFFICE
+        self.last_provisioning_error = error_message
+        self.save(update_fields=['state', 'last_provisioning_error', 'modified'])
+        logger.info(f'CheckoutIntent {self} marked as {CheckoutIntentState.ERRORED_BACKOFFICE}.')
         return self
 
     def mark_provisioning_error(self, error_message, workflow=None):

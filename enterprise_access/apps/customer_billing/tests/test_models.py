@@ -200,7 +200,8 @@ class TestCheckoutIntentModel(TestCase):
         )
 
         # Now put it in a failure state
-        intent.mark_checkout_error('Payment processing failed')
+        intent.mark_as_paid('cs_test_123')
+        intent.mark_backoffice_error('Salesforce integration failed')
         self.assertIn(intent.state, CheckoutIntent.FAILURE_STATES)
 
         # Trying to create a new intent for the same user should fail
@@ -220,7 +221,7 @@ class TestCheckoutIntentModel(TestCase):
         self.assertEqual(intent.enterprise_slug, 'original-slug')
         self.assertEqual(intent.enterprise_name, 'Original Enterprise')
         self.assertEqual(intent.quantity, 5)
-        self.assertEqual(intent.state, CheckoutIntentState.ERRORED_STRIPE_CHECKOUT)
+        self.assertEqual(intent.state, CheckoutIntentState.ERRORED_BACKOFFICE)
 
     def test_state_transitions_happy_path(self):
         """Test the state transitions for the happy path."""
@@ -249,26 +250,25 @@ class TestCheckoutIntentModel(TestCase):
 
     def test_state_transitions_error_paths(self):
         """Test state transitions for error paths."""
+        # Test PAID → ERRORED_BACKOFFICE
         intent = CheckoutIntent.create_intent(
             user=cast(AbstractUser, self.user1),
             slug=self.basic_data['enterprise_slug'],
             name=self.basic_data['enterprise_name'],
             quantity=self.basic_data['quantity']
         )
+        intent.mark_as_paid('cs_test_123')
+        intent.mark_backoffice_error('Salesforce integration failed')
+        self.assertEqual(intent.state, CheckoutIntentState.ERRORED_BACKOFFICE)
+        self.assertEqual(intent.last_provisioning_error, 'Salesforce integration failed')
 
-        # CREATED → ERRORED_STRIPE_CHECKOUT
-        intent.mark_checkout_error('Payment failed: card declined')
-        self.assertEqual(intent.state, CheckoutIntentState.ERRORED_STRIPE_CHECKOUT)
-        self.assertEqual(intent.last_checkout_error, 'Payment failed: card declined')
-
-        # Reset for testing PAID → ERRORED_PROVISIONING
+        # Test PAID → ERRORED_PROVISIONING
         intent = CheckoutIntent.create_intent(
             user=cast(AbstractUser, self.user2),
             slug='another-slug',
             name='Another Enterprise',
             quantity=7
         )
-
         intent.mark_as_paid('cs_test_456')
         workflow = ProvisionNewCustomerWorkflowFactory()
         intent.mark_provisioning_error('Provisioning failed: API error', workflow)

@@ -72,18 +72,18 @@ CHECKOUT_INTENT_EXAMPLES = [
     OpenApiExample(
         'Error State Example',
         summary='CheckoutIntent in error state',
-        description='Failed during payment or provisioning',
+        description='Failed during backoffice integration or provisioning',
         value={
             'uuid': '123e4567-e89b-12d3-a456-426614174003',
             'user': 1,
-            'state': CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
+            'state': CheckoutIntentState.ERRORED_BACKOFFICE,
             'stripe_checkout_session_id': 'cs_test_d4e5f6g7h8i9j0k1l2m3',
             'enterprise_customer_uuid': '987e6543-e21b-12d3-a456-426614174000',
             'created': '2025-01-15T10:30:00.000Z',
             'modified': '2025-01-15T10:35:00.000Z',
-            'error_message': 'Payment failed: Card declined',
+            'error_message': 'Salesforce integration failed',
             'metadata': {
-                'failure_reason': 'card_declined',
+                'failure_reason': 'salesforce_api_error',
                 'attempt_count': 1
             }
         },
@@ -106,8 +106,8 @@ PATCH_REQUEST_EXAMPLES = [
         summary='Transition to error state',
         description='Updates state to error with descriptive message',
         value={
-            'state': CheckoutIntentState.ERRORED_STRIPE_CHECKOUT,
-            'error_message': 'Payment failed: Insufficient funds'
+            'state': CheckoutIntentState.ERRORED_PROVISIONING,
+            'error_message': 'Provisioning workflow failed'
         },
         request_only=True,
     ),
