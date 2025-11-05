@@ -1119,3 +1119,65 @@ class TestStripeEventSummary(TestCase):
 
         summary = StripeEventSummary.objects.get(event_id=stripe_event_data.event_id)
         self.assertEqual(summary.upcoming_invoice_amount_due, 200)
+
+
+class TestCheckoutIntentStalledFulfillment(TestCase):
+    """
+    Tests for CheckoutIntent stalled fulfillment detection and handling.
+    """
+
+    def setUp(self):
+        self.user = UserFactory()
+
+    def _create_intent(self, state, slug_suffix='', **kwargs):
+        """Helper to create a CheckoutIntent with minimal boilerplate."""
+        defaults = {
+            'user': kwargs.pop('user', self.user),
+            'state': state,
+            'enterprise_name': f'Test Enterprise{slug_suffix}',
+            'enterprise_slug': f'test-enterprise{slug_suffix}',
+            'quantity': 10,
+            'expires_at': timezone.now() + timedelta(hours=1),
+        }
+        defaults.update(kwargs)
+        return CheckoutIntent.objects.create(**defaults)
+
+    def test_mark_stalled_fulfillment_intents_finds_stalled_intents(self):
+        """Test class method finds and marks stalled intents."""
+        intent = self._create_intent(CheckoutIntentState.PAID)
+        CheckoutIntent.objects.filter(pk=intent.pk).update(
+            modified=timezone.now() - timedelta(minutes=5)
+        )
+
+        count, uuids = CheckoutIntent.mark_stalled_fulfillment_intents(stalled_threshold_seconds=180)
+
+        self.assertEqual(count, 1)
+        self.assertEqual(len(uuids), 1)
+        self.assertIn(str(intent.pk), uuids)
+
+        intent.refresh_from_db()
+        self.assertEqual(intent.state, CheckoutIntentState.ERRORED_FULFILLMENT_STALLED)
+        self.assertIsNotNone(intent.last_provisioning_error)
+
+    def test_mark_stalled_fulfillment_intents_ignores_non_paid_states(self):
+        """Test that only PAID intents are marked as stalled."""
+        created_intent = self._create_intent(CheckoutIntentState.CREATED, '-created')
+        fulfilled_intent = self._create_intent(CheckoutIntentState.FULFILLED, '-fulfilled', user=UserFactory())
+        paid_intent = self._create_intent(CheckoutIntentState.PAID, '-paid', user=UserFactory())
+
+        CheckoutIntent.objects.filter(
+            pk__in=[created_intent.pk, fulfilled_intent.pk, paid_intent.pk]
+        ).update(modified=timezone.now() - timedelta(minutes=5))
+
+        count, uuids = CheckoutIntent.mark_stalled_fulfillment_intents(stalled_threshold_seconds=180)
+
+        self.assertEqual(count, 1)
+        self.assertIn(str(paid_intent.pk), uuids)
+
+        for intent, expected_state in [
+            (created_intent, CheckoutIntentState.CREATED),
+            (fulfilled_intent, CheckoutIntentState.FULFILLED),
+            (paid_intent, CheckoutIntentState.ERRORED_FULFILLMENT_STALLED)
+        ]:
+            intent.refresh_from_db()
+            self.assertEqual(intent.state, expected_state)
