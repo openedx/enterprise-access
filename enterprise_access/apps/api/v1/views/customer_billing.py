@@ -386,19 +386,16 @@ class CustomerBillingViewSet(viewsets.ViewSet):
             '## Allowed State Transitions\n'
             '```\n'
             'created → paid\n'
-            'created → expired\n'
+            'created → errored_stripe_checkout\n'
             'paid → fulfilled\n'
-            'paid → errored_backoffice\n'
-            'paid → errored_fulfillment_stalled\n'
             'paid → errored_provisioning\n'
-            'errored_provisioning → fulfilled\n'
-            'expired → created\n'
+            'errored_stripe_checkout → paid\n'
+            'errored_provisioning → paid\n'
             '```\n'
             '## Integration Points\n'
             '- **Stripe Webhook**: Transitions from `created` to `paid` after successful payment\n'
             '- **Fulfillment Service**: Transitions from `paid` to `fulfilled` after provisioning\n'
-            '- **Backoffice Integration**: Transitions to `errored_backoffice` on Salesforce failures\n'
-            '- **Error Recovery**: Allows retry from `errored_provisioning` to `fulfilled`\n\n'
+            '- **Error Recovery**: Allows retry from error states back to `paid`\n\n'
         ),
         parameters=[
             OpenApiParameter(
@@ -526,3 +523,21 @@ class StripeEventSummaryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         Lists ``StripeEventSummary`` records, filtered by given subscription plan uuid.
         """
         return super().list(request, *args, **kwargs)
+
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path='first-invoice-upcoming-amount-due',
+    )
+    def first_upcoming_invoice_amount_due(self, request, *args, **kwargs):
+        subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
+        summary = StripeEventSummary.objects.filter(
+            event_type='customer.subscription.created',
+            subscription_plan_uuid=subscription_plan_uuid,
+        ).first()
+        if not (subscription_plan_uuid and summary):
+            return Response({})
+        return Response({
+            'upcoming_invoice_amount_due': summary.upcoming_invoice_amount_due,
+            'currency': summary.currency,
+        })

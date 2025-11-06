@@ -110,7 +110,7 @@ class StripeEventSummaryTests(APITest):
             expires_at=timezone.now() + timedelta(hours=1),
         )
 
-        # Create twp StripeEventData objects, will each create StripeEventSummary on create
+        # Create two StripeEventData objects, will each create StripeEventSummary on create
         self.stripe_event_data = StripeEventData.objects.create(
             event_id='evt_test_invoice',
             event_type='invoice.paid',
@@ -178,3 +178,86 @@ class StripeEventSummaryTests(APITest):
         response = self.client.get(url)
         # trying to fetch a subscription plan for an enterprise customer they are not associated with
         assert response.status_code == 403
+
+
+class StripeEventUpcomingInvoiceAmountDueTests(APITest):
+    """
+    Tests for first_upcoming_invoice_amount_due endpoint.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.user = UserFactory()
+        self.enterprise_uuid = str(uuid.uuid4())
+        self.stripe_customer_id = 'cus_test_123'
+        self.subscription_plan_uuid = str(uuid.uuid4())
+
+        self.checkout_intent = CheckoutIntent.objects.create(
+            user=self.user,
+            enterprise_uuid=self.enterprise_uuid,
+            enterprise_name='Test Enterprise',
+            enterprise_slug='test-enterprise',
+            stripe_customer_id=self.stripe_customer_id,
+            state=CheckoutIntentState.PAID,
+            quantity=10,
+            expires_at=timezone.now() + timedelta(hours=1),
+        )
+
+        subscription_event_data = {
+            'id': 'evt_test_sub_created',
+            'type': 'customer.subscription.created',
+            'data': {
+                'object': {
+                    'object': 'subscription',
+                    'id': 'sub_test_789',
+                    'status': 'active',
+                    'currency': 'usd',
+                    'items': {
+                        'data': [
+                            {
+                                'object': 'subscription_item',
+                                'current_period_start': 1609459200,  # 2021-01-01 00:00:00 UTC
+                                'current_period_end': 1640995200,    # 2022-01-01 00:00:00 UTC
+                            }
+                        ]
+                    },
+                }
+            },
+            'metadata': {
+                'checkout_intent_id': self.checkout_intent.id,
+                'enterprise_customer_name': 'Test Enterprise',
+                'enterprise_customer_slug': 'test-enterprise',
+            }
+        }
+
+        # Creating a StripeEventData record triggers a create of related StripeEventSummary
+        self.stripe_event_data = StripeEventData.objects.create(
+            event_id='evt_test_subscription',
+            event_type='customer.subscription.created',
+            checkout_intent=self.checkout_intent,
+            data=subscription_event_data,
+        )
+
+        test_summary = StripeEventSummary.objects.filter(event_id='evt_test_subscription').first()
+        test_summary.upcoming_invoice_amount_due = 200
+        test_summary.subscription_plan_uuid = self.subscription_plan_uuid
+        test_summary.save(update_fields=['upcoming_invoice_amount_due', 'subscription_plan_uuid'])
+
+    def test_get_first_upcoming_invoice_amount_due(self):
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': self.enterprise_uuid,  # implicit access to this enterprise
+        }])
+
+        query_params = {
+            'subscription_plan_uuid': self.subscription_plan_uuid,
+        }
+
+        url = reverse('api:v1:stripe-event-summary-first-upcoming-invoice-amount-due')
+        url += f"?{urlencode(query_params)}"
+        response = self.client.get(url)
+        assert response.status_code == 200
+        assert response.data == {
+            'currency': 'usd',
+            'upcoming_invoice_amount_due': 200,
+        }
