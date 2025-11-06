@@ -23,6 +23,7 @@ from enterprise_access.apps.bffs.checkout.response_builder import (
     CheckoutValidationResponseBuilder
 )
 from enterprise_access.apps.bffs.checkout.serializers import CheckoutSuccessResponseSerializer
+from enterprise_access.apps.bffs.tests.utils import default_field_constraints
 from test_utils import APITest
 
 
@@ -68,14 +69,7 @@ class TestCheckoutContextResponseBuilder(APITest):
             'default_by_lookup_key': 'subscription_licenses_yearly',
             'prices': []
         }
-        context.field_constraints = {
-            'quantity': {'min': 5, 'max': 30},
-            'enterprise_slug': {
-                'min_length': 3,
-                'max_length': 30,
-                'pattern': '^[a-z0-9-]+$'
-            }
-        }
+        context.field_constraints = default_field_constraints
         return context
 
     def test_build_complete_context(self):
@@ -108,15 +102,7 @@ class TestCheckoutContextResponseBuilder(APITest):
                 }
             ]
         }
-        context.field_constraints = {
-            'quantity': {'min': 5, 'max': 30},
-            'enterprise_slug': {
-                'min_length': 3,
-                'max_length': 30,
-                'pattern': '^[a-z0-9-]+$'
-            }
-        }
-
+        context.field_constraints = default_field_constraints
         # Create and build response
         builder = CheckoutContextResponseBuilder(context)
         builder.build()
@@ -155,9 +141,19 @@ class TestCheckoutContextResponseBuilder(APITest):
         constraints = data['field_constraints']
         self.assertEqual(constraints['quantity']['min'], 5)
         self.assertEqual(constraints['quantity']['max'], 30)
-        self.assertEqual(constraints['enterprise_slug']['min_length'], 3)
-        self.assertEqual(constraints['enterprise_slug']['max_length'], 30)
+        self.assertEqual(constraints['enterprise_slug']['min_length'], 1)
+        self.assertEqual(constraints['enterprise_slug']['max_length'], 255)
         self.assertEqual(constraints['enterprise_slug']['pattern'], '^[a-z0-9-]+$')
+        self.assertEqual(constraints['full_name']['min_length'], 1)
+        self.assertEqual(constraints['full_name']['max_length'], 150)
+        self.assertEqual(constraints['admin_email']['min_length'], 6)
+        self.assertEqual(constraints['admin_email']['max_length'], 253)
+        self.assertEqual(constraints['admin_email']['pattern'], '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$')
+        self.assertEqual(constraints['country']['min_length'], 2)
+        self.assertEqual(constraints['country']['max_length'], 2)
+        self.assertEqual(constraints['country']['pattern'], '^[A-Z]{2}$')
+        self.assertEqual(constraints['company_name']['min_length'], 1)
+        self.assertEqual(constraints['company_name']['max_length'], 255)
 
     def test_build_minimal_context(self):
         """
@@ -216,14 +212,7 @@ class TestCheckoutContextResponseBuilder(APITest):
                 }
             ]
         }
-        context.field_constraints = {
-            'quantity': {'min': 5, 'max': 30},
-            'enterprise_slug': {
-                'min_length': 3,
-                'max_length': 30,
-                'pattern': '^[a-z0-9-]+$'
-            }
-        }
+        context.field_constraints = default_field_constraints
 
         # Build response
         builder = CheckoutContextResponseBuilder(context)
@@ -263,9 +252,19 @@ class TestCheckoutContextResponseBuilder(APITest):
         constraints = data['field_constraints']
         self.assertEqual(constraints['quantity']['min'], 5)
         self.assertEqual(constraints['quantity']['max'], 30)
-        self.assertEqual(constraints['enterprise_slug']['min_length'], 3)
-        self.assertEqual(constraints['enterprise_slug']['max_length'], 30)
+        self.assertEqual(constraints['enterprise_slug']['min_length'], 1)
+        self.assertEqual(constraints['enterprise_slug']['max_length'], 255)
         self.assertEqual(constraints['enterprise_slug']['pattern'], '^[a-z0-9-]+$')
+        self.assertEqual(constraints['full_name']['min_length'], 1)
+        self.assertEqual(constraints['full_name']['max_length'], 150)
+        self.assertEqual(constraints['admin_email']['min_length'], 6)
+        self.assertEqual(constraints['admin_email']['max_length'], 253)
+        self.assertEqual(constraints['admin_email']['pattern'], '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$')
+        self.assertEqual(constraints['country']['min_length'], 2)
+        self.assertEqual(constraints['country']['max_length'], 2)
+        self.assertEqual(constraints['country']['pattern'], '^[A-Z]{2}$')
+        self.assertEqual(constraints['company_name']['min_length'], 1)
+        self.assertEqual(constraints['company_name']['max_length'], 255)
 
     def test_serializer_validation_error(self):
         """
