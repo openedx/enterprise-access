@@ -20,6 +20,7 @@ from django.db import models, transaction
 from django.utils import timezone
 from django_countries.fields import CountryField
 from django_extensions.db.models import TimeStampedModel
+from edx_django_utils.monitoring import set_custom_attribute
 from simple_history.models import HistoricalRecords
 from simple_history.utils import bulk_update_with_history
 
@@ -30,6 +31,9 @@ from .constants import INTENT_RESERVATION_DURATION_MINUTES, CheckoutIntentState
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+CHECKOUT_LIFEYCLE_STATE_MONITORING_KEY = 'ssp_ci_lifecycle_change'
+CHECKOUT_LIFEYCLE_IS_ERROR_MONITORING_KEY = 'ssp_ci_lifecycle_is_error'
 
 
 def _datetime_from_timestamp(timestamp):
@@ -208,6 +212,17 @@ class CheckoutIntent(TimeStampedModel):
             f"state={self.state}, "
             f"expires_at={self.expires_at}>"
         )
+
+    def save(self, *args, **kwargs):
+        """
+        Adds a custom lifecycle tracking attribute via monitoring utils. Only takes effect
+        if 'state' is specified in the ``update_fields`` kwarg.
+        """
+        if 'state' in kwargs.get('update_fields', []):
+            set_custom_attribute(CHECKOUT_LIFEYCLE_STATE_MONITORING_KEY, self.state)
+            if self.state in self.FAILURE_STATES:
+                set_custom_attribute(CHECKOUT_LIFEYCLE_IS_ERROR_MONITORING_KEY, 'true')
+        super().save(*args, **kwargs)
 
     @classmethod
     def is_valid_state_transition(
