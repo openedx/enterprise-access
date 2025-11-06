@@ -137,47 +137,47 @@ class StripeEventSummaryTests(APITest):
         StripeEventSummary.objects.all().delete()
         super().tearDown()
 
-    # def test_get_stripe_event_summary_no_authorization(self):
-    #     """
-    #     Successful retrieval of StripeEventSummary object
-    #     """
-    #     url = reverse('api:v1:stripe-event-summary-list')
-    #     response = self.client.get(url)
-    #     assert response.status_code == 401
+    def test_get_stripe_event_summary_no_authorization(self):
+        """
+        Successful retrieval of StripeEventSummary object
+        """
+        url = reverse('api:v1:stripe-event-summary-list')
+        response = self.client.get(url)
+        assert response.status_code == 401
 
-    # def test_get_stripe_event_summary_by_subscription_uuid(self):
-    #     self.set_jwt_cookie([{
-    #         'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
-    #         'context': self.enterprise_uuid,  # implicit access to this enterprise
-    #     }])
+    def test_get_stripe_event_summary_by_subscription_uuid(self):
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': self.enterprise_uuid,  # implicit access to this enterprise
+        }])
 
-    #     query_params = {
-    #         'subscription_plan_uuid': self.subscription_plan_uuid,
-    #     }
-    #     url = reverse('api:v1:stripe-event-summary-list')
-    #     url += f"?{urlencode(query_params)}"
+        query_params = {
+            'subscription_plan_uuid': self.subscription_plan_uuid,
+        }
+        url = reverse('api:v1:stripe-event-summary-list')
+        url += f"?{urlencode(query_params)}"
 
-    #     response = self.client.get(url)
-    #     assert response.status_code == 200
-    #     assert response.data['count'] == 1
-    #     results = response.data['results']
-    #     assert results[0]['subscription_plan_uuid'] == self.subscription_plan_uuid
+        response = self.client.get(url)
+        assert response.status_code == 200
+        assert response.data['count'] == 1
+        results = response.data['results']
+        assert results[0]['subscription_plan_uuid'] == self.subscription_plan_uuid
 
-    # def test_get_stripe_event_summary_by_subscription_uuid_no_auth(self):
-    #     self.set_jwt_cookie([{
-    #         'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
-    #         'context': self.enterprise_uuid_2,  # access to a different enterprise than the sub plan
-    #     }])
+    def test_get_stripe_event_summary_by_subscription_uuid_no_auth(self):
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': self.enterprise_uuid_2,  # access to a different enterprise than the sub plan
+        }])
 
-    #     query_params = {
-    #         'subscription_plan_uuid': self.subscription_plan_uuid,
-    #     }
-    #     url = reverse('api:v1:stripe-event-summary-list')
-    #     url += f"?{urlencode(query_params)}"
+        query_params = {
+            'subscription_plan_uuid': self.subscription_plan_uuid,
+        }
+        url = reverse('api:v1:stripe-event-summary-list')
+        url += f"?{urlencode(query_params)}"
 
-    #     response = self.client.get(url)
-    #     # trying to fetch a subscription plan for an enterprise customer they are not associated with
-    #     assert response.status_code == 403
+        response = self.client.get(url)
+        # trying to fetch a subscription plan for an enterprise customer they are not associated with
+        assert response.status_code == 403
 
 
 class StripeEventUpcomingInvoiceAmountDueTests(APITest):
