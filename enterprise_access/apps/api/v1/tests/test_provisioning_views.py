@@ -25,7 +25,7 @@ from enterprise_access.apps.customer_billing.models import CheckoutIntent
 from enterprise_access.apps.provisioning.models import (
     GetCreateCustomerStep,
     GetCreateEnterpriseAdminUsersStep,
-    GetCreateSubscriptionPlanStep,
+    GetCreateFirstPaidSubscriptionPlanStep,
     ProvisionNewCustomerWorkflow
 )
 from test_utils import APITest
@@ -40,7 +40,16 @@ TEST_CATALOG_UUID = uuid.uuid4()
 
 TEST_AGREEMENT_UUID = uuid.uuid4()
 
-TEST_SUBSCRIPTION_UUID = uuid.uuid4()
+TEST_TRIAL_SUBSCRIPTION_UUID = uuid.uuid4()
+TEST_FIRST_PAID_SUBSCRIPTION_UUID = uuid.uuid4()
+
+DEFAULT_CHECKOUT_INTENT_RECORD = {
+    'enterprise_slug': 'test-customer',
+    'enterprise_name': 'Test customer',
+    'quantity': 5,
+    'state': CheckoutIntentState.PAID,
+    'expires_at': timezone.now() + timedelta(hours=1),
+}
 
 DEFAULT_CUSTOMER_RECORD = {
     "uuid": str(TEST_ENTERPRISE_UUID),
@@ -56,25 +65,44 @@ DEFAULT_CATALOG_RECORD = {
     'enterprise_catalog_query': 2,
 }
 
-DEFAULT_SUBSCRIPTION_PLAN_RECORD = {
-    "uuid": str(TEST_SUBSCRIPTION_UUID),
-    "title": "provisioning test 1",
+DEFAULT_TRIAL_SUBSCRIPTION_PLAN_RECORD = {
+    "uuid": str(TEST_TRIAL_SUBSCRIPTION_UUID),
+    "title": "provisioning test trial 1",
     "salesforce_opportunity_line_item": "00k000000000000123",
     "created": "2025-05-16T15:20:19.159640+00:00",
     "start_date": "2025-06-01T00:00:00+00:00",
     "expiration_date": "2026-03-31T00:00:00+00:00",
     "is_active": True,
     "is_current": False,
-    "plan_type": "Standard Paid",
+    "plan_type": "Standard Trial",
     "enterprise_catalog_uuid": str(TEST_CATALOG_UUID),
     "product": 1,
+    "desired_num_licenses": 5,
+}
+
+DEFAULT_FIRST_PAID_SUBSCRIPTION_PLAN_RECORD = {
+    "uuid": str(TEST_FIRST_PAID_SUBSCRIPTION_UUID),
+    "title": "provisioning test paid 1",
+    "salesforce_opportunity_line_item": None,
+    "created": "2025-05-16T15:20:19.159640+00:00",
+    "start_date": "2026-03-31T00:00:00+00:00",
+    "expiration_date": "2027-03-31T00:00:00+00:00",
+    "is_active": True,
+    "is_current": False,
+    "plan_type": "Standard Paid",
+    "enterprise_catalog_uuid": str(TEST_CATALOG_UUID),
+    "product": 2,
+    "desired_num_licenses": 5,
 }
 
 DEFAULT_AGREEMENT_RECORD = {
     "uuid": str(TEST_AGREEMENT_UUID),
     "enterprise_customer_uuid": str(TEST_ENTERPRISE_UUID),
     "default_catalog_uuid": None,
-    "subscriptions": [DEFAULT_SUBSCRIPTION_PLAN_RECORD],
+    "subscriptions": [
+        DEFAULT_TRIAL_SUBSCRIPTION_PLAN_RECORD,
+        DEFAULT_FIRST_PAID_SUBSCRIPTION_PLAN_RECORD,
+    ],
 }
 
 DEFAULT_REQUEST_PAYLOAD = {
@@ -89,12 +117,20 @@ DEFAULT_REQUEST_PAYLOAD = {
         'catalog_query_id': 2,
     },
     'customer_agreement': {},
-    'subscription_plan': {
-        'title': 'provisioning test 1',
+    'trial_subscription_plan': {
+        'title': 'provisioning test trial 1',
         'salesforce_opportunity_line_item': '00k000000000000123',
         'start_date': '2025-06-01T00:00:00Z',
         'expiration_date': '2026-03-31T00:00:00Z',
         'product_id': 1,
+        'desired_num_licenses': 5,
+    },
+    'first_paid_subscription_plan': {
+        'title': 'provisioning test paid 1',
+        'salesforce_opportunity_line_item': None,
+        'start_date': '2026-03-31T00:00:00Z',
+        'expiration_date': '2027-03-31T00:00:00Z',
+        'product_id': 2,
         'desired_num_licenses': 5,
     },
 }
@@ -106,17 +142,38 @@ EXPECTED_CATALOG_RESPONSE = {
     'catalog_query_id': 2,
 }
 
+EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE = {
+    'id': 1,
+    'prior_subscription_plan': str(TEST_TRIAL_SUBSCRIPTION_UUID),
+    'renewed_subscription_plan': str(TEST_FIRST_PAID_SUBSCRIPTION_UUID),
+    'number_of_licenses': 5,
+    'effective_date': '2026-03-31T00:00:00+00:00',
+    'renewed_expiration_date': '2027-03-31T00:00:00+00:00',
+    'salesforce_opportunity_id': None,
+}
+
 
 @ddt.ddt
 class TestProvisioningAuth(APITest):
     """
     Tests Authentication and Permission checking for provisioning.
     """
+    def setUp(self):
+        super().setUp()
+        self._create_checkout_intent()
+
     def tearDown(self):
         super().tearDown()
         GetCreateCustomerStep.objects.all().delete()
         GetCreateEnterpriseAdminUsersStep.objects.all().delete()
         ProvisionNewCustomerWorkflow.objects.all().delete()
+
+    def _create_checkout_intent(self):
+        """Helper to create a checkout intent for testing."""
+        return CheckoutIntent.objects.create(
+            user=UserFactory(),
+            **DEFAULT_CHECKOUT_INTENT_RECORD,
+        )
 
     @ddt.data(
         # A role that's not mapped to any feature perms will get you a 403.
@@ -168,9 +225,16 @@ class TestProvisioningAuth(APITest):
     @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_enterprise_catalog')
     @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_enterprise_admin_users')
     @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_enterprise_customer')
+    @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_subscription_plan_renewal')
     def test_provisioning_create_allowed_for_provisioning_admins(
-        self, role_context_dict, expected_response_code, mock_create_customer,
-        mock_create_admins, mock_create_catalog, mock_create_agreement,
+        self,
+        role_context_dict,
+        expected_response_code,
+        mock_create_renewal,
+        mock_create_customer,
+        mock_create_admins,
+        mock_create_catalog,
+        mock_create_agreement,
     ):
         """
         Tests that we get expected 200 response for the provisioning create view when
@@ -187,6 +251,7 @@ class TestProvisioningAuth(APITest):
         }
         mock_create_catalog.return_value = DEFAULT_CATALOG_RECORD
         mock_create_agreement.return_value = DEFAULT_AGREEMENT_RECORD
+        mock_create_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
         request_payload = {**DEFAULT_REQUEST_PAYLOAD}
         request_payload['pending_admins'] = [
@@ -223,6 +288,14 @@ class TestProvisioningEndToEnd(APITest):
                 'context': ALL_ACCESS_CONTEXT,
             },
         ])
+        self._create_checkout_intent()
+
+    def _create_checkout_intent(self):
+        """Helper to create a checkout intent for testing."""
+        return CheckoutIntent.objects.create(
+            user=UserFactory(),
+            **DEFAULT_CHECKOUT_INTENT_RECORD,
+        )
 
     @ddt.data(
         # Data representing the state where a net-new customer is created.
@@ -251,8 +324,15 @@ class TestProvisioningEndToEnd(APITest):
         },
     )
     @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_customer_agreement')
+    @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_subscription_plan_renewal')
     @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
-    def test_get_or_create_customer_and_admins_created(self, test_data, mock_lms_api_client, mock_create_agreement):
+    def test_get_or_create_customer_and_admins_created(
+        self,
+        test_data,
+        mock_lms_api_client,
+        mock_create_renewal,
+        mock_create_agreement,
+    ):
         """
         Tests cases where admins don't exist and customer is fetched or created.
         """
@@ -269,6 +349,7 @@ class TestProvisioningEndToEnd(APITest):
         ]
         mock_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
         mock_create_agreement.return_value = DEFAULT_AGREEMENT_RECORD
+        mock_create_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
         request_payload = {**DEFAULT_REQUEST_PAYLOAD}
         request_payload['pending_admins'] = [
@@ -388,6 +469,7 @@ class TestProvisioningEndToEnd(APITest):
         mock_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
         mock_license_client = mock_license_manager_client.return_value
         mock_license_client.get_customer_agreement.return_value = DEFAULT_AGREEMENT_RECORD
+        mock_license_client.create_subscription_plan_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
         request_payload = {**DEFAULT_REQUEST_PAYLOAD}
         request_payload['pending_admins'] = [
@@ -462,8 +544,15 @@ class TestProvisioningEndToEnd(APITest):
         },
     )
     @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_customer_agreement')
+    @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_subscription_plan_renewal')
     @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
-    def test_catalog_fetched_or_created(self, test_data, mock_lms_api_client, mock_create_agreement):
+    def test_catalog_fetched_or_created(
+        self,
+        test_data,
+        mock_lms_api_client,
+        mock_create_renewal,
+        mock_create_agreement,
+    ):
         """
         Tests cases where the customer exists, no admins are needed, and we
         either fetch or create a catalog record
@@ -477,6 +566,7 @@ class TestProvisioningEndToEnd(APITest):
             mock_client.create_enterprise_catalog.return_value = test_data['catalog_to_create']
 
         mock_create_agreement.return_value = DEFAULT_AGREEMENT_RECORD
+        mock_create_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
         request_payload = {**DEFAULT_REQUEST_PAYLOAD}
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
@@ -502,9 +592,13 @@ class TestProvisioningEndToEnd(APITest):
             self.assertFalse(mock_client.create_enterprise_catalog.called)
 
     @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_customer_agreement')
+    @mock.patch('enterprise_access.apps.provisioning.models.get_or_create_subscription_plan_renewal')
     @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
     def test_catalog_created_with_generated_title_and_inferred_query_id(
-        self, mock_lms_api_client, mock_create_agreement
+        self,
+        mock_lms_api_client,
+        mock_create_renewal,
+        mock_create_agreement,
     ):
         """
         Tests the case where no enterprise_catalog is provided in the request payload.
@@ -528,6 +622,7 @@ class TestProvisioningEndToEnd(APITest):
         mock_client.create_enterprise_catalog.return_value = expected_created_catalog
 
         mock_create_agreement.return_value = DEFAULT_AGREEMENT_RECORD
+        mock_create_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
         # Create request payload WITHOUT enterprise_catalog section
         request_payload = {**DEFAULT_REQUEST_PAYLOAD}
@@ -589,7 +684,12 @@ class TestProvisioningEndToEnd(APITest):
 
         if test_data['created_agreement']:
             mock_license_client.create_customer_agreement.return_value = test_data['created_agreement']
-            mock_license_client.create_subscription_plan.return_value = DEFAULT_SUBSCRIPTION_PLAN_RECORD
+            mock_license_client.create_subscription_plan.side_effect = [
+                DEFAULT_TRIAL_SUBSCRIPTION_PLAN_RECORD,
+                DEFAULT_FIRST_PAID_SUBSCRIPTION_PLAN_RECORD,
+            ]
+
+        mock_license_client.create_subscription_plan_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
         request_payload = {**DEFAULT_REQUEST_PAYLOAD}
         if test_data['created_agreement']:
@@ -642,10 +742,12 @@ class TestProvisioningEndToEnd(APITest):
         mock_license_client.create_customer_agreement.return_value = {
             **DEFAULT_AGREEMENT_RECORD, "subscriptions": []
         }
-        plan_record = dict(DEFAULT_SUBSCRIPTION_PLAN_RECORD)
+        trial_plan_record = dict(DEFAULT_TRIAL_SUBSCRIPTION_PLAN_RECORD)
+        first_paid_plan_record = dict(DEFAULT_FIRST_PAID_SUBSCRIPTION_PLAN_RECORD)
         if not response_has_product:
-            plan_record.pop('product')
-        mock_license_client.create_subscription_plan.return_value = plan_record
+            trial_plan_record.pop('product')
+        mock_license_client.create_subscription_plan.side_effect = [trial_plan_record, first_paid_plan_record]
+        mock_license_client.create_subscription_plan_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
         # Make the provisioning request
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=DEFAULT_REQUEST_PAYLOAD)
@@ -653,31 +755,32 @@ class TestProvisioningEndToEnd(APITest):
 
         actual_response = response.json()
         # The subscription_plan in the response should match what the license manager returned
-        self.assertIn('subscription_plan', actual_response)
+        self.assertIn('trial_subscription_plan', actual_response)
         self.assertEqual(
-            actual_response['subscription_plan']['uuid'],
-            plan_record['uuid'],
+            actual_response['trial_subscription_plan']['uuid'],
+            trial_plan_record['uuid'],
         )
         self.assertEqual(
-            actual_response['subscription_plan']['title'],
-            plan_record['title'],
+            actual_response['trial_subscription_plan']['title'],
+            trial_plan_record['title'],
         )
         self.assertEqual(
-            actual_response['subscription_plan']['salesforce_opportunity_line_item'],
-            plan_record['salesforce_opportunity_line_item'],
+            actual_response['trial_subscription_plan']['salesforce_opportunity_line_item'],
+            trial_plan_record['salesforce_opportunity_line_item'],
         )
-        self.assertTrue(actual_response['subscription_plan']['is_active'])
+        self.assertTrue(actual_response['trial_subscription_plan']['is_active'])
         if response_has_product:
             self.assertEqual(
-                actual_response['subscription_plan']['product'],
-                plan_record['product'],
+                actual_response['trial_subscription_plan']['product'],
+                trial_plan_record['product'],
             )
         else:
-            self.assertIsNone(actual_response['subscription_plan']['product'])
+            self.assertIsNone(actual_response['trial_subscription_plan']['product'])
 
         # Workflow record/step assertions
         workflow = ProvisionNewCustomerWorkflow.objects.all()[0]
-        self.assertIsNotNone(workflow.get_create_subscription_plan_step())
+        self.assertIsNotNone(workflow.get_create_trial_subscription_plan_step())
+        self.assertIsNotNone(workflow.get_create_first_paid_subscription_plan_step())
 
         # LicenseManagerApiClient should be called to create agreement and subscription plan
         mock_license_client.get_customer_agreement.assert_called_once_with(
@@ -688,16 +791,34 @@ class TestProvisioningEndToEnd(APITest):
             'test-customer',
             default_catalog_uuid=None,
         )
-        mock_license_client.create_subscription_plan.assert_called_once_with(
-            customer_agreement_uuid=str(TEST_AGREEMENT_UUID),
-            title='provisioning test 1',
-            salesforce_opportunity_line_item='00k000000000000123',
-            start_date='2025-06-01T00:00:00+00:00',
-            expiration_date='2026-03-31T00:00:00+00:00',
-            desired_num_licenses=5,
-            enterprise_catalog_uuid=str(TEST_CATALOG_UUID),
-            product_id=1,
+
+        expected_create_subscription_plan_calls = [
+            mock.call(
+                customer_agreement_uuid=str(TEST_AGREEMENT_UUID),
+                title='provisioning test trial 1',
+                salesforce_opportunity_line_item='00k000000000000123',
+                start_date='2025-06-01T00:00:00+00:00',
+                expiration_date='2026-03-31T00:00:00+00:00',
+                desired_num_licenses=5,
+                enterprise_catalog_uuid=str(TEST_CATALOG_UUID),
+                product_id=1,
+            ),
+            mock.call(
+                customer_agreement_uuid=str(TEST_AGREEMENT_UUID),
+                title='provisioning test paid 1',
+                salesforce_opportunity_line_item=None,
+                start_date='2026-03-31T00:00:00+00:00',
+                expiration_date='2027-03-31T00:00:00+00:00',
+                desired_num_licenses=5,
+                enterprise_catalog_uuid=str(TEST_CATALOG_UUID),
+                product_id=2,
+            ),
+        ]
+        mock_license_client.create_subscription_plan.assert_has_calls(
+            expected_create_subscription_plan_calls,
+            any_order=False,
         )
+        assert mock_license_client.create_subscription_plan.call_count == 2
 
 
 @ddt.ddt
@@ -722,16 +843,22 @@ class TestCheckoutIntentSynchronization(APITest):
         CheckoutIntent.objects.all().delete()
         GetCreateCustomerStep.objects.all().delete()
         GetCreateEnterpriseAdminUsersStep.objects.all().delete()
-        GetCreateSubscriptionPlanStep.objects.all().delete()
+        GetCreateFirstPaidSubscriptionPlanStep.objects.all().delete()
         ProvisionNewCustomerWorkflow.objects.all().delete()
         User.objects.filter(email__endswith='@test-factory.com').delete()
 
-    def _create_checkout_intent(self, state=CheckoutIntentState.PAID, enterprise_slug=None):
+    def _create_checkout_intent(
+        self,
+        state=CheckoutIntentState.PAID,
+        user=None,
+        enterprise_slug=None,
+        enterprise_name=None,
+    ):
         """Helper to create a checkout intent for testing."""
         return CheckoutIntent.objects.create(
-            user=self.user,
+            user=user or self.user,
             enterprise_slug=enterprise_slug or self.enterprise_slug,
-            enterprise_name='Test Enterprise',
+            enterprise_name=enterprise_name or 'Test Enterprise',
             quantity=10,
             state=state,
             expires_at=timezone.now() + timedelta(hours=1),
@@ -771,7 +898,11 @@ class TestCheckoutIntentSynchronization(APITest):
         mock_license_client.create_customer_agreement.return_value = {
             **DEFAULT_AGREEMENT_RECORD, "subscriptions": []
         }
-        mock_license_client.create_subscription_plan.return_value = DEFAULT_SUBSCRIPTION_PLAN_RECORD
+        mock_license_client.create_subscription_plan.side_effect = [
+            DEFAULT_TRIAL_SUBSCRIPTION_PLAN_RECORD,
+            DEFAULT_FIRST_PAID_SUBSCRIPTION_PLAN_RECORD,
+        ]
+        mock_license_client.create_subscription_plan_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
         # Make provisioning request
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=self._get_base_request_payload())
@@ -816,6 +947,7 @@ class TestCheckoutIntentSynchronization(APITest):
         # Make subscription plan creation fail
         error_message = "License Manager API error"
         mock_license_client.create_subscription_plan.side_effect = Exception(error_message)
+        mock_license_client.create_subscription_plan_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
         # Make provisioning request (should fail at subscription plan step)
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=self._get_base_request_payload())
@@ -837,11 +969,11 @@ class TestCheckoutIntentSynchronization(APITest):
     )
     @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
     @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
-    def test_checkout_intent_wrong_state_ignored(
+    def test_checkout_intent_wrong_state(
         self, intent_state, mock_lms_api_client, mock_license_manager_client
     ):
         """
-        Test that non-fulfillable checkout intents are ignored during synchronization.
+        Test that non-fulfillable checkout intents CRASH the workflow before it provisionions any subscriptions.
         """
         # Create a checkout intent in various non-PAID states
         checkout_intent = self._create_checkout_intent(state=intent_state)
@@ -863,11 +995,15 @@ class TestCheckoutIntentSynchronization(APITest):
         mock_license_client.create_customer_agreement.return_value = {
             **DEFAULT_AGREEMENT_RECORD, "subscriptions": []
         }
-        mock_license_client.create_subscription_plan.return_value = DEFAULT_SUBSCRIPTION_PLAN_RECORD
+        mock_license_client.create_subscription_plan.side_effect = [
+            DEFAULT_TRIAL_SUBSCRIPTION_PLAN_RECORD,
+            DEFAULT_FIRST_PAID_SUBSCRIPTION_PLAN_RECORD,
+        ]
+        mock_license_client.create_subscription_plan_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
         # Make provisioning request
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=self._get_base_request_payload())
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         # Verify checkout intent was not modified (stayed in original state)
         checkout_intent.refresh_from_db()
@@ -878,7 +1014,7 @@ class TestCheckoutIntentSynchronization(APITest):
 
         # Verify workflow was still created successfully
         workflow = ProvisionNewCustomerWorkflow.objects.first()
-        self.assertIsNotNone(workflow)
+        assert workflow.exception_message == 'No fulfillable CheckoutIntent records for the given slug were found.'
 
     @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
     @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
@@ -886,18 +1022,22 @@ class TestCheckoutIntentSynchronization(APITest):
         """
         Test that checkout intents with different enterprise slug are ignored.
         """
-        # Create a checkout intent with different enterprise slug
+        # The checkout intent we expect to be updated.
+        main_checkout_intent = self._create_checkout_intent(state=CheckoutIntentState.PAID)
+
+        # Create a checkout intent with different enterprise slug. Later, test that this is NOT modified.
         different_slug = 'different-enterprise-slug'
-        checkout_intent = self._create_checkout_intent(
+        different_checkout_intent = self._create_checkout_intent(
+            user=UserFactory(),
             state=CheckoutIntentState.PAID,
-            enterprise_slug=different_slug
+            enterprise_slug=different_slug,
         )
 
         # Setup mocks for successful provisioning
         mock_lms_client = mock_lms_api_client.return_value
         mock_lms_client.get_enterprise_customer_data.return_value = {
             **DEFAULT_CUSTOMER_RECORD,
-            'slug': self.enterprise_slug,  # Different from checkout intent slug
+            'slug': self.enterprise_slug,
         }
         mock_lms_client.get_enterprise_admin_users.return_value = []
         mock_lms_client.get_enterprise_pending_admin_users.return_value = []
@@ -908,18 +1048,28 @@ class TestCheckoutIntentSynchronization(APITest):
         mock_license_client.create_customer_agreement.return_value = {
             **DEFAULT_AGREEMENT_RECORD, "subscriptions": []
         }
-        mock_license_client.create_subscription_plan.return_value = DEFAULT_SUBSCRIPTION_PLAN_RECORD
+        mock_license_client.create_subscription_plan.side_effect = [
+            DEFAULT_TRIAL_SUBSCRIPTION_PLAN_RECORD,
+            DEFAULT_FIRST_PAID_SUBSCRIPTION_PLAN_RECORD,
+        ]
+        mock_license_client.create_subscription_plan_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
         # Make provisioning request
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=self._get_base_request_payload())
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # Verify checkout intent was not modified (different slug)
-        checkout_intent.refresh_from_db()
-        self.assertEqual(checkout_intent.state, CheckoutIntentState.PAID)
-        self.assertIsNone(checkout_intent.workflow)
-        self.assertIsNone(checkout_intent.last_provisioning_error)
-        self.assertIsNone(checkout_intent.enterprise_uuid)
+        # Verify different_checkout_intent was NOT modified (different slug)
+        different_checkout_intent.refresh_from_db()
+        self.assertEqual(different_checkout_intent.state, CheckoutIntentState.PAID)
+        self.assertIsNone(different_checkout_intent.workflow)
+        self.assertIsNone(different_checkout_intent.last_provisioning_error)
+        self.assertIsNone(different_checkout_intent.enterprise_uuid)
+
+        # Verify the main checkout intent WAS modified.
+        main_checkout_intent.refresh_from_db()
+        self.assertEqual(main_checkout_intent.state, CheckoutIntentState.FULFILLED)
+        self.assertIsNotNone(main_checkout_intent.workflow)
+        self.assertIsNotNone(main_checkout_intent.enterprise_uuid)
 
         # Verify workflow was still created successfully
         workflow = ProvisionNewCustomerWorkflow.objects.first()
@@ -952,7 +1102,7 @@ class TestSubscriptionPlanOLIUpdateView(APITest):
 
         self.subscription_plan_uuid = uuid.uuid4()
         # Create a subscription plan step with complete output data
-        GetCreateSubscriptionPlanStep.objects.create(
+        GetCreateFirstPaidSubscriptionPlanStep.objects.create(
             workflow_record_uuid=self.workflow.uuid,
             input_data={
                 'title': 'Paid Plan',
@@ -974,6 +1124,7 @@ class TestSubscriptionPlanOLIUpdateView(APITest):
                 'is_current': True,
                 'plan_type': 'Standard',
                 'enterprise_catalog_uuid': str(TEST_CATALOG_UUID),
+                'desired_num_licenses': 10,
                 'product': 1,
             }
         )
@@ -990,7 +1141,7 @@ class TestSubscriptionPlanOLIUpdateView(APITest):
         super().tearDown()
         CheckoutIntent.objects.all().delete()
         ProvisionNewCustomerWorkflow.objects.all().delete()
-        GetCreateSubscriptionPlanStep.objects.all().delete()
+        GetCreateFirstPaidSubscriptionPlanStep.objects.all().delete()
 
     @mock.patch('enterprise_access.apps.api.v1.views.provisioning.LicenseManagerApiClient')
     def test_successful_oli_update(self, mock_license_manager_client):

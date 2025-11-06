@@ -83,20 +83,25 @@ class SubscriptionPlanRequestSerializer(BaseSerializer):
         help_text='The title of the subscription plan.',
     )
     salesforce_opportunity_line_item = serializers.CharField(
+        required=True, allow_null=True,
         help_text='The Salesforce Opportunity Line Item id associated with this subscription plan.',
     )
     start_date = serializers.DateTimeField(
+        required=False, allow_null=False,
         help_text='The date and time at which the subscription plan becomes usable.',
     )
     expiration_date = serializers.DateTimeField(
-        help_text='The date and time at which the subscription plan becomes unusable.'
+        help_text='The date and time at which the subscription plan becomes unusable.',
+        required=False, allow_null=False,
     )
     product_id = serializers.ChoiceField(
         choices=settings.PROVISIONING_DEFAULTS['subscription']['all_product_choices'],
+        required=False, allow_null=False,
         help_text='The internal edX Enterprise Subscription Product record.',
     )
     desired_num_licenses = serializers.IntegerField(
-        help_text='The number of licenses to create for this plan.'
+        required=False, allow_null=False,
+        help_text='The number of licenses to create for this plan.',
     )
     enterprise_catalog_uuid = serializers.UUIDField(
         required=False, allow_null=True, default=None,
@@ -125,7 +130,8 @@ class ProvisioningRequestSerializer(BaseSerializer):
         required=False,
         allow_null=True,
     )
-    subscription_plan = SubscriptionPlanRequestSerializer()
+    trial_subscription_plan = SubscriptionPlanRequestSerializer()
+    first_paid_subscription_plan = SubscriptionPlanRequestSerializer()
 
 
 ## All the RESPONSE serializers go under here ##
@@ -189,6 +195,7 @@ class SubscriptionPlanResponseSerializer(BaseSerializer):
     plan_type = serializers.CharField()
     enterprise_catalog_uuid = serializers.UUIDField()
     product = serializers.IntegerField()
+    desired_num_licenses = serializers.IntegerField()
 
 
 class CustomerAgreementResponseSerializer(BaseSerializer):
@@ -201,6 +208,19 @@ class CustomerAgreementResponseSerializer(BaseSerializer):
     subscriptions = SubscriptionPlanResponseSerializer(many=True)
 
 
+class SubscriptionPlanRenewalResponseSerializer(BaseSerializer):
+    """
+    Subscription Plan Renewal serializer for provisioning responses.
+    """
+    id = serializers.IntegerField()
+    prior_subscription_plan = serializers.UUIDField()
+    renewed_subscription_plan = serializers.UUIDField()
+    number_of_licenses = serializers.IntegerField()
+    effective_date = serializers.DateTimeField()
+    renewed_expiration_date = serializers.DateTimeField()
+    salesforce_opportunity_line_item = serializers.CharField(required=False)
+
+
 class ProvisioningResponseSerializer(BaseSerializer):
     """
     Response serializer for provisioning create view.
@@ -209,7 +229,9 @@ class ProvisioningResponseSerializer(BaseSerializer):
     customer_admins = AdminObjectResponseSerializer()
     enterprise_catalog = EnterpriseCatalogResponseSerializer()
     customer_agreement = CustomerAgreementResponseSerializer()
-    subscription_plan = SubscriptionPlanResponseSerializer()
+    trial_subscription_plan = SubscriptionPlanResponseSerializer()
+    first_paid_subscription_plan = SubscriptionPlanResponseSerializer()
+    subscription_plan_renewal = SubscriptionPlanRenewalResponseSerializer()
 
 
 class SubscriptionPlanOLIUpdateSerializer(BaseSerializer):

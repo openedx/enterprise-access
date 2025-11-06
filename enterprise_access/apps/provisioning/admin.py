@@ -263,10 +263,10 @@ class GetCreateCustomerAgreementStepAdmin(DjangoQLSearchMixin, ProvisionWorkflow
         ))
 
 
-@admin.register(models.GetCreateSubscriptionPlanStep)
-class GetCreateSubscriptionPlanStepAdmin(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
+@admin.register(models.GetCreateTrialSubscriptionPlanStep)
+class GetCreateTrialSubscriptionPlanStepAdmin(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
     """
-    Admin model for the subscription plan creation step.
+    Admin model for the trial subscription plan creation step.
     """
     fields = ProvisionWorkflowStepAdminBase.fields + ('preceding_step_link',)
     readonly_fields = ProvisionWorkflowStepAdminBase.readonly_fields + ('preceding_step_link',)

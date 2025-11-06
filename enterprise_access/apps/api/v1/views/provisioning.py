@@ -15,7 +15,10 @@ from enterprise_access.apps.api import serializers
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core import constants
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
-from enterprise_access.apps.provisioning.models import GetCreateSubscriptionPlanStep, ProvisionNewCustomerWorkflow
+from enterprise_access.apps.provisioning.models import (
+    GetCreateFirstPaidSubscriptionPlanStep,
+    ProvisionNewCustomerWorkflow
+)
 from enterprise_access.apps.workflow.exceptions import UnitOfWorkException
 
 logger = logging.getLogger(__name__)
@@ -60,10 +63,16 @@ class ProvisioningCreateView(PermissionRequiredMixin, generics.CreateAPIView):
         ]
         catalog_request_data = request_serializer.validated_data.get('enterprise_catalog')
         customer_agreement_data = request_serializer.validated_data.get('customer_agreement')
-        subscription_plan_data = request_serializer.validated_data['subscription_plan']
+        trial_subscription_plan_data = request_serializer.validated_data['trial_subscription_plan']
+        first_paid_subscription_plan_data = request_serializer.validated_data['first_paid_subscription_plan']
 
         workflow_input_dict = ProvisionNewCustomerWorkflow.generate_input_dict(
-            customer_request_data, admin_emails, catalog_request_data, customer_agreement_data, subscription_plan_data
+            customer_request_data,
+            admin_emails,
+            catalog_request_data,
+            customer_agreement_data,
+            trial_subscription_plan_data,
+            first_paid_subscription_plan_data,
         )
         workflow = ProvisionNewCustomerWorkflow.objects.create(input_data=workflow_input_dict)
 
@@ -80,7 +89,9 @@ class ProvisioningCreateView(PermissionRequiredMixin, generics.CreateAPIView):
             'customer_admins': workflow.admin_users_output_dict(),
             'enterprise_catalog': workflow.catalog_output_dict(),
             'customer_agreement': workflow.customer_agreement_output_dict(),
-            'subscription_plan': workflow.subscription_plan_output_dict(),
+            'trial_subscription_plan': workflow.trial_subscription_plan_output_dict(),
+            'first_paid_subscription_plan': workflow.first_paid_subscription_plan_output_dict(),
+            'subscription_plan_renewal': workflow.subscription_plan_renewal_output_dict(),
         })
         return Response(
             response_serializer.data,
@@ -129,15 +140,16 @@ class SubscriptionPlanOLIUpdateView(PermissionRequiredMixin, APIView):
             )
 
         # Find the subscription plan step
-        subscription_steps = GetCreateSubscriptionPlanStep.objects.filter(
+        subscription_steps = GetCreateFirstPaidSubscriptionPlanStep.objects.filter(
             workflow_record_uuid=checkout_intent.workflow.uuid
         )
         target_product_id = settings.PROVISIONING_PAID_SUBSCRIPTION_PRODUCT_ID
         is_trial = serializer.validated_data.get('is_trial', False)
         if is_trial:
-            target_product_id = settings.PROVISIONING_TRIAL_SUBSCRIPTION_PRODUCT_ID
+            raise NotImplementedError('Modifying trial plans not supported.')
 
-        # Filter for trial/paid plan based on input
+        # Filter for paid plan based on input
+        subscription_plan_uuid = None
         for step in subscription_steps:
             if step.input_data and step.input_data['product_id'] == target_product_id:
                 if step.output_object:

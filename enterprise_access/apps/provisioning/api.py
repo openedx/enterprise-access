@@ -248,7 +248,7 @@ def get_or_create_subscription_plan_renewal(
         ),
         created_renewal['id'],
         created_renewal['salesforce_opportunity_id'],
-        created_renewal['prior_subscription_plan_uuid'],
-        created_renewal['renewed_subscription_plan_uuid'],
+        created_renewal['prior_subscription_plan'],
+        created_renewal['renewed_subscription_plan'],
     )
     return created_renewal
