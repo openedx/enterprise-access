@@ -841,8 +841,6 @@ class StripeEventSummary(TimeStampedModel):
             first_item = subscription_obj['items'].data[0]
             self.stripe_subscription_id = subscription_obj.id
             self.subscription_status = subscription_obj.status
-            import pdb;
-            pdb.set_trace()
             self.currency = subscription_obj.currency
             self.subscription_period_start = self._timestamp_to_datetime(
                 first_item.get('current_period_start')
