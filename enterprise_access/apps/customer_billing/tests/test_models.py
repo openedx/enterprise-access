@@ -865,6 +865,7 @@ class TestStripeEventSummary(TestCase):
                     'object': 'subscription',
                     'id': 'sub_test_789',
                     'status': 'active',
+                    'currency': 'usd',
                     'items': {
                         'data': [
                             {
@@ -956,6 +957,7 @@ class TestStripeEventSummary(TestCase):
                 'object': {
                     'object': 'subscription',
                     'id': 'sub_test_with_uuid',
+                    'currency': 'usd',
                     'status': 'active',
                     'items': {
                         'data': [

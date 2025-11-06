@@ -539,4 +539,5 @@ class StripeEventSummaryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
             return Response({})
         return Response({
             'upcoming_invoice_amount_due': summary.upcoming_invoice_amount_due,
+            'currency': summary.currency,
         })

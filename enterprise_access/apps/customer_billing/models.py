@@ -692,6 +692,15 @@ class StripeEventSummary(TimeStampedModel):
             'which relates the (current) plan to the future plan'
         ),
     )
+    currency = models.CharField(
+        max_length=3,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            'Three-letter ISO currency code associated with the subscription..'
+        ),
+    )
 
     # Stripe object identification
     stripe_object_type = models.CharField(
@@ -832,6 +841,9 @@ class StripeEventSummary(TimeStampedModel):
             first_item = subscription_obj['items'].data[0]
             self.stripe_subscription_id = subscription_obj.id
             self.subscription_status = subscription_obj.status
+            import pdb;
+            pdb.set_trace()
+            self.currency = subscription_obj.currency
             self.subscription_period_start = self._timestamp_to_datetime(
                 first_item.get('current_period_start')
             )
