@@ -48,6 +48,23 @@ def _get_assignment_or_raise(assignment_uuid):
         raise
 
 
+def _get_learner_credit_request_or_raise(learner_credit_request_uuid):
+    """
+    Returns a ``LearnerCreditRequest`` instance with the given uuid, or raises
+    if no such record exists.
+    """
+    learner_credit_request_model = apps.get_model('subsidy_request.LearnerCreditRequest')
+
+    try:
+        return learner_credit_request_model.objects.get(uuid=learner_credit_request_uuid)
+    except learner_credit_request_model.DoesNotExist:
+        logger.warning(
+            '_get_learner_credit_request_or_raise: LearnerCreditRequest with uuid %s does not exist.',
+            learner_credit_request_uuid,
+        )
+        raise
+
+
 class BrazeCampaignSender:
     """
     Class to help standardize the allowed keys and methods of conversion to values
@@ -566,3 +583,42 @@ def send_assignment_automatically_expired_email(expired_assignment_uuid):
     )
     assignment.add_successful_expiration_action()
     logger.info(f'Sent braze campaign expiration uuid={campaign_uuid} message for assignment {assignment}')
+
+
+@shared_task(base=SendExpirationEmailTask)
+def send_bnr_automatically_expired_email(learner_credit_request_uuid):
+    """
+    Send email via braze for automatically expired B&R learner credit request.
+
+    This email is sent when a Browse & Request learner credit request expires due to:
+    - 90 days passing since approval
+    - Enrollment deadline passing
+    - Subsidy expiring
+
+    Args:
+        learner_credit_request_uuid: (string) expired learner credit request uuid
+    """
+    learner_credit_request = _get_learner_credit_request_or_raise(learner_credit_request_uuid)
+
+    # Get the assignment associated with this B&R request
+    assignment = learner_credit_request.assignment
+    if not assignment:
+        logger.error(f'LearnerCreditRequest {learner_credit_request_uuid} has no associated assignment.')
+        return
+
+    # Use BrazeCampaignSender just like send_assignment_automatically_expired_email does
+    campaign_sender = BrazeCampaignSender(assignment)
+    braze_trigger_properties = campaign_sender.get_properties(
+        'contact_admin_link',
+        'organization',
+        'course_title',
+        'learner_portal_link',
+    )
+    campaign_uuid = settings.BRAZE_LEARNER_CREDIT_BNR_AUTOMATIC_EXPIRATION_NOTIFICATION_CAMPAIGN
+    campaign_sender.send_campaign_message(
+        braze_trigger_properties,
+        campaign_uuid,
+    )
+    logger.info(
+        f'Sent braze campaign expiration uuid={campaign_uuid} message for B&R request {learner_credit_request_uuid}'
+    )

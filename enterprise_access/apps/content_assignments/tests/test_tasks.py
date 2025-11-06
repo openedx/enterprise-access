@@ -27,6 +27,7 @@ from enterprise_access.apps.content_assignments.tasks import (
     BrazeCampaignSender,
     create_pending_enterprise_learner_for_assignment_task,
     send_assignment_automatically_expired_email,
+    send_bnr_automatically_expired_email,
     send_cancel_email_for_pending_assignment,
     send_email_for_new_assignment,
     send_reminder_email_for_pending_assignment
@@ -37,6 +38,7 @@ from enterprise_access.apps.content_assignments.tests.factories import (
 )
 from enterprise_access.apps.subsidy_access_policy.models import REQUEST_CACHE_NAMESPACE
 from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
+from enterprise_access.apps.subsidy_request.tests.factories import LearnerCreditRequestFactory
 from enterprise_access.cache_utils import request_cache
 from enterprise_access.utils import get_automatic_expiration_date_and_reason
 from test_utils import APITestWithMocks
@@ -648,6 +650,66 @@ class TestBrazeEmailTasks(APITestWithMocks):
                 'contact_admin_link': mock_admin_mailto,
                 'course_title': assignment.content_title,
                 'organization': self.enterprise_customer_name,
+            },
+        )
+        assert mock_braze_client.return_value.send_campaign_message.call_count == 1
+
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.objects')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.LmsApiClient')
+    @mock.patch('enterprise_access.apps.content_assignments.tasks.BrazeApiClient')
+    @ddt.data(
+        {'is_assigned_course_run': False},
+        {'is_assigned_course_run': True},
+    )
+    @ddt.unpack
+    def test_send_bnr_automatically_expired_email(
+        self,
+        mock_braze_client,
+        mock_lms_client,
+        mock_subsidy_model,  # pylint: disable=unused-argument
+        is_assigned_course_run,
+    ):
+        """
+        Verify `send_bnr_automatically_expired_email` task works as expected
+        """
+        admin_email = 'test@admin.com'
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
+            'uuid': TEST_ENTERPRISE_UUID,
+            'slug': 'test-slug',
+            'admin_users': [{
+                'email': admin_email,
+                'lms_user_id': 1
+            }],
+            'name': self.enterprise_customer_name,
+        }
+        mock_recipient = {
+            'external_user_id': 1
+        }
+        mock_braze_client.return_value.create_recipient.return_value = mock_recipient
+        mock_admin_mailto = f'mailto:{admin_email}'
+        mock_braze_client.return_value.generate_mailto_link.return_value = mock_admin_mailto
+        mock_learner_portal_link = f'{settings.ENTERPRISE_LEARNER_PORTAL_URL}/test-slug'
+
+        assignment = self.assignment_course_run if is_assigned_course_run else self.assignment_course
+
+        # Create a learner credit request associated with the assignment
+        learner_credit_request = LearnerCreditRequestFactory.create(
+            assignment=assignment,
+            course_id=assignment.content_key,
+            enterprise_customer_uuid=assignment.assignment_configuration.enterprise_customer_uuid,
+            learner_credit_request_config__active=False,
+        )
+
+        send_bnr_automatically_expired_email(learner_credit_request.uuid)
+
+        mock_braze_client.return_value.send_campaign_message.assert_any_call(
+            'test-bnr-expired-campaign',
+            recipients=[mock_recipient],
+            trigger_properties={
+                'contact_admin_link': mock_admin_mailto,
+                'course_title': assignment.content_title,
+                'organization': self.enterprise_customer_name,
+                'learner_portal_link': mock_learner_portal_link,
             },
         )
         assert mock_braze_client.return_value.send_campaign_message.call_count == 1

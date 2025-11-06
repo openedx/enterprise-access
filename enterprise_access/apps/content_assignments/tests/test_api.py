@@ -1075,8 +1075,14 @@ class TestAssignmentExpiration(TestCase):
     @ddt.data(
         *LearnerContentAssignmentStateChoices.EXPIRABLE_STATES
     )
+    @mock.patch('enterprise_access.apps.content_assignments.api.send_bnr_automatically_expired_email')
     @mock.patch('enterprise_access.apps.content_assignments.api.send_assignment_automatically_expired_email')
-    def test_expire_credit_request_when_assigment_expires(self, expirable_assignment_state, mock_expired_email):
+    def test_expire_credit_request_when_assigment_expires(
+        self,
+        expirable_assignment_state,
+        mock_assignment_expired_email,
+        mock_bnr_expired_email,
+    ):
         """
         Tests that we expire any open credit requests when we expire an assignment.
         """
@@ -1121,7 +1127,9 @@ class TestAssignmentExpiration(TestCase):
 
         self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.EXPIRED)
         self.assertEqual(credit_request.state, SubsidyRequestStates.EXPIRED)
-        mock_expired_email.delay.assert_not_called()
+        # When a credit request exists, the BnR email should be sent instead of the assignment email
+        mock_bnr_expired_email.delay.assert_called_once_with(credit_request.uuid)
+        mock_assignment_expired_email.delay.assert_not_called()
 
 
 class AllocateAssignmentForRequestsTests(TestCase):
