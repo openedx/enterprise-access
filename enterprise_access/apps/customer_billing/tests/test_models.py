@@ -1099,6 +1099,7 @@ class TestStripeEventSummary(TestCase):
                     'object': 'subscription',
                     'id': 'sub_test_789',
                     'status': 'active',
+                    'currency': 'usd',
                     'items': {
                         'data': [
                             {
@@ -1121,7 +1122,6 @@ class TestStripeEventSummary(TestCase):
         mock_event = self._create_mock_stripe_event(
             "customer.subscription.created", subscription_event_data
         )
-        print('mock event ', mock_event)
 
         # Create StripeEventData
         stripe_event_data = StripeEventData.objects.create(

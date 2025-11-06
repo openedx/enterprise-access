@@ -238,7 +238,6 @@ class StripeEventUpcomingInvoiceAmountDueTests(APITest):
             data=subscription_event_data,
         )
 
-        
         test_summary = StripeEventSummary.objects.filter(event_id='evt_test_subscription').first()
         test_summary.upcoming_invoice_amount_due = 200
         test_summary.subscription_plan_uuid = self.subscription_plan_uuid
