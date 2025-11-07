@@ -776,7 +776,7 @@ class StripeEventSummary(TimeStampedModel):
         null=True,
         blank=True,
         db_index=True,
-        help_text='UUID of the SubscriptionPlan from License Manager'
+        help_text='UUID of the Trial SubscriptionPlan from License Manager'
     )
     future_subscription_plan_uuid = models.UUIDField(
         null=True,
@@ -918,7 +918,7 @@ class StripeEventSummary(TimeStampedModel):
             # Fetch model from the Django app registry to avoid
             # a circular import.
             subscription_step_model = apps.get_model(
-                'provisioning', 'GetCreateSubscriptionPlanStep',
+                'provisioning', 'GetCreateTrialSubscriptionPlanStep',
             )
             subscription_step = subscription_step_model.objects.filter(
                 workflow_record_uuid=checkout_intent.workflow.uuid,

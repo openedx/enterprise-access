@@ -1,11 +1,13 @@
 """
 Workflow models for the customer-and-subsidy-provisioning business domain.
 """
+import logging
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
 from attrs import define, field, validators
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django_countries import countries
 
@@ -21,9 +23,87 @@ from .api import (
     get_or_create_enterprise_admin_users,
     get_or_create_enterprise_catalog,
     get_or_create_enterprise_customer,
-    get_or_create_subscription_plan
+    get_or_create_subscription_plan,
+    get_or_create_subscription_plan_renewal
 )
 from .utils import attrs_validate_email, is_bool, is_datetime, is_int, is_list_of_type, is_str, is_uuid
+
+logger = logging.getLogger(__name__)
+
+# Business rule: For non-trial plans, default the subscription duration to 1 year from the start
+# date if no expiration_date was specified under `create_first_paid_subscription_plan_input`.
+FIRST_PAID_SUBSCRIPTION_PERIOD_DURATION_FALLBACK = relativedelta(years=1)
+
+
+class CheckoutIntentStepMixin:
+    """
+    Centralized logic for interfacing with CheckoutIntent records from workflow steps.
+    """
+
+    def get_workflow_record(self) -> 'ProvisionNewCustomerWorkflow':
+        """
+        Implemented by base class.
+        """
+        raise NotImplementedError()
+
+    def get_fulfillable_checkout_intent_via_slug(self) -> CheckoutIntent:
+        """
+        Helper to get the checkout intent (related via the enterprise customer slug).
+        """
+        workflow = self.get_workflow_record()
+        enterprise_slug = workflow.input_object.create_customer_input.slug
+        checkout_intent = CheckoutIntent.filter_by_name_and_slug(
+            slug=enterprise_slug,
+        ).filter(
+            state__in=CheckoutIntent.FULFILLABLE_STATES,
+        ).first()
+        if not checkout_intent:
+            raise CheckoutIntent.DoesNotExist('No fulfillable CheckoutIntent records for the given slug were found.')
+        return checkout_intent
+
+    def get_linked_checkout_intent(self) -> CheckoutIntent:
+        """
+        Helper to get the linked checkout intent (depends on link_checkout_intent() having been called).
+
+        Raises:
+            - CheckoutIntent.DoesNotExist: If there is no linked checkout intent.
+        """
+        workflow = self.get_workflow_record()
+        checkout_intent = CheckoutIntent.objects.get(workflow=workflow)
+        return checkout_intent
+
+    def link_checkout_intent(self, enterprise_customer_uuid: UUID) -> None:
+        """
+        Links the parent workflow to the related CheckoutIntent, if any.
+        """
+        workflow = self.get_workflow_record()
+        checkout_intent = self.get_fulfillable_checkout_intent_via_slug()
+        checkout_intent.workflow = workflow
+        checkout_intent.enterprise_uuid = enterprise_customer_uuid
+        checkout_intent.save()
+
+    def error_checkout_intent(self, exc: Exception) -> None:
+        """
+        Set the checkout intent to an errored state.
+
+        Raises:
+            - CheckoutIntent.DoesNotExist: If there is no linked checkout intent.
+        """
+        checkout_intent = self.get_linked_checkout_intent()
+        checkout_intent.last_provisioning_error = str(exc)
+        checkout_intent.state = CheckoutIntentState.ERRORED_PROVISIONING
+        checkout_intent.save()
+
+    def fulfill_checkout_intent(self) -> None:
+        """
+        Set the checkout intent to a fulfilled state.
+
+        Raises:
+            - CheckoutIntent.DoesNotExist: If there is no linked checkout intent.
+        """
+        checkout_intent = self.get_linked_checkout_intent()
+        checkout_intent.state = CheckoutIntentState.FULFILLED
+        checkout_intent.save()
 
 
 @define
@@ -59,7 +139,7 @@ class CreateCustomerStepException(UnitOfWorkException):
     """
 
 
-class GetCreateCustomerStep(AbstractWorkflowStep):
+class GetCreateCustomerStep(CheckoutIntentStepMixin, AbstractWorkflowStep):
     """
     Workflow step for creating a new customer, or returning an existing record
     based on matching title value.
@@ -85,6 +165,7 @@ class GetCreateCustomerStep(AbstractWorkflowStep):
             slug=input_object.slug,
             country=input_object.country,
         )
+        self.link_checkout_intent(result_dict['uuid'])
         return self.output_class.from_dict(result_dict)
 
     def get_workflow_record(self):
@@ -241,7 +322,7 @@ class GetCreateCatalogStep(AbstractWorkflowStep):
         if (title_input := self.input_object.title):
             return title_input
 
-        subsidy_type = getattr(workflow_input.create_subscription_plan_input, 'SUBSIDY_TYPE', '')
+        subsidy_type = getattr(workflow_input.create_trial_subscription_plan_input, 'SUBSIDY_TYPE', '')
         if subsidy_type:
             subsidy_type = ' ' + subsidy_type
         return f"{customer_name}{subsidy_type} Catalog"
@@ -256,7 +337,7 @@ class GetCreateCatalogStep(AbstractWorkflowStep):
             return catalog_query_id_input
 
         # Need to get product_id from subscription plan input to infer catalog_query_id
-        product_id = str(workflow_input.create_subscription_plan_input.product_id)
+        product_id = str(workflow_input.create_trial_subscription_plan_input.product_id)
 
         if product_id and product_id in settings.PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING:
             return settings.PRODUCT_ID_TO_CATALOG_QUERY_ID_MAPPING[product_id]
@@ -350,19 +431,19 @@ class GetCreateCustomerAgreementStep(AbstractWorkflowStep):
         ).first()
 
 
-class GetCreateSubscriptionPlanException(UnitOfWorkException):
+class GetCreateTrialSubscriptionPlanException(UnitOfWorkException):
     """
     Exception raised when a Subscription Plan could not be fetched or created.
     """
 
 
 @define
-class GetCreateSubscriptionPlanStepInput(BaseInputOutput):
+class GetCreateTrialSubscriptionPlanStepInput(BaseInputOutput):
     """
     The input object to be used for the business logic of get-or-creating
     a Subscription Plan
     """
-    KEY = 'create_subscription_plan_input'
+    KEY = 'create_trial_subscription_plan_input'
     SUBSIDY_TYPE = 'Subscription'
 
     title: str = field(validator=is_str)
@@ -371,16 +452,16 @@ class GetCreateSubscriptionPlanStepInput(BaseInputOutput):
     expiration_date: datetime = field(validator=is_datetime)
     desired_num_licenses: int = field(validator=is_int)
     product_id: int = field(validator=is_int)
-    enterprise_catalog_uuid: UUID = field(default=None, validator=validators.optional(is_uuid))
+    enterprise_catalog_uuid: Optional[UUID] = field(default=None, validator=validators.optional(is_uuid))
 
 
 @define
-class GetCreateSubscriptionPlanStepOutput(BaseInputOutput):
+class GetCreateTrialSubscriptionPlanStepOutput(BaseInputOutput):
     """
     The output object to be used for the business logic of get-or-creating
     a Subscription Plan
     """
-    KEY = 'create_subscription_plan_output'
+    KEY = 'create_trial_subscription_plan_output'
 
     uuid: UUID = field(validator=is_uuid)
     title: str = field(validator=is_str)
@@ -388,6 +469,7 @@ class GetCreateSubscriptionPlanStepOutput(BaseInputOutput):
     created: datetime = field(validator=is_datetime)
     start_date: datetime = field(validator=is_datetime)
     expiration_date: datetime = field(validator=is_datetime)
+    desired_num_licenses: int = field(validator=is_int)
     is_active: bool = field(validator=is_bool)
     is_current: bool = field(validator=is_bool)
     plan_type: str = field(validator=is_str)
@@ -395,14 +477,14 @@ class GetCreateSubscriptionPlanStepOutput(BaseInputOutput):
     product: Optional[int] = field(default=None, validator=validators.optional(is_int))
 
 
-class GetCreateSubscriptionPlanStep(AbstractWorkflowStep):
+class GetCreateTrialSubscriptionPlanStep(CheckoutIntentStepMixin, AbstractWorkflowStep):
     """
     Workflow step for creating a new Subscription Plan, or returning an existing record
     based on matching customer agreement uuid and opportunity_line_item.
     """
-    exception_class = GetCreateSubscriptionPlanException
-    input_class = GetCreateSubscriptionPlanStepInput
-    output_class = GetCreateSubscriptionPlanStepOutput
+    exception_class = GetCreateTrialSubscriptionPlanException
+    input_class = GetCreateTrialSubscriptionPlanStepInput
+    output_class = GetCreateTrialSubscriptionPlanStepOutput
 
     def process_input(self, accumulated_output=None, **kwargs):
         """
@@ -434,48 +516,137 @@ class GetCreateSubscriptionPlanStep(AbstractWorkflowStep):
                 desired_num_licenses=self.input_object.desired_num_licenses,
                 product_id=self.input_object.product_id,
             )
-            self.synchronize_checkout_intent(accumulated_output=accumulated_output)
-            send_enterprise_provision_signup_confirmation_email.delay(
-                self.input_object.start_date,
-                self.input_object.expiration_date,
-                self.input_object.desired_num_licenses,
-                accumulated_output.create_customer_output.name,
-                accumulated_output.create_customer_output.slug
-            )
-
-            return self.output_class.from_dict(result_dict)
         except Exception as exc:
-            self.synchronize_checkout_intent(accumulated_output=accumulated_output, exc=exc)
-            raise GetCreateSubscriptionPlanException(
+            try:
+                self.error_checkout_intent(exc=exc)
+            except CheckoutIntent.DoesNotExist:
+                logger.exception(
+                    "Could not error CheckoutIntent because no linked CheckoutIntent found for this workflow."
+                )
+            raise self.exception_class(
                 f'Failed to get/create subscription plan for customer agreement uuid {customer_agreement_uuid}'
             ) from exc
 
-    def synchronize_checkout_intent(self, accumulated_output=None, exc=None):
-        """
-        Links this step's workflow to the related CheckoutIntent, if any.
-        If found, also updates the CheckoutIntent's state.
-        """
-        workflow = self.get_workflow_record()
-        enterprise_slug = workflow.input_object.create_customer_input.slug
-        checkout_intent = CheckoutIntent.filter_by_name_and_slug(
-            slug=enterprise_slug,
-        ).filter(
-            state__in=CheckoutIntent.FULFILLABLE_STATES,
+        return self.output_class.from_dict(result_dict)
+
+    def get_workflow_record(self) -> 'ProvisionNewCustomerWorkflow':
+        return ProvisionNewCustomerWorkflow.objects.filter(
+            uuid=self.workflow_record_uuid,
         ).first()
-        if not checkout_intent:
-            return
 
-        checkout_intent.workflow = workflow
-        enterprise_uuid = accumulated_output.create_customer_output.uuid
-        checkout_intent.enterprise_uuid = enterprise_uuid
+    def get_preceding_step_record(self):
+        return GetCreateCustomerAgreementStep.objects.filter(
+            uuid=self.preceding_step_uuid,
+        ).first()
 
-        if exc:
-            checkout_intent.last_provisioning_error = str(exc)
-            checkout_intent.state = CheckoutIntentState.ERRORED_PROVISIONING
+
+class GetCreateFirstPaidSubscriptionPlanException(UnitOfWorkException):
+    """
+    Exception raised when a Subscription Plan (first paid) could not be fetched or created.
+    """
+
+
+@define
+class GetCreateFirstPaidSubscriptionPlanStepInput(BaseInputOutput):
+    """
+    The input object to be used for the business logic of get-or-creating
+    a Subscription Plan
+    """
+    KEY = 'create_first_paid_subscription_plan_input'
+    SUBSIDY_TYPE = 'Subscription'
+
+    title: str = field(validator=is_str)
+    product_id: int = field(validator=is_int)
+    start_date: Optional[datetime] = field(validator=validators.optional(is_datetime))
+    expiration_date: Optional[datetime] = field(validator=is_datetime)
+    salesforce_opportunity_line_item: Optional[str] = field(default=None, validator=validators.optional(is_str))
+    enterprise_catalog_uuid: Optional[UUID] = field(default=None, validator=validators.optional(is_uuid))
+
+
+@define
+class GetCreateFirstPaidSubscriptionPlanStepOutput(BaseInputOutput):
+    """
+    The output object to be used for the business logic of get-or-creating
+    a Subscription Plan
+    """
+    KEY = 'create_first_paid_subscription_plan_output'
+
+    uuid: UUID = field(validator=is_uuid)
+    title: str = field(validator=is_str)
+    created: datetime = field(validator=is_datetime)
+    start_date: datetime = field(validator=is_datetime)
+    expiration_date: datetime = field(validator=is_datetime)
+    desired_num_licenses: int = field(validator=is_int)
+    is_active: bool = field(validator=is_bool)
+    is_current: bool = field(validator=is_bool)
+    plan_type: str = field(validator=is_str)
+    enterprise_catalog_uuid: UUID = field(validator=is_uuid)
+    salesforce_opportunity_line_item: Optional[str] = field(default=None, validator=validators.optional(is_str))
+    product: Optional[int] = field(default=None, validator=validators.optional(is_int))
+
+
+class GetCreateFirstPaidSubscriptionPlanStep(CheckoutIntentStepMixin, AbstractWorkflowStep):
+    """
+    Workflow step for creating a new Subscription Plan (first paid), or returning an existing
+    record based on matching customer agreement uuid and opportunity_line_item.
+    """
+    exception_class = GetCreateFirstPaidSubscriptionPlanException
+    input_class = GetCreateFirstPaidSubscriptionPlanStepInput
+    output_class = GetCreateFirstPaidSubscriptionPlanStepOutput
+
+    def process_input(self, accumulated_output=None, **kwargs):
+        """
+        Gets or creates a Subscription Plan record.
+
+        Params:
+          accumulated_output (obj): An optional accumulator object in which
+            the resulting output is persisted (this action is performed by the containing workflow).
+
+        Returns:
+          An instance of ``self.output_class``.
+        """
+        if self.input_object.enterprise_catalog_uuid:
+            catalog_uuid = str(self.input_object.enterprise_catalog_uuid)
         else:
-            checkout_intent.state = CheckoutIntentState.FULFILLED
+            catalog_uuid = str(accumulated_output.create_catalog_output.uuid)
 
-        checkout_intent.save()
+        customer_agreement_uuid = str(accumulated_output.create_customer_agreement_output.uuid)
+
+        if self.input_object.start_date:
+            start_date = self.input_object.start_date
+        else:
+            start_date = accumulated_output.create_trial_subscription_plan_output.expiration_date
+
+        if self.input_object.expiration_date:
+            expiration_date = self.input_object.expiration_date
+        else:
+            expiration_date = start_date + FIRST_PAID_SUBSCRIPTION_PERIOD_DURATION_FALLBACK
+
+        try:
+            result_dict = get_or_create_subscription_plan(
+                customer_agreement_uuid=customer_agreement_uuid,
+                existing_subscription_list=accumulated_output.create_customer_agreement_output.subscriptions,
+                plan_title=self.input_object.title,
+                catalog_uuid=catalog_uuid,
+                # Inherit the num licenses from the trial plan.
+                desired_num_licenses=accumulated_output.create_trial_subscription_plan_output.desired_num_licenses,
+                opp_line_item=self.input_object.salesforce_opportunity_line_item,
+                start_date=start_date.isoformat(),
+                expiration_date=expiration_date.isoformat(),
+                product_id=self.input_object.product_id,
+            )
+        except Exception as exc:
+            try:
+                self.error_checkout_intent(exc=exc)
+            except CheckoutIntent.DoesNotExist:
+                logger.exception(
+                    "Could not error CheckoutIntent because no linked CheckoutIntent found for this workflow."
+                )
+            raise self.exception_class(
+                f'Failed to get/create subscription plan for customer agreement uuid {customer_agreement_uuid}'
+            ) from exc
+
+        return self.output_class.from_dict(result_dict)
 
     def get_workflow_record(self):
         return ProvisionNewCustomerWorkflow.objects.filter(
@@ -483,7 +654,179 @@ class GetCreateSubscriptionPlanStep(AbstractWorkflowStep):
         ).first()
 
     def get_preceding_step_record(self):
-        return GetCreateCustomerAgreementStep.objects.filter(
+        return GetCreateTrialSubscriptionPlanStep.objects.filter(
+            uuid=self.preceding_step_uuid,
+        ).first()
+
+
+class GetCreateSubscriptionPlanRenewalStepException(UnitOfWorkException):
+    """
+    Exception raised when a Subscription Plan Renewal could not be fetched or created.
+    """
+
+
+@define
+class GetCreateSubscriptionPlanRenewalStepInput(BaseInputOutput):
+    """
+    The input object to be used for the business logic of get-or-creating
+    a Subscription Plan
+    """
+    KEY = 'create_subscription_plan_renewal_input'
+
+
+@define
+class GetCreateSubscriptionPlanRenewalStepOutput(BaseInputOutput):
+    """
+    The output object to be used for the business logic of get-or-creating
+    a Subscription Plan
+    """
+    KEY = 'create_subscription_plan_renewal_output'
+
+    id: int = field(validator=is_int)
+    prior_subscription_plan: UUID = field(validator=is_uuid)
+    renewed_subscription_plan: UUID = field(validator=is_uuid)
+    number_of_licenses: int = field(validator=is_int)
+    effective_date: datetime = field(validator=is_datetime)
+    renewed_expiration_date: datetime = field(validator=is_datetime)
+    salesforce_opportunity_line_item_id: Optional[str] = field(default=None, validator=validators.optional(is_str))
+
+
+class GetCreateSubscriptionPlanRenewalStep(CheckoutIntentStepMixin, AbstractWorkflowStep):
+    """
+    Workflow step for creating a new Subscription Plan renewal, or returning an existing
+    renewal record based on matching customer agreement UUID and opportunity_line_item.
+    """
+    exception_class = GetCreateSubscriptionPlanRenewalStepException
+    input_class = GetCreateSubscriptionPlanRenewalStepInput
+    output_class = GetCreateSubscriptionPlanRenewalStepOutput
+
+    def process_input(self, accumulated_output=None, **kwargs):
+        """
+        Gets or creates a SubscriptionPlanRenewal record.
+
+        The renewal links the trial plan to the first paid plan, using the trial plan's
+        expiration date as the effective date for the renewal.
+
+        Params:
+          accumulated_output (obj): An optional accumulator object in which
+            the resulting output is persisted (this action is performed by the containing workflow).
+
+        Returns:
+          An instance of ``self.output_class``.
+        """
+        trial_plan_uuid = str(accumulated_output.create_trial_subscription_plan_output.uuid)
+        first_paid_plan_uuid = str(accumulated_output.create_first_paid_subscription_plan_output.uuid)
+        try:
+            result_dict = get_or_create_subscription_plan_renewal(
+                prior_subscription_plan_uuid=trial_plan_uuid,
+                renewed_subscription_plan_uuid=first_paid_plan_uuid,
+                # salesforce_opportunity_id is intentionally None and will be populated outside of this workflow.
+                salesforce_opportunity_line_item_id=None,
+                effective_date=accumulated_output.create_trial_subscription_plan_output.expiration_date.isoformat(),
+                renewed_expiration_date=(
+                    accumulated_output.create_first_paid_subscription_plan_output.expiration_date.isoformat()
+                ),
+                # All licenses should be transferred.
+                number_of_licenses=accumulated_output.create_trial_subscription_plan_output.desired_num_licenses,
+            )
+            logger.info(
+                'Provisioning: created or found subscription plan renewal with id %s linking trial plan %s '
+                'to paid plan %s',
+                result_dict.get('id'), trial_plan_uuid, first_paid_plan_uuid
+            )
+        except Exception as exc:
+            try:
+                self.error_checkout_intent(exc=exc)
+            except CheckoutIntent.DoesNotExist:
+                logger.exception(
+                    "Could not error CheckoutIntent because no linked CheckoutIntent found for this workflow."
+                )
+            raise self.exception_class(
+                f'Failed to get/create subscription plan renewal from trial plan {trial_plan_uuid} '
+                f'to paid plan {first_paid_plan_uuid}'
+            ) from exc
+
+        return self.output_class.from_dict(result_dict)
+
+    def get_workflow_record(self):
+        return ProvisionNewCustomerWorkflow.objects.filter(
+            uuid=self.workflow_record_uuid,
+        ).first()
+
+    def get_preceding_step_record(self):
+        return GetCreateFirstPaidSubscriptionPlanStep.objects.filter(
+            uuid=self.preceding_step_uuid,
+        ).first()
+
+
+class NotificationStepException(UnitOfWorkException):
+    """
+    Exception raised if there was an issue with NotificationStep.
+    """
+
+
+@define
+class NotificationStepInput(BaseInputOutput):
+    """
+    Empty input object.
+    """
+    KEY = 'notification_input'
+
+
+@define
+class NotificationStepOutput(BaseInputOutput):
+    """
+    Empty output object.
+    """
+    KEY = 'notification_output'
+
+
+class NotificationStep(CheckoutIntentStepMixin, AbstractWorkflowStep):
+    """
+    Workflow step for marking the CheckoutIntent as fulfilled and notifying the customer admin.
+    """
+    exception_class = NotificationStepException
+    input_class = NotificationStepInput
+    output_class = NotificationStepOutput
+
+    def process_input(self, accumulated_output=None, **kwargs):
+        """
+        Mark the CheckoutIntent as fulfilled and notify the customer admin.
+
+        Params:
+          accumulated_output (obj): An optional accumulator object in which
+            the resulting output is persisted (this action is performed by the containing workflow).
+
+        Returns:
+          An instance of ``self.output_class``.
+        """
+        # Mark the checkout intent as fulfilled.
+        try:
+            self.fulfill_checkout_intent()
+        except CheckoutIntent.DoesNotExist as exc:
+            raise self.exception_class("Unexpectedly, no linked CheckoutIntent found for this workflow step.") from exc
+
+        # Notify the customer admin via email.
+        send_enterprise_provision_signup_confirmation_email.delay(
+            # The email campaign will be specifically designed around the trial plan parameters.
+            accumulated_output.create_trial_subscription_plan_output.start_date,
+            accumulated_output.create_trial_subscription_plan_output.expiration_date,
+            accumulated_output.create_trial_subscription_plan_output.desired_num_licenses,
+            # Remaining campaign params.
+            accumulated_output.create_customer_output.name,
+            accumulated_output.create_customer_output.slug
+        )
+
+        # TODO: Is there a better way than to just send an empty dict?
+        return self.output_class.from_dict({})
+
+    def get_workflow_record(self):
+        return ProvisionNewCustomerWorkflow.objects.filter(
+            uuid=self.workflow_record_uuid,
+        ).first()
+
+    def get_preceding_step_record(self):
+        return GetCreateSubscriptionPlanRenewalStep.objects.filter(
             uuid=self.preceding_step_uuid,
         ).first()
 
@@ -498,13 +841,21 @@ class ProvisionNewCustomerWorkflow(AbstractWorkflow):
         GetCreateEnterpriseAdminUsersStep,
         GetCreateCatalogStep,
         GetCreateCustomerAgreementStep,
-        GetCreateSubscriptionPlanStep,
+        GetCreateTrialSubscriptionPlanStep,
+        GetCreateFirstPaidSubscriptionPlanStep,
+        GetCreateSubscriptionPlanRenewalStep,
+        NotificationStep,
     ]
 
     @classmethod
     def generate_input_dict(
-        cls, customer_request_dict, admin_email_list, catalog_request_dict,
-        customer_agreement_request_dict, subscription_plan_request_dict
+        cls,
+        customer_request_dict,
+        admin_email_list,
+        catalog_request_dict,
+        customer_agreement_request_dict,
+        trial_subscription_plan_request_dict,
+        first_paid_subscription_plan_request_dict,
     ):
         """
         Generates a dictionary to use as ``input_data`` for instances of this workflow.
@@ -516,7 +867,10 @@ class ProvisionNewCustomerWorkflow(AbstractWorkflow):
             },
             GetCreateCatalogStepInput.KEY: catalog_request_dict or {},
             GetCreateCustomerAgreementStepInput.KEY: customer_agreement_request_dict or {},
-            GetCreateSubscriptionPlanStepInput.KEY: subscription_plan_request_dict,
+            GetCreateTrialSubscriptionPlanStepInput.KEY: trial_subscription_plan_request_dict,
+            GetCreateFirstPaidSubscriptionPlanStepInput.KEY: first_paid_subscription_plan_request_dict,
+            GetCreateSubscriptionPlanRenewalStepInput.KEY: {},
+            NotificationStepInput.KEY: {},
         }
 
     def get_create_customer_step(self):
@@ -539,8 +893,23 @@ class ProvisionNewCustomerWorkflow(AbstractWorkflow):
             workflow_record_uuid=self.uuid,
         ).first()
 
-    def get_create_subscription_plan_step(self):
-        return GetCreateSubscriptionPlanStep.objects.filter(
+    def get_create_trial_subscription_plan_step(self):
+        return GetCreateTrialSubscriptionPlanStep.objects.filter(
+            workflow_record_uuid=self.uuid,
+        ).first()
+
+    def get_create_first_paid_subscription_plan_step(self):
+        return GetCreateFirstPaidSubscriptionPlanStep.objects.filter(
+            workflow_record_uuid=self.uuid,
+        ).first()
+
+    def get_create_subscription_plan_renewal_step(self):
+        return GetCreateSubscriptionPlanRenewalStep.objects.filter(
+            workflow_record_uuid=self.uuid,
+        ).first()
+
+    def get_create_notification_step(self):
+        return NotificationStep.objects.filter(
             workflow_record_uuid=self.uuid,
         ).first()
 
@@ -556,8 +925,17 @@ class ProvisionNewCustomerWorkflow(AbstractWorkflow):
     def customer_agreement_output_dict(self):
         return self.output_data[GetCreateCustomerAgreementStepOutput.KEY]
 
-    def subscription_plan_output_dict(self):
-        return self.output_data[GetCreateSubscriptionPlanStepOutput.KEY]
+    def trial_subscription_plan_output_dict(self):
+        return self.output_data[GetCreateTrialSubscriptionPlanStepOutput.KEY]
+
+    def first_paid_subscription_plan_output_dict(self):
+        return self.output_data[GetCreateFirstPaidSubscriptionPlanStepOutput.KEY]
+
+    def subscription_plan_renewal_output_dict(self):
+        return self.output_data[GetCreateSubscriptionPlanRenewalStepOutput.KEY]
+
+    def notification_output_dict(self):
+        return self.output_data[NotificationStepOutput.KEY]
 
 
 class TriggerProvisionSubscriptionTrialCustomerWorkflow(ProvisionNewCustomerWorkflow):

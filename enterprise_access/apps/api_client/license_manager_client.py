@@ -26,6 +26,7 @@ class LicenseManagerApiClient(BaseOAuthClient):
     customer_agreement_endpoint = api_base_url + 'customer-agreement/'
     customer_agreement_provisioning_endpoint = api_base_url + 'provisioning-admins/customer-agreement/'
     subscription_provisioning_endpoint = api_base_url + 'provisioning-admins/subscriptions/'
+    subscription_plan_renewal_provisioning_endpoint = api_base_url + 'provisioning-admins/subscription-plan-renewals/'
 
     def get_subscription_overview(self, subscription_uuid):
         """
@@ -250,6 +251,75 @@ class LicenseManagerApiClient(BaseOAuthClient):
                 f'Could not update subscription plan {subscription_uuid}',
                 exc,
             ) from exc
+
+    def create_subscription_plan_renewal(
+        self,
+        prior_subscription_plan_uuid: str,
+        renewed_subscription_plan_uuid: str,
+        salesforce_opportunity_line_item_id: str | None,
+        effective_date: str,
+        renewed_expiration_date: str,
+        number_of_licenses: int,
+        renewed_plan_title: str | None = None,
+        license_types_to_copy: str | None = None,
+        disable_auto_apply_licenses: bool = False,
+        exempt_from_batch_processing: bool = False,
+    ) -> dict:
+        """
+        Creates or retrieves a subscription plan renewal via the license-manager service.
+
+        This is a get-or-create operation - if a renewal already exists with matching
+        prior_subscription_plan, renewed_subscription_plan, and salesforce_opportunity_line_item_id,
+        it will be returned instead of creating a new one.
+
+        Arguments:
+            prior_subscription_plan_uuid (str): UUID of the subscription plan being renewed
+            effective_date (str): ISO format date when the renewal becomes effective
+            renewed_expiration_date (str): ISO format date when the renewed plan expires
+            number_of_licenses (int): Number of licenses for the renewal
+            renewed_plan_title (str, optional): Title for the renewed plan
+            renewed_subscription_plan_uuid (str, optional): UUID of the future subscription plan
+            salesforce_opportunity_line_item_id (str, optional): Salesforce opportunity line item ID
+            license_types_to_copy (list, optional): List of license statuses to copy
+            disable_auto_apply_licenses (bool, optional): Whether to disable auto-apply
+
+        Returns:
+            dict: The created or existing subscription plan renewal record
+        """
+        endpoint = f'{self.subscription_plan_renewal_provisioning_endpoint}'
+        payload = {
+            'prior_subscription_plan': prior_subscription_plan_uuid,
+            'renewed_subscription_plan': renewed_subscription_plan_uuid,
+            # The payload key is misleadingly named---it really requires a line item.
+            'salesforce_opportunity_id': salesforce_opportunity_line_item_id,
+            'effective_date': effective_date,
+            'renewed_expiration_date': renewed_expiration_date,
+            'number_of_licenses': number_of_licenses,
+        }
+
+        if renewed_plan_title:
+            payload['renewed_plan_title'] = renewed_plan_title
+        if license_types_to_copy:
+            payload['license_types_to_copy'] = license_types_to_copy
+        if disable_auto_apply_licenses:
+            payload['disable_auto_apply_licenses'] = disable_auto_apply_licenses
+        if exempt_from_batch_processing:
+            payload['exempt_from_batch_processing'] = exempt_from_batch_processing
+
+        try:
+            response = self.client.post(endpoint, json=payload)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                (
+                    'Failed to create subscription plan renewal for prior plan %s. '
+                    'Error: %s',
+                ),
+                prior_subscription_plan_uuid,
+                exc,
+            )
+            raise
 
 
 class LicenseManagerUserApiClient(BaseUserApiClient):

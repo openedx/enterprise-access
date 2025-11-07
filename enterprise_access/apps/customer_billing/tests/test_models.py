@@ -4,7 +4,7 @@ Tests for the ``enterprise_access.customer_billing.models`` module.
 from datetime import timedelta
 from decimal import Decimal
 from random import randint
-from typing import Type, cast
+from typing import cast
 from unittest import mock
 from uuid import uuid4
 
@@ -27,7 +27,10 @@ from enterprise_access.apps.customer_billing.models import (
 )
 from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
 from enterprise_access.apps.customer_billing.tests.test_stripe_event_handlers import AttrDict
-from enterprise_access.apps.provisioning.models import GetCreateSubscriptionPlanStep
+from enterprise_access.apps.provisioning.models import (
+    GetCreateFirstPaidSubscriptionPlanStep,
+    GetCreateTrialSubscriptionPlanStep
+)
 from enterprise_access.apps.provisioning.tests.factories import ProvisionNewCustomerWorkflowFactory
 
 User = get_user_model()
@@ -901,8 +904,8 @@ class TestStripeEventSummary(TestCase):
         checkout_intent.save()
 
         # Create a subscription plan step with output containing subscription_plan_uuid
-        subscription_plan_uuid = uuid4()
-        _ = GetCreateSubscriptionPlanStep.objects.create(
+        trial_subscription_plan_uuid = uuid4()
+        _ = GetCreateTrialSubscriptionPlanStep.objects.create(
             workflow_record_uuid=workflow.uuid,
             input_data={
                 'title': 'Test Plan',
@@ -910,10 +913,10 @@ class TestStripeEventSummary(TestCase):
                 'start_date': '2024-01-01T00:00:00Z',
                 'expiration_date': '2025-01-01T00:00:00Z',
                 'desired_num_licenses': 5,
-                'product_id': 123
+                'product_id': 123,
             },
             output_data={
-                'uuid': str(subscription_plan_uuid),
+                'uuid': str(trial_subscription_plan_uuid),  # This is what we're testing
                 'title': 'Test Plan',
                 'salesforce_opportunity_line_item': 'test-oli-123',
                 'created': '2024-01-01T00:00:00Z',
@@ -924,7 +927,34 @@ class TestStripeEventSummary(TestCase):
                 'plan_type': 'Subscription',
                 'enterprise_catalog_uuid': str(uuid4()),
                 'product': 123,
-                'subscription_plan_uuid': str(subscription_plan_uuid)  # This is what we're testing
+                'desired_num_licenses': 5,
+            }
+        )
+
+        first_paid_subscription_plan_uuid = uuid4()
+        _ = GetCreateFirstPaidSubscriptionPlanStep.objects.create(
+            workflow_record_uuid=workflow.uuid,
+            input_data={
+                'title': 'First Paid Plan',
+                'salesforce_opportunity_line_item': None,
+                'start_date': '2025-01-01T00:00:00Z',
+                'expiration_date': '2026-01-01T00:00:00Z',
+                'desired_num_licenses': 5,
+                'product_id': 456,
+            },
+            output_data={
+                'uuid': str(first_paid_subscription_plan_uuid),  # Should be IGNORED.
+                'title': 'First Paid Plan',
+                'salesforce_opportunity_line_item': None,
+                'created': '2024-01-01T00:00:00Z',
+                'start_date': '2025-01-01T00:00:00Z',
+                'expiration_date': '2026-01-01T00:00:00Z',
+                'is_active': True,
+                'is_current': True,
+                'plan_type': 'Subscription',
+                'enterprise_catalog_uuid': str(uuid4()),
+                'product': 456,
+                'desired_num_licenses': 5,
             }
         )
 
@@ -962,8 +992,8 @@ class TestStripeEventSummary(TestCase):
         summary = StripeEventSummary(stripe_event_data=stripe_event_data)
         summary.populate_with_summary_data()
 
-        # Verify that subscription_plan_uuid was extracted from the workflow
-        self.assertEqual(summary.subscription_plan_uuid, subscription_plan_uuid)
+        # Verify that trial_subscription_plan_uuid was extracted from the workflow
+        self.assertEqual(summary.subscription_plan_uuid, trial_subscription_plan_uuid)
         self.assertEqual(summary.event_id, 'evt_test_with_plan_uuid')
         self.assertEqual(summary.event_type, 'customer.subscription.created')
         self.assertEqual(summary.checkout_intent, checkout_intent)

@@ -530,6 +530,10 @@ class StripeEventSummaryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         url_path='first-invoice-upcoming-amount-due',
     )
     def first_upcoming_invoice_amount_due(self, request, *args, **kwargs):
+        """
+        Given a license-manager SubscriptionPlan uuid, returns an upcoming
+        invoice amount due, dervied from Stripe's preview invoice API.
+        """
         subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
         summary = StripeEventSummary.objects.filter(
             event_type='customer.subscription.created',
