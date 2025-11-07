@@ -60,13 +60,13 @@ class QuantityConstraintSerializer(serializers.Serializer):
     max = serializers.IntegerField(help_text="Maximum allowed quantity")
 
 
-class SlugConstraintSerializer(serializers.Serializer):
+class StringConstraintSerializer(serializers.Serializer):
     """
-    Serializer for enterprise slug constraints.
+    Serializer for enterprise string constraints.
     """
-    min_length = serializers.IntegerField(help_text="Minimum slug length")
-    max_length = serializers.IntegerField(help_text="Maximum slug length")
-    pattern = serializers.CharField(help_text="Regex pattern for valid slugs")
+    min_length = serializers.IntegerField(help_text="Minimum string length")
+    max_length = serializers.IntegerField(help_text="Maximum string length")
+    pattern = serializers.CharField(required=False, help_text="Regex pattern for valid ")
 
 
 class FieldConstraintsSerializer(serializers.Serializer):
@@ -77,7 +77,11 @@ class FieldConstraintsSerializer(serializers.Serializer):
     https://github.com/edx/frontend-app-enterprise-checkout/blob/main/src/constants.ts#L13-L39
     """
     quantity = QuantityConstraintSerializer(help_text="Constraints for license quantity")
-    enterprise_slug = SlugConstraintSerializer(help_text="Constraints for enterprise slug")
+    enterprise_slug = StringConstraintSerializer(help_text="Constraints for enterprise slug")
+    full_name = StringConstraintSerializer(help_text="Constraints for enterprise user full name")
+    admin_email = StringConstraintSerializer(help_text="Constraints for admin email address")
+    country = StringConstraintSerializer(help_text="Constraints for enterprise country")
+    company_name = StringConstraintSerializer(help_text="Constraints for enterprise company name")
     embargoed_countries = serializers.ListField(
         child=serializers.CharField(max_length=2),
         help_text="Embargoed country codes",

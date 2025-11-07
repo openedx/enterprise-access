@@ -22,6 +22,7 @@ from enterprise_access.apps.bffs.checkout.serializers import (
     EnterpriseCustomerSerializer,
     PriceSerializer
 )
+from enterprise_access.apps.bffs.tests.utils import default_field_constraints
 from enterprise_access.apps.core.constants import SYSTEM_ENTERPRISE_LEARNER_ROLE
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
@@ -109,14 +110,7 @@ class CheckoutBFFViewSetTests(APITest):
                 'default_by_lookup_key': 'b2b_enterprise_self_service_yearly',
                 'prices': []
             },
-            'field_constraints': {
-                'quantity': {'min': 5, 'max': 30},
-                'enterprise_slug': {
-                    'min_length': 3,
-                    'max_length': 30,
-                    'pattern': '^[a-z0-9-]+$'
-                }
-            }
+            'field_constraints': default_field_constraints
         }
 
         # Validate using our serializer
@@ -134,14 +128,7 @@ class CheckoutBFFViewSetTests(APITest):
                 'default_by_lookup_key': 'b2b_enterprise_self_service_yearly',
                 'prices': []
             },
-            'field_constraints': {
-                'quantity': {'min': 5, 'max': 30},
-                'enterprise_slug': {
-                    'min_length': 3,
-                    'max_length': 30,
-                    'pattern': '^[a-z0-9-]+$'
-                }
-            },
+            'field_constraints': default_field_constraints,
             'checkout_intent': self.mock_checkout_intent_data
         }
 
@@ -159,14 +146,7 @@ class CheckoutBFFViewSetTests(APITest):
                 'default_by_lookup_key': 'b2b_enterprise_self_service_yearly',
                 'prices': []
             },
-            'field_constraints': {
-                'quantity': {'min': 5, 'max': 30},
-                'enterprise_slug': {
-                    'min_length': 3,
-                    'max_length': 30,
-                    'pattern': '^[a-z0-9-]+$'
-                }
-            },
+            'field_constraints': default_field_constraints,
             'checkout_intent': None
         }
 

@@ -11,6 +11,37 @@ from enterprise_access.apps.api_client.tests.test_constants import DATE_FORMAT_I
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.utils import _days_from_now
 
+default_field_constraints = {
+    'quantity': {
+        'min': 5,
+        'max': 30
+    },
+    'enterprise_slug': {
+        'min_length': 1,
+        'max_length': 255,
+        'pattern': '^[a-z0-9-]+$'
+    },
+    'full_name': {
+        'min_length': 1,
+        'max_length': 150
+    },
+    'admin_email': {
+        'min_length': 6,
+        'max_length': 253,
+        'pattern': '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$'
+    },
+    'country': {
+        'min_length': 2,
+        'max_length': 2,
+        'pattern': '^[A-Z]{2}$'
+    },
+    'company_name': {
+        'min_length': 1,
+        'max_length': 255
+    },
+    'embargoed_countries': []
+}
+
 
 class TestHandlerContextMixin(TestCase):
     """
