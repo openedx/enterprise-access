@@ -4,7 +4,7 @@ Tests for the ``enterprise_access.customer_billing.models`` module.
 from datetime import timedelta
 from decimal import Decimal
 from random import randint
-from typing import Type, cast
+from typing import cast
 from unittest import mock
 from uuid import uuid4
 

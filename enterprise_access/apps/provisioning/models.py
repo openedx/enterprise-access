@@ -3,11 +3,11 @@ Workflow models for the customer-and-subsidy-provisioning business domain.
 """
 import logging
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
 from typing import Optional
 from uuid import UUID
 
 from attrs import define, field, validators
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django_countries import countries
 
