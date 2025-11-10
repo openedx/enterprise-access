@@ -924,8 +924,15 @@ class StripeEventSummary(TimeStampedModel):
                 workflow_record_uuid=checkout_intent.workflow.uuid,
             ).first()
 
-            if subscription_step and subscription_step.output_object:
-                self.subscription_plan_uuid = subscription_step.output_object.uuid
+            try:
+                if subscription_step and subscription_step.output_object:
+                    self.subscription_plan_uuid = subscription_step.output_object.uuid
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                logger.warning(
+                    'Could not get trial subscription output data for %s, CheckoutIntent %s',
+                    self.event_id,
+                    checkout_intent.uuid,
+                )
 
         # Extract data from the Stripe event payload
         event_data = stripe_event_data.data
