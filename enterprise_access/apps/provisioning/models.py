@@ -557,8 +557,8 @@ class GetCreateFirstPaidSubscriptionPlanStepInput(BaseInputOutput):
 
     title: str = field(validator=is_str)
     product_id: int = field(validator=is_int)
-    start_date: Optional[datetime] = field(validator=validators.optional(is_datetime))
-    expiration_date: Optional[datetime] = field(validator=is_datetime)
+    start_date: Optional[datetime] = field(default=None, validator=validators.optional(is_datetime))
+    expiration_date: Optional[datetime] = field(default=None, validator=validators.optional(is_datetime))
     salesforce_opportunity_line_item: Optional[str] = field(default=None, validator=validators.optional(is_str))
     enterprise_catalog_uuid: Optional[UUID] = field(default=None, validator=validators.optional(is_uuid))
 

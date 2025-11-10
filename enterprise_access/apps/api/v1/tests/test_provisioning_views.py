@@ -7,6 +7,7 @@ from datetime import timedelta
 from unittest import mock
 
 import ddt
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from edx_rbac.constants import ALL_ACCESS_CONTEXT
@@ -819,6 +820,80 @@ class TestProvisioningEndToEnd(APITest):
             any_order=False,
         )
         assert mock_license_client.create_subscription_plan.call_count == 2
+
+    @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
+    @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
+    @mock.patch('enterprise_access.apps.api.v1.views.provisioning.logger')
+    def test_legacy_single_plan_request_transformation(
+        self, mock_logger, mock_lms_api_client, mock_license_manager_client
+    ):
+        """
+        Test that legacy requests with single 'subscription_plan' key are transformed
+        to the new two-plan format and successfully provision resources.
+        """
+        # Setup mocks for successful provisioning.
+        mock_lms_client = mock_lms_api_client.return_value
+        mock_lms_client.get_enterprise_customer_data.return_value = None
+        mock_lms_client.create_enterprise_customer.return_value = DEFAULT_CUSTOMER_RECORD
+        mock_lms_client.get_enterprise_admin_users.return_value = []
+        mock_lms_client.get_enterprise_pending_admin_users.return_value = []
+        mock_lms_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
+
+        mock_license_client = mock_license_manager_client.return_value
+        mock_license_client.get_customer_agreement.return_value = None
+        mock_license_client.create_customer_agreement.return_value = {
+            **DEFAULT_AGREEMENT_RECORD, "subscriptions": []
+        }
+        mock_license_client.create_subscription_plan.side_effect = [
+            DEFAULT_TRIAL_SUBSCRIPTION_PLAN_RECORD,
+            DEFAULT_FIRST_PAID_SUBSCRIPTION_PLAN_RECORD,
+        ]
+        mock_license_client.create_subscription_plan_renewal.return_value = (
+            EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
+        )
+
+        # Create a legacy request payload with 'subscription_plan' instead of the new format.
+        legacy_request_payload = {**DEFAULT_REQUEST_PAYLOAD}
+        legacy_request_payload.pop('first_paid_subscription_plan')
+        legacy_request_payload['subscription_plan'] = legacy_request_payload.pop('trial_subscription_plan')
+
+        # Make the provisioning request.
+        response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=legacy_request_payload)
+
+        # Should succeed despite using legacy format.
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify warning was logged about deprecated format.
+        mock_logger.warning.assert_called_once()
+        warning_message = mock_logger.warning.call_args[0][0]
+        self.assertIn('Deprecated request format detected', warning_message)
+        self.assertIn('subscription_plan', warning_message)
+
+        # Verify info log about transformation.
+        mock_logger.info.assert_called()
+        info_calls = [call[0][0] for call in mock_logger.info.call_args_list]
+        self.assertTrue(
+            any('Transformed legacy subscription_plan' in msg for msg in info_calls),
+            "Expected transformation log message not found"
+        )
+
+        # Verify response has both trial and paid subscription plans.
+        response_data = response.json()
+        self.assertIn('trial_subscription_plan', response_data)
+        self.assertIn('first_paid_subscription_plan', response_data)
+
+        # Verify the workflow input_data contains correct trial and paid plan data
+        workflow = ProvisionNewCustomerWorkflow.objects.first()
+        trial_plan_input = workflow.input_data.get('create_trial_subscription_plan_input')
+        first_paid_plan_input = workflow.input_data.get('create_first_paid_subscription_plan_input')
+        assert trial_plan_input['title'] == legacy_request_payload['subscription_plan']['title']
+        assert trial_plan_input['salesforce_opportunity_line_item'] == (
+            legacy_request_payload['subscription_plan']['salesforce_opportunity_line_item']
+        )
+        assert trial_plan_input['product_id'] == legacy_request_payload['subscription_plan']['product_id']
+        assert 'First Paid Plan' in first_paid_plan_input['title']
+        assert first_paid_plan_input['product_id'] == settings.PROVISIONING_PAID_SUBSCRIPTION_PRODUCT_ID
+        assert first_paid_plan_input['salesforce_opportunity_line_item'] is None
 
 
 @ddt.ddt
