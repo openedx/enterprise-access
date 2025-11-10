@@ -78,7 +78,6 @@ DEFAULT_TRIAL_SUBSCRIPTION_PLAN_RECORD = {
     "plan_type": "Standard Trial",
     "enterprise_catalog_uuid": str(TEST_CATALOG_UUID),
     "product": 1,
-    "desired_num_licenses": 5,
 }
 
 DEFAULT_FIRST_PAID_SUBSCRIPTION_PLAN_RECORD = {
@@ -93,7 +92,6 @@ DEFAULT_FIRST_PAID_SUBSCRIPTION_PLAN_RECORD = {
     "plan_type": "Standard Paid",
     "enterprise_catalog_uuid": str(TEST_CATALOG_UUID),
     "product": 2,
-    "desired_num_licenses": 5,
 }
 
 DEFAULT_AGREEMENT_RECORD = {
@@ -1199,7 +1197,6 @@ class TestSubscriptionPlanOLIUpdateView(APITest):
                 'is_current': True,
                 'plan_type': 'Standard',
                 'enterprise_catalog_uuid': str(TEST_CATALOG_UUID),
-                'desired_num_licenses': 10,
                 'product': 1,
             }
         )
