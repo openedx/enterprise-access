@@ -102,7 +102,7 @@ defusedxml==0.7.1
     #   -r requirements/base.txt
     #   python3-openid
     #   social-auth-core
-django==4.2.25
+django==5.2.8
     # via
     #   -r requirements/base.txt
     #   crispy-bootstrap5
@@ -137,9 +137,9 @@ django-celery-results==2.6.0
     # via -r requirements/base.txt
 django-cors-headers==4.9.0
     # via -r requirements/base.txt
-django-countries==7.6.1
+django-countries==8.0.0
     # via -r requirements/base.txt
-django-crispy-forms==2.4
+django-crispy-forms==2.5
     # via
     #   -r requirements/base.txt
     #   crispy-bootstrap5
@@ -151,7 +151,7 @@ django-crum==0.7.9
     #   edx-toggles
 django-extensions==4.1
     # via -r requirements/base.txt
-django-filter==25.1
+django-filter==25.2
     # via -r requirements/base.txt
 django-log-request-id==2.1.0
     # via -r requirements/base.txt
@@ -435,7 +435,7 @@ six==1.17.0
     #   edx-django-release-util
     #   edx-rbac
     #   python-dateutil
-social-auth-app-django==5.4.3
+social-auth-app-django==5.6.0
     # via
     #   -r requirements/base.txt
     #   edx-auth-backends
@@ -454,7 +454,7 @@ stevedore==5.5.0
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
-stripe==13.1.1
+stripe==13.2.0
     # via -r requirements/base.txt
 text-unidecode==1.3
     # via
@@ -492,7 +492,7 @@ wcwidth==0.2.14
     # via
     #   -r requirements/base.txt
     #   prompt-toolkit
-zope-event==6.0
+zope-event==6.1
     # via gevent
 zope-interface==8.0.1
     # via gevent
