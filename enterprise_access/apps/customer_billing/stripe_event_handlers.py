@@ -18,6 +18,7 @@ from enterprise_access.apps.customer_billing.stripe_event_types import StripeEve
 from enterprise_access.apps.customer_billing.tasks import (
     send_payment_receipt_email,
     send_trial_cancellation_email_task,
+    send_trial_end_and_subscription_started_email_task,
     send_trial_ending_reminder_email_task
 )
 
@@ -329,6 +330,13 @@ class StripeEventHandler:
                 logger.info(
                     f"Subscription {subscription.id} already canceled (status unchanged), skipping cancellation email"
                 )
+
+        prior_status = getattr(checkout_intent.previous_summary(event), 'subscription_status', None)
+        if current_status == 'active' and prior_status == 'trialing':
+            send_trial_end_and_subscription_started_email_task.delay(
+                subscription_id=subscription.id,
+                checkout_intent_id=checkout_intent.id,
+            )
 
     @on_stripe_event("customer.subscription.deleted")
     @staticmethod
