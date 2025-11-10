@@ -1,6 +1,7 @@
 """
 Rest API views for the browse and request app.
 """
+import copy
 import logging
 
 from django.conf import settings
@@ -52,8 +53,60 @@ class ProvisioningCreateView(PermissionRequiredMixin, generics.CreateAPIView):
     permission_classes = (permissions.IsAuthenticated,)
     permission_required = constants.PROVISIONING_CREATE_PERMISSION
 
+    def _transform_legacy_request_data(self, request_data: dict) -> dict:
+        """
+        Transform legacy request format to support backward compatibility.
+
+        Converts old `subscription_plan` key to new `trial_subscription_plan` and
+        `first_paid_subscription_plan` keys if the old format is detected.
+
+        Args:
+            request_data (dict): The incoming request data
+
+        Returns:
+            dict: Transformed request data with new keys
+        """
+        # If new format is already present, return as-is.
+        if 'trial_subscription_plan' in request_data and 'first_paid_subscription_plan' in request_data:
+            return request_data
+
+        # If old format is present, transform it.
+        if 'subscription_plan' in request_data:
+            logger.warning(
+                'Deprecated request format detected: `subscription_plan` key should be replaced with '
+                '`trial_subscription_plan` and `first_paid_subscription_plan`'
+            )
+
+            subscription_plan = request_data.pop('subscription_plan')
+
+            # Use the subscription_plan data as trial_subscription_plan
+            request_data['trial_subscription_plan'] = subscription_plan
+
+            # Synthesize first_paid_subscription_plan with required fields only
+            request_data['first_paid_subscription_plan'] = {
+                'title': f"{subscription_plan.get('title', 'Subscription')} - First Paid Plan",
+                'product_id': settings.PROVISIONING_PAID_SUBSCRIPTION_PRODUCT_ID,
+                'salesforce_opportunity_line_item': None,
+            }
+
+            logger.info(
+                'Transformed legacy subscription_plan to trial_subscription_plan and '
+                'synthesized first_paid_subscription_plan'
+            )
+            logger.info(
+                'Transformed request payload: %s',
+                str(request_data),
+            )
+            return request_data
+
+        # If neither format detected, passthrough to serializer to inevitably fail validation and return HTTP 400.
+        return request_data
+
     def create(self, request, *args, **kwargs):
-        request_serializer = serializers.ProvisioningRequestSerializer(data=request.data)
+        # TEMP: Transform legacy request data before serialization. See docstring.
+        transformed_data = self._transform_legacy_request_data(copy.deepcopy(dict(request.data)))
+
+        request_serializer = serializers.ProvisioningRequestSerializer(data=transformed_data)
         request_serializer.is_valid(raise_exception=True)
 
         customer_request_data = request_serializer.validated_data['enterprise_customer']
