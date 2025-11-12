@@ -383,12 +383,13 @@ class TestSendPaymentReceiptEmail(TestCase):
             'admin_users': []
         }
 
-        send_payment_receipt_email(
-            invoice_data=self.mock_invoice_data,
-            subscription_data=self.mock_subscription_data,
-            enterprise_customer_name=self.enterprise_customer_name,
-            enterprise_slug=self.enterprise_slug,
-        )
+        with self.assertRaisesRegex(Exception, 'No admin users'):
+            send_payment_receipt_email(
+                invoice_data=self.mock_invoice_data,
+                subscription_data=self.mock_subscription_data,
+                enterprise_customer_name=self.enterprise_customer_name,
+                enterprise_slug=self.enterprise_slug,
+            )
 
         # Verify LMS API was called but Braze API was not
         mock_lms_client.return_value.get_enterprise_customer_data.assert_called_once()
@@ -541,9 +542,10 @@ class TestSendTrialEndingReminderEmailTask(TestCase):
             "admin_users": []
         }
 
-        send_trial_ending_reminder_email_task(
-            checkout_intent_id=self.checkout_intent.id,
-        )
+        with self.assertRaisesRegex(Exception, 'No admin users'):
+            send_trial_ending_reminder_email_task(
+                checkout_intent_id=self.checkout_intent.id,
+            )
 
         mock_get_subscription.assert_not_called()
         mock_braze_client.return_value.send_campaign_message.assert_not_called()
@@ -768,12 +770,13 @@ class TestSendTrialEndAndSubscriptionStartedEmailTask(TestCase):
     @mock.patch("enterprise_access.apps.customer_billing.tasks.CheckoutIntent")
     @mock.patch("enterprise_access.apps.customer_billing.tasks.BrazeApiClient")
     @mock.patch("enterprise_access.apps.customer_billing.tasks.LmsApiClient")
-    def test_success_sends_to_all_admins(self,
-                                         mock_lms_client,
-                                         mock_braze_client,
-                                         mock_checkout_intent,
-                                         mock_get_stripe_subscription
-                                         ):
+    def test_success_sends_to_all_admins(
+        self,
+        mock_lms_client,
+        mock_braze_client,
+        mock_checkout_intent,
+        mock_get_stripe_subscription
+    ):
         subscription = {
             'id': 'sub_123',
             'quantity': 5,
@@ -816,12 +819,13 @@ class TestSendTrialEndAndSubscriptionStartedEmailTask(TestCase):
     @mock.patch("enterprise_access.apps.customer_billing.tasks.CheckoutIntent")
     @mock.patch("enterprise_access.apps.customer_billing.tasks.BrazeApiClient")
     @mock.patch("enterprise_access.apps.customer_billing.tasks.LmsApiClient")
-    def test_no_admins_logs_and_returns(self,
-                                        mock_lms_client,
-                                        mock_braze_client,
-                                        mock_checkout_intent,
-                                        mock_get_stripe_subscription
-                                        ):
+    def test_no_admins_logs_and_returns(
+        self,
+        mock_lms_client,
+        mock_braze_client,
+        mock_checkout_intent,
+        mock_get_stripe_subscription
+    ):
         subscription = {
             'id': 'sub_123',
             'quantity': 5,
@@ -837,5 +841,8 @@ class TestSendTrialEndAndSubscriptionStartedEmailTask(TestCase):
         mock_get_stripe_subscription.return_value = subscription
         mock_lms_instance = mock_lms_client.return_value
         mock_lms_instance.get_enterprise_customer_data.return_value = {'admin_users': []}
-        send_trial_end_and_subscription_started_email_task('sub_123', 1)
+
+        with self.assertRaisesRegex(Exception, 'No admin users'):
+            send_trial_end_and_subscription_started_email_task('sub_123', 1)
+
         assert not mock_braze_client.return_value.send_campaign_message.called

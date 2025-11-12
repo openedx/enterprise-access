@@ -92,6 +92,49 @@ class TestLicenseManagerApiClient(TestCase):
         )
 
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient', autospec=True)
+    def test_list_subscriptions_params(self, mock_oauth_client):
+        mock_get = mock_oauth_client.return_value.get
+        mock_get.return_value.json.return_value = {'results': []}
+
+        lm_client = LicenseManagerApiClient()
+        enterprise_uuid = 'ec-uuid-123'
+
+        # Should only set enterprise_customer_uuid parameter
+        result = lm_client.list_subscriptions(enterprise_uuid)
+        self.assertEqual(result, {'results': []})
+
+        # Verify URL and params
+        expected_url = (
+            'http://license-manager.example.com'
+            '/api/v1/subscriptions/'
+        )
+        mock_get.assert_called_with(
+            expected_url,
+            params={'enterprise_customer_uuid': enterprise_uuid},
+            timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT,
+        )
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient', autospec=True)
+    def test_update_subscription_plan_patch(self, mock_oauth_client):
+        mock_patch = mock_oauth_client.return_value.patch
+        mock_patch.return_value.json.return_value = {'uuid': 'plan-uuid', 'is_active': False}
+
+        lm_client = LicenseManagerApiClient()
+        payload = {'is_active': False, 'change_reason': 'delayed_payment'}
+        result = lm_client.update_subscription_plan('plan-uuid', **payload)
+
+        self.assertEqual(result, mock_patch.return_value.json.return_value)
+        expected_url = (
+            'http://license-manager.example.com'
+            '/api/v1/provisioning-admins/subscriptions/plan-uuid/'
+        )
+        mock_patch.assert_called_once_with(
+            expected_url,
+            json=payload,
+            timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT,
+        )
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient', autospec=True)
     def test_create_subscription_plan(self, mock_oauth_client):
         mock_post = mock_oauth_client.return_value.post
         customer_agreement_uuid = uuid.uuid4()
