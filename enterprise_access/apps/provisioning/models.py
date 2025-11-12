@@ -469,7 +469,6 @@ class GetCreateTrialSubscriptionPlanStepOutput(BaseInputOutput):
     created: datetime = field(validator=is_datetime)
     start_date: datetime = field(validator=is_datetime)
     expiration_date: datetime = field(validator=is_datetime)
-    desired_num_licenses: int = field(validator=is_int)
     is_active: bool = field(validator=is_bool)
     is_current: bool = field(validator=is_bool)
     plan_type: str = field(validator=is_str)
@@ -576,7 +575,6 @@ class GetCreateFirstPaidSubscriptionPlanStepOutput(BaseInputOutput):
     created: datetime = field(validator=is_datetime)
     start_date: datetime = field(validator=is_datetime)
     expiration_date: datetime = field(validator=is_datetime)
-    desired_num_licenses: int = field(validator=is_int)
     is_active: bool = field(validator=is_bool)
     is_current: bool = field(validator=is_bool)
     plan_type: str = field(validator=is_str)
@@ -622,14 +620,17 @@ class GetCreateFirstPaidSubscriptionPlanStep(CheckoutIntentStepMixin, AbstractWo
         else:
             expiration_date = start_date + FIRST_PAID_SUBSCRIPTION_PERIOD_DURATION_FALLBACK
 
+        # Inherit the num licenses from the trial plan.
+        workflow = self.get_workflow_record()
+        desired_num_licenses = workflow.input_object.create_trial_subscription_plan_input.desired_num_licenses
+
         try:
             result_dict = get_or_create_subscription_plan(
                 customer_agreement_uuid=customer_agreement_uuid,
                 existing_subscription_list=accumulated_output.create_customer_agreement_output.subscriptions,
                 plan_title=self.input_object.title,
                 catalog_uuid=catalog_uuid,
-                # Inherit the num licenses from the trial plan.
-                desired_num_licenses=accumulated_output.create_trial_subscription_plan_output.desired_num_licenses,
+                desired_num_licenses=desired_num_licenses,
                 opp_line_item=self.input_object.salesforce_opportunity_line_item,
                 start_date=start_date.isoformat(),
                 expiration_date=expiration_date.isoformat(),
@@ -716,6 +717,10 @@ class GetCreateSubscriptionPlanRenewalStep(CheckoutIntentStepMixin, AbstractWork
         """
         trial_plan_uuid = str(accumulated_output.create_trial_subscription_plan_output.uuid)
         first_paid_plan_uuid = str(accumulated_output.create_first_paid_subscription_plan_output.uuid)
+
+        workflow = self.get_workflow_record()
+        desired_num_licenses = workflow.input_object.create_trial_subscription_plan_input.desired_num_licenses
+
         try:
             result_dict = get_or_create_subscription_plan_renewal(
                 prior_subscription_plan_uuid=trial_plan_uuid,
@@ -727,7 +732,7 @@ class GetCreateSubscriptionPlanRenewalStep(CheckoutIntentStepMixin, AbstractWork
                     accumulated_output.create_first_paid_subscription_plan_output.expiration_date.isoformat()
                 ),
                 # All licenses should be transferred.
-                number_of_licenses=accumulated_output.create_trial_subscription_plan_output.desired_num_licenses,
+                number_of_licenses=desired_num_licenses,
             )
             logger.info(
                 'Provisioning: created or found subscription plan renewal with id %s linking trial plan %s '
@@ -806,12 +811,15 @@ class NotificationStep(CheckoutIntentStepMixin, AbstractWorkflowStep):
         except CheckoutIntent.DoesNotExist as exc:
             raise self.exception_class("Unexpectedly, no linked CheckoutIntent found for this workflow step.") from exc
 
+        workflow = self.get_workflow_record()
+        desired_num_licenses = workflow.input_object.create_trial_subscription_plan_input.desired_num_licenses
+
         # Notify the customer admin via email.
         send_enterprise_provision_signup_confirmation_email.delay(
             # The email campaign will be specifically designed around the trial plan parameters.
             accumulated_output.create_trial_subscription_plan_output.start_date,
             accumulated_output.create_trial_subscription_plan_output.expiration_date,
-            accumulated_output.create_trial_subscription_plan_output.desired_num_licenses,
+            desired_num_licenses,
             # Remaining campaign params.
             accumulated_output.create_customer_output.name,
             accumulated_output.create_customer_output.slug
