@@ -228,6 +228,32 @@ class TestStripeEventHandler(TestCase):
         event_data = StripeEventData.objects.get(event_id=mock_event.id)
         self.assertEqual(event_data.checkout_intent, self.checkout_intent)
 
+    def test_event_marked_as_handled_after_success(self):
+        """StripeEventData.handled_at is set after successful handler execution."""
+        subscription_id = 'sub_test_handled_123'
+        stripe_customer_id = 'cus_test_handled_456'
+        mock_subscription = self._create_mock_stripe_subscription(self.checkout_intent.id)
+
+        invoice_data = {
+            'id': 'in_test_handled_123',
+            'customer': stripe_customer_id,
+            'parent': {
+                'subscription_details': {
+                    'metadata': mock_subscription,
+                    'subscription': subscription_id,
+                }
+            },
+        }
+
+        mock_event = self._create_mock_stripe_event('invoice.paid', invoice_data)
+
+        self.assertFalse(StripeEventData.objects.filter(event_id=mock_event.id).exists())
+
+        StripeEventHandler.dispatch(mock_event)
+
+        event_data = StripeEventData.objects.get(event_id=mock_event.id)
+        self.assertIsNotNone(event_data.handled_at)
+
     @mock.patch(
         "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_cancellation_email_task"
     )

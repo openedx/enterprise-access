@@ -729,9 +729,19 @@ class StripeEventData(TimeStampedModel):
         help_text='The event payload data',
         encoder=DjangoJSONEncoder,
     )
+    handled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Timestamp when this Stripe event was successfully handled.'
+    )
 
     def __str__(self):
         return f"<StripeEventData id={self.event_id}, event_type={self.event_type}>"
+
+    def mark_as_handled(self):
+        """Mark this event as handled by setting handled_at to now."""
+        self.handled_at = timezone.now()
+        self.save(update_fields=['handled_at', 'modified'])
 
 
 class StripeEventSummary(TimeStampedModel):

@@ -140,8 +140,11 @@ class StripeEventHandler:
                 # The default __repr__ is really long because it just barfs out the entire payload.
                 event_short_repr = f'<stripe.Event id={event.id} type={event.type}>'
                 logger.info(f'[StripeEventHandler] handling {event_short_repr}.')
-                persist_stripe_event(event)
+                event_record = persist_stripe_event(event)
                 handler_method(event)
+                # Mark event as handled if we persisted it successfully and no exception was raised
+                if event_record is not None:
+                    event_record.mark_as_handled()
                 logger.info(f'[StripeEventHandler] handler for {event_short_repr} complete.')
 
             # Register the wrapped handler method.
