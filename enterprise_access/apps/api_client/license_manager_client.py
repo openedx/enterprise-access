@@ -29,6 +29,73 @@ class LicenseManagerApiClient(BaseOAuthClient):
     subscription_provisioning_endpoint = api_base_url + 'provisioning-admins/subscriptions/'
     subscription_plan_renewal_provisioning_endpoint = api_base_url + 'provisioning-admins/subscription-plan-renewals/'
 
+    def list_subscriptions(self, enterprise_customer_uuid):
+        """
+        List subscription plans for an enterprise.
+
+        Returns a paginated DRF list response: { count, next, previous, results: [...] }
+        """
+        try:
+            params = {
+                'enterprise_customer_uuid': enterprise_customer_uuid,
+            }
+
+            response = self.client.get(
+                self.subscriptions_endpoint,
+                params=params,
+                timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT,
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Failed to list subscriptions for enterprise %s, response: %s, exc: %s',
+                enterprise_customer_uuid, safe_error_response_content(exc), exc,
+            )
+            raise
+
+    def update_subscription_plan(self, subscription_uuid, salesforce_opportunity_line_item=None, **kwargs):
+        """
+        Update a SubscriptionPlan's Salesforce Opportunity Line Item.
+
+        Arguments:
+            subscription_uuid (str): UUID of the SubscriptionPlan to update
+            salesforce_opportunity_line_item (str): Salesforce OLI to associate with the plan
+
+        Returns:
+            dict: Updated subscription plan data from the API
+
+        Raises:
+            APIClientException: If the API call fails
+        """
+        endpoint = f"{self.subscription_provisioning_endpoint}{subscription_uuid}/"
+        payload = {
+            'salesforce_opportunity_line_item': salesforce_opportunity_line_item,
+            'change_reason': OTHER_SUBSCRIPTION_CHANGE_REASON,
+        }
+        payload.update(kwargs)
+
+        try:
+            response = self.client.patch(
+                endpoint,
+                json=payload,
+                timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Failed to update subscription plan %s with OLI %s, response %s, exception: %s',
+                subscription_uuid,
+                salesforce_opportunity_line_item,
+                safe_error_response_content(exc),
+                exc,
+            )
+            raise APIClientException(
+                f'Could not update subscription plan {subscription_uuid}',
+                exc,
+            ) from exc
+
     def get_subscription_overview(self, subscription_uuid):
         """
         Call license-manager API for data about a SubscriptionPlan.
@@ -210,47 +277,6 @@ class LicenseManagerApiClient(BaseOAuthClient):
             )
             raise APIClientException(
                 f'Could not create subscription plan for customer agreement {customer_agreement_uuid}',
-                exc,
-            ) from exc
-
-    def update_subscription_plan(self, subscription_uuid, salesforce_opportunity_line_item):
-        """
-        Update a SubscriptionPlan's Salesforce Opportunity Line Item.
-
-        Arguments:
-            subscription_uuid (str): UUID of the SubscriptionPlan to update
-            salesforce_opportunity_line_item (str): Salesforce OLI to associate with the plan
-
-        Returns:
-            dict: Updated subscription plan data from the API
-
-        Raises:
-            APIClientException: If the API call fails
-        """
-        endpoint = f"{self.subscription_provisioning_endpoint}{subscription_uuid}/"
-        payload = {
-            'salesforce_opportunity_line_item': salesforce_opportunity_line_item,
-            'change_reason': OTHER_SUBSCRIPTION_CHANGE_REASON,
-        }
-
-        try:
-            response = self.client.patch(
-                endpoint,
-                json=payload,
-                timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT
-            )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.HTTPError as exc:
-            logger.exception(
-                'Failed to update subscription plan %s with OLI %s, response %s, exception: %s',
-                subscription_uuid,
-                salesforce_opportunity_line_item,
-                safe_error_response_content(exc),
-                exc,
-            )
-            raise APIClientException(
-                f'Could not update subscription plan {subscription_uuid}',
                 exc,
             ) from exc
 
