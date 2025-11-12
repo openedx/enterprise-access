@@ -2055,7 +2055,7 @@ class AssignedLearnerCreditAccessPolicy(AssignedCreditPolicyMixin, SubsidyAccess
 
         return {"valid_requests": valid_requests, "failed_requests_by_reason": failed_requests_by_reason}
 
-    def allocate(self, learner_emails, content_key, content_price_cents):
+    def allocate(self, learner_emails, content_key, content_price_cents, admin_lms_user_id=None):
         """
         Creates allocated ``LearnerContentAssignment`` records.
 
@@ -2063,12 +2063,14 @@ class AssignedLearnerCreditAccessPolicy(AssignedCreditPolicyMixin, SubsidyAccess
           learner_emails: A list of learner emails for whom content should be allocated.
           content_key: Typically a course key (although theoretically could be *any* content identifier).
           content_price_cents: A *negative* integer reflecting the current price of the content in USD cents.
+          admin_lms_user_id: LMS Admin user who created this Learner Credit assignment.
         """
         return assignments_api.allocate_assignments(
             self.assignment_configuration,
             learner_emails,
             content_key,
             content_price_cents,
+            admin_lms_user_id,
         )
 
 
