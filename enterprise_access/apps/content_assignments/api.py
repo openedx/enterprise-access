@@ -266,7 +266,8 @@ def get_allocated_quantity_for_configuration(assignment_configuration):
 
 
 def allocate_assignments(
-    assignment_configuration, learner_emails, content_key, content_price_cents, known_lms_user_ids=None,
+    assignment_configuration, learner_emails, content_key,
+    content_price_cents, admin_lms_user_id=None, known_lms_user_ids=None,
 ):
     """
     Creates or updates an allocated assignment record
@@ -287,6 +288,7 @@ def allocate_assignments(
       - ``known_lms_user_ids``: Optional list of known lms user ids corresponding to the provided emails.
         If present, it's assumed to be *all* lms user ids for the provided emails, and that no duplicate
         user emails are provided.
+      - ``admin_lms_user_id``: ID of the admin LMS user who initiated the Learner Credit assignment.
 
     Returns: A dictionary of updated, created, and unchanged assignment records. e.g.
       ```
@@ -419,6 +421,8 @@ def allocate_assignments(
             content_quantity,
             lms_user_ids_by_email,
             allocation_batch_id,
+            # Forward admin LMS user ID to identify the assignment creator
+            admin_lms_user_id,
         )
 
     # Enqueue an asynchronous task to link assigned learners to the customer
@@ -790,7 +794,9 @@ def _create_new_assignments(
     content_key,
     content_quantity,
     lms_user_ids_by_email,
-    allocation_batch_id
+    allocation_batch_id,
+    # Forward the LMS admin user who created this Learner Credit assignment.
+    admin_lms_user_id=None,
 ):
     """
     Helper to bulk save new LearnerContentAssignment instances.
@@ -825,6 +831,8 @@ def _create_new_assignments(
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
             allocation_batch_id=allocation_batch_id,
             allocated_at=localized_utcnow(),
+            # Add admin LMS user ID to allocation to identify the assignment creator.
+            admin_lms_user_id=admin_lms_user_id,
         )
         assignments_to_create.append(assignment)
 
