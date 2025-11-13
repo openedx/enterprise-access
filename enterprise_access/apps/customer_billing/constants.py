@@ -99,7 +99,6 @@ ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS = {
     CheckoutIntentState.ERRORED_PROVISIONING: [
         CheckoutIntentState.FULFILLED,
     ],
-    CheckoutIntentState.ERRORED_FULFILLMENT_STALLED: [],
     CheckoutIntentState.EXPIRED: [
         CheckoutIntentState.CREATED,
     ],

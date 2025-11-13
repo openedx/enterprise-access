@@ -364,6 +364,7 @@ class AdminTriggerProvisioningSubscriptionTrialWorkflowAdmin(admin.ModelAdmin):
                 catalog_step_input,
                 agreement_step_input,
                 plan_step_input,
+                {},  # TODO: pass a real first paid dict argument
             )
             workflow_instance = models.ProvisionNewCustomerWorkflow.objects.create(
                 input_data=workflow_input_dict,

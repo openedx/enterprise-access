@@ -2,6 +2,7 @@
 REST API views for the billing provider (Stripe) integration.
 """
 import logging
+import uuid
 
 import stripe
 from django.conf import settings
@@ -50,7 +51,19 @@ class CheckoutIntentPermission(permissions.BasePermission):
             return True
 
         checkout_intent_pk = request.parser_context['kwargs']['pk']
-        intent_record = CheckoutIntent.objects.filter(pk=checkout_intent_pk).first()
+
+        # Try UUID lookup first, then fall back to id lookup
+        try:
+            uuid_value = uuid.UUID(checkout_intent_pk)
+            intent_record = CheckoutIntent.objects.filter(uuid=uuid_value).first()
+        except (ValueError, TypeError):
+            # Fall back to id lookup
+            try:
+                int_value = int(checkout_intent_pk)
+                intent_record = CheckoutIntent.objects.filter(pk=int_value).first()
+            except (ValueError, TypeError):
+                return False
+
         if not intent_record:
             return False
 
@@ -288,7 +301,21 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         Response structure defined here: https://docs.stripe.com/api/customer_portal/sessions/create
         """
         origin_url = request.META.get("HTTP_ORIGIN")
-        checkout_intent = CheckoutIntent.objects.filter(pk=int(pk)).first()
+
+        # Try UUID lookup first, then fall back to id lookup
+        try:
+            uuid_value = uuid.UUID(pk)
+            checkout_intent = CheckoutIntent.objects.filter(uuid=uuid_value).first()
+        except (ValueError, TypeError):
+            # Fall back to id lookup
+            try:
+                int_value = int(pk)
+                checkout_intent = CheckoutIntent.objects.filter(pk=int_value).first()
+            except (ValueError, TypeError):
+                return Response(
+                    'Invalid lookup value: must be either a valid UUID or integer ID',
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         if not checkout_intent:
             msg = f"No checkout intent for id, for requesting user {request.user.id}"
@@ -360,10 +387,14 @@ class CustomerBillingViewSet(viewsets.ViewSet):
     retrieve=extend_schema(
         summary='Retrieve CheckoutIntent',
         description=(
-            'Retrieve a specific CheckoutIntent by UUID.\n'
+            'Retrieve a specific CheckoutIntent by either ID or UUID.\n'
             'This endpoint is designed to support polling from the frontend to check '
             'the fulfillment state after a successful Stripe checkout.\n'
             'Users can only retrieve their own CheckoutIntent records.\n'
+            '\n'
+            'Supports lookup by either:\n'
+            '- Integer ID (e.g., `/checkout-intents/123/`)\n'
+            '- UUID (e.g., `/checkout-intents/550e8400-e29b-41d4-a716-446655440000/`)\n'
         ),
         responses={
             200: OpenApiResponse(
@@ -383,6 +414,11 @@ class CustomerBillingViewSet(viewsets.ViewSet):
             'This endpoint is used to transition the CheckoutIntent through its lifecycle states. '
             'Only valid state transitions are allowed.\n'
             'Users can only update their own CheckoutIntent records.\n'
+            '\n'
+            'Supports lookup by either:\n'
+            '- Integer ID (e.g., `/checkout-intents/123/`)\n'
+            '- UUID (e.g., `/checkout-intents/550e8400-e29b-41d4-a716-446655440000/`)\n'
+            '\n'
             '## Allowed State Transitions\n'
             '```\n'
             'created → paid\n'
@@ -400,10 +436,10 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         parameters=[
             OpenApiParameter(
                 name='id',
-                type=OpenApiTypes.UUID,
+                type=OpenApiTypes.STR,
                 location=OpenApiParameter.PATH,
                 required=True,
-                description='id of the CheckoutIntent to update',
+                description='ID or UUID of the CheckoutIntent to update',
             ),
         ],
         request=serializers.CheckoutIntentUpdateRequestSerializer,
@@ -426,6 +462,8 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
 
     Provides list, retrieve, and partial_update actions for CheckoutIntent records.
     Users can only access their own CheckoutIntent records.
+
+    Supports lookup by either 'id' (integer) or 'uuid' (UUID).
     """
     authentication_classes = (JwtAuthentication,)
     permission_classes = (permissions.IsAuthenticated,)
@@ -455,6 +493,36 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
         if user.has_perm(CHECKOUT_INTENT_READ_WRITE_ALL_PERMISSION, ALL_ACCESS_CONTEXT):
             base_queryset = CheckoutIntent.objects.all()
         return base_queryset.select_related('user')
+
+    def get_object(self):
+        """
+        Override get_object to support lookup by either id or uuid.
+
+        Attempts to parse the lookup value as UUID first, then falls back to integer id.
+        This allows clients to use either field for retrieving CheckoutIntent objects.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        lookup_value = self.kwargs[self.lookup_url_kwarg or self.lookup_field]
+
+        try:
+            uuid_value = uuid.UUID(lookup_value)
+            filter_kwargs = {'uuid': uuid_value}
+        except (ValueError, TypeError):
+            try:
+                int_value = int(lookup_value)
+                filter_kwargs = {'id': int_value}
+            except (ValueError, TypeError) as exc:
+                raise exceptions.ValidationError(
+                    'Lookup value must be either a valid UUID or integer ID'
+                ) from exc
+
+        try:
+            obj = queryset.get(**filter_kwargs)
+        except CheckoutIntent.DoesNotExist as exc:
+            raise exceptions.NotFound('CheckoutIntent not found') from exc
+
+        self.check_object_permissions(self.request, obj)
+        return obj
 
 
 def stripe_event_summary_permission_detail_fn(request, *args, **kwargs):

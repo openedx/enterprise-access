@@ -939,9 +939,8 @@ class StripeEventSummary(TimeStampedModel):
                     self.subscription_plan_uuid = subscription_step.output_object.uuid
             except Exception as exc:  # pylint: disable=broad-exception-caught
                 logger.warning(
-                    'Could not get trial subscription output data for %s, CheckoutIntent %s',
-                    self.event_id,
-                    checkout_intent.uuid,
+                    'Could not get trial subscription output data for %s, CheckoutIntent %s. %s',
+                    self.event_id, checkout_intent.uuid, exc,
                 )
 
         # Extract data from the Stripe event payload
