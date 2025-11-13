@@ -751,6 +751,52 @@ class GetCreateSubscriptionPlanRenewalStep(CheckoutIntentStepMixin, AbstractWork
                 f'to paid plan {first_paid_plan_uuid}'
             ) from exc
 
+        # Create SelfServiceSubscriptionRenewal record to track this renewal
+        try:
+            checkout_intent = self.get_linked_checkout_intent()
+
+            # Import here to avoid circular imports
+            # pylint: disable=import-outside-toplevel
+            from enterprise_access.apps.customer_billing.models import (
+                SelfServiceSubscriptionRenewal,
+                StripeEventSummary
+            )
+
+            stripe_subscription_id = None
+            event_data = None
+            latest_summary = StripeEventSummary.get_latest_for_checkout_intent(
+                checkout_intent,
+                stripe_subscription_id__isnull=False,
+            )
+            if latest_summary:
+                stripe_subscription_id = latest_summary.stripe_subscription_id
+                event_data = latest_summary.stripe_event_data
+
+            renewal_tracking_record, created = SelfServiceSubscriptionRenewal.objects.get_or_create(
+                checkout_intent=checkout_intent,
+                subscription_plan_renewal_id=result_dict['id'],
+                defaults={
+                    'stripe_subscription_id': stripe_subscription_id,
+                    'stripe_event_data': event_data,
+                }
+            )
+            if created:
+                logger.info(
+                    'Created SelfServiceSubscriptionRenewal tracking record %s for renewal %s',
+                    renewal_tracking_record.id, result_dict['id']
+                )
+            else:
+                logger.info(
+                    'Found existing SelfServiceSubscriptionRenewal tracking record %s for renewal %s',
+                    renewal_tracking_record.id, result_dict['id']
+                )
+        except Exception as exc:
+            logger.exception(
+                'Failed to create SelfServiceSubscriptionRenewal tracking record for renewal %s: %s',
+                result_dict.get('id'), exc
+            )
+            raise
+
         return self.output_class.from_dict(result_dict)
 
     def get_workflow_record(self):

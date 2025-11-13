@@ -7,7 +7,13 @@ from functools import wraps
 
 import stripe
 
-from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData, StripeEventSummary
+from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
+from enterprise_access.apps.customer_billing.models import (
+    CheckoutIntent,
+    SelfServiceSubscriptionRenewal,
+    StripeEventData,
+    StripeEventSummary
+)
 from enterprise_access.apps.customer_billing.stripe_event_types import StripeEventType
 from enterprise_access.apps.customer_billing.tasks import (
     send_payment_receipt_email,
@@ -16,7 +22,6 @@ from enterprise_access.apps.customer_billing.tasks import (
 )
 
 logger = logging.getLogger(__name__)
-
 
 # Central registry for event handlers.
 #
@@ -287,12 +292,20 @@ class StripeEventHandler:
                 get_checkout_intent_id_from_subscription(subscription),
             )
 
+        # Handle trial-to-paid transition for renewal processing
+        current_status = subscription.get("status")
+        prior_status = getattr(checkout_intent.previous_summary(event), 'subscription_status', None)
+
+        if prior_status == "trialing" and current_status == "active":
+            logger.info(
+                f"Subscription {subscription.id} transitioned from trial to active. "
+                f"Processing renewal for checkout_intent_id={checkout_intent_id}"
+            )
+            _process_trial_to_paid_renewal(checkout_intent, subscription.id, event)
+
         # Handle trial subscription cancellation
         # Check if status changed to canceled to avoid duplicate emails
-        current_status = subscription.get("status")
         if current_status == "canceled":
-            prior_status = getattr(checkout_intent.previous_summary(event), 'subscription_status', None)
-
             # Only send email if status changed from non-canceled to canceled
             if prior_status != 'canceled':
                 trial_end = subscription.get("trial_end")
@@ -321,3 +334,69 @@ class StripeEventHandler:
         """
         Handle customer.subscription.deleted events.
         """
+
+
+def _process_trial_to_paid_renewal(checkout_intent: CheckoutIntent, stripe_subscription_id: str, event: stripe.Event):
+    """
+    Process the trial-to-paid renewal for a subscription.
+
+    This function:
+    1. Finds the existing SelfServiceSubscriptionRenewal record
+    2. Updates it with the Stripe event data and subscription ID
+    3. Calls license manager to process the renewal
+    4. Marks the renewal as processed
+
+    Args:
+        checkout_intent: The CheckoutIntent associated with the subscription
+        stripe_subscription_id: The Stripe subscription ID
+        event: The Stripe event that triggered the renewal
+    """
+    try:
+        # Find the SelfServiceSubscriptionRenewal record for this checkout intent
+        renewal = SelfServiceSubscriptionRenewal.objects.filter(
+            checkout_intent=checkout_intent,
+            processed_at__isnull=True  # Only unprocessed renewals
+        ).first()
+
+        if not renewal:
+            logger.error(
+                f"No unprocessed SelfServiceSubscriptionRenewal found for checkout_intent {checkout_intent.id}"
+            )
+            return
+
+        # Get the StripeEventData record for this event
+        event_data = StripeEventData.objects.get(event_id=event.id)
+
+        # Update the renewal record with event data and subscription ID
+        renewal.stripe_event_data = event_data
+        renewal.stripe_subscription_id = stripe_subscription_id
+        renewal.save(update_fields=['stripe_event_data', 'stripe_subscription_id', 'modified'])
+
+        logger.info(
+            f"Updated SelfServiceSubscriptionRenewal {renewal.id} with event data {event_data.event_id} "
+            f"and subscription {stripe_subscription_id}"
+        )
+
+        # Process the renewal via license manager
+        license_manager_client = LicenseManagerApiClient()
+        result = license_manager_client.process_subscription_plan_renewal(renewal.subscription_plan_renewal_id)
+
+        logger.info(
+            f"Successfully processed subscription plan renewal {renewal.subscription_plan_renewal_id} "
+            f"via license manager. Result: {result}"
+        )
+
+        # Mark the renewal as processed
+        renewal.mark_as_processed()
+
+        logger.info(
+            f"Marked SelfServiceSubscriptionRenewal {renewal.id} as processed for "
+            f"subscription {stripe_subscription_id}"
+        )
+
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        logger.exception(
+            f"Failed to process trial-to-paid renewal for checkout_intent {checkout_intent.id}, "
+            f"subscription {stripe_subscription_id}: {exc}"
+        )
+        raise

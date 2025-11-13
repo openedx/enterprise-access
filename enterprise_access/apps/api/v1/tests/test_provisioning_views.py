@@ -22,7 +22,8 @@ from enterprise_access.apps.core.constants import (
 )
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
-from enterprise_access.apps.customer_billing.models import CheckoutIntent
+from enterprise_access.apps.customer_billing.models import CheckoutIntent, SelfServiceSubscriptionRenewal
+from enterprise_access.apps.customer_billing.tests.factories import StripeEventSummaryFactory
 from enterprise_access.apps.provisioning.models import (
     GetCreateCustomerStep,
     GetCreateEnterpriseAdminUsersStep,
@@ -159,7 +160,7 @@ class TestProvisioningAuth(APITest):
     """
     def setUp(self):
         super().setUp()
-        self._create_checkout_intent()
+        self.checkout_intent = self._create_checkout_intent()
 
     def tearDown(self):
         super().tearDown()
@@ -252,6 +253,8 @@ class TestProvisioningAuth(APITest):
         mock_create_agreement.return_value = DEFAULT_AGREEMENT_RECORD
         mock_create_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
+        StripeEventSummaryFactory.create(checkout_intent=self.checkout_intent)
+
         request_payload = {**DEFAULT_REQUEST_PAYLOAD}
         request_payload['pending_admins'] = [
             {
@@ -287,7 +290,7 @@ class TestProvisioningEndToEnd(APITest):
                 'context': ALL_ACCESS_CONTEXT,
             },
         ])
-        self._create_checkout_intent()
+        self.checkout_intent = self._create_checkout_intent()
 
     def _create_checkout_intent(self):
         """Helper to create a checkout intent for testing."""
@@ -349,6 +352,7 @@ class TestProvisioningEndToEnd(APITest):
         mock_client.get_enterprise_catalogs.return_value = [DEFAULT_CATALOG_RECORD]
         mock_create_agreement.return_value = DEFAULT_AGREEMENT_RECORD
         mock_create_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
+        StripeEventSummaryFactory.create(checkout_intent=self.checkout_intent)
 
         request_payload = {**DEFAULT_REQUEST_PAYLOAD}
         request_payload['pending_admins'] = [
@@ -412,6 +416,18 @@ class TestProvisioningEndToEnd(APITest):
             [{'user_email': 'alice@foo.com'}, {'user_email': 'bob@foo.com'}],
         )
 
+        # Verify that a SelfServiceSubscriptionRenewal record was created during provisioning
+        renewal_records = SelfServiceSubscriptionRenewal.objects.filter(
+            checkout_intent=self.checkout_intent
+        )
+        self.assertEqual(renewal_records.count(), 1)
+        renewal_record = renewal_records.first()
+        # The renewal ID is stored as UUID, so convert the expected integer to UUID for comparison
+        import uuid
+        expected_renewal_id = uuid.UUID(f'00000000-0000-0000-0000-{EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE["id"]:012d}')
+        self.assertEqual(renewal_record.subscription_plan_renewal_id, expected_renewal_id)
+        self.assertIsNone(renewal_record.processed_at)
+
     @ddt.data(
         # No admin users exist, two admins created.
         {
@@ -469,6 +485,7 @@ class TestProvisioningEndToEnd(APITest):
         mock_license_client = mock_license_manager_client.return_value
         mock_license_client.get_customer_agreement.return_value = DEFAULT_AGREEMENT_RECORD
         mock_license_client.create_subscription_plan_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
+        StripeEventSummaryFactory.create(checkout_intent=self.checkout_intent)
 
         request_payload = {**DEFAULT_REQUEST_PAYLOAD}
         request_payload['pending_admins'] = [
@@ -567,6 +584,8 @@ class TestProvisioningEndToEnd(APITest):
         mock_create_agreement.return_value = DEFAULT_AGREEMENT_RECORD
         mock_create_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
+        StripeEventSummaryFactory.create(checkout_intent=self.checkout_intent)
+
         request_payload = {**DEFAULT_REQUEST_PAYLOAD}
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=request_payload)
 
@@ -622,6 +641,8 @@ class TestProvisioningEndToEnd(APITest):
 
         mock_create_agreement.return_value = DEFAULT_AGREEMENT_RECORD
         mock_create_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
+
+        StripeEventSummaryFactory.create(checkout_intent=self.checkout_intent)
 
         # Create request payload WITHOUT enterprise_catalog section
         request_payload = {**DEFAULT_REQUEST_PAYLOAD}
@@ -690,6 +711,8 @@ class TestProvisioningEndToEnd(APITest):
 
         mock_license_client.create_subscription_plan_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
 
+        StripeEventSummaryFactory.create(checkout_intent=self.checkout_intent)
+
         request_payload = {**DEFAULT_REQUEST_PAYLOAD}
         if test_data['created_agreement']:
             request_payload['customer_agreement'] = {
@@ -747,6 +770,8 @@ class TestProvisioningEndToEnd(APITest):
             trial_plan_record.pop('product')
         mock_license_client.create_subscription_plan.side_effect = [trial_plan_record, first_paid_plan_record]
         mock_license_client.create_subscription_plan_renewal.return_value = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE
+
+        StripeEventSummaryFactory.create(checkout_intent=self.checkout_intent)
 
         # Make the provisioning request
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=DEFAULT_REQUEST_PAYLOAD)
@@ -855,6 +880,8 @@ class TestProvisioningEndToEnd(APITest):
         legacy_request_payload.pop('first_paid_subscription_plan')
         legacy_request_payload['subscription_plan'] = legacy_request_payload.pop('trial_subscription_plan')
 
+        StripeEventSummaryFactory.create(checkout_intent=self.checkout_intent)
+
         # Make the provisioning request.
         response = self.client.post(PROVISIONING_CREATE_ENDPOINT, data=legacy_request_payload)
 
@@ -953,6 +980,7 @@ class TestCheckoutIntentSynchronization(APITest):
         Test that a fulfillable checkout intent is linked to workflow and marked as FULFILLED on success.
         """
         checkout_intent = self._create_checkout_intent(state=intent_state)
+        StripeEventSummaryFactory.create(checkout_intent=checkout_intent)
         self.assertEqual(checkout_intent.state, intent_state)
         self.assertIsNone(checkout_intent.workflow)
 
@@ -1097,6 +1125,7 @@ class TestCheckoutIntentSynchronization(APITest):
         """
         # The checkout intent we expect to be updated.
         main_checkout_intent = self._create_checkout_intent(state=CheckoutIntentState.PAID)
+        StripeEventSummaryFactory.create(checkout_intent=main_checkout_intent)
 
         # Create a checkout intent with different enterprise slug. Later, test that this is NOT modified.
         different_slug = 'different-enterprise-slug'
@@ -1105,6 +1134,7 @@ class TestCheckoutIntentSynchronization(APITest):
             state=CheckoutIntentState.PAID,
             enterprise_slug=different_slug,
         )
+        StripeEventSummaryFactory.create(checkout_intent=different_checkout_intent)
 
         # Setup mocks for successful provisioning
         mock_lms_client = mock_lms_api_client.return_value
