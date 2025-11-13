@@ -107,6 +107,11 @@ class CheckoutIntentViewSetTestCase(APITest):
             'api:v1:checkout-intent-detail',
             kwargs={'id': self.checkout_intent_3.id}
         )
+        # URLs for testing UUID lookup
+        self.detail_url_by_uuid_1 = reverse(
+            'api:v1:checkout-intent-detail',
+            kwargs={'id': str(self.checkout_intent_1.uuid)}
+        )
 
     def test_authentication_required(self):
         """Test that all endpoints require authentication."""
@@ -735,3 +740,78 @@ class CheckoutIntentViewSetTestCase(APITest):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['id'], self.checkout_intent_2.id)
         self.assertEqual(response.data['state'], 'paid')
+
+    def test_retrieve_by_uuid(self):
+        """Test that users can retrieve their own records using UUID."""
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }])
+
+        response = self.client.get(self.detail_url_by_uuid_1)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['id'], self.checkout_intent_1.id)
+        self.assertEqual(response.data['uuid'], str(self.checkout_intent_1.uuid))
+
+    def test_retrieve_by_invalid_lookup(self):
+        """Test that invalid lookup values return appropriate error."""
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }])
+
+        invalid_url = reverse(
+            'api:v1:checkout-intent-detail',
+            kwargs={'id': 'invalid-lookup-value'}
+        )
+        response = self.client.get(invalid_url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('Lookup value must be either a valid UUID or integer ID', str(response.data))
+
+    def test_update_by_uuid(self):
+        """Test that users can update their own records using UUID."""
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }])
+
+        response = self.client.patch(
+            self.detail_url_by_uuid_1,
+            {'state': 'paid'},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['state'], 'paid')
+
+        # Verify in database
+        self.checkout_intent_1.refresh_from_db()
+        self.assertEqual(self.checkout_intent_1.state, 'paid')
+
+    def test_cannot_retrieve_other_users_record_by_uuid(self):
+        """Test that users cannot retrieve other users' records using UUID."""
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }])
+
+        other_uuid_url = reverse(
+            'api:v1:checkout-intent-detail',
+            kwargs={'id': str(self.checkout_intent_3.uuid)}
+        )
+        response = self.client.get(other_uuid_url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_retrieve_nonexistent_uuid(self):
+        """Test that retrieving with nonexistent UUID returns 404."""
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }])
+
+        nonexistent_uuid_url = reverse(
+            'api:v1:checkout-intent-detail',
+            kwargs={'id': str(uuid.uuid4())}  # Random UUID that doesn't exist
+        )
+        response = self.client.get(nonexistent_uuid_url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
