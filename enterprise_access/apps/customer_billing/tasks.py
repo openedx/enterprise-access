@@ -15,7 +15,7 @@ from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments.content_metadata_api import format_datetime_obj
 from enterprise_access.apps.customer_billing.api import create_stripe_billing_portal_session
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventSummary
-from enterprise_access.apps.customer_billing.stripe_api import get_stripe_trialing_subscription
+from enterprise_access.apps.customer_billing.stripe_api import get_stripe_subscription, get_stripe_trialing_subscription
 from enterprise_access.apps.provisioning.utils import validate_trial_subscription
 from enterprise_access.tasks import LoggedTaskWithRetry
 from enterprise_access.utils import cents_to_dollars, format_cents_for_user_display
@@ -603,5 +603,117 @@ def send_trial_ending_reminder_email_task(checkout_intent_id):  # pylint: disabl
             "Braze API error: Failed to send trial ending reminder email for CheckoutIntent %s. Error: %s",
             checkout_intent_id,
             str(exc),
+        )
+        raise
+
+
+@shared_task(base=LoggedTaskWithRetry)
+def send_trial_end_and_subscription_started_email_task(
+    subscription_id: str,
+    checkout_intent_id: int,
+):
+    """
+    Send an email to all enterprise admins notifying about trial end and subscription start.
+
+    Args:
+        subscription_id (str): Stripe subscription ID
+        checkout_intent_id (int): CheckoutIntent DB ID
+    """
+    logger.info(
+        "Sending trial end and subscription started email for subscription %s and checkout_intent %s",
+        subscription_id, checkout_intent_id
+    )
+    braze_client = BrazeApiClient()
+    lms_client = LmsApiClient()
+
+    subscription = get_stripe_subscription(subscription_id)
+    checkout_intent = CheckoutIntent.objects.get(id=checkout_intent_id)
+
+    total_license = subscription.get('quantity')
+    plan = subscription.get('plan', {})
+    amount_cents = plan.get('amount', 0)
+    billing_amount = str(cents_to_dollars(amount_cents)) if amount_cents else None
+
+    period_start = subscription.get('current_period_start')
+    period_end = subscription.get('current_period_end')
+    subscription_period = None
+    next_payment_date = None
+    if period_start and period_end:
+        start_str = format_datetime_obj(datetime.utcfromtimestamp(period_start), '%d %B %Y')
+        end_str = format_datetime_obj(datetime.utcfromtimestamp(period_end), '%d %B %Y')
+        subscription_period = f"{start_str} – {end_str}"
+        next_payment_date = end_str
+
+    organization_name = checkout_intent.enterprise_name
+    enterprise_slug = checkout_intent.enterprise_slug
+
+    invoice_url = None
+    latest_invoice = subscription.get('latest_invoice')
+    if latest_invoice:
+        invoice_url = getattr(latest_invoice, 'hosted_invoice_url', None)
+        if not invoice_url and isinstance(latest_invoice, dict):
+            invoice_url = latest_invoice.get('hosted_invoice_url')
+
+    admin_emails = []
+    if enterprise_slug:
+        try:
+            enterprise_data = lms_client.get_enterprise_customer_data(enterprise_customer_slug=enterprise_slug)
+            admin_users = enterprise_data.get('admin_users', [])
+            admin_emails = [admin['email'] for admin in admin_users if 'email' in admin]
+        except Exception as exc:
+            logger.error(
+                "Failed to fetch admin users for enterprise slug %s: %s. No emails will be sent.",
+                enterprise_slug, str(exc)
+            )
+            return
+    if not admin_emails:
+        logger.error(
+            "No admin users found for enterprise slug %s. No emails will be sent.",
+            enterprise_slug
+        )
+        return
+
+    recipients = []
+    for admin_email in admin_emails:
+        try:
+            recipient = braze_client.create_braze_recipient(user_email=admin_email)
+            recipients.append(recipient)
+        except Exception as exc:
+            logger.warning(
+                'Failed to create Braze recipient for admin email %s: %s',
+                admin_email, str(exc)
+            )
+
+    if not recipients:
+        logger.error(
+            'No valid Braze recipients created for enterprise %s. Check admin email errors above.',
+            enterprise_slug
+        )
+        return
+
+    trigger_properties = {
+        'total_license': total_license,
+        'billing_amount': billing_amount,
+        'subscription_period': subscription_period,
+        'next_payment_date': next_payment_date,
+        'organization': organization_name,
+        'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}',
+        'invoice_url': invoice_url,
+    }
+
+    try:
+        braze_client.send_campaign_message(
+            settings.BRAZE_ENTERPRISE_PROVISION_TRIAL_END_SUBSCRIPTION_STARTED_CAMPAIGN,
+            recipients=recipients,
+            trigger_properties=trigger_properties,
+        )
+        logger.info(
+            'Successfully sent trial end and subscription started email to %d admin(s) for enterprise %s',
+            len(recipients), enterprise_slug
+        )
+    except Exception as exc:
+        logger.exception(
+            'Braze API error: Failed to send trial end/subscription started email for enterprise %s. Error: %s',
+            enterprise_slug, str(exc)
         )
         raise
