@@ -321,6 +321,40 @@ class LicenseManagerApiClient(BaseOAuthClient):
             )
             raise
 
+    def process_subscription_plan_renewal(self, renewal_id: int) -> dict:
+        """
+        Process an existing subscription plan renewal via the license-manager service.
+
+        This triggers License Manager to process the renewal from the trial to paid
+        subscription plan, typically called during the trial-to-paid transition.
+
+        Arguments:
+            renewal_id (int): ID of the subscription plan renewal to process
+
+        Returns:
+            dict: Response from the license manager API
+
+        Raises:
+            APIClientException: If the API call fails
+        """
+        endpoint = f'{self.subscription_plan_renewal_provisioning_endpoint}{renewal_id}/process/'
+
+        try:
+            response = self.client.post(endpoint, timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as exc:
+            logger.exception(
+                'Failed to process subscription plan renewal %s, response %s, exception: %s',
+                renewal_id,
+                safe_error_response_content(exc),
+                exc,
+            )
+            raise APIClientException(
+                f'Could not process subscription plan renewal {renewal_id}',
+                exc,
+            ) from exc
+
 
 class LicenseManagerUserApiClient(BaseUserApiClient):
     """

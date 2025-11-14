@@ -788,7 +788,7 @@ class StripeEventData(TimeStampedModel):
     )
 
     def __str__(self):
-        return f"<StripeEventData id={self.event_id}, event_type={self.event_type}>"
+        return f"id={self.event_id}, event_type={self.event_type}"
 
     def mark_as_handled(self):
         """Mark this event as handled by setting handled_at to now."""
@@ -1072,6 +1072,22 @@ class StripeEventSummary(TimeStampedModel):
         if timestamp:
             return _datetime_from_timestamp(timestamp)
         return None
+
+    @classmethod
+    def get_latest_for_checkout_intent(cls, checkout_intent, **filter_kwargs):
+        """
+        Helper to get latest summary for the given CheckoutIntent.
+        """
+        result = StripeEventSummary.objects.filter(
+            checkout_intent=checkout_intent,
+            **filter_kwargs,
+        ).order_by('-stripe_event_created_at').first()
+
+        if result:
+            logger.info('Found Stripe event summary %s for checkout intent %s', result, checkout_intent.uuid)
+        else:
+            logger.warning('No Stripe event summary for checkout intent %s', checkout_intent.uuid)
+        return result
 
     @classmethod
     def get_latest_invoice_paid(cls, invoice_id):
