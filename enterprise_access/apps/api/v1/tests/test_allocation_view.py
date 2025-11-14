@@ -141,35 +141,43 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             'learner_emails': [],
             'content_key': 'course+abc',
             'content_price_cents': 100,
+            'admin_lms_user_id': 3,
             'error_regex': 'This list may not be empty',
         },
         {
             'learner_emails': ['not-a-valid-email'],
             'content_key': 'course+abc',
             'content_price_cents': 100,
+            'admin_lms_user_id': 3,
             'error_regex': 'Enter a valid email address',
         },
         {
             'learner_emails': ['everything-valid@example.com'],
             'content_key': 'course+abc',  # valid course key
             'content_price_cents': 100,
+            'admin_lms_user_id': 3,
             'error_regex': '',
         },
         {
             'learner_emails': ['everything-valid@example.com'],
             'content_key': 'course-v1:edX+Privacy101+3T2020',  # valid course run key
             'content_price_cents': 100,
+            'admin_lms_user_id': 3,
             'error_regex': '',
         },
         {
             'learner_emails': ['everything-valid@example.com'],
             'content_key': 'course-v1:edX+Privacy101+3T2020',  # valid course run key
             'content_price_cents': -100,
+            'admin_lms_user_id': 3,
             'error_regex': 'Ensure this value is greater than or equal to 0',
         },
     )
     @ddt.unpack
-    def test_request_serialization(self, learner_emails, content_key, content_price_cents, error_regex):
+    def test_request_serialization(
+        self, learner_emails, content_key,
+        content_price_cents, admin_lms_user_id, error_regex
+    ):
         """
         Validates that the allocation request serializer appropriately accepts
         or rejects request payloads.
@@ -178,6 +186,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             'learner_emails': learner_emails,
             'content_key': content_key,
             'content_price_cents': content_price_cents,
+            'admin_lms_user_id': admin_lms_user_id,
         }
         if error_regex:
             with self.assertRaisesRegex(ValidationError, error_regex):
@@ -225,6 +234,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             'learner_emails': ['alice@foo.com', 'bob@foo.com', 'carol@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': 12345,
+            'admin_lms_user_id': 3,
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)
@@ -309,6 +319,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             allocate_payload['learner_emails'],
             allocate_payload['content_key'],
             allocate_payload['content_price_cents'],
+            allocate_payload['admin_lms_user_id'],
         )
 
     @mock.patch.object(AssignedLearnerCreditAccessPolicy, 'can_allocate', autospec=True)
@@ -336,6 +347,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             'learner_emails': ['alice@foo.com', 'bob@foo.com', 'carol@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': 12345,
+            'admin_lms_user_id': 3,
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)
@@ -375,6 +387,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             'learner_emails': ['alice@foo.com', 'bob@foo.com', 'carol@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': -1,
+            'admin_lms_user_id': 3,
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)
@@ -404,6 +417,7 @@ class TestSubsidyAccessPolicyAllocationView(APITestWithMocks):
             'learner_emails': ['alice@foo.com', 'bob@foo.com', 'carol@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': 12345,
+            'admin_lms_user_id': 3,
         }
 
         # manually acquire a lock on our policy before the request is made
@@ -597,6 +611,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'learner_emails': ['new@foo.com', 'canceled@foo.com', 'expired@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': assignment_content_quantity_usd_cents,  # this should be well below limit
+            'admin_lms_user_id': 3,
         }
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -718,6 +733,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'learner_emails': ['new@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': requested_price,
+            'admin_lms_user_id': 3,
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)
@@ -767,6 +783,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'learner_emails': ['new@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': 1,
+            'admin_lms_user_id': 3,
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)
@@ -815,6 +832,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'learner_emails': ['new@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': 1,
+            'admin_lms_user_id': 3,
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)
@@ -866,6 +884,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'learner_emails': ['new@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': 1,
+            'admin_lms_user_id': 3,
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)
@@ -932,6 +951,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'learner_emails': ['new@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': 2,
+            'admin_lms_user_id': 3,
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)
@@ -1031,6 +1051,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'learner_emails': ['new@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': 1,
+            'admin_lms_user_id': 3,
         }
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -1046,6 +1067,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'learner_emails': ['blue@foo.com'],
             'content_key': self.content_key,
             'content_price_cents': 1,
+            'admin_lms_user_id': 3,
         }
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -1116,6 +1138,7 @@ class TestSubsidyAccessPolicyAllocationEndToEnd(APITestWithMocks):
             'content_price_cents': (
                 self.assigned_learner_credit_policy.spend_limit + 10
             ),
+            'admin_lms_user_id': 3,
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)
@@ -1198,6 +1221,7 @@ class TestAssignmentConfigurationUnauthorizedCRUD(APITest):
             'learner_emails': ['alice@foo.com', 'bob@foo.com'],
             'content_key': 'the-content-key',
             'content_price_cents': 12345,
+            'admin_lms_user_id': 3,
         }
 
         response = self.client.post(allocate_url, data=allocate_payload)

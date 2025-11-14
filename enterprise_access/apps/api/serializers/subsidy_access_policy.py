@@ -803,6 +803,10 @@ class SubsidyAccessPolicyAllocateRequestSerializer(serializers.Serializer):
         ),
         min_value=0,
     )
+    # Tracks the LMS admin user ID responsible for creating the Learner Credit assignment.
+    admin_lms_user_id = serializers.IntegerField(
+        help_text="The id of the Open edX Admin LMS user record. This may be null at time of creation."
+    )
 
 
 class SubsidyAccessPolicyAllocationResponseSerializer(serializers.Serializer):
