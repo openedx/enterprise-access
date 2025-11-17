@@ -718,7 +718,7 @@ class SelfServiceSubscriptionRenewal(TimeStampedModel):
         related_name='renewals',
         help_text="The CheckoutIntent this renewal is associated with",
     )
-    subscription_plan_renewal_id = models.UUIDField(
+    subscription_plan_renewal_id = models.IntegerField(
         help_text="UUID of the SubscriptionPlanRenewal in License Manager",
     )
     stripe_event_data = models.OneToOneField(
