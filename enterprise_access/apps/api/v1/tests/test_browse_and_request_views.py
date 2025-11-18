@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import ddt
 from django.conf import settings
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.reverse import reverse
 
@@ -84,18 +85,27 @@ BNR_VIEW_PATH = 'enterprise_access.apps.api.v1.views.browse_and_request'
 
 
 @ddt.ddt
+@override_settings(SEGMENT_KEY='test_key')
 class TestLicenseRequestViewSet(BaseEnterpriseAccessTestCase):
     """
     Tests for LicenseRequestViewSet.
     """
+    @classmethod
+    def setUpTestData(cls):
+        # license request with no associations to the user
+        cls.other_license_request = LicenseRequestFactory()
 
     def setUp(self):
         super().setUp()
 
-        self.set_jwt_cookie([{
-            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
-            'context': str(self.enterprise_customer_uuid_1),
-        }])
+        if not hasattr(self, '_original_cookies'):
+            self.set_jwt_cookie(roles_and_contexts=[{
+                'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+                'context': str(self.enterprise_customer_uuid_1),
+            }])
+            self._original_cookies = self.client.cookies
+        else:
+            self.client.cookies = self._original_cookies
 
         # license requests for the user
         self.user_license_request_1 = LicenseRequestFactory(
@@ -111,9 +121,6 @@ class TestLicenseRequestViewSet(BaseEnterpriseAccessTestCase):
         self.enterprise_license_request = LicenseRequestFactory(
             enterprise_customer_uuid=self.enterprise_customer_uuid_1
         )
-
-        # license request with no associations to the user
-        self.other_license_request = LicenseRequestFactory()
 
     def test_list_as_enterprise_learner(self):
         """
@@ -739,6 +746,7 @@ class TestLicenseRequestViewSet(BaseEnterpriseAccessTestCase):
 
 
 @ddt.ddt
+@override_settings(SEGMENT_KEY='test_key')
 class TestCouponCodeRequestViewSet(BaseEnterpriseAccessTestCase):
     """
     Tests for CouponCodeRequestViewSet.
@@ -1191,6 +1199,7 @@ class TestCouponCodeRequestViewSet(BaseEnterpriseAccessTestCase):
 
 
 @ddt.ddt
+@override_settings(SEGMENT_KEY='test_key')
 class TestSubsidyRequestCustomerConfigurationViewSet(APITestWithMocks):
     """
     Tests for SubsidyRequestCustomerConfigurationViewSet.
@@ -1538,6 +1547,7 @@ class TestSubsidyRequestCustomerConfigurationViewSet(APITestWithMocks):
 
 
 @ddt.ddt
+@override_settings(SEGMENT_KEY='test_key')
 class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
     """
     Tests for LearnerCreditRequestViewSet.

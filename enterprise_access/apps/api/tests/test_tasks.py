@@ -6,6 +6,7 @@ from unittest import mock
 from uuid import uuid4
 
 import ddt
+from django.test import override_settings
 
 from enterprise_access.apps.api.serializers import CouponCodeRequestSerializer, LicenseRequestSerializer
 from enterprise_access.apps.api.tasks import (
@@ -24,6 +25,7 @@ from test_utils import APITestWithMocks
 
 
 @ddt.ddt
+@override_settings(SEGMENT_KEY='test_key')
 class TestTasks(APITestWithMocks):
     """
     Test tasks.
@@ -194,6 +196,7 @@ class TestTasks(APITestWithMocks):
         )
 
 
+@override_settings(SEGMENT_KEY='test_key')
 class TestLicenseAssignmentTasks(APITestWithMocks):
     """
     Test license assignment tasks.
@@ -272,6 +275,7 @@ class TestLicenseAssignmentTasks(APITestWithMocks):
         )
 
 
+@override_settings(SEGMENT_KEY='test_key')
 class TestCouponCodeAssignmentTasks(APITestWithMocks):
     """
     Test coupon code assignment tasks.
