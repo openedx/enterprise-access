@@ -1074,6 +1074,22 @@ class StripeEventSummary(TimeStampedModel):
         return None
 
     @classmethod
+    def get_latest_for_checkout_intent(cls, checkout_intent, **filter_kwargs):
+        """
+        Helper to get latest summary for the given CheckoutIntent.
+        """
+        result = StripeEventSummary.objects.filter(
+            checkout_intent=checkout_intent,
+            **filter_kwargs,
+        ).order_by('-stripe_event_created_at').first()
+
+        if result:
+            logger.info('Found Stripe event summary %s for checkout intent %s', result, checkout_intent.uuid)
+        else:
+            logger.warning('No Stripe event summary for checkout intent %s', checkout_intent.uuid)
+        return result
+
+    @classmethod
     def get_latest_invoice_paid(cls, invoice_id):
         """
         Retrieve the most recent invoice.paid event summary for a given invoice ID.

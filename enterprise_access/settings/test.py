@@ -55,9 +55,6 @@ BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_85_CAMPAIGN = 'test-day-85-reminder-campaig
 BRAZE_TRIAL_CANCELLATION_CAMPAIGN = 'test-trial-cancellation-campaign'
 BRAZE_ENTERPRISE_PROVISION_TRIAL_ENDING_SOON_CAMPAIGN = 'test-trial-ending-reminder-campaign'
 
-# SEGMENT CONFIGURATION
-SEGMENT_KEY = 'test-key'
-
 ################### Kafka Related Settings ##############################
 KAFKA_ENABLED = False
 
