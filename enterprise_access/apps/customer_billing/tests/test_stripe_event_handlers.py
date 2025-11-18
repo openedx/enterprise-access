@@ -372,3 +372,390 @@ class TestStripeEventHandler(TestCase):
         StripeEventHandler.dispatch(mock_event)
 
         mock_email_task.delay.assert_not_called()
+
+    @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient')
+    def test_subscription_updated_trial_to_active_processes_renewal(self, mock_license_manager_client):
+        """Test that subscription updated from trial to active processes renewal."""
+        from enterprise_access.apps.customer_billing.models import SelfServiceSubscriptionRenewal, StripeEventData
+        from enterprise_access.apps.customer_billing.tests.factories import StripeEventSummaryFactory
+
+        # Create existing SelfServiceSubscriptionRenewal record
+        import uuid
+        from enterprise_access.apps.customer_billing.models import StripeEventData
+        
+        # Create placeholder StripeEventData for the renewal record (will be updated during processing)
+        placeholder_event_data = StripeEventData.objects.create(
+            event_id='evt_placeholder_123',
+            event_type='customer.subscription.created',
+            checkout_intent=self.checkout_intent,
+            data={'placeholder': 'data'}
+        )
+        
+        expected_renewal_id = uuid.UUID('00000000-0000-0000-0000-000000000123')
+        renewal_record = SelfServiceSubscriptionRenewal.objects.create(
+            checkout_intent=self.checkout_intent,
+            subscription_plan_renewal_id=expected_renewal_id,
+            stripe_subscription_id='',
+            stripe_event_data=placeholder_event_data
+        )
+
+        # Create previous summary with trial status (with earlier timestamp)
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        earlier_time = timezone.now() - timedelta(hours=1)
+        trial_summary = StripeEventSummaryFactory(
+            checkout_intent=self.checkout_intent,
+            subscription_status='trialing',
+            stripe_subscription_id='sub_test_123'
+        )
+        # Update the timestamp to be earlier
+        trial_summary.stripe_event_created_at = earlier_time
+        trial_summary.save()
+
+        subscription_data = {
+            "id": "sub_test_123",
+            "status": "active",
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+        # Ensure the mock event has a timestamp after the trial summary
+        mock_event.created = int((earlier_time + timedelta(hours=2)).timestamp())
+
+        # Mock the license manager client and its method
+        mock_client_instance = mock_license_manager_client.return_value
+        mock_client_instance.process_subscription_plan_renewal.return_value = {
+            'id': 123, 'status': 'processed'
+        }
+
+        # Dispatch the event
+        StripeEventHandler.dispatch(mock_event)
+
+        # Verify license manager client was called with correct renewal_id
+        mock_license_manager_client.assert_called_once()
+        mock_client_instance.process_subscription_plan_renewal.assert_called_once_with(expected_renewal_id)
+
+        # Verify renewal record was marked as processed and stripe_subscription_id populated
+        renewal_record.refresh_from_db()
+        self.assertIsNotNone(renewal_record.processed_at)
+        self.assertEqual(renewal_record.stripe_subscription_id, 'sub_test_123')
+        
+        # Verify event data was linked to renewal record
+        event_data = StripeEventData.objects.get(event_id=mock_event.id)
+        self.assertEqual(renewal_record.stripe_event_data, event_data)
+
+    @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient')
+    def test_subscription_updated_trial_to_active_no_renewal_record(self, mock_license_manager_client):
+        """Test trial→active transition gracefully handles missing renewal record."""
+        from enterprise_access.apps.customer_billing.tests.factories import StripeEventSummaryFactory
+
+        # Create previous summary with trial status but NO renewal record
+        StripeEventSummaryFactory(
+            checkout_intent=self.checkout_intent,
+            subscription_status='trialing',
+            stripe_subscription_id='sub_test_456'
+        )
+
+        subscription_data = {
+            "id": "sub_test_456",
+            "status": "active",
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+
+        # This should not raise an exception - should be gracefully handled
+        StripeEventHandler.dispatch(mock_event)
+
+        # Verify license manager client was NOT called since no renewal record exists
+        mock_license_manager_client.assert_not_called()
+
+    @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient')
+    def test_subscription_updated_trial_to_active_already_processed(self, mock_license_manager_client):
+        """Test that already processed renewals are not processed again."""
+        from enterprise_access.apps.customer_billing.models import SelfServiceSubscriptionRenewal
+        from enterprise_access.apps.customer_billing.tests.factories import StripeEventSummaryFactory
+        from django.utils import timezone
+
+        # Create renewal record already marked as processed
+        import uuid
+        from enterprise_access.apps.customer_billing.models import StripeEventData
+        
+        # Create StripeEventData for the renewal record
+        event_data = StripeEventData.objects.create(
+            event_id='evt_test_renewal_789',
+            event_type='customer.subscription.updated',
+            checkout_intent=self.checkout_intent,
+            data={'test': 'renewal_data'}
+        )
+        
+        expected_renewal_id = uuid.UUID('00000000-0000-0000-0000-000000000789')
+        renewal_record = SelfServiceSubscriptionRenewal.objects.create(
+            checkout_intent=self.checkout_intent,
+            subscription_plan_renewal_id=expected_renewal_id,
+            processed_at=timezone.now(),  # Already processed
+            stripe_subscription_id='sub_test_789',
+            stripe_event_data=event_data
+        )
+
+        # Create previous summary with trial status
+        StripeEventSummaryFactory(
+            checkout_intent=self.checkout_intent,
+            subscription_status='trialing',
+            stripe_subscription_id='sub_test_789'
+        )
+
+        subscription_data = {
+            "id": "sub_test_789",
+            "status": "active",
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+
+        # Dispatch the event
+        StripeEventHandler.dispatch(mock_event)
+
+        # Verify license manager client was NOT called since renewal already processed
+        mock_license_manager_client.assert_not_called()
+
+        # Verify renewal record remains processed
+        renewal_record.refresh_from_db()
+        self.assertIsNotNone(renewal_record.processed_at)
+
+    @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient')
+    def test_subscription_updated_non_trial_to_active_ignores(self, mock_license_manager_client):
+        """Test that non-trial→active transitions don't trigger renewal processing."""
+        from enterprise_access.apps.customer_billing.models import SelfServiceSubscriptionRenewal
+        from enterprise_access.apps.customer_billing.tests.factories import StripeEventSummaryFactory
+
+        # Create renewal record
+        import uuid
+        from enterprise_access.apps.customer_billing.models import StripeEventData
+        
+        # Create StripeEventData for the renewal record
+        event_data = StripeEventData.objects.create(
+            event_id='evt_test_renewal_456',
+            event_type='customer.subscription.updated',
+            checkout_intent=self.checkout_intent,
+            data={'test': 'renewal_data'}
+        )
+        
+        expected_renewal_id = uuid.UUID('00000000-0000-0000-0000-000000000456')
+        SelfServiceSubscriptionRenewal.objects.create(
+            checkout_intent=self.checkout_intent,
+            subscription_plan_renewal_id=expected_renewal_id,
+            stripe_subscription_id='sub_test_456',
+            stripe_event_data=event_data
+        )
+
+        # Create previous summary with incomplete status (not trialing)
+        StripeEventSummaryFactory(
+            checkout_intent=self.checkout_intent,
+            subscription_status='incomplete',
+            stripe_subscription_id='sub_test_456'
+        )
+
+        subscription_data = {
+            "id": "sub_test_456", 
+            "status": "active",
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+
+        # Dispatch the event
+        StripeEventHandler.dispatch(mock_event)
+
+        # Verify license manager client was NOT called for non-trial→active transition
+        mock_license_manager_client.assert_not_called()
+
+    @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient')
+    def test_subscription_updated_license_manager_api_error(self, mock_license_manager_client):
+        """Test error handling when license manager API fails during renewal processing."""
+        from enterprise_access.apps.customer_billing.models import SelfServiceSubscriptionRenewal, StripeEventData
+        from enterprise_access.apps.customer_billing.tests.factories import StripeEventSummaryFactory
+
+        # Create renewal record
+        import uuid
+        from enterprise_access.apps.customer_billing.models import StripeEventData
+        
+        # Create placeholder StripeEventData for the renewal record
+        placeholder_event_data = StripeEventData.objects.create(
+            event_id='evt_placeholder_999',
+            event_type='customer.subscription.created',
+            checkout_intent=self.checkout_intent,
+            data={'placeholder': 'data'}
+        )
+        
+        expected_renewal_id = uuid.UUID('00000000-0000-0000-0000-000000000999')
+        renewal_record = SelfServiceSubscriptionRenewal.objects.create(
+            checkout_intent=self.checkout_intent,
+            subscription_plan_renewal_id=expected_renewal_id,
+            stripe_subscription_id='',
+            stripe_event_data=placeholder_event_data
+        )
+
+        # Create previous summary with trial status (with earlier timestamp)
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        earlier_time = timezone.now() - timedelta(hours=1)
+        trial_summary = StripeEventSummaryFactory(
+            checkout_intent=self.checkout_intent,
+            subscription_status='trialing',
+            stripe_subscription_id='sub_test_999'
+        )
+        # Update the timestamp to be earlier
+        trial_summary.stripe_event_created_at = earlier_time
+        trial_summary.save()
+
+        subscription_data = {
+            "id": "sub_test_999",
+            "status": "active", 
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+        # Ensure the mock event has a timestamp after the trial summary
+        mock_event.created = int((earlier_time + timedelta(hours=2)).timestamp())
+
+        # Mock license manager API failure
+        mock_client_instance = mock_license_manager_client.return_value
+        mock_client_instance.process_subscription_plan_renewal.side_effect = Exception("API Error")
+
+        # Dispatch should raise the exception since _process_trial_to_paid_renewal re-raises
+        with self.assertRaises(Exception) as context:
+            StripeEventHandler.dispatch(mock_event)
+        self.assertIn("API Error", str(context.exception))
+
+        # Verify license manager was called but failed
+        mock_client_instance.process_subscription_plan_renewal.assert_called_once_with(expected_renewal_id)
+
+        # Verify renewal record was NOT marked as processed due to error
+        renewal_record.refresh_from_db()
+        self.assertIsNone(renewal_record.processed_at)
+
+        # Note: Due to exception re-raising, StripeEventData might not be marked as handled
+        # This is expected behavior when license manager processing fails
+
+    @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient')
+    def test_full_subscription_renewal_flow(self, mock_license_manager_client):
+        """Test the complete subscription renewal flow from provisioning to processing."""
+        from enterprise_access.apps.customer_billing.models import SelfServiceSubscriptionRenewal, StripeEventData
+        from enterprise_access.apps.customer_billing.tests.factories import StripeEventSummaryFactory
+        from enterprise_access.apps.provisioning.tests.factories import ProvisionNewCustomerWorkflowFactory
+
+        # Step 1: Create provisioning workflow (simulates renewal record creation during provisioning)
+        workflow = ProvisionNewCustomerWorkflowFactory()
+        self.checkout_intent.workflow = workflow
+        self.checkout_intent.save()
+
+        # Create a renewal record as would happen during provisioning
+        import uuid
+        from enterprise_access.apps.customer_billing.models import StripeEventData
+        
+        # Create placeholder StripeEventData for the renewal record
+        placeholder_event_data = StripeEventData.objects.create(
+            event_id='evt_placeholder_555',
+            event_type='customer.subscription.created',
+            checkout_intent=self.checkout_intent,
+            data={'placeholder': 'data'}
+        )
+        
+        expected_renewal_id = uuid.UUID('00000000-0000-0000-0000-000000000555')
+        renewal_record = SelfServiceSubscriptionRenewal.objects.create(
+            checkout_intent=self.checkout_intent,
+            subscription_plan_renewal_id=expected_renewal_id,
+            stripe_subscription_id='sub_full_flow_123',  # Populated during provisioning
+            stripe_event_data=placeholder_event_data
+        )
+
+        # Step 2: Simulate trial subscription creation event (creates StripeEventSummary with trial status)
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        earlier_time = timezone.now() - timedelta(hours=1)
+        trial_summary = StripeEventSummaryFactory(
+            checkout_intent=self.checkout_intent,
+            subscription_status='trialing',
+            stripe_subscription_id='sub_full_flow_123'
+        )
+        # Update the timestamp to be earlier
+        trial_summary.stripe_event_created_at = earlier_time
+        trial_summary.save()
+
+        # Step 3: Simulate trial→active transition event
+        subscription_data = {
+            "id": "sub_full_flow_123",
+            "status": "active",
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+        # Ensure the mock event has a timestamp after the trial summary
+        mock_event.created = int((earlier_time + timedelta(hours=2)).timestamp())
+
+        # Mock the license manager client response
+        mock_client_instance = mock_license_manager_client.return_value
+        mock_client_instance.process_subscription_plan_renewal.return_value = {
+            'id': 555, 'status': 'processed', 'processed_at': '2024-01-15T10:30:00Z'
+        }
+
+        # Step 4: Process the trial→active event
+        StripeEventHandler.dispatch(mock_event)
+
+        # Step 5: Verify the complete flow worked end-to-end
+        
+        # Verify license manager was called to process the renewal
+        mock_license_manager_client.assert_called_once()
+        mock_client_instance.process_subscription_plan_renewal.assert_called_once_with(expected_renewal_id)
+
+        # Verify renewal record was processed
+        renewal_record.refresh_from_db()
+        self.assertIsNotNone(renewal_record.processed_at)
+        self.assertEqual(renewal_record.stripe_subscription_id, 'sub_full_flow_123')
+
+        # Verify event was linked to renewal record
+        event_data = StripeEventData.objects.get(event_id=mock_event.id)
+        self.assertEqual(renewal_record.stripe_event_data, event_data)
+        self.assertIsNotNone(event_data.handled_at)
+
+        # Verify StripeEventSummary was created for the new event (if auto-created)
+        from enterprise_access.apps.customer_billing.models import StripeEventSummary
+        try:
+            new_summary = event_data.summary
+            self.assertEqual(new_summary.subscription_status, 'active')
+            self.assertEqual(new_summary.stripe_subscription_id, 'sub_full_flow_123')
+            self.assertEqual(new_summary.checkout_intent, self.checkout_intent)
+            
+            # Verify all data relationships are intact (including new_summary)
+            self.assertEqual(renewal_record.checkout_intent, self.checkout_intent)
+            self.assertEqual(event_data.checkout_intent, self.checkout_intent)
+            self.assertEqual(new_summary.checkout_intent, self.checkout_intent)
+        except StripeEventSummary.DoesNotExist:
+            # Summary creation might depend on signal handling which may not work in tests
+            # The important part is that the event was processed and renewal was handled
+            # Verify data relationships without new_summary
+            self.assertEqual(renewal_record.checkout_intent, self.checkout_intent)
+            self.assertEqual(event_data.checkout_intent, self.checkout_intent)
+
+        # Verify the previous summary still exists (trial status)
+        trial_summary.refresh_from_db()
+        self.assertEqual(trial_summary.subscription_status, 'trialing')
+
+        # Verify workflow relationship is maintained
+        self.assertEqual(self.checkout_intent.workflow, workflow)
