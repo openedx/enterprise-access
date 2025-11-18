@@ -12,7 +12,11 @@ from django.utils import timezone
 
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, SelfServiceSubscriptionRenewal
-from enterprise_access.apps.customer_billing.tests.factories import CheckoutIntentFactory, StripeEventSummaryFactory
+from enterprise_access.apps.customer_billing.tests.factories import (
+    CheckoutIntentFactory,
+    StripeEventDataFactory,
+    StripeEventSummaryFactory
+)
 from enterprise_access.apps.provisioning.models import GetCreateSubscriptionPlanRenewalStep
 from enterprise_access.apps.provisioning.tests.factories import ProvisionNewCustomerWorkflowFactory
 
@@ -59,11 +63,11 @@ class TestBackfillSubscriptionRenewalsCommand(TestCase):
         # Create a workflow with a completed renewal step but no tracking record
         workflow = ProvisionNewCustomerWorkflowFactory()
         checkout_intent = CheckoutIntentFactory(user=self.user, workflow=workflow)
-        summary = StripeEventSummaryFactory(
-            checkout_intent=checkout_intent,
-            subscription_status='trialing',
-            stripe_subscription_id='sub_test_789'
-        )
+        event_data = StripeEventDataFactory.create(checkout_intent=checkout_intent)
+        summary = event_data.summary
+        summary.subscription_status = 'trialing',
+        summary.stripe_subscription_id = 'sub_test_789'
+        summary.save()
 
         renewal_step = self._create_renewal_step(workflow)
 

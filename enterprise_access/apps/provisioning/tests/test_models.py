@@ -14,7 +14,11 @@ from enterprise_access.apps.customer_billing.models import (
     SelfServiceSubscriptionRenewal,
     StripeEventSummary
 )
-from enterprise_access.apps.customer_billing.tests.factories import CheckoutIntentFactory, StripeEventSummaryFactory
+from enterprise_access.apps.customer_billing.tests.factories import (
+    CheckoutIntentFactory,
+    StripeEventDataFactory,
+    StripeEventSummaryFactory
+)
 from enterprise_access.apps.provisioning.models import GetCreateSubscriptionPlanRenewalStep
 from enterprise_access.apps.provisioning.tests.factories import ProvisionNewCustomerWorkflowFactory
 
@@ -71,10 +75,12 @@ class TestGetCreateSubscriptionPlanRenewalStep(TestCase):
 
         # Create an existing StripeEventSummary to provide stripe_subscription_id
         stripe_subscription_id = 'sub_test_12345'
-        summary = StripeEventSummaryFactory(
-            checkout_intent=self.checkout_intent,
-            stripe_subscription_id=stripe_subscription_id
+        event_data = StripeEventDataFactory.create(checkout_intent=self.checkout_intent)
+        summary = StripeEventSummaryFactory.create(
+            stripe_event_data=event_data,
         )
+        summary.stripe_subscription_id = stripe_subscription_id
+        summary.save()
 
         # Create mock accumulated_output with the required structure
         mock_accumulated_output = mock.Mock()
@@ -123,11 +129,15 @@ class TestGetCreateSubscriptionPlanRenewalStep(TestCase):
             'renewed_expiration_date': '2027-01-01T00:00:00Z',
         }
         mock_create_renewal.return_value = mock_renewal_response
-        summary = StripeEventSummaryFactory(
-            checkout_intent=self.checkout_intent,
+
+        stripe_subscription_id = 'sub_test_12345'
+        event_data = StripeEventDataFactory.create(checkout_intent=self.checkout_intent)
+        summary = StripeEventSummaryFactory.create(
+            stripe_event_data=event_data,
+            stripe_subscription_id=stripe_subscription_id,
             subscription_status='trialing',
-            stripe_subscription_id='sub_test_789'
         )
+
         expected_renewal_id = 123
         existing_renewal = SelfServiceSubscriptionRenewal.objects.create(
             checkout_intent=self.checkout_intent,
@@ -242,23 +252,17 @@ class TestGetCreateSubscriptionPlanRenewalStep(TestCase):
         mock_create_renewal.return_value = mock_renewal_response
 
         # Create multiple StripeEventSummary records with different timestamps
-        older_summary = StripeEventSummaryFactory(
-            checkout_intent=self.checkout_intent,
-            stripe_subscription_id='sub_older_123'
-        )
-        # Update the timestamp manually to be older
-        StripeEventSummary.objects.filter(id=older_summary.id).update(
-            stripe_event_created_at=older_summary.stripe_event_created_at.replace(hour=1)
-        )
+        older_event = StripeEventDataFactory(checkout_intent=self.checkout_intent)
+        older_summary = older_event.summary
+        older_summary.stripe_subscription_id = 'sub_older_123'
+        older_summary.stripe_event_created_at = older_summary.stripe_event_created_at.replace(hour=1)
+        older_summary.save()
 
-        latest_summary = StripeEventSummaryFactory(
-            checkout_intent=self.checkout_intent,
-            stripe_subscription_id='sub_latest_456'
-        )
-        # Update the timestamp manually to be newer
-        StripeEventSummary.objects.filter(id=latest_summary.id).update(
-            stripe_event_created_at=latest_summary.stripe_event_created_at.replace(hour=2)
-        )
+        latest_event = StripeEventDataFactory(checkout_intent=self.checkout_intent)
+        latest_summary = latest_event.summary
+        latest_summary.stripe_subscription_id = 'sub_latest_456'
+        latest_summary.stripe_event_created_at = latest_summary.stripe_event_created_at.replace(hour=2)
+        latest_summary.save()
 
         mock_accumulated_output = mock.Mock()
         mock_accumulated_output.create_trial_subscription_plan_output = mock.Mock()
