@@ -788,7 +788,7 @@ class StripeEventData(TimeStampedModel):
     )
 
     def __str__(self):
-        return f"<StripeEventData id={self.event_id}, event_type={self.event_type}>"
+        return f"id={self.event_id}, event_type={self.event_type}"
 
     def mark_as_handled(self):
         """Mark this event as handled by setting handled_at to now."""
