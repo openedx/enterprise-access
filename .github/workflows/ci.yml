@@ -32,7 +32,5 @@ jobs:
       run: make validate_translations
     - name: Run tests
       run: make test
-    # - name: Run lint  # 2025-11-03 AED: pylint is crashing in github CI
-    #  run: make lint
     - name: Run style
       run: make style isort_check pii_check check_keywords
