@@ -23,7 +23,7 @@ services:
 
   app:
     image: edxops/enterprise-access-dev
-    container_name: enterprise_access.app
+    container_name: enterprise-access.app
     volumes:
       - .:/edx/app/enterprise-access/
       - ../src:/edx/src

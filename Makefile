@@ -223,7 +223,7 @@ dev.restore:
 	docker compose exec -T mysql80 mysql < .dev/enterprise_access_all.sql
 
 app-shell: # Run the app shell as root
-	docker exec -u 0 -it enterprise_access.app bash
+	docker exec -u 0 -it enterprise-access.app bash
 
 db-shell-57: # Run the mysql 5.7 shell as root, enter the app's database
 	docker exec -u 0 -it enterprise_access.db mysql -u root enterprise_access
@@ -246,8 +246,11 @@ dev.dbcopy8: ## Copy data from old mysql 5.7 container into a new 8 db
 app-restart-devserver:  # restart just the app Django dev server
 	docker-compose exec app bash -c 'kill $$(ps aux | egrep "manage.py ?\w* runserver" | egrep -v "while|grep" | awk "{print \$$2}")'
 
-%-attach:
-	docker attach enterprise_access.$*
+app-attach:
+	docker attach enterprise-access.app
+
+worker-attach:
+	docker attach enterprise_access.worker
 
 %-shell: # Run a shell, as root, on the specified service container
 	docker exec -u 0 -it enterprise_access.$* bash
