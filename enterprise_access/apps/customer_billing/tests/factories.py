@@ -16,6 +16,58 @@ from enterprise_access.apps.customer_billing.models import CheckoutIntent, Strip
 FAKER = Faker()
 
 
+def get_stripe_object_for_event_type(event_type, **overrides):
+    """Generate realistic Stripe object data based on event type."""
+    if event_type == 'invoice.paid':
+        return {
+            'object': 'invoice',
+            'id': f'in_{FAKER.bothify("?" * 24)}',
+            'subscription': f'sub_{FAKER.bothify("?" * 24)}',
+            'amount_paid': FAKER.random_int(min=1000, max=10000),  # Amount in cents
+            'currency': 'usd',
+            'lines': {
+                'data': [
+                    {
+                        'quantity': FAKER.random_int(min=1, max=100),
+                        'pricing': {
+                            'unit_amount': FAKER.random_int(min=100, max=5000),
+                            'unit_amount_decimal': f'{FAKER.random_int(min=100, max=5000)}.0'
+                        }
+                    }
+                ]
+            },
+            'parent': {
+                'subscription_details': {
+                    'subscription': f'sub_{FAKER.bothify("?" * 24)}'
+                }
+            },
+            **overrides,
+        }
+    elif event_type.startswith('customer.subscription'):
+        return {
+            'object': 'subscription',
+            'id': f'sub_{FAKER.bothify("?" * 24)}',
+            'status': FAKER.random_element(elements=['active', 'trialing', 'past_due']),
+            'currency': 'usd',
+            'items': {
+                'data': [
+                    {
+                        'current_period_start': int((timezone.now() - timedelta(days=30)).timestamp()),
+                        'current_period_end': int((timezone.now() + timedelta(days=30)).timestamp())
+                    }
+                ]
+            },
+            **overrides,
+        }
+    else:
+        # Default generic object for other event types
+        return {
+            'object': 'unknown',
+            'id': f'obj_{FAKER.bothify("?" * 24)}',
+            **overrides,
+        }
+
+
 class CheckoutIntentFactory(DjangoModelFactory):
     """
     Factory for creating CheckoutIntent instances for testing.
@@ -68,6 +120,14 @@ class StripeEventDataFactory(DjangoModelFactory):
     ])
     checkout_intent = factory.SubFactory(CheckoutIntentFactory)
     handled_at = None
+    data = factory.LazyAttribute(lambda obj: {
+        'id': obj.event_id,
+        'type': obj.event_type,
+        'created': int(timezone.now().timestamp()),
+        'data': {
+            'object': get_stripe_object_for_event_type(obj.event_type)
+        }
+    })
 
 
 class StripeEventSummaryFactory(DjangoModelFactory):
@@ -76,6 +136,7 @@ class StripeEventSummaryFactory(DjangoModelFactory):
     """
     class Meta:
         model = StripeEventSummary
+        django_get_or_create = ("event_id",)
 
     stripe_event_data = factory.SubFactory(StripeEventDataFactory)
     event_id = factory.LazyAttribute(lambda obj: obj.stripe_event_data.event_id)

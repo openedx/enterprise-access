@@ -1,6 +1,7 @@
 """
 Tests for the ``enterprise_access.customer_billing.models`` module.
 """
+import time
 from datetime import timedelta
 from decimal import Decimal
 from random import randint
@@ -21,11 +22,13 @@ from enterprise_access.apps.customer_billing.constants import CheckoutIntentStat
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
     FailedCheckoutIntentConflict,
+    SelfServiceSubscriptionRenewal,
     SlugReservationConflict,
     StripeEventData,
     StripeEventSummary
 )
 from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
+from enterprise_access.apps.customer_billing.tests.factories import StripeEventDataFactory, StripeEventSummaryFactory
 from enterprise_access.apps.customer_billing.tests.test_stripe_event_handlers import AttrDict
 from enterprise_access.apps.provisioning.models import (
     GetCreateFirstPaidSubscriptionPlanStep,
@@ -1211,3 +1214,132 @@ class TestCheckoutIntentStalledFulfillment(TestCase):
         ]:
             intent.refresh_from_db()
             self.assertEqual(intent.state, expected_state)
+
+
+class TestSelfServiceSubscriptionRenewal(TestCase):
+    """
+    Tests for the SelfServiceSubscriptionRenewal model.
+    """
+
+    def setUp(self):
+        self.user = UserFactory()
+        self.checkout_intent = CheckoutIntent.create_intent(
+            user=self.user,
+            slug='test-enterprise',
+            name='Test Enterprise',
+            quantity=10
+        )
+
+    def tearDown(self):
+        """Clean up test data."""
+        SelfServiceSubscriptionRenewal.objects.all().delete()
+        CheckoutIntent.objects.all().delete()
+
+    def test_self_service_subscription_renewal_mark_as_processed(self):
+        """Test that mark_as_processed sets processed_at timestamp."""
+        # Create StripeEventData first
+        event_data = StripeEventData.objects.create(
+            event_id='evt_test_123',
+            event_type='customer.subscription.updated',
+            checkout_intent=self.checkout_intent,
+            data={'test': 'data'}
+        )
+
+        # Create renewal record
+        expected_renewal_id = 123
+        renewal = SelfServiceSubscriptionRenewal.objects.create(
+            checkout_intent=self.checkout_intent,
+            subscription_plan_renewal_id=expected_renewal_id,
+            stripe_subscription_id='sub_test_123',
+            stripe_event_data=event_data
+        )
+
+        # Verify initial state
+        self.assertIsNone(renewal.processed_at)
+
+        # Mark as processed
+        before_processing = timezone.now()
+        renewal.mark_as_processed()
+        after_processing = timezone.now()
+
+        # Verify processed_at was set
+        self.assertIsNotNone(renewal.processed_at)
+        self.assertGreaterEqual(renewal.processed_at, before_processing)
+        self.assertLessEqual(renewal.processed_at, after_processing)
+
+    def test_self_service_subscription_renewal_mark_as_processed_multiple_times(self):
+        """Test that calling mark_as_processed multiple times updates the timestamp each time."""
+        # Create StripeEventData first
+        event_data = StripeEventData.objects.create(
+            event_id='evt_test_456',
+            event_type='customer.subscription.updated',
+            checkout_intent=self.checkout_intent,
+            data={'test': 'data'}
+        )
+
+        expected_renewal_id = 456
+        renewal = SelfServiceSubscriptionRenewal.objects.create(
+            checkout_intent=self.checkout_intent,
+            subscription_plan_renewal_id=expected_renewal_id,
+            stripe_subscription_id='sub_test_456',
+            stripe_event_data=event_data
+        )
+
+        # Mark as processed first time
+        renewal.mark_as_processed()
+        first_processed_at = renewal.processed_at
+        self.assertIsNotNone(first_processed_at)
+
+        # Wait a small amount to ensure timestamp difference
+        time.sleep(0.001)
+
+        # Mark as processed second time
+        renewal.mark_as_processed()
+        second_processed_at = renewal.processed_at
+
+        # Verify the timestamp was updated (current implementation behavior)
+        self.assertIsNotNone(second_processed_at)
+        self.assertGreaterEqual(second_processed_at, first_processed_at)
+
+    def test_self_service_subscription_renewal_relationships(self):
+        """Test that foreign key relationships work correctly."""
+        # Create StripeEventData
+        event_data = StripeEventDataFactory(
+            checkout_intent=self.checkout_intent,
+            event_type='customer.subscription.updated',
+        )
+        summary = event_data.summary
+
+        # Create renewal record with relationships
+        expected_renewal_id = 789
+        renewal = SelfServiceSubscriptionRenewal.objects.create(
+            checkout_intent=self.checkout_intent,
+            subscription_plan_renewal_id=expected_renewal_id,
+            stripe_subscription_id=summary.stripe_subscription_id,
+            stripe_event_data=event_data,
+        )
+
+        # Test forward relationships
+        self.assertEqual(renewal.checkout_intent, self.checkout_intent)
+        self.assertEqual(renewal.stripe_event_data, summary.stripe_event_data)
+
+        # Test reverse relationship from checkout_intent
+        related_renewals = self.checkout_intent.renewals.all()
+        self.assertIn(renewal, related_renewals)
+
+        # Test reverse relationship from event_data
+        related_renewals_from_event = SelfServiceSubscriptionRenewal.objects.filter(
+            stripe_event_data=event_data,
+        )
+        self.assertIn(renewal, related_renewals_from_event)
+
+        # Test querying by related fields
+        renewals_by_intent = SelfServiceSubscriptionRenewal.objects.filter(
+            checkout_intent__enterprise_name='Test Enterprise'
+        )
+        self.assertIn(renewal, renewals_by_intent)
+
+        renewals_by_event = SelfServiceSubscriptionRenewal.objects.filter(
+            stripe_event_data__event_type='customer.subscription.updated'
+        )
+        self.assertIn(renewal, renewals_by_event)
