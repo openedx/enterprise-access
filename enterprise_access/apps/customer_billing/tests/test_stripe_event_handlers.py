@@ -19,6 +19,14 @@ from enterprise_access.apps.customer_billing.models import CheckoutIntent, Strip
 from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
 
 
+def _rand_numeric_string():
+    return str(randint(1, 100000)).zfill(6)
+
+
+def _rand_created_at():
+    return timezone.now() - timedelta(seconds=randint(1, 30))
+
+
 class AttrDict(dict):
     """
     Minimal helper that allows both attribute (obj.foo) and item (obj['foo']) access.
@@ -65,17 +73,22 @@ class TestStripeEventHandler(TestCase):
         CheckoutIntent.objects.all().delete()
         StripeEventData.objects.all().delete()
 
-    def _create_mock_stripe_event(self, event_type, event_data):
-        """Helper to create a mock Stripe event."""
-        mock_event = mock.MagicMock(spec=stripe.Event)
-        created_at = timezone.now() - timedelta(seconds=randint(1, 30))
-        mock_event.created = int(created_at.timestamp())
-        mock_event.type = event_type
-        numeric_id = str(randint(1, 100000)).zfill(6)
-        mock_event.id = f'evt_test_{event_type.replace(".", "_")}_{numeric_id}'
-        mock_event.data = mock.Mock()
-        mock_event.data.object = AttrDict.wrap(event_data)
-        return mock_event
+    def _create_mock_stripe_event(self, event_type, event_data, **event_attrs):
+        """
+        Creates an honest-to-goodness ``stripe.Event`` object with the given
+        type and data.
+        """
+        event = stripe.Event()
+        event.id = f'evt_test_{event_type.replace(".", "_")}_{_rand_numeric_string()}'
+        event.created = int(_rand_created_at().timestamp())
+        event.type = event_type
+        event.data = stripe.StripeObject()
+        event.data.object = AttrDict.wrap(event_data)
+
+        for k, v in event_attrs.items():
+            setattr(event, k, v)
+
+        return event
 
     def _create_mock_stripe_subscription(self, checkout_intent_id):
         """Helper to create a mock Stripe subscription."""
@@ -120,8 +133,12 @@ class TestStripeEventHandler(TestCase):
         },
     )
     @ddt.unpack
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_payment_receipt_email"
+    )
     def test_invoice_paid_handler(
         self,
+        mock_send_payment_receipt_email,  # pylint: disable=unused-argument
         checkout_intent_state=CheckoutIntentState.CREATED,
         intent_id_override=None,
         expected_exception=None,
@@ -129,17 +146,20 @@ class TestStripeEventHandler(TestCase):
         expected_final_state=CheckoutIntentState.PAID,
     ):
         """Test various scenarios for the invoice.paid event handler."""
+        stripe_customer_id = 'cus_test_customer_456'
+
         if checkout_intent_state == CheckoutIntentState.PAID:
             self.checkout_intent.mark_as_paid(
                 stripe_session_id=self.stripe_checkout_session_id,
-                stripe_customer_id='cus_test_789',
+                stripe_customer_id=stripe_customer_id,
             )
 
         subscription_id = 'sub_test_123456'
         mock_subscription = self._create_mock_stripe_subscription(intent_id_override or self.checkout_intent.id)
         invoice_data = {
             'id': 'in_test_123456',
-            'customer': 'cus_test_789',
+            'customer': stripe_customer_id,
+            'object': 'invoice',
             'parent': {
                 'subscription_details': {
                     'metadata': mock_subscription,
@@ -160,39 +180,9 @@ class TestStripeEventHandler(TestCase):
         if expect_matching_intent:
             event_data = StripeEventData.objects.get(event_id=mock_event.id)
             self.assertEqual(event_data.checkout_intent, self.checkout_intent)
-
-    def test_invoice_paid_handler_sets_stripe_customer_id(self):
-        """Test that invoice.paid handler correctly sets stripe_customer_id on CheckoutIntent."""
-        subscription_id = 'sub_test_customer_id_123'
-        stripe_customer_id = 'cus_test_customer_456'
-        mock_subscription = self._create_mock_stripe_subscription(self.checkout_intent.id)
-
-        invoice_data = {
-            'id': 'in_test_customer_123',
-            'customer': stripe_customer_id,
-            'parent': {
-                'subscription_details': {
-                    'metadata': mock_subscription,
-                    'subscription': subscription_id,
-                }
-            },
-        }
-
-        mock_event = self._create_mock_stripe_event('invoice.paid', invoice_data)
-
-        # Verify initial state
-        self.assertEqual(self.checkout_intent.state, CheckoutIntentState.CREATED)
-        self.assertIsNone(self.checkout_intent.stripe_customer_id)
-
-        # Handle the event
-        StripeEventHandler.dispatch(mock_event)
-
-        # Verify the checkout intent was updated correctly
-        self.checkout_intent.refresh_from_db()
-        self.assertEqual(self.checkout_intent.state, CheckoutIntentState.PAID)
-        self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)
-        event_data = StripeEventData.objects.get(event_id=mock_event.id)
-        self.assertEqual(event_data.checkout_intent, self.checkout_intent)
+            self.assertEqual(event_data.summary.checkout_intent, self.checkout_intent)
+            self.assertIsNotNone(event_data.handled_at)
+            self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)
 
     def test_invoice_paid_handler_idempotent_with_same_customer_id(self):
         """Test that invoice.paid handler is idempotent when called with same stripe_customer_id."""
@@ -207,6 +197,7 @@ class TestStripeEventHandler(TestCase):
 
         invoice_data = {
             'id': 'in_test_idempotent_123',
+            'object': 'invoice',
             'customer': stripe_customer_id,
             'parent': {
                 'subscription_details': {
@@ -227,32 +218,6 @@ class TestStripeEventHandler(TestCase):
         self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)
         event_data = StripeEventData.objects.get(event_id=mock_event.id)
         self.assertEqual(event_data.checkout_intent, self.checkout_intent)
-
-    def test_event_marked_as_handled_after_success(self):
-        """StripeEventData.handled_at is set after successful handler execution."""
-        subscription_id = 'sub_test_handled_123'
-        stripe_customer_id = 'cus_test_handled_456'
-        mock_subscription = self._create_mock_stripe_subscription(self.checkout_intent.id)
-
-        invoice_data = {
-            'id': 'in_test_handled_123',
-            'customer': stripe_customer_id,
-            'parent': {
-                'subscription_details': {
-                    'metadata': mock_subscription,
-                    'subscription': subscription_id,
-                }
-            },
-        }
-
-        mock_event = self._create_mock_stripe_event('invoice.paid', invoice_data)
-
-        self.assertFalse(StripeEventData.objects.filter(event_id=mock_event.id).exists())
-
-        StripeEventHandler.dispatch(mock_event)
-
-        event_data = StripeEventData.objects.get(event_id=mock_event.id)
-        self.assertIsNotNone(event_data.handled_at)
 
     @mock.patch(
         "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_cancellation_email_task"
@@ -313,6 +278,7 @@ class TestStripeEventHandler(TestCase):
         subscription_data = {
             "id": "sub_test_trial_will_end_123",
             "trial_end": trial_end_timestamp,
+            "object": "subscription",
             "metadata": self._create_mock_stripe_subscription(
                 self.checkout_intent.id
             ),
