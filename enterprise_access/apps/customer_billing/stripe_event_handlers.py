@@ -115,8 +115,9 @@ def link_event_data_to_checkout_intent(event, checkout_intent):
     Sets the StripeEventData record for the given event to point at the provided CheckoutIntent.
     """
     event_data = StripeEventData.objects.get(event_id=event.id)
-    event_data.checkout_intent = checkout_intent
-    event_data.save()
+    if not event_data.checkout_intent:
+        event_data.checkout_intent = checkout_intent
+        event_data.save()  # this triggers a post_save signal that updates the related summary record
 
 
 class StripeEventHandler:
@@ -144,6 +145,7 @@ class StripeEventHandler:
                 handler_method(event)
                 # Mark event as handled if we persisted it successfully and no exception was raised
                 if event_record is not None:
+                    event_record.refresh_from_db()
                     event_record.mark_as_handled()
                 logger.info(f'[StripeEventHandler] handler for {event_short_repr} complete.')
 

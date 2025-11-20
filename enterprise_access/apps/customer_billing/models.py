@@ -793,7 +793,7 @@ class StripeEventData(TimeStampedModel):
     def mark_as_handled(self):
         """Mark this event as handled by setting handled_at to now."""
         self.handled_at = timezone.now()
-        self.save(update_fields=['handled_at', 'modified'])
+        self.save()
 
 
 class StripeEventSummary(TimeStampedModel):
@@ -1005,12 +1005,14 @@ class StripeEventSummary(TimeStampedModel):
         # Extract subscription-specific fields
         if self.stripe_object_type == 'subscription' or self.event_type.startswith('customer.subscription'):
             subscription_obj = stripe_object
-            if not subscription_obj['items'].data:
-                return
-            first_item = subscription_obj['items'].data[0]
+
             self.stripe_subscription_id = subscription_obj.id
-            self.subscription_status = subscription_obj.status
-            self.currency = subscription_obj.currency
+            self.subscription_status = subscription_obj.get('status')
+            self.currency = subscription_obj.get('currency')
+
+            if 'items' not in subscription_obj or not subscription_obj['items'].get('data', []):
+                return
+            first_item = subscription_obj['items']['data'][0]
             self.subscription_period_start = self._timestamp_to_datetime(
                 first_item.get('current_period_start')
             )
@@ -1026,11 +1028,11 @@ class StripeEventSummary(TimeStampedModel):
                 self.stripe_subscription_id = invoice_obj.parent.subscription_details.subscription
             except AttributeError:
                 pass
-            self.invoice_amount_paid = invoice_obj.amount_paid
-            self.invoice_currency = invoice_obj.currency
+            self.invoice_amount_paid = invoice_obj.get('amount_paid')
+            self.invoice_currency = invoice_obj.get('currency')
 
             # Extract unit amount and quantity from line items
-            lines = invoice_obj.lines.data
+            lines = invoice_obj.get('lines', {}).get('data', [])
             if lines:
                 primary_line = lines[0]
                 self.invoice_unit_amount = getattr(primary_line.pricing, 'unit_amount', None)
