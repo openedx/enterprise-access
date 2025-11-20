@@ -15,6 +15,7 @@ from enterprise_access.apps.customer_billing.tasks import (
     send_enterprise_provision_signup_confirmation_email,
     send_payment_receipt_email,
     send_trial_cancellation_email_task,
+    send_trial_end_and_subscription_started_email_task,
     send_trial_ending_reminder_email_task
 )
 
@@ -744,3 +745,85 @@ class TestSendTrialEndingReminderEmailTask(TestCase):
         call_args = mock_braze_instance.send_campaign_message.call_args
         trigger_props = call_args[1]["trigger_properties"]
         self.assertEqual(trigger_props["total_paid_amount"], "$0.00 USD")
+
+
+class TestSendTrialEndAndSubscriptionStartedEmailTask(TestCase):
+    """
+    Tests for send_trial_end_and_subscription_started_email_task.
+    """
+
+    @mock.patch("enterprise_access.apps.customer_billing.tasks.get_stripe_subscription")
+    @mock.patch("enterprise_access.apps.customer_billing.tasks.CheckoutIntent")
+    @mock.patch("enterprise_access.apps.customer_billing.tasks.BrazeApiClient")
+    @mock.patch("enterprise_access.apps.customer_billing.tasks.LmsApiClient")
+    def test_success_sends_to_all_admins(self,
+                                         mock_lms_client,
+                                         mock_braze_client,
+                                         mock_checkout_intent,
+                                         mock_get_stripe_subscription
+                                         ):
+        subscription = {
+            'id': 'sub_123',
+            'quantity': 5,
+            'plan': {'amount': 10000},
+            'current_period_start': 1762273481,  # 05 Dec 2025
+            'current_period_end': 1793809481,    # 05 Dec 2026
+            'latest_invoice': {'hosted_invoice_url': 'https://invoice.url'},
+        }
+        checkout_intent_obj = mock.Mock()
+        checkout_intent_obj.enterprise_name = 'Test Org'
+        checkout_intent_obj.enterprise_slug = 'test-org'
+        mock_checkout_intent.objects.get.return_value = checkout_intent_obj
+        mock_get_stripe_subscription.return_value = subscription
+        mock_lms_instance = mock_lms_client.return_value
+        mock_lms_instance.get_enterprise_customer_data.return_value = {
+            'admin_users': [
+                {'email': 'admin1@test.com'},
+                {'email': 'admin2@test.com'},
+            ]
+        }
+        mock_braze_instance = mock_braze_client.return_value
+        mock_braze_instance.create_braze_recipient.side_effect = [
+            {'external_user_id': '1'},
+            {'external_user_id': '2'},
+        ]
+        send_trial_end_and_subscription_started_email_task('sub_123', 1)
+        assert mock_braze_instance.send_campaign_message.called
+        args, kwargs = mock_braze_instance.send_campaign_message.call_args
+        assert args[0] == settings.BRAZE_ENTERPRISE_PROVISION_TRIAL_END_SUBSCRIPTION_STARTED_CAMPAIGN
+        assert len(kwargs['recipients']) == 2
+        props = kwargs['trigger_properties']
+        assert props['total_license'] == 5
+        assert props['billing_amount'] == str(Decimal('100'))
+        assert 'subscription_period' in props
+        assert 'next_payment_date' in props
+        assert props['organization'] == 'Test Org'
+        assert props['invoice_url'] == 'https://invoice.url'
+
+    @mock.patch("enterprise_access.apps.customer_billing.tasks.get_stripe_subscription")
+    @mock.patch("enterprise_access.apps.customer_billing.tasks.CheckoutIntent")
+    @mock.patch("enterprise_access.apps.customer_billing.tasks.BrazeApiClient")
+    @mock.patch("enterprise_access.apps.customer_billing.tasks.LmsApiClient")
+    def test_no_admins_logs_and_returns(self,
+                                        mock_lms_client,
+                                        mock_braze_client,
+                                        mock_checkout_intent,
+                                        mock_get_stripe_subscription
+                                        ):
+        subscription = {
+            'id': 'sub_123',
+            'quantity': 5,
+            'plan': {'amount': 10000},
+            'current_period_start': 1762273481,  # 05 Dec 2025
+            'current_period_end': 1793809481,    # 05 Dec 2026
+            'latest_invoice': {'hosted_invoice_url': 'https://invoice.url'},
+        }
+        checkout_intent_obj = mock.Mock()
+        checkout_intent_obj.enterprise_name = 'Test Org'
+        checkout_intent_obj.enterprise_slug = 'test-org'
+        mock_checkout_intent.objects.get.return_value = checkout_intent_obj
+        mock_get_stripe_subscription.return_value = subscription
+        mock_lms_instance = mock_lms_client.return_value
+        mock_lms_instance.get_enterprise_customer_data.return_value = {'admin_users': []}
+        send_trial_end_and_subscription_started_email_task('sub_123', 1)
+        assert not mock_braze_client.return_value.send_campaign_message.called
