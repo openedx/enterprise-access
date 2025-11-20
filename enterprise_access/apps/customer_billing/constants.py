@@ -94,8 +94,12 @@ ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS = {
         CheckoutIntentState.ERRORED_PROVISIONING,
         CheckoutIntentState.ERRORED_FULFILLMENT_STALLED,
     ],
-    CheckoutIntentState.ERRORED_BACKOFFICE: [],
-    CheckoutIntentState.ERRORED_FULFILLMENT_STALLED: [],
+    CheckoutIntentState.ERRORED_BACKOFFICE: [
+        CheckoutIntentState.FULFILLED,
+    ],
+    CheckoutIntentState.ERRORED_FULFILLMENT_STALLED: [
+        CheckoutIntentState.FULFILLED,
+    ],
     CheckoutIntentState.ERRORED_PROVISIONING: [
         CheckoutIntentState.FULFILLED,
     ],
