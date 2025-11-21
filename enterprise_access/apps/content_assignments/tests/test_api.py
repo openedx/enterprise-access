@@ -343,6 +343,7 @@ class TestContentAssignmentApi(TestCase):
         """
         content_key = 'demoX'
         content_price_cents = -1
+        admin_lms_user_id = 3
         learners_to_assign = [
             f'{name}@foo.com' for name in ('alice', 'bob', 'carol', 'david', 'eugene')
         ]
@@ -353,6 +354,7 @@ class TestContentAssignmentApi(TestCase):
                 learners_to_assign,
                 content_key,
                 content_price_cents,
+                admin_lms_user_id,
             )
 
     # pylint: disable=too-many-statements
@@ -415,6 +417,7 @@ class TestContentAssignmentApi(TestCase):
                 'kian',
             )
         ]
+        admin_lms_user_id = 3
         mock_get_and_cache_content_metadata.return_value = {
             'content_title': content_title,
             'content_key': course_key,
@@ -518,6 +521,7 @@ class TestContentAssignmentApi(TestCase):
                 learners_to_assign,
                 content_key,
                 content_price_cents,
+                admin_lms_user_id,
             )
 
         # Refresh from db to get any updates reflected in the python objects.
@@ -619,6 +623,7 @@ class TestContentAssignmentApi(TestCase):
         self.assertEqual(created_assignment.content_title, content_title)
         self.assertEqual(created_assignment.content_quantity, -1 * content_price_cents)
         self.assertEqual(created_assignment.state, LearnerContentAssignmentStateChoices.ALLOCATED)
+        self.assertEqual(created_assignment.admin_lms_user_id, 3)
 
         # Assert that an async task was enqueued for each of the updated and created assignments
         mock_pending_learner_task.delay.assert_has_calls([
