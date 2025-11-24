@@ -287,6 +287,13 @@ class GetCreateTrialSubscriptionPlanStepAdmin(DjangoQLSearchMixin, ProvisionWork
         ))
 
 
+@admin.register(models.GetCreateSubscriptionPlanRenewalStep)
+class GetCreateSubscriptionPlanRenewalStepAdmin(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
+    """
+    Admin model for the subscription plan renewal creation step.
+    """
+
+
 @admin.register(models.TriggerProvisionSubscriptionTrialCustomerWorkflow)
 class AdminTriggerProvisioningSubscriptionTrialWorkflowAdmin(admin.ModelAdmin):
     """
