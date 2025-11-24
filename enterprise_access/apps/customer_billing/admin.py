@@ -11,7 +11,7 @@ from django.utils.html import format_html
 from djangoql.admin import DjangoQLSearchMixin
 
 from .constants import CheckoutIntentState
-from .models import CheckoutIntent, StripeEventData, StripeEventSummary
+from .models import CheckoutIntent, SelfServiceSubscriptionRenewal, StripeEventData, StripeEventSummary
 from .stripe_event_handlers import StripeEventHandler
 
 
@@ -312,8 +312,6 @@ class StripeEventSummaryAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
         'created',
         'checkout_intent_id',
         'subscription_plan_uuid',
-        'future_subscription_plan_uuid',
-        'subscription_plan_renewal_uuid',
     ]
     list_filter = [
         'event_type',
@@ -321,8 +319,6 @@ class StripeEventSummaryAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     search_fields = [
         'event_id',
         'subscription_plan_uuid',
-        'future_subscription_plan_uuid',
-        'subscription_plan_renewal_uuid',
     ]
     select_related = [
         'checkout_intent',
@@ -338,3 +334,10 @@ class StripeEventSummaryAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
 
     def checkout_intent_state(self, obj):
         return obj.checkout_intent.state if obj.checkout_intent else None
+
+
+@admin.register(SelfServiceSubscriptionRenewal)
+class SelfServiceSubscriptionRenewal(DjangoQLSearchMixin, admin.ModelAdmin):
+    """
+    Admin class for SelfServiceSubscriptionRenewal.
+    """
