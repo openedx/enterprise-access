@@ -429,9 +429,20 @@ class TestProvisioningEndToEnd(APITest):
             checkout_intent=self.checkout_intent
         )
         self.assertEqual(renewal_records.count(), 1)
+
         renewal_record = renewal_records.first()
-        expected_renewal_id = EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE["id"]
-        self.assertEqual(renewal_record.subscription_plan_renewal_id, expected_renewal_id)
+        self.assertEqual(
+            renewal_record.subscription_plan_renewal_id,
+            EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE['id'],
+        )
+        self.assertEqual(
+            str(renewal_record.prior_subscription_plan_uuid),
+            EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE['prior_subscription_plan'],
+        )
+        self.assertEqual(
+            str(renewal_record.renewed_subscription_plan_uuid),
+            EXPECTED_SUBSCRIPTION_PLAN_RENEWAL_RESPONSE['renewed_subscription_plan'],
+        )
         self.assertIsNone(renewal_record.processed_at)
 
     @ddt.data(
