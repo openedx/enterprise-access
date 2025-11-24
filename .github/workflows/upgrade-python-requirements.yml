@@ -53,7 +53,7 @@ jobs:
           --user-reviewers="" --team-reviewers="2u-enterprise-titans" --delete-old-pull-requests
       - name: Send failure notification
         if: ${{ failure() }}
-        uses: dawidd6/action-send-mail@v3
+        uses: dawidd6/action-send-mail@v6
         with:
           server_address: email-smtp.us-east-1.amazonaws.com
           server_port: 465
