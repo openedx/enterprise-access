@@ -22,7 +22,7 @@ jobs:
       - name: setup target branch
         run: echo "target_branch=$(if ['${{ github.event.inputs.branch }}' = '']; then echo 'main'; else echo '${{ github.event.inputs.branch }}'; fi)" >> $GITHUB_ENV
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ env.target_branch }}
       
