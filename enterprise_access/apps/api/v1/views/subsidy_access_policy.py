@@ -1077,8 +1077,6 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
                         learner_emails,
                         content_key,
                         content_price_cents,
-                        # Forward admin LMS user ID to allocation
-                        # to identify the assignment creator.
                         admin_lms_user_id,
                     )
                     response_serializer = serializers.SubsidyAccessPolicyAllocationResponseSerializer(

@@ -421,7 +421,6 @@ def allocate_assignments(
             content_quantity,
             lms_user_ids_by_email,
             allocation_batch_id,
-            # Forward admin LMS user ID to identify the assignment creator
             admin_lms_user_id,
         )
 
@@ -795,7 +794,6 @@ def _create_new_assignments(
     content_quantity,
     lms_user_ids_by_email,
     allocation_batch_id,
-    # Forward the LMS admin user who created this Learner Credit assignment.
     admin_lms_user_id=None,
 ):
     """
