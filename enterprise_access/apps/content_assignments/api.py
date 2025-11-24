@@ -829,7 +829,6 @@ def _create_new_assignments(
             state=LearnerContentAssignmentStateChoices.ALLOCATED,
             allocation_batch_id=allocation_batch_id,
             allocated_at=localized_utcnow(),
-            # Add admin LMS user ID to allocation to identify the assignment creator.
             admin_lms_user_id=admin_lms_user_id,
         )
         assignments_to_create.append(assignment)
