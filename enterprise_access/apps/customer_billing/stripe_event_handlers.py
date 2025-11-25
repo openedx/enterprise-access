@@ -305,6 +305,10 @@ class StripeEventHandler:
                 f"Processing renewal for checkout_intent_id={checkout_intent_id}"
             )
             _process_trial_to_paid_renewal(checkout_intent, subscription.id, event)
+            send_trial_end_and_subscription_started_email_task.delay(
+                subscription_id=subscription.id,
+                checkout_intent_id=checkout_intent.id,
+            )
 
         # Handle trial subscription cancellation
         # Check if status changed to canceled to avoid duplicate emails
@@ -330,13 +334,6 @@ class StripeEventHandler:
                 logger.info(
                     f"Subscription {subscription.id} already canceled (status unchanged), skipping cancellation email"
                 )
-
-        prior_status = getattr(checkout_intent.previous_summary(event), 'subscription_status', None)
-        if current_status == 'active' and prior_status == 'trialing':
-            send_trial_end_and_subscription_started_email_task.delay(
-                subscription_id=subscription.id,
-                checkout_intent_id=checkout_intent.id,
-            )
 
     @on_stripe_event("customer.subscription.deleted")
     @staticmethod
