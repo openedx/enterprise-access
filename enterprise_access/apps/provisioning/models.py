@@ -739,9 +739,10 @@ class GetCreateSubscriptionPlanRenewalStep(CheckoutIntentStepMixin, AbstractWork
                 number_of_licenses=desired_num_licenses,
             )
             logger.info(
-                'Provisioning: created or found subscription plan renewal with id %s linking trial plan %s '
-                'to paid plan %s',
-                result_dict.get('id'), trial_plan_uuid, first_paid_plan_uuid
+                'Provisioning: created/found subscription plan renewal with id %s linking plan %s to renewed plan %s',
+                result_dict.get('id'),
+                result_dict.get('prior_subscription_plan'),
+                result_dict.get('renewed_subscription_plan'),
             )
         except Exception as exc:
             try:
@@ -765,12 +766,14 @@ class GetCreateSubscriptionPlanRenewalStep(CheckoutIntentStepMixin, AbstractWork
             if not latest_summary:
                 raise self.exception_class(f'No summary for {checkout_intent}')
 
-            renewal_tracking_record, created = SelfServiceSubscriptionRenewal.objects.get_or_create(
+            renewal_tracking_record, created = SelfServiceSubscriptionRenewal.objects.update_or_create(
                 checkout_intent=checkout_intent,
                 subscription_plan_renewal_id=result_dict['id'],
                 defaults={
                     'stripe_subscription_id': latest_summary.stripe_subscription_id,
                     'stripe_event_data': latest_summary.stripe_event_data,
+                    'prior_subscription_plan_uuid': result_dict.get('prior_subscription_plan'),
+                    'renewed_subscription_plan_uuid': result_dict.get('renewed_subscription_plan'),
                 }
             )
         except Exception as exc:

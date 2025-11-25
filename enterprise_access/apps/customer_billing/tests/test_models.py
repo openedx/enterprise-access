@@ -28,7 +28,7 @@ from enterprise_access.apps.customer_billing.models import (
     StripeEventSummary
 )
 from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
-from enterprise_access.apps.customer_billing.tests.factories import StripeEventDataFactory, StripeEventSummaryFactory
+from enterprise_access.apps.customer_billing.tests.factories import StripeEventDataFactory
 from enterprise_access.apps.customer_billing.tests.test_stripe_event_handlers import AttrDict
 from enterprise_access.apps.provisioning.models import (
     GetCreateFirstPaidSubscriptionPlanStep,

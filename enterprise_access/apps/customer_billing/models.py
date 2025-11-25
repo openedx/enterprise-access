@@ -721,6 +721,16 @@ class SelfServiceSubscriptionRenewal(TimeStampedModel):
     subscription_plan_renewal_id = models.IntegerField(
         help_text="UUID of the SubscriptionPlanRenewal in License Manager",
     )
+    prior_subscription_plan_uuid = models.UUIDField(
+        null=True,
+        blank=True,
+        help_text='The prior (or current) subscription plan uuid on this renewal',
+    )
+    renewed_subscription_plan_uuid = models.UUIDField(
+        null=True,
+        blank=True,
+        help_text='The renewed (or future) subscription plan uuid on this renewal',
+    )
     stripe_event_data = models.OneToOneField(
         'StripeEventData',
         on_delete=models.CASCADE,
