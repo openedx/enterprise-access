@@ -10,10 +10,6 @@ from django.apps import apps
 from pytz import UTC
 
 from enterprise_access.apps.content_assignments.constants import AssignmentAutomaticExpiredReason
-from enterprise_access.apps.content_assignments.content_metadata_api import (
-    get_content_metadata_for_assignments,
-    parse_datetime_string
-)
 from enterprise_access.apps.enterprise_groups.constants import (
     BRAZE_GROUPS_EMAIL_CAMPAIGNS_FINAL_REMINDER_DAY,
     BRAZE_GROUPS_EMAIL_CAMPAIGNS_FIRST_REMINDER_DAY,
@@ -77,6 +73,9 @@ def _get_subsidy_expiration(assignment):
     """
     Returns the datetime at which the subsidy for this assignment expires.
     """
+    # Import here to avoid circular import
+    from enterprise_access.apps.content_assignments.content_metadata_api import parse_datetime_string
+
     subsidy_expiration_datetime = (
         assignment.assignment_configuration.policy.subsidy_expiration_datetime
     )
@@ -89,23 +88,18 @@ def _get_subsidy_expiration(assignment):
 def _get_enrollment_deadline_date(assignment, content_metadata):
     """
     Helper to get the enrollment end date from a content metadata record.
-    """
-    if not content_metadata:
-        return None
 
-    normalized_metadata = get_normalized_metadata_for_assignment(assignment, content_metadata)
-    enrollment_end_date_str = normalized_metadata.get('enroll_by_date')
-    try:
-        datetime_obj = parse_datetime_string(enrollment_end_date_str)
-        if datetime_obj:
-            return datetime_obj.replace(tzinfo=UTC)
-    except ValueError:
-        logger.warning(
-            'Bad datetime format for %s, value: %s',
-            content_metadata.get('key'),
-            enrollment_end_date_str,
-        )
-    return None
+    Uses strategy pattern to handle different assignment types:
+    - Credit request assignments: Consider future course runs (last course run's deadline)
+    - Other assignments: Use existing normalized_metadata behavior
+    """
+    # Import here to avoid circular import
+    from enterprise_access.apps.content_assignments.enrollment_deadline_strategies import (
+        EnrollmentDeadlineStrategyFactory
+    )
+
+    strategy = EnrollmentDeadlineStrategyFactory.get_strategy(assignment)
+    return strategy.get_enrollment_deadline(assignment, content_metadata)
 
 
 def get_automatic_expiration_date_and_reason(
@@ -126,6 +120,9 @@ def get_automatic_expiration_date_and_reason(
         [content_metadata] (dict): Content metadata for the assignment's content key. If not provided, it will be
             fetched and subsequently cached from the content metadata API.
     """
+    # Import here to avoid circular import
+    from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
+
     assignment_configuration = assignment.assignment_configuration
     # pylint: disable=no-member,useless-suppression
     subsidy_access_policy = assignment_configuration.subsidy_access_policy
