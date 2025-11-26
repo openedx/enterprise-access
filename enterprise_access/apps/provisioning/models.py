@@ -59,7 +59,7 @@ class CheckoutIntentStepMixin:
         checkout_intent = CheckoutIntent.filter_by_name_and_slug(
             slug=enterprise_slug,
         ).filter(
-            state__in=CheckoutIntent.FULFILLABLE_STATES,
+            state__in=CheckoutIntent.FULFILLABLE_STATES(),
         ).first()
         if not checkout_intent:
             raise CheckoutIntent.DoesNotExist('No fulfillable CheckoutIntent records for the given slug were found.')

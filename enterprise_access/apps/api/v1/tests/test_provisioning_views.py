@@ -993,7 +993,7 @@ class TestCheckoutIntentSynchronization(APITest):
         payload['enterprise_customer']['slug'] = self.enterprise_slug
         return payload
 
-    @ddt.data(*CheckoutIntent.FULFILLABLE_STATES)
+    @ddt.data(*CheckoutIntent.FULFILLABLE_STATES())
     @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
     @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
     def test_checkout_intent_synchronized_on_success(
@@ -1086,13 +1086,7 @@ class TestCheckoutIntentSynchronization(APITest):
         self.assertEqual(checkout_intent.last_provisioning_error, error_message)
         self.assertEqual(str(checkout_intent.enterprise_uuid), str(TEST_ENTERPRISE_UUID))
 
-    @ddt.data(
-        CheckoutIntentState.CREATED,
-        CheckoutIntentState.FULFILLED,
-        CheckoutIntentState.ERRORED_BACKOFFICE,
-        CheckoutIntentState.ERRORED_FULFILLMENT_STALLED,
-        CheckoutIntentState.EXPIRED,
-    )
+    @ddt.data(*(set(CheckoutIntentState) - set(CheckoutIntent.FULFILLABLE_STATES())))
     @mock.patch('enterprise_access.apps.provisioning.api.LicenseManagerApiClient')
     @mock.patch('enterprise_access.apps.provisioning.api.LmsApiClient')
     def test_checkout_intent_wrong_state(
