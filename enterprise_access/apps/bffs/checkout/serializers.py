@@ -140,11 +140,13 @@ class CheckoutIntentMinimalResponseSerializer(serializers.Serializer):
         help_text='The last checkout error related to this intent',
         required=False,
         allow_blank=True,
+        allow_null=True,
     )
     last_provisioning_error = serializers.CharField(
         help_text='The last provisioning error related to this intent',
         required=False,
         allow_blank=True,
+        allow_null=True,
     )
     workflow_id = serializers.CharField(
         help_text='The workflow id related to this intent',
