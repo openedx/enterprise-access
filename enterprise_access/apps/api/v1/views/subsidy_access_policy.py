@@ -1055,13 +1055,15 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
         requested ``AssignedLearnerCreditAccessPolicy`` record.
         """
         policy = get_object_or_404(SubsidyAccessPolicy, pk=kwargs.get('policy_uuid'))
-
         serializer = serializers.SubsidyAccessPolicyAllocateRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         learner_emails = serializer.data['learner_emails']
         content_key = serializer.data['content_key']
         content_price_cents = serializer.data['content_price_cents']
+        # Extracts the LMS admin user ID from the validated serializer data to track and verify
+        # who created each Learner Credit (LC) assignment.
+        admin_lms_user_id = serializer.data['admin_lms_user_id']
 
         try:
             with policy.lock():
@@ -1075,6 +1077,7 @@ class SubsidyAccessPolicyAllocateViewset(UserDetailsFromJwtMixin, PermissionRequ
                         learner_emails,
                         content_key,
                         content_price_cents,
+                        admin_lms_user_id,
                     )
                     response_serializer = serializers.SubsidyAccessPolicyAllocationResponseSerializer(
                         allocation_result,

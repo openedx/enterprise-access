@@ -393,11 +393,25 @@ class LearnerContentAssignment(TimeStampedModel):
             "A reference to the batch that this assignment was created in. Helpful for grouping assignments together."
         ),
     )
+    # Tracks the LMS admin user who created this Learner Credit assignment.
+    # Added for auditability, this field enables administrators to track and verify who created
+    # each Learner Credit assignment, supporting transparency and accountability.
+    admin_lms_user_id = models.IntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "The id of the Open edX Admin LMS user record. "
+            "This may be null at time of creation."
+        ),
+    )
+
     history = HistoricalRecords()
 
     def __str__(self):
         return (
-            f'uuid={self.uuid}, state={self.state}, learner_email={self.learner_email}, content_key={self.content_key}'
+            f'uuid={self.uuid}, state={self.state}, learner_email={self.learner_email},'
+            f'content_key={self.content_key}, admin_lms_user_id={self.admin_lms_user_id}'
         )
 
     def clean(self):
