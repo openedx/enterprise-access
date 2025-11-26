@@ -572,7 +572,7 @@ BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_50_CAMPAIGN = ''
 BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_65_CAMPAIGN = ''
 BRAZE_GROUPS_EMAIL_AUTO_REMINDER_DAY_85_CAMPAIGN = ''
 
-# The "Desposit Funds" button (custom django object action) triggers an API call which needs to pass a sales contract
+# The "Deposit Funds" button (custom django object action) triggers an API call which needs to pass a sales contract
 # reference provider slug matching one SalesContractReferenceProvider in the enterprise-subsidy database. Since these
 # slugs are operator-defined at runtime, this codebase cannot hard-code the value. However, the least we can do is
 # inherit the same default:
@@ -591,9 +591,12 @@ PROVISIONING_DEFAULTS = {
         'all_product_choices': [
             (1, 'Standard Paid'),
             (2, 'Trial'),
+            (3, 'Self-service Paid'),
+            (4, 'Self-service Trial'),
         ],
         'trial_product_choices': [
             (2, 'Trial'),
+            (4, 'Self-service Trial'),
         ],
         'trial_catalog_query_choices': [
             (2, 'All open courses'),
