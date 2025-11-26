@@ -590,12 +590,12 @@ PROVISIONING_DEFAULTS = {
         'all_product_choices': [
             (1, 'Standard Paid'),
             (2, 'Trial'),
-            (3, 'self-service-paid'),
-            (4, 'self-service-trial'),
+            (3, 'Self-service Paid'),
+            (4, 'Self-service Trial'),
         ],
         'trial_product_choices': [
             (2, 'Trial'),
-            (4, 'self-service-trial'),
+            (4, 'Self-service Trial'),
         ],
         'trial_catalog_query_choices': [
             (2, 'All open courses'),
