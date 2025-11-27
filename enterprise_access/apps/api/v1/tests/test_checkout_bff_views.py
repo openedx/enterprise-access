@@ -41,6 +41,7 @@ class CheckoutBFFViewSetTests(APITest):
         # Create a mock checkout intent we can use in tests
         self.mock_checkout_intent_data = {
             'id': 123,
+            'uuid': '3d79ef51-7e91-476d-85f9-5cd97fb210e5',
             'state': 'created',
             'enterprise_name': 'Test Enterprise',
             'enterprise_slug': 'test-enterprise',
@@ -159,6 +160,7 @@ class CheckoutBFFViewSetTests(APITest):
         """
         sample_data = {
             'id': 123,
+            'uuid': '3d79ef51-7e91-476d-85f9-5cd97fb210e5',
             'state': 'paid',
             'enterprise_name': 'Test Enterprise',
             'enterprise_slug': 'test-enterprise',

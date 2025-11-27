@@ -108,6 +108,9 @@ class CheckoutIntentMinimalResponseSerializer(serializers.Serializer):
     id = serializers.IntegerField(
         help_text='CheckoutIntent id',
     )
+    uuid = serializers.UUIDField(
+        help_text='CheckoutIntent uuid',
+    )
     state = serializers.ChoiceField(
         help_text='The current state of this record',
         choices=CheckoutIntentState,
