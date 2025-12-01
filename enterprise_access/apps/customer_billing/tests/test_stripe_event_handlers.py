@@ -1,6 +1,7 @@
 """
 Unit tests for Stripe event handlers.
 """
+import uuid
 from contextlib import nullcontext
 from datetime import timedelta
 from random import randint
@@ -21,8 +22,14 @@ from enterprise_access.apps.customer_billing.models import (
     StripeEventData,
     StripeEventSummary
 )
-from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
+from enterprise_access.apps.customer_billing.stripe_event_handlers import (
+    StripeEventHandler,
+    _get_future_plan_uuids,
+    _get_subscription_plan_uuid_from_checkout_intent,
+    cancel_all_future_plans
+)
 from enterprise_access.apps.customer_billing.tests.factories import (
+    CheckoutIntentFactory,
     StripeEventDataFactory,
     StripeEventSummaryFactory,
     get_stripe_object_for_event_type
@@ -289,7 +296,6 @@ class TestStripeEventHandler(TestCase):
 
         StripeEventHandler.dispatch(mock_event)
 
-        # Verify the email task was queued
         mock_email_task.delay.assert_called_once_with(
             checkout_intent_id=self.checkout_intent.id,
             trial_end_timestamp=trial_end_timestamp,
@@ -315,6 +321,271 @@ class TestStripeEventHandler(TestCase):
         ) as mock_task:
             StripeEventHandler.dispatch(mock_event)
             mock_task.delay.assert_not_called()
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.cancel_all_future_plans"
+    )
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_billing_error_email_task"
+    )
+    @mock.patch.object(CheckoutIntent, "previous_summary")
+    def test_subscription_updated_past_due_cancels_future_plans(
+        self,
+        mock_prev_summary,
+        mock_send_billing_error,
+        mock_cancel_future_plans,
+    ):
+        """Past-due transition cancels all future plans and sends billing email."""
+        subscription_id = "sub_test_past_due_123"
+        subscription_data = {
+            "id": subscription_id,
+            "status": "past_due",
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_prev_summary.return_value = AttrDict({"subscription_status": "active"})
+        self.checkout_intent.enterprise_uuid = uuid.uuid4()
+        self.checkout_intent.save(update_fields=["enterprise_uuid"])
+        mock_cancel_future_plans.return_value = ["future-plan-uuid"]
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        mock_send_billing_error.delay.assert_called_once_with(checkout_intent_id=self.checkout_intent.id)
+        mock_cancel_future_plans.assert_called_once_with(
+            enterprise_uuid=str(self.checkout_intent.enterprise_uuid),
+            reason="delayed_payment",
+            subscription_id_for_logs=subscription_id,
+            checkout_intent=self.checkout_intent,
+        )
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.cancel_all_future_plans"
+    )
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_billing_error_email_task"
+    )
+    @mock.patch.object(CheckoutIntent, "previous_summary")
+    def test_subscription_updated_past_due_no_status_change_skips_cancellation(
+        self,
+        mock_prev_summary,
+        mock_send_billing_error,
+        mock_cancel_future_plans,
+    ):
+        """If status is already past_due, no emails or cancellations are triggered."""
+        subscription_data = {
+            "id": "sub_test_past_due_unchanged",
+            "status": "past_due",
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_prev_summary.return_value = AttrDict({"subscription_status": "past_due"})
+        self.checkout_intent.enterprise_uuid = uuid.uuid4()
+        self.checkout_intent.save(update_fields=["enterprise_uuid"])
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        mock_send_billing_error.delay.assert_not_called()
+        mock_cancel_future_plans.assert_not_called()
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.cancel_all_future_plans"
+    )
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_billing_error_email_task"
+    )
+    @mock.patch.object(CheckoutIntent, "previous_summary")
+    def test_subscription_updated_past_due_missing_enterprise_uuid(
+        self,
+        mock_prev_summary,
+        mock_send_billing_error,
+        mock_cancel_future_plans,
+    ):
+        """If the checkout intent is missing enterprise UUID, no LM calls are made."""
+        subscription_data = {
+            "id": "sub_test_past_due_missing_ent",
+            "status": "past_due",
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_prev_summary.return_value = AttrDict({"subscription_status": "active"})
+        self.checkout_intent.enterprise_uuid = None
+        mock_cancel_future_plans.return_value = ["future-plan-uuid"]
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        mock_send_billing_error.delay.assert_called_once_with(checkout_intent_id=self.checkout_intent.id)
+        mock_cancel_future_plans.assert_not_called()
+
+    def test_get_future_plan_uuids_collects_descendants(self):
+        """Future plan helper traverses renewal graph depth-first."""
+        checkout_intent = CheckoutIntentFactory()
+        current_plan_uuid = uuid.uuid4()
+        future_one = uuid.uuid4()
+        future_two = uuid.uuid4()
+        future_three = uuid.uuid4()
+
+        base_time = timezone.now()
+
+        event_one = StripeEventDataFactory(checkout_intent=checkout_intent)
+        SelfServiceSubscriptionRenewal.objects.create(
+            checkout_intent=checkout_intent,
+            subscription_plan_renewal_id=301,
+            stripe_event_data=event_one,
+            stripe_subscription_id="sub-future-1",
+            prior_subscription_plan_uuid=current_plan_uuid,
+            renewed_subscription_plan_uuid=future_one,
+        )
+        StripeEventSummaryFactory(
+            stripe_event_data=event_one,
+            stripe_event_created_at=base_time,
+        )
+        event_two_data = StripeEventDataFactory(checkout_intent=checkout_intent)
+        SelfServiceSubscriptionRenewal.objects.create(
+            checkout_intent=checkout_intent,
+            subscription_plan_renewal_id=302,
+            stripe_event_data=event_two_data,
+            stripe_subscription_id="sub-future-2",
+            prior_subscription_plan_uuid=future_one,
+            renewed_subscription_plan_uuid=future_two,
+        )
+        StripeEventSummaryFactory(
+            stripe_event_data=event_two_data,
+            stripe_event_created_at=base_time + timedelta(minutes=1),
+        )
+        event_three_data = StripeEventDataFactory(checkout_intent=checkout_intent)
+        SelfServiceSubscriptionRenewal.objects.create(
+            checkout_intent=checkout_intent,
+            subscription_plan_renewal_id=303,
+            stripe_event_data=event_three_data,
+            stripe_subscription_id="sub-future-3",
+            prior_subscription_plan_uuid=future_two,
+            renewed_subscription_plan_uuid=future_three,
+        )
+        StripeEventSummaryFactory(
+            stripe_event_data=event_three_data,
+            stripe_event_created_at=base_time + timedelta(minutes=2),
+        )
+        # Processed renewals shouldn't be considered future plans.
+        processed_event = StripeEventDataFactory(checkout_intent=checkout_intent)
+        SelfServiceSubscriptionRenewal.objects.create(
+            checkout_intent=checkout_intent,
+            subscription_plan_renewal_id=304,
+            stripe_event_data=processed_event,
+            stripe_subscription_id="sub-processed",
+            prior_subscription_plan_uuid=future_three,
+            renewed_subscription_plan_uuid=uuid.uuid4(),
+            processed_at=timezone.now(),
+        )
+        StripeEventSummaryFactory(
+            stripe_event_data=processed_event,
+            stripe_event_created_at=base_time + timedelta(minutes=3),
+        )
+
+        result = _get_future_plan_uuids(checkout_intent, str(current_plan_uuid))
+
+        self.assertEqual(result, [str(future_one), str(future_two), str(future_three)])
+
+    def test_get_subscription_plan_uuid_reads_from_summary(self):
+        """Subscription plan lookup pulls from latest summary record only."""
+        checkout_intent = CheckoutIntentFactory()
+        target_uuid = uuid.uuid4()
+        event_data = StripeEventDataFactory(checkout_intent=checkout_intent)
+        summary = event_data.summary
+        summary.subscription_plan_uuid = target_uuid
+        summary.checkout_intent = checkout_intent
+        summary.stripe_event_created_at = timezone.now()
+        summary.save(update_fields=['subscription_plan_uuid', 'checkout_intent', 'stripe_event_created_at', 'modified'])
+
+        result = _get_subscription_plan_uuid_from_checkout_intent(checkout_intent)
+
+        self.assertEqual(result, str(target_uuid))
+
+    def test_get_subscription_plan_uuid_returns_none_without_summary(self):
+        """Helper returns None when no subscription plan available on summaries."""
+        checkout_intent = CheckoutIntentFactory()
+        workflow = ProvisionNewCustomerWorkflowFactory()
+        checkout_intent.workflow = workflow
+        checkout_intent.save()
+
+        result = _get_subscription_plan_uuid_from_checkout_intent(checkout_intent)
+
+        self.assertIsNone(result)
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient"
+    )
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers._get_future_plan_uuids"
+    )
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers._get_current_plan_uuid"
+    )
+    def test_cancel_all_future_plans_deactivates_each_plan(
+        self,
+        mock_get_current_plan,
+        mock_get_future_plans,
+        MockClient,
+    ):
+        """Cancel helper deactivates every future plan resolved for the enterprise."""
+        mock_get_current_plan.return_value = "plan-current"
+        mock_get_future_plans.return_value = ["future-one", "future-two"]
+
+        result = cancel_all_future_plans(
+            enterprise_uuid=str(self.checkout_intent.enterprise_uuid),
+            reason="delayed_payment",
+            subscription_id_for_logs="sub-example",
+            checkout_intent=self.checkout_intent,
+        )
+
+        self.assertEqual(result, ["future-one", "future-two"])
+        mock_get_current_plan.assert_called_once_with(self.checkout_intent)
+        mock_get_future_plans.assert_called_once_with(self.checkout_intent, "plan-current")
+        MockClient.assert_called_once()
+        MockClient.return_value.update_subscription_plan.assert_has_calls([
+            mock.call("future-one", is_active=False, change_reason="delayed_payment"),
+            mock.call("future-two", is_active=False, change_reason="delayed_payment"),
+        ])
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers._get_future_plan_uuids"
+    )
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers._get_current_plan_uuid",
+        return_value=None,
+    )
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient"
+    )
+    def test_cancel_all_future_plans_skips_without_current_plan(
+        self,
+        MockClient,
+        mock_get_current_plan,
+        mock_get_future_plans,
+    ):
+        """Without a current plan UUID the helper exits early."""
+        result = cancel_all_future_plans(
+            enterprise_uuid=str(self.checkout_intent.enterprise_uuid),
+            reason="delayed_payment",
+            subscription_id_for_logs="sub-missing",
+            checkout_intent=self.checkout_intent,
+        )
+
+        self.assertEqual(result, [])
+        MockClient.assert_not_called()
+        mock_get_future_plans.assert_not_called()
+        mock_get_current_plan.assert_called_once_with(self.checkout_intent)
 
     @mock.patch(
         "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_ending_reminder_email_task"
