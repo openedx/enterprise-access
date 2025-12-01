@@ -248,12 +248,19 @@ class StripeEventHandler:
         """
         subscription = event.data.object
 
-        logger.info(f'Enabling pending updates for created subscription {subscription.id}')
+        checkout_intent_id = get_checkout_intent_id_from_subscription(
+            subscription
+        )
+        checkout_intent = get_checkout_intent_or_raise(
+            checkout_intent_id, event.id
+        )
+        link_event_data_to_checkout_intent(event, checkout_intent)
 
         try:
             # Update the subscription to enable pending updates for future modifications
             # This ensures that quantity changes through the billing portal will only
             # be applied if payment succeeds, preventing license count drift
+            logger.info(f'Enabling pending updates for created subscription {subscription.id}')
             stripe.Subscription.modify(
                 subscription.id,
                 payment_behavior='pending_if_incomplete',
@@ -401,7 +408,7 @@ def _process_trial_to_paid_renewal(checkout_intent: CheckoutIntent, stripe_subsc
             f"subscription {stripe_subscription_id}"
         )
 
-    except Exception as exc:  # pylint: disable=broad-exception-caught
+    except Exception as exc:
         logger.exception(
             f"Failed to process trial-to-paid renewal for checkout_intent {checkout_intent.id}, "
             f"subscription {stripe_subscription_id}: {exc}"
