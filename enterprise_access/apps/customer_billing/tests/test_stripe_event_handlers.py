@@ -27,7 +27,7 @@ from enterprise_access.apps.customer_billing.tests.factories import (
     StripeEventSummaryFactory,
     get_stripe_object_for_event_type
 )
-from enterprise_access.apps.provisioning.tests.factories import *
+from enterprise_access.apps.provisioning.tests.factories import ProvisionNewCustomerWorkflowFactory
 
 
 def _rand_numeric_string():
@@ -388,9 +388,7 @@ class TestStripeEventHandler(TestCase):
 
     @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient')
     def test_subscription_updated_trial_to_active_no_renewal_record(self, mock_license_manager_client):
-        """Test trial→active transition gracefully handles missing renewal record."""
-        from enterprise_access.apps.customer_billing.tests.factories import StripeEventSummaryFactory
-
+        """Test trial -> active transition gracefully handles missing renewal record."""
         # Create previous summary with trial status but NO renewal record
         StripeEventSummaryFactory(
             checkout_intent=self.checkout_intent,
@@ -423,7 +421,7 @@ class TestStripeEventHandler(TestCase):
         self.checkout_intent.save()
 
         stripe_subscription_id = 'sub_test_222'
-        trial_event_data, trial_summary = self._create_existing_event_data_records(stripe_subscription_id)
+        trial_event_data, _ = self._create_existing_event_data_records(stripe_subscription_id)
 
         expected_renewal_id = 999
         renewal_record = SelfServiceSubscriptionRenewal.objects.create(
@@ -469,7 +467,7 @@ class TestStripeEventHandler(TestCase):
         self.checkout_intent.save()
 
         stripe_subscription_id = 'sub_test_789'
-        trial_event_data, trial_summary = self._create_existing_event_data_records(stripe_subscription_id)
+        trial_event_data, _ = self._create_existing_event_data_records(stripe_subscription_id)
 
         expected_renewal_id = 999
         renewal_record = SelfServiceSubscriptionRenewal.objects.create(
@@ -525,7 +523,7 @@ class TestStripeEventHandler(TestCase):
         # Create existing StripeEventData and summary in a "trialing" state,
         # so that we can create a renewal record as it would exist after initial
         # provisioning workflow execution.
-        trial_event_data, trial_summary = self._create_existing_event_data_records(stripe_subscription_id)
+        trial_event_data, _ = self._create_existing_event_data_records(stripe_subscription_id)
 
         expected_renewal_id = 555
         renewal_record = SelfServiceSubscriptionRenewal.objects.create(
@@ -586,3 +584,87 @@ class TestStripeEventHandler(TestCase):
         self.assertEqual(renewal_record.checkout_intent, self.checkout_intent)
         self.assertEqual(event_data.checkout_intent, self.checkout_intent)
         self.assertEqual(new_summary.checkout_intent, self.checkout_intent)
+
+    @mock.patch('stripe.Subscription.modify')
+    def test_subscription_created_handler_success(self, mock_stripe_modify):
+        """Test successful customer.subscription.created event handling."""
+        subscription_id = 'sub_test_created_123'
+        subscription_data = {
+            'id': subscription_id,
+            'status': 'trialing',
+            'object': 'subscription',
+            'metadata': self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            'customer.subscription.created', subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        # Verify stripe.Subscription.modify was called to enable pending updates
+        mock_stripe_modify.assert_called_once_with(
+            subscription_id,
+            payment_behavior='pending_if_incomplete',
+        )
+
+        # Verify event data was created and linked to checkout intent
+        event_data = StripeEventData.objects.get(event_id=mock_event.id)
+        self.assertEqual(event_data.checkout_intent, self.checkout_intent)
+        self.assertEqual(event_data.event_type, 'customer.subscription.created')
+        self.assertIsNotNone(event_data.handled_at)
+
+        # Verify summary was created and updated
+        summary = event_data.summary
+        self.assertEqual(summary.checkout_intent, self.checkout_intent)
+        self.assertEqual(summary.subscription_status, 'trialing')
+
+    @mock.patch('stripe.Subscription.modify')
+    def test_subscription_created_handler_checkout_intent_not_found(self, mock_stripe_modify):
+        """Test customer.subscription.created when CheckoutIntent is not found."""
+        subscription_data = {
+            'id': 'sub_test_not_found_123',
+            'status': 'trialing',
+            'object': 'subscription',
+            'metadata': self._create_mock_stripe_subscription(99999),  # Non-existent ID
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            'customer.subscription.created', subscription_data
+        )
+
+        # Should raise CheckoutIntent.DoesNotExist
+        with self.assertRaises(Exception):
+            StripeEventHandler.dispatch(mock_event)
+
+        # Verify stripe.Subscription.modify was NOT called
+        mock_stripe_modify.assert_not_called()
+
+    @mock.patch('stripe.Subscription.modify', side_effect=stripe.StripeError("API error"))
+    def test_subscription_created_handler_stripe_error(self, mock_stripe_modify):
+        """Test customer.subscription.created when Stripe API fails."""
+        subscription_id = 'sub_test_stripe_error_123'
+        subscription_data = {
+            'id': subscription_id,
+            'status': 'trialing',
+            'object': 'subscription',
+            'metadata': self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            'customer.subscription.created', subscription_data
+        )
+
+        # Should complete successfully despite Stripe error (error is logged but not re-raised)
+        StripeEventHandler.dispatch(mock_event)
+
+        # Verify stripe.Subscription.modify was called
+        mock_stripe_modify.assert_called_once_with(
+            subscription_id,
+            payment_behavior='pending_if_incomplete',
+        )
+
+        # Verify event data was still created and linked to checkout intent
+        event_data = StripeEventData.objects.get(event_id=mock_event.id)
+        self.assertEqual(event_data.checkout_intent, self.checkout_intent)
+        self.assertIsNotNone(event_data.handled_at)
