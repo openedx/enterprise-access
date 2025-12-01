@@ -13,7 +13,7 @@ analytics-python==1.4.post1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-asgiref==3.10.0
+asgiref==3.11.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -44,12 +44,12 @@ backoff==1.10.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   analytics-python
-billiard==4.2.2
+billiard==4.2.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   celery
-cachetools==6.2.1
+cachetools==6.2.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -58,13 +58,13 @@ cattrs==25.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-celery==5.5.3
+celery==5.6.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django-celery-results
     #   edx-celeryutils
-certifi==2025.10.5
+certifi==2025.11.12
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -85,7 +85,7 @@ charset-normalizer==3.4.4
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   requests
-click==8.3.0
+click==8.3.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -143,7 +143,7 @@ coreschema==0.0.4
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   coreapi
-coverage[toml]==7.11.3
+coverage[toml]==7.12.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -223,7 +223,7 @@ django-cors-headers==4.9.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-django-countries==8.0.0
+django-countries==8.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -396,11 +396,16 @@ edx-toggles==5.4.1
     #   -r requirements/test.txt
     #   edx-auth-backends
     #   edx-event-bus-kafka
+exceptiongroup==1.3.1
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   celery
 factory-boy==3.3.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==37.12.0
+faker==38.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -493,11 +498,11 @@ jsonschema-specifications==2025.9.1
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   jsonschema
-keyring==25.6.0
+keyring==25.7.0
     # via
     #   -r requirements/quality.txt
     #   twine
-kombu==5.5.4
+kombu==5.6.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -646,12 +651,12 @@ pymemcache==4.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-pymongo==4.15.3
+pymongo==4.15.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-opaque-keys
-pynacl==1.6.0
+pynacl==1.6.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -661,7 +666,7 @@ pyproject-api==1.10.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   tox
-pytest==9.0.0
+pytest==9.0.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -713,7 +718,7 @@ readme-renderer==44.0
     # via
     #   -r requirements/quality.txt
     #   twine
-redis==7.0.1
+redis==7.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -755,7 +760,7 @@ rich==14.2.0
     # via
     #   -r requirements/quality.txt
     #   twine
-rpds-py==0.28.0
+rpds-py==0.30.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -765,7 +770,7 @@ rules==3.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-secretstorage==3.4.0
+secretstorage==3.5.0
     # via
     #   -r requirements/quality.txt
     #   keyring
@@ -805,19 +810,19 @@ social-auth-core==4.8.1
     #   -r requirements/test.txt
     #   edx-auth-backends
     #   social-auth-app-django
-sqlparse==0.5.3
+sqlparse==0.5.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django
-stevedore==5.5.0
+stevedore==5.6.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
-stripe==13.2.0
+stripe==14.0.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -844,6 +849,7 @@ typing-extensions==4.15.0
     #   cattrs
     #   django-countries
     #   edx-opaque-keys
+    #   exceptiongroup
     #   referencing
     #   stripe
 tzdata==2025.2
@@ -852,6 +858,11 @@ tzdata==2025.2
     #   -r requirements/test.txt
     #   faker
     #   kombu
+tzlocal==5.3.1
+    # via
+    #   -r requirements/quality.txt
+    #   -r requirements/test.txt
+    #   celery
 uritemplate==4.2.0
     # via
     #   -r requirements/quality.txt
