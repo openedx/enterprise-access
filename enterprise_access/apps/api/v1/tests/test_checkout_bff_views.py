@@ -678,7 +678,7 @@ class CheckoutBFFSuccessViewSetTests(APITest):
         self.assertEqual(response_data['state'], mock_checkout_intent.state)
 
         invoice = response_data['first_billable_invoice']
-        self.assertEqual(invoice['last4'], '4242')
+        self.assertEqual(invoice['last4'], 4242)
         self.assertEqual(invoice['quantity'], 35)
         self.assertEqual(Decimal(invoice['unit_amount_decimal']), 396.00)
         self.assertEqual(invoice['customer_name'], 'Test Customer')
