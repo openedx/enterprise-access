@@ -117,10 +117,6 @@ class CheckoutIntent(TimeStampedModel):
         CheckoutIntentState.ERRORED_FULFILLMENT_STALLED,
         CheckoutIntentState.ERRORED_PROVISIONING,
     }
-    FULFILLABLE_STATES = {
-        CheckoutIntentState.PAID,
-        CheckoutIntentState.ERRORED_PROVISIONING,
-    }
 
     user = models.OneToOneField(
         User,
@@ -212,6 +208,15 @@ class CheckoutIntent(TimeStampedModel):
             f"state={self.state}, "
             f"expires_at={self.expires_at}>"
         )
+
+    @classmethod
+    def FULFILLABLE_STATES(cls) -> list[CheckoutIntentState]:
+        return [
+            from_state
+            for from_state, to_states
+            in ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS.items()
+            if CheckoutIntentState.FULFILLED in to_states
+        ]
 
     def save(self, *args, **kwargs):
         """
