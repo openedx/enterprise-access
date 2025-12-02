@@ -637,7 +637,7 @@ class CheckoutIntentViewSetTestCase(APITest):
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
         assert 'has already been reserved' in response.json()['detail']
 
-    @ddt.data('RU', 'IR', 'KP', 'SY', 'CU')
+    @ddt.data('RU', 'IR', 'KP', 'SY', 'CU', 'BY')
     def test_patch_embargoed_country_rejected(self, embargoed_country_code):
         """Test that PATCH with embargoed countries is rejected."""
         self.set_jwt_cookie([{
