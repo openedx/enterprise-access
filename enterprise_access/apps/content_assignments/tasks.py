@@ -25,7 +25,13 @@ from enterprise_access.utils import (
     localized_utcnow
 )
 
-from .constants import BRAZE_TIMESTAMP_FORMAT, LearnerContentAssignmentStateChoices
+from .constants import (
+    BRAZE_TIMESTAMP_FORMAT,
+    RETIRED_EMAIL_ADDRESS_FORMAT,
+    AssignmentAutomaticExpiredReason,
+    LearnerContentAssignmentStateChoices
+)
+from .models import AssignmentConfiguration
 from .utils import get_self_paced_normalized_start_date
 
 logger = logging.getLogger(__name__)
@@ -622,3 +628,144 @@ def send_bnr_automatically_expired_email(learner_credit_request_uuid):
     logger.info(
         f'Sent braze campaign expiration uuid={campaign_uuid} message for B&R request {learner_credit_request_uuid}'
     )
+
+
+def _should_clear_pii_for_assignment(assignment, content_metadata):
+    """
+    Determine if PII should be cleared for the given expired assignment.
+
+    PII should only be cleared if:
+    1. A successful expiration email has been sent
+    2. The assignment expired due to NINETY_DAYS_PASSED reason
+
+    Note: The ORM query in clear_pii_for_expired_assignments already filters for
+    expired assignments with non-cleared PII, so those checks are not duplicated here.
+
+    Args:
+        assignment: LearnerContentAssignment instance
+        content_metadata: dict of content metadata for the assignment
+
+    Returns:
+        bool: True if PII should be cleared, False otherwise
+    """
+    # Check if expiration email was successfully sent
+    if not assignment.get_last_successful_expiration_action():
+        logger.info(
+            'No successful expiration email sent for assignment %s, skipping PII clearing.',
+            assignment.uuid
+        )
+        return False
+
+    # Check the expiration reason - only clear PII for NINETY_DAYS_PASSED
+    expiration_date_and_reason = get_automatic_expiration_date_and_reason(assignment, content_metadata)
+    expiration_reason = expiration_date_and_reason.get('reason')
+
+    if expiration_reason != AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED:
+        logger.info(
+            'Assignment %s expired due to %s, not NINETY_DAYS_PASSED. Skipping PII clearing.',
+            assignment.uuid,
+            expiration_reason
+        )
+        return False
+
+    return True
+
+
+@shared_task(base=LoggedTaskWithRetry)
+def clear_pii_for_expired_assignments(dry_run=False):
+    """
+    Clears PII from assignments that have expired due to the 90-day timeout.
+
+    This task should be run daily, after the automatic expiration job has completed
+    and expiration emails have been sent. It ensures that:
+    1. Expiration emails are sent to actual learner email addresses (not retired addresses)
+    2. PII is cleared only after successful email notification
+
+    PII is only cleared for assignments that:
+    - Are in EXPIRED state
+    - Have not already had PII cleared
+    - Have had a successful expiration email sent
+    - Expired due to NINETY_DAYS_PASSED reason (not enrollment deadline or subsidy expiration)
+
+    Args:
+        dry_run: If True, log what would be done without making changes
+
+    Returns:
+        dict: Summary of assignments processed
+    """
+    cleared_count = 0
+    skipped_count = 0
+    assignment_uuids_cleared = []
+
+    for assignment_configuration in AssignmentConfiguration.objects.filter(active=True):
+        subsidy_access_policy = assignment_configuration.subsidy_access_policy
+        enterprise_catalog_uuid = subsidy_access_policy.catalog_uuid
+
+        logger.info(
+            '[CLEAR_PII_FOR_EXPIRED_ASSIGNMENTS] Processing Assignment Configuration. UUID: [%s], '
+            'Policy: [%s], Catalog: [%s], Enterprise: [%s], dry_run [%s]',
+            assignment_configuration.uuid,
+            subsidy_access_policy.uuid,
+            enterprise_catalog_uuid,
+            assignment_configuration.enterprise_customer_uuid,
+            dry_run,
+        )
+
+        # Get all expired assignments that might need PII clearing
+        # Exclude those with already retired emails
+        retired_prefix = RETIRED_EMAIL_ADDRESS_FORMAT.split('{}')[0]
+        expired_assignments = assignment_configuration.assignments.filter(
+            state=LearnerContentAssignmentStateChoices.EXPIRED,
+            expired_at__isnull=False,
+        ).exclude(
+            learner_email__startswith=retired_prefix
+        ).order_by('expired_at')
+
+        if not expired_assignments.exists():
+            logger.info(
+                '[CLEAR_PII_FOR_EXPIRED_ASSIGNMENTS] No eligible expired assignments found for '
+                'Assignment Configuration %s',
+                assignment_configuration.uuid
+            )
+            continue
+
+        # Fetch content metadata for all assignments in batch
+        content_metadata_for_assignments = get_content_metadata_for_assignments(
+            enterprise_catalog_uuid,
+            expired_assignments
+        )
+
+        for assignment in expired_assignments:
+            content_metadata = content_metadata_for_assignments.get(assignment.content_key, {})
+
+            if _should_clear_pii_for_assignment(assignment, content_metadata):
+                if dry_run:
+                    logger.info(
+                        '[CLEAR_PII_FOR_EXPIRED_ASSIGNMENTS] [DRY RUN] Would clear PII for assignment %s',
+                        assignment.uuid
+                    )
+                else:
+                    assignment.clear_pii()
+                    assignment.save()
+                    logger.info(
+                        '[CLEAR_PII_FOR_EXPIRED_ASSIGNMENTS] Cleared PII for assignment %s',
+                        assignment.uuid
+                    )
+                cleared_count += 1
+                assignment_uuids_cleared.append(str(assignment.uuid))
+            else:
+                skipped_count += 1
+
+    summary = {
+        'cleared_count': cleared_count,
+        'skipped_count': skipped_count,
+        'assignment_uuids_cleared': assignment_uuids_cleared,
+        'dry_run': dry_run,
+    }
+
+    logger.info(
+        '[CLEAR_PII_FOR_EXPIRED_ASSIGNMENTS] Completed. Summary: %s',
+        summary
+    )
+
+    return summary

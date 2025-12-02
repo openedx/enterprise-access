@@ -885,3 +885,128 @@ class TestBrazeEmailTasks(APITestWithMocks):
             output_pattern=BRAZE_TIMESTAMP_FORMAT
         )
         self.assertEqual(expected_result, action_required_by)
+
+
+class TestClearPiiForExpiredAssignmentsTask(APITestWithMocks):
+    """
+    Tests for clear_pii_for_expired_assignments task.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+
+        cls.enterprise_uuid = TEST_ENTERPRISE_UUID
+        cls.assignment_configuration = AssignmentConfigurationFactory(
+            enterprise_customer_uuid=cls.enterprise_uuid,
+        )
+        cls.policy = AssignedLearnerCreditAccessPolicyFactory(
+            display_name='An assigned learner credit policy, for the test customer.',
+            enterprise_customer_uuid=cls.enterprise_uuid,
+            active=True,
+            assignment_configuration=cls.assignment_configuration,
+            spend_limit=1000000,
+        )
+
+    def setUp(self):
+        super().setUp()
+        self.expired_assignment = LearnerContentAssignmentFactory(
+            assignment_configuration=self.assignment_configuration,
+            learner_email='expired@test.com',
+            lms_user_id=TEST_LMS_USER_ID,
+            content_key=TEST_COURSE_KEY,
+            content_title='Test Course',
+            content_quantity=-100,
+            state=LearnerContentAssignmentStateChoices.EXPIRED,
+            expired_at=now() - timedelta(hours=2),
+        )
+        self.expired_assignment.created = now() - timedelta(days=100)
+        self.expired_assignment.save()
+
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
+    def test_clear_pii_for_expired_assignments_task(
+        self,
+        mock_subsidy_client,
+        mock_catalog_client,
+    ):
+        """
+        Test that the task clears PII for assignments expired due to 90-day timeout
+        after expiration email has been sent.
+        """
+        import re
+
+        from enterprise_access.apps.content_assignments.constants import RETIRED_EMAIL_ADDRESS_FORMAT
+        from enterprise_access.apps.content_assignments.tasks import clear_pii_for_expired_assignments
+
+        self.expired_assignment.add_successful_expiration_action()
+
+        subsidy_expiry = now() + timedelta(days=365)
+        enrollment_end = now() + timedelta(days=365)
+
+        mock_subsidy_client.retrieve_subsidy.return_value = {
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'expiration_datetime': subsidy_expiry.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            'is_active': True,
+        }
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
+            'count': 1,
+            'results': [{
+                'key': TEST_COURSE_KEY,
+                'normalized_metadata': {
+                    'start_date': '2020-01-01 12:00:00Z',
+                    'end_date': '2030-01-01 12:00:00Z',
+                    'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    'content_price': 100,
+                },
+            }],
+        }
+
+        result = clear_pii_for_expired_assignments(dry_run=False)
+
+        self.expired_assignment.refresh_from_db()
+        pattern = RETIRED_EMAIL_ADDRESS_FORMAT.format('[a-f0-9]{16}')
+        assert re.match(pattern, self.expired_assignment.learner_email) is not None
+        assert result['cleared_count'] == 1
+
+    @mock.patch('enterprise_access.apps.content_metadata.api.EnterpriseCatalogApiClient')
+    @mock.patch('enterprise_access.apps.subsidy_access_policy.models.SubsidyAccessPolicy.subsidy_client')
+    def test_clear_pii_skipped_without_expiration_email(
+        self,
+        mock_subsidy_client,
+        mock_catalog_client,
+    ):
+        """
+        Test that PII is NOT cleared if expiration email wasn't successfully sent.
+        """
+        from enterprise_access.apps.content_assignments.tasks import clear_pii_for_expired_assignments
+
+        # Note: NOT adding successful expiration action
+        original_email = self.expired_assignment.learner_email
+
+        subsidy_expiry = now() + timedelta(days=365)
+        enrollment_end = now() + timedelta(days=365)
+
+        mock_subsidy_client.retrieve_subsidy.return_value = {
+            'enterprise_customer_uuid': str(self.enterprise_uuid),
+            'expiration_datetime': subsidy_expiry.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            'is_active': True,
+        }
+        mock_catalog_client.return_value.catalog_content_metadata.return_value = {
+            'count': 1,
+            'results': [{
+                'key': TEST_COURSE_KEY,
+                'normalized_metadata': {
+                    'start_date': '2020-01-01 12:00:00Z',
+                    'end_date': '2030-01-01 12:00:00Z',
+                    'enroll_by_date': enrollment_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    'content_price': 100,
+                },
+            }],
+        }
+
+        result = clear_pii_for_expired_assignments(dry_run=False)
+
+        self.expired_assignment.refresh_from_db()
+        assert self.expired_assignment.learner_email == original_email
+        assert result['cleared_count'] == 0
