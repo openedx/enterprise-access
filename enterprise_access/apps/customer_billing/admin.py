@@ -337,7 +337,7 @@ class StripeEventSummaryAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
 
 
 @admin.register(SelfServiceSubscriptionRenewal)
-class SelfServiceSubscriptionRenewal(DjangoQLSearchMixin, admin.ModelAdmin):
+class SelfServiceSubscriptionRenewalAdmin(DjangoQLSearchMixin, admin.ModelAdmin):
     """
     Admin class for SelfServiceSubscriptionRenewal.
     """

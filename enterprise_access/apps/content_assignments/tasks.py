@@ -11,7 +11,6 @@ from django.conf import settings
 from enterprise_access.apps.api_client.braze_client import ENTERPRISE_BRAZE_ALIAS_LABEL, BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.content_assignments.content_metadata_api import (
-    format_datetime_obj,
     get_card_image_url,
     get_content_metadata_for_assignments,
     get_course_partners,
@@ -19,6 +18,7 @@ from enterprise_access.apps.content_assignments.content_metadata_api import (
 )
 from enterprise_access.tasks import LoggedTaskWithRetry
 from enterprise_access.utils import (
+    format_datetime_obj,
     get_automatic_expiration_date_and_reason,
     get_course_run_metadata_for_assignment,
     get_normalized_metadata_for_assignment,

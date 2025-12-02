@@ -1,7 +1,7 @@
 """
 Tests for customer_billing tasks.
 """
-
+from datetime import datetime
 from decimal import Decimal
 from unittest import mock
 
@@ -35,7 +35,8 @@ class TestSendTrialCancellationEmailTask(TestCase):
         self.checkout_intent.stripe_customer_id = "cus_test_123"
         self.checkout_intent.save()
 
-        self.trial_end_timestamp = 1609459200  # Jan 1, 2021
+        self.trial_end_datetime = datetime(2021, 1, 1)
+        self.trial_end_timestamp = int(self.trial_end_datetime.timestamp())
 
     @mock.patch(
         "enterprise_access.apps.customer_billing.tasks.BrazeApiClient"
@@ -128,15 +129,15 @@ class TestSendEnterpriseProvisionSignupConfirmationEmail(TestCase):
     def setUp(self):
         super().setUp()
         self.test_data = {
-            'subscription_start_date': '2025-01-01',
-            'subscription_end_date': '2026-01-01',
+            'subscription_start_date': datetime(2025, 1, 1),
+            'subscription_end_date': datetime(2026, 1, 1),
             'number_of_licenses': 100,
             'organization_name': 'Test Corp',
             'enterprise_slug': 'test-corp',
         }
         self.mock_subscription = {
-            'trial_start': '2025-01-01',
-            'trial_end': '2025-02-01',
+            'trial_start': int(datetime(2025, 1, 1).timestamp()),
+            'trial_end': int(datetime(2025, 2, 1).timestamp()),
             'plan': {
                 'amount': 10000  # $100.00 in cents
             }
@@ -152,13 +153,13 @@ class TestSendEnterpriseProvisionSignupConfirmationEmail(TestCase):
             }
         ]
         self.expected_braze_properties = {
-            'subscription_start_date': '2025-01-01',
-            'subscription_end_date': '2026-01-01',
+            'subscription_start_date': 'Jan 01, 2025',
+            'subscription_end_date': 'Jan 01, 2026',
             'number_of_licenses': 100,
             'organization': 'Test Corp',
             'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/test-corp',
-            'trial_start_date': '2025-01-01',
-            'trial_end_date': '2025-02-01',
+            'trial_start_date': 'Jan 01, 2025',
+            'trial_end_date': 'Feb 01, 2025',
             'plan_amount': Decimal('100'),
         }
 
@@ -439,7 +440,7 @@ class TestSendTrialEndingReminderEmailTask(TestCase):
         self.mock_subscription.__getitem__ = mock.Mock(return_value=mock.Mock(
             data=[
                 mock.Mock(
-                    current_period_end=1640995200,
+                    current_period_end=int(datetime(2022, 1, 1).timestamp()),
                     quantity=10,
                 )
             ]
@@ -502,7 +503,7 @@ class TestSendTrialEndingReminderEmailTask(TestCase):
 
         trigger_props = call_args[1]["trigger_properties"]
         self.assertIn("renewal_date", trigger_props)
-        self.assertEqual(trigger_props["renewal_date"], "January 01, 2022")
+        self.assertEqual(trigger_props["renewal_date"], "Jan 01, 2022")
         self.assertIn("subscription_management_url", trigger_props)
         self.assertEqual(trigger_props["license_count"], 10)
         self.assertEqual(trigger_props["payment_method"], "Visa ending in 4242")

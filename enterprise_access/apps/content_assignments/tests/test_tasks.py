@@ -22,7 +22,7 @@ from enterprise_access.apps.content_assignments.constants import (
     AssignmentActions,
     LearnerContentAssignmentStateChoices
 )
-from enterprise_access.apps.content_assignments.content_metadata_api import format_datetime_obj, get_human_readable_date
+from enterprise_access.apps.content_assignments.content_metadata_api import get_human_readable_date
 from enterprise_access.apps.content_assignments.tasks import (
     BrazeCampaignSender,
     create_pending_enterprise_learner_for_assignment_task,
@@ -40,7 +40,7 @@ from enterprise_access.apps.subsidy_access_policy.models import REQUEST_CACHE_NA
 from enterprise_access.apps.subsidy_access_policy.tests.factories import AssignedLearnerCreditAccessPolicyFactory
 from enterprise_access.apps.subsidy_request.tests.factories import LearnerCreditRequestFactory
 from enterprise_access.cache_utils import request_cache
-from enterprise_access.utils import get_automatic_expiration_date_and_reason
+from enterprise_access.utils import format_datetime_obj, get_automatic_expiration_date_and_reason
 from test_utils import APITestWithMocks
 
 TEST_COURSE_KEY = 'edX+DemoX'
