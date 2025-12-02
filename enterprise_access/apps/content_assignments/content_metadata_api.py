@@ -103,10 +103,6 @@ def parse_datetime_string(datetime_string, set_to_utc=False):
     return None
 
 
-def format_datetime_obj(datetime_obj, output_pattern=DEFAULT_STRFTIME_PATTERN):
-    return datetime_obj.strftime(output_pattern)
-
-
 def get_course_partners(course_metadata):
     """
     Returns a list of course partner data for subsidy requests given a course dictionary.

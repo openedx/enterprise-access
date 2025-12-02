@@ -12,13 +12,12 @@ from django.utils import timezone
 
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
-from enterprise_access.apps.content_assignments.content_metadata_api import format_datetime_obj
 from enterprise_access.apps.customer_billing.api import create_stripe_billing_portal_session
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventSummary
 from enterprise_access.apps.customer_billing.stripe_api import get_stripe_subscription, get_stripe_trialing_subscription
 from enterprise_access.apps.provisioning.utils import validate_trial_subscription
 from enterprise_access.tasks import LoggedTaskWithRetry
-from enterprise_access.utils import cents_to_dollars, format_cents_for_user_display
+from enterprise_access.utils import cents_to_dollars, format_cents_for_user_display, format_datetime_obj
 
 logger = logging.getLogger(__name__)
 
@@ -147,8 +146,8 @@ def send_payment_receipt_email(
 
 @shared_task(base=LoggedTaskWithRetry)
 def send_enterprise_provision_signup_confirmation_email(
-        subscription_start_date: str,
-        subscription_end_date: str,
+        subscription_start_date: datetime,
+        subscription_end_date: datetime,
         number_of_licenses: int,
         organization_name: str,
         enterprise_slug: str,
@@ -201,14 +200,17 @@ def send_enterprise_provision_signup_confirmation_email(
         )
         return
 
+    trial_start_date = timezone.make_aware(datetime.fromtimestamp(subscription['trial_start']))
+    trial_end_date = timezone.make_aware(datetime.fromtimestamp(subscription['trial_end']))
+
     braze_trigger_properties = {
-        'subscription_start_date': subscription_start_date,
-        'subscription_end_date': subscription_end_date,
+        'subscription_start_date': format_datetime_obj(subscription_start_date),
+        'subscription_end_date': format_datetime_obj(subscription_end_date),
         'number_of_licenses': number_of_licenses,
         'organization': organization_name,
         'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}',
-        'trial_start_date': subscription['trial_start'],
-        'trial_end_date': subscription['trial_end'],
+        'trial_start_date': format_datetime_obj(trial_start_date),
+        'trial_end_date': format_datetime_obj(trial_end_date),
         'plan_amount': cents_to_dollars(subscription['plan']['amount']),
     }
 
@@ -356,9 +358,7 @@ def send_trial_cancellation_email_task(
         return
 
     # Format trial end date for email template
-    trial_end_date = datetime.fromtimestamp(trial_end_timestamp).strftime(
-        "%B %d, %Y"
-    )
+    trial_end_date = format_datetime_obj(timezone.make_aware(datetime.fromtimestamp(trial_end_timestamp)))
 
     # Generate Stripe billing portal URL for restarting subscription
     restart_url = _get_billing_portal_url(checkout_intent)
@@ -502,9 +502,9 @@ def send_trial_ending_reminder_email_task(checkout_intent_id):  # pylint: disabl
             return
 
         first_item = subscription["items"].data[0]
-        renewal_date = timezone.make_aware(
-            datetime.fromtimestamp(first_item.current_period_end)
-        ).strftime("%B %d, %Y")
+        renewal_date = format_datetime_obj(
+            timezone.make_aware(datetime.fromtimestamp(first_item.current_period_end))
+        )
         license_count = first_item.quantity
 
         # Get payment method details with card brand
@@ -611,7 +611,7 @@ def send_trial_ending_reminder_email_task(checkout_intent_id):  # pylint: disabl
 def send_trial_end_and_subscription_started_email_task(
     subscription_id: str,
     checkout_intent_id: int,
-):
+):  # pylint: disable=too-many-statements
     """
     Send an email to all enterprise admins notifying about trial end and subscription start.
 
@@ -639,8 +639,8 @@ def send_trial_end_and_subscription_started_email_task(
     subscription_period = None
     next_payment_date = None
     if period_start and period_end:
-        start_str = format_datetime_obj(datetime.utcfromtimestamp(period_start), '%d %B %Y')
-        end_str = format_datetime_obj(datetime.utcfromtimestamp(period_end), '%d %B %Y')
+        start_str = format_datetime_obj(datetime.utcfromtimestamp(period_start))
+        end_str = format_datetime_obj(datetime.utcfromtimestamp(period_end))
         subscription_period = f"{start_str} – {end_str}"
         next_payment_date = end_str
 
@@ -660,7 +660,7 @@ def send_trial_end_and_subscription_started_email_task(
             enterprise_data = lms_client.get_enterprise_customer_data(enterprise_customer_slug=enterprise_slug)
             admin_users = enterprise_data.get('admin_users', [])
             admin_emails = [admin['email'] for admin in admin_users if 'email' in admin]
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.error(
                 "Failed to fetch admin users for enterprise slug %s: %s. No emails will be sent.",
                 enterprise_slug, str(exc)
@@ -678,7 +678,7 @@ def send_trial_end_and_subscription_started_email_task(
         try:
             recipient = braze_client.create_braze_recipient(user_email=admin_email)
             recipients.append(recipient)
-        except Exception as exc:
+        except Exception as exc:  # pylint: disable=broad-exception-caught
             logger.warning(
                 'Failed to create Braze recipient for admin email %s: %s',
                 admin_email, str(exc)
