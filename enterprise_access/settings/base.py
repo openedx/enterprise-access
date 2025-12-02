@@ -671,10 +671,10 @@ ENABLE_STRIPE_EVENT_SUMMARIES = False
 
 # List of 2-letter ISO country codes that are embargoed
 # Can be overridden via EMBARGOED_COUNTRY_CODES environment variable
-# Expected format: comma-separated string like "RU,IR,KP,SY,CU"
+# Expected format: comma-separated string like "RU,IR,KP,SY,CU,BY"
 EMBARGOED_COUNTRY_CODES = os.environ.get(
     'EMBARGOED_COUNTRY_CODES',
-    'RU,IR,KP,SY,CU'
+    'RU,IR,KP,SY,CU,BY'
 ).split(',')
 
 ################# End Embargo Settings #################
