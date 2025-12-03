@@ -490,7 +490,7 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
         """
         user = self.request.user
         base_queryset = CheckoutIntent.objects.filter(user=user)
-        if user.has_perm(CHECKOUT_INTENT_READ_WRITE_ALL_PERMISSION, ALL_ACCESS_CONTEXT):
+        if user.is_staff:
             base_queryset = CheckoutIntent.objects.all()
         return base_queryset.select_related('user')
 
