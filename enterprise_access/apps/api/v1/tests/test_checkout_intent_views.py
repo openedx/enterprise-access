@@ -680,13 +680,15 @@ class CheckoutIntentViewSetTestCase(APITest):
         self.checkout_intent_1.refresh_from_db()
         self.assertEqual(self.checkout_intent_1.country, 'DE')
 
-    def test_list_with_read_write_all_permission_returns_all_records(self):
-        """Test that users with CHECKOUT_INTENT_READ_WRITE_ALL permission can see all checkout intents."""
-        # Set JWT with customer billing operator role to get the read/write all permission
+    def test_list_with_staff_permission_returns_all_records(self):
+        """Test that users with `is_staff=True` can see all checkout intents."""
+        staff_user = self.create_user(
+            username='a-staff-user', password='password', is_staff=True,
+        )
         self.set_jwt_cookie([{
-            'system_wide_role': SYSTEM_ENTERPRISE_PROVISIONING_ADMIN_ROLE,
-            'context': ALL_ACCESS_CONTEXT,
-        }])
+            'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
+            'context': str(uuid.uuid4()),
+        }], user=staff_user)
 
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -702,28 +704,15 @@ class CheckoutIntentViewSetTestCase(APITest):
         self.assertEqual(len(ids), 4)
         self.assertEqual(set(ids), set(expected_ids))
 
-    def test_list_without_permission_returns_only_user_records(self):
-        """Test that users without special permissions only see their own checkout intents."""
-        # This test duplicates test_list_only_returns_users_own_records but is included
-        # for completeness to contrast with the permission-based test above
+    def test_retrieve_other_users_record_with_staff_permission(self):
+        """Test that users with staff permission can retrieve other users' records."""
+        staff_user = self.create_user(
+            username='a-staff-user', password='password', is_staff=True,
+        )
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
             'context': str(uuid.uuid4()),
-        }])
-
-        response = self.client.get(self.list_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        ids = [item['id'] for item in response.data['results']]
-        self.assertEqual([self.checkout_intent_1.id], ids)
-
-    def test_retrieve_other_users_record_with_read_write_all_permission(self):
-        """Test that users with CHECKOUT_INTENT_READ_WRITE_ALL permission can retrieve other users' records."""
-        # Set JWT with customer billing operator role to get the read/write all permission
-        self.set_jwt_cookie([{
-            'system_wide_role': SYSTEM_ENTERPRISE_OPERATOR_ROLE,
-            'context': ALL_ACCESS_CONTEXT,
-        }])
+        }], user=staff_user)
 
         # Try to access user_3's checkout intent (should succeed with permission)
         response = self.client.get(self.detail_url_3)
