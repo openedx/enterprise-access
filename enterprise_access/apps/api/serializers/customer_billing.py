@@ -140,6 +140,7 @@ class CheckoutIntentReadOnlySerializer(CountryFieldMixin, serializers.ModelSeria
     """
     Serializer for reading and updating CheckoutIntent model instances.
     """
+    workflow = serializers.UUIDField(source='workflow.uuid', read_only=True, allow_null=True)
 
     class Meta:
         model = CheckoutIntent

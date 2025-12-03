@@ -129,7 +129,7 @@ class TestCheckoutIntentSignals(TestCase):
         properties = call_args.kwargs['properties']
         self.assertEqual(properties['previous_state'], CheckoutIntentState.PAID)
         self.assertEqual(properties['new_state'], CheckoutIntentState.FULFILLED)
-        self.assertEqual(properties['workflow'], workflow.uuid)
+        self.assertEqual(properties['workflow'], str(workflow.uuid))
 
     @mock.patch('enterprise_access.apps.customer_billing.signals.track_event')
     def test_transition_to_errored_backoffice_event(self, mock_track_event):
@@ -205,7 +205,7 @@ class TestCheckoutIntentSignals(TestCase):
         self.assertEqual(properties['previous_state'], CheckoutIntentState.PAID)
         self.assertEqual(properties['new_state'], CheckoutIntentState.ERRORED_PROVISIONING)
         self.assertEqual(properties['last_provisioning_error'], error_message)
-        self.assertEqual(properties['workflow'], workflow.uuid)
+        self.assertEqual(properties['workflow'], str(workflow.uuid))
 
     @mock.patch('enterprise_access.apps.customer_billing.signals.track_event')
     def test_no_event_on_same_state_transition(self, mock_track_event):
