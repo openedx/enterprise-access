@@ -2,7 +2,6 @@
 Tests for customer_billing tasks.
 """
 from datetime import datetime
-from decimal import Decimal
 from unittest import mock
 
 import stripe
@@ -160,7 +159,7 @@ class TestSendEnterpriseProvisionSignupConfirmationEmail(TestCase):
             'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/test-corp',
             'trial_start_date': 'Jan 01, 2025',
             'trial_end_date': 'Feb 01, 2025',
-            'plan_amount': Decimal('100'),
+            'plan_amount': 100.00,
         }
 
     @mock.patch('enterprise_access.apps.customer_billing.tasks.validate_trial_subscription')
@@ -347,11 +346,11 @@ class TestSendPaymentReceiptEmail(TestCase):
 
         # Verify the campaign was sent with correct properties
         expected_properties = {
-            'total_paid_amount': Decimal('1980.00'),  # $396.00 * 5 licenses = $1,980.00
+            'total_paid_amount': 1980.0,  # $396.00 * 5 licenses = $1,980.00
             'date_paid': '03 November 2025',  # Based on mock timestamp
             'payment_method': 'visa - 4242',
             'license_count': 5,
-            'price_per_license': Decimal('396.00'),
+            'price_per_license': 396.0,
             'customer_name': 'Test User',
             'organization': 'Test Enterprise',
             'billing_address': '123 Test St\nSuite 100\nTest City, TS 12345\nUS',
@@ -795,7 +794,7 @@ class TestSendTrialEndAndSubscriptionStartedEmailTask(TestCase):
         assert len(kwargs['recipients']) == 2
         props = kwargs['trigger_properties']
         assert props['total_license'] == 5
-        assert props['billing_amount'] == str(Decimal('100'))
+        assert props['billing_amount'] == '100'
         assert 'subscription_period' in props
         assert 'next_payment_date' in props
         assert props['organization'] == 'Test Org'
