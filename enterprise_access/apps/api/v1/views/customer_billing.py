@@ -10,6 +10,7 @@ from django.http import HttpResponseServerError
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, OpenApiTypes, extend_schema, extend_schema_view
 from edx_rbac.decorators import permission_required
+from edx_rbac.mixins import PermissionRequiredForListingMixin
 from edx_rest_framework_extensions.auth.jwt.authentication import JwtAuthentication
 from rest_framework import exceptions, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
@@ -21,8 +22,10 @@ from enterprise_access.apps.core.constants import (
     ALL_ACCESS_CONTEXT,
     CHECKOUT_INTENT_READ_WRITE_ALL_PERMISSION,
     CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,
-    STRIPE_EVENT_SUMMARY_READ_PERMISSION
+    STRIPE_EVENT_SUMMARY_READ_PERMISSION,
+    CUSTOMER_BILLING_OPERATOR_ROLE,
 )
+from enterprise_access.apps.core.models import EnterpriseAccessRoleAssignment
 from enterprise_access.apps.customer_billing.api import (
     CreateCheckoutSessionFailedConflict,
     CreateCheckoutSessionSlugReservationConflict,
@@ -456,7 +459,7 @@ class CustomerBillingViewSet(viewsets.ViewSet):
         operation_id='update_checkout_intent',
     ),
 )
-class CheckoutIntentViewSet(viewsets.ModelViewSet):
+class CheckoutIntentViewSet(PermissionRequiredForListingMixin, viewsets.ModelViewSet):
     """
     ViewSet for CheckoutIntent model.
 
@@ -468,6 +471,13 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
     authentication_classes = (JwtAuthentication,)
     permission_classes = (permissions.IsAuthenticated,)
     lookup_field = 'id'
+
+    permission_required = CHECKOUT_INTENT_READ_WRITE_ALL_PERMISSION
+
+    base_queryset = CheckoutIntent.objects.all()
+    list_lookup_field = 'enterprise_uuid'
+    allowed_roles = [CUSTOMER_BILLING_OPERATOR_ROLE]
+    role_assignment_class = EnterpriseAccessRoleAssignment
 
     # Only allow GET and PATCH operations
     http_method_names = ['get', 'patch', 'post', 'head', 'options']
@@ -482,17 +492,13 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
             return serializers.CheckoutIntentCreateRequestSerializer
         return serializers.CheckoutIntentReadOnlySerializer
 
-    def get_queryset(self):
+    def get_permission_object(self):
         """
-        Filter queryset to only include CheckoutIntent records
-        belonging to the authenticated user, unless the requesting user
-        has permission to read and write *all* CheckoutIntent records.
+        For any of the http methods that retrieve a specific record,
+        return the corresponding enterprise customer uuid, which will be used
+        in the edx-rbac rules predicate checks.
         """
-        user = self.request.user
-        base_queryset = CheckoutIntent.objects.filter(user=user)
-        if user.has_perm(CHECKOUT_INTENT_READ_WRITE_ALL_PERMISSION, ALL_ACCESS_CONTEXT):
-            base_queryset = CheckoutIntent.objects.all()
-        return base_queryset.select_related('user')
+        return self.get_object().enterprise_uuid
 
     def get_object(self):
         """
@@ -501,6 +507,9 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
         Attempts to parse the lookup value as UUID first, then falls back to integer id.
         This allows clients to use either field for retrieving CheckoutIntent objects.
         """
+        if self.action in ['create', 'list']:
+            return super.get_object()
+
         queryset = self.filter_queryset(self.get_queryset())
         lookup_value = self.kwargs[self.lookup_url_kwarg or self.lookup_field]
 
@@ -521,7 +530,6 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
         except CheckoutIntent.DoesNotExist as exc:
             raise exceptions.NotFound('CheckoutIntent not found') from exc
 
-        self.check_object_permissions(self.request, obj)
         return obj
 
 
