@@ -86,12 +86,14 @@ def send_payment_receipt_email(
         address.get('country', '')
     ]))
 
+    # All trigger properties values must be JSON-serializable to eventuallly
+    # send in the request payload to Braze.
     braze_trigger_properties = {
-        'total_paid_amount': cents_to_dollars(total_amount),
+        'total_paid_amount': float(cents_to_dollars(total_amount)),
         'date_paid': formatted_date,
         'payment_method': payment_method_display,
         'license_count': quantity,
-        'price_per_license': cents_to_dollars(price_per_license),
+        'price_per_license': float(cents_to_dollars(price_per_license)),
         'customer_name': billing_details.get('name', ''),
         'organization': enterprise_customer_name,
         'billing_address': billing_address,
@@ -203,6 +205,8 @@ def send_enterprise_provision_signup_confirmation_email(
     trial_start_date = timezone.make_aware(datetime.fromtimestamp(subscription['trial_start']))
     trial_end_date = timezone.make_aware(datetime.fromtimestamp(subscription['trial_end']))
 
+    # All trigger properties values must be JSON-serializable to eventuallly
+    # send in the request payload to Braze.
     braze_trigger_properties = {
         'subscription_start_date': format_datetime_obj(subscription_start_date),
         'subscription_end_date': format_datetime_obj(subscription_end_date),
@@ -211,7 +215,7 @@ def send_enterprise_provision_signup_confirmation_email(
         'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}',
         'trial_start_date': format_datetime_obj(trial_start_date),
         'trial_end_date': format_datetime_obj(trial_end_date),
-        'plan_amount': cents_to_dollars(subscription['plan']['amount']),
+        'plan_amount': float(cents_to_dollars(subscription['plan']['amount'])),
     }
 
     recipients = []
@@ -502,7 +506,7 @@ def send_trial_ending_reminder_email_task(checkout_intent_id):  # pylint: disabl
             return
 
         first_item = subscription["items"].data[0]
-        renewal_date = format_datetime_obj(
+        renewal_date_formatted = format_datetime_obj(
             timezone.make_aware(datetime.fromtimestamp(first_item.current_period_end))
         )
         license_count = first_item.quantity
@@ -520,14 +524,14 @@ def send_trial_ending_reminder_email_task(checkout_intent_id):  # pylint: disabl
                 last4 = payment_method.card.last4
                 payment_method_info = f"{brand} ending in {last4}"
 
-        total_paid_amount = "$0.00 USD"
+        total_paid_amount_formatted = "$0.00 USD"
         if subscription.latest_invoice:
             invoice_summary = StripeEventSummary.get_latest_invoice_paid(
                 subscription.latest_invoice
             )
 
             if invoice_summary and invoice_summary.invoice_amount_paid is not None:
-                total_paid_amount = format_cents_for_user_display(
+                total_paid_amount_formatted = format_cents_for_user_display(
                     invoice_summary.invoice_amount_paid
                 )
             else:
@@ -554,11 +558,11 @@ def send_trial_ending_reminder_email_task(checkout_intent_id):  # pylint: disabl
     subscription_management_url = _get_billing_portal_url(checkout_intent)
 
     braze_trigger_properties = {
-        "renewal_date": renewal_date,
+        "renewal_date": renewal_date_formatted,
         "subscription_management_url": subscription_management_url,
         "license_count": license_count,
         "payment_method": payment_method_info,
-        "total_paid_amount": total_paid_amount,
+        "total_paid_amount": total_paid_amount_formatted,
     }
 
     # Create Braze recipients for all admin users
