@@ -160,6 +160,7 @@ class TestSendEnterpriseProvisionSignupConfirmationEmail(TestCase):
             'trial_start_date': 'Jan 01, 2025',
             'trial_end_date': 'Feb 01, 2025',
             'plan_amount': 100.00,
+            'total_amount': 100.00 * 100,
         }
 
     @mock.patch('enterprise_access.apps.customer_billing.tasks.validate_trial_subscription')

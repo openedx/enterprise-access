@@ -205,6 +205,8 @@ def send_enterprise_provision_signup_confirmation_email(
     trial_start_date = timezone.make_aware(datetime.fromtimestamp(subscription['trial_start']))
     trial_end_date = timezone.make_aware(datetime.fromtimestamp(subscription['trial_end']))
 
+    total_cost_cents = subscription['plan']['amount'] * number_of_licenses
+
     # All trigger properties values must be JSON-serializable to eventuallly
     # send in the request payload to Braze.
     braze_trigger_properties = {
@@ -215,7 +217,8 @@ def send_enterprise_provision_signup_confirmation_email(
         'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}',
         'trial_start_date': format_datetime_obj(trial_start_date),
         'trial_end_date': format_datetime_obj(trial_end_date),
-        'plan_amount': float(cents_to_dollars(subscription['plan']['amount'])),
+        'plan_amount': float(cents_to_dollars(subscription['plan']['amount'])),  # the per-unit cost
+        'total_amount': float(cents_to_dollars(total_cost_cents)),
     }
 
     recipients = []
