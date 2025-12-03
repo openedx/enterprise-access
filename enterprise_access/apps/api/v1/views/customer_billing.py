@@ -369,9 +369,10 @@ class CustomerBillingViewSet(viewsets.ViewSet):
     list=extend_schema(
         summary='List CheckoutIntents',
         description=(
-            'Retrieve a list of CheckoutIntent records for the authenticated user.\n'
+            'Retrieve a list of CheckoutIntent records for the authenticated user. '
             'This endpoint returns only the CheckoutIntent records that belong to the '
-            'currently authenticated user.'
+            'currently authenticated user, unless the user is staff, in which case '
+            '**all** records are returned.'
         ),
         responses={
             200: OpenApiResponse(
@@ -387,14 +388,13 @@ class CustomerBillingViewSet(viewsets.ViewSet):
     retrieve=extend_schema(
         summary='Retrieve CheckoutIntent',
         description=(
-            'Retrieve a specific CheckoutIntent by either ID or UUID.\n'
+            'Retrieve a specific CheckoutIntent by either ID or UUID. '
             'This endpoint is designed to support polling from the frontend to check '
-            'the fulfillment state after a successful Stripe checkout.\n'
-            'Users can only retrieve their own CheckoutIntent records.\n'
-            '\n'
+            'the fulfillment state after a successful Stripe checkout. '
+            'Users can only retrieve their own CheckoutIntent records. '
             'Supports lookup by either:\n'
-            '- Integer ID (e.g., `/checkout-intents/123/`)\n'
-            '- UUID (e.g., `/checkout-intents/550e8400-e29b-41d4-a716-446655440000/`)\n'
+            '- Integer ID (e.g., `/api/v1/checkout-intents/123/`)\n'
+            '- UUID (e.g., `/api/v1/checkout-intents/550e8400-e29b-41d4-a716-446655440000/`)\n'
         ),
         responses={
             200: OpenApiResponse(
@@ -410,11 +410,10 @@ class CustomerBillingViewSet(viewsets.ViewSet):
     partial_update=extend_schema(
         summary='Update CheckoutIntent State',
         description=(
-            'Update the state of a CheckoutIntent.\n'
+            'Update the state of a CheckoutIntent. '
             'This endpoint is used to transition the CheckoutIntent through its lifecycle states. '
-            'Only valid state transitions are allowed.\n'
-            'Users can only update their own CheckoutIntent records.\n'
-            '\n'
+            'Only valid state transitions are allowed. '
+            'Users can only update their own CheckoutIntent records. '
             'Supports lookup by either:\n'
             '- Integer ID (e.g., `/checkout-intents/123/`)\n'
             '- UUID (e.g., `/checkout-intents/550e8400-e29b-41d4-a716-446655440000/`)\n'
@@ -430,7 +429,7 @@ class CustomerBillingViewSet(viewsets.ViewSet):
             '```\n'
             '## Integration Points\n'
             '- **Stripe Webhook**: Transitions from `created` to `paid` after successful payment\n'
-            '- **Fulfillment Service**: Transitions from `paid` to `fulfilled` after provisioning\n'
+            '- **Fulfillment**: Transitions from `paid` to `fulfilled` after provisioning\n'
             '- **Error Recovery**: Allows retry from error states back to `paid`\n\n'
         ),
         parameters=[
@@ -461,7 +460,13 @@ class CheckoutIntentViewSet(viewsets.ModelViewSet):
     ViewSet for CheckoutIntent model.
 
     Provides list, retrieve, and partial_update actions for CheckoutIntent records.
-    Users can only access their own CheckoutIntent records.
+    Users can only access their own CheckoutIntent records, unless the user is staff,
+    in which case all records can be accessed.
+
+    This ViewSet intentionally does not utilize edx-rbac for permission checking,
+    because most use cases involve requesting users who are not yet expected
+    to have been granted any enterprise roles. Instead, we manage authorization
+    via the ``get_queryset()`` method.
 
     Supports lookup by either 'id' (integer) or 'uuid' (UUID).
     """
