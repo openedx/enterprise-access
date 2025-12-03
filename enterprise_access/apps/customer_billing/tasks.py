@@ -608,7 +608,7 @@ def send_trial_ending_reminder_email_task(checkout_intent_id):  # pylint: disabl
 
 
 @shared_task(base=LoggedTaskWithRetry)
-def send_trial_end_and_subscription_started_email_task(
+def send_trial_end_and_subscription_started_email_task(  # pylint: disable=too-many-statements
     subscription_id: str,
     checkout_intent_id: int,
 ):  # pylint: disable=too-many-statements

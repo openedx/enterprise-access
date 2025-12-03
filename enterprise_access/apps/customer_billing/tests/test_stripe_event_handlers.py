@@ -388,7 +388,6 @@ class TestStripeEventHandler(TestCase):
 
     @mock.patch('enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient')
     def test_subscription_updated_trial_to_active_no_renewal_record(self, mock_license_manager_client):
-        """Test trial -> active transition gracefully handles missing renewal record."""
         # Create previous summary with trial status but NO renewal record
         StripeEventSummaryFactory(
             checkout_intent=self.checkout_intent,
@@ -621,6 +620,7 @@ class TestStripeEventHandler(TestCase):
 
     @mock.patch('stripe.Subscription.modify')
     def test_subscription_created_handler_checkout_intent_not_found(self, mock_stripe_modify):
+        """Test trial -> active transition gracefully handles missing renewal record."""
         """Test customer.subscription.created when CheckoutIntent is not found."""
         subscription_data = {
             'id': 'sub_test_not_found_123',

@@ -370,6 +370,60 @@ class TestCheckoutContextHandler(APITest):
         error_messages = [error.get('developer_message', '') for error in context.errors]
         self.assertTrue(any('database error' in msg.lower() for msg in error_messages))
 
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutIntentModelSerializer')
+    @mock.patch('enterprise_access.apps.customer_billing.models.CheckoutIntent.for_user')
+    def test_get_checkout_intent_includes_client_secret(
+        self,
+        mock_for_user,
+        mock_serializer,
+        mock_get_session,
+    ):
+        """_get_checkout_intent should include the latest Stripe client secret when a session exists."""
+        mock_for_user.return_value = mock.MagicMock()
+        serializer_instance = mock.MagicMock()
+        serializer_instance.data = {
+            'id': 99,
+            'stripe_checkout_session_id': 'cs_test_123',
+        }
+        mock_serializer.return_value = serializer_instance
+        mock_get_session.return_value = {'client_secret': 'cs_test_123_secret_abc'}
+
+        context = self._create_context()
+        handler = CheckoutContextHandler(context)
+
+        checkout_intent = handler._get_checkout_intent()
+
+        self.assertEqual(checkout_intent['checkout_session_client_secret'], 'cs_test_123_secret_abc')
+        mock_get_session.assert_called_once_with('cs_test_123')
+
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.get_stripe_checkout_session')
+    @mock.patch('enterprise_access.apps.bffs.checkout.handlers.CheckoutIntentModelSerializer')
+    @mock.patch('enterprise_access.apps.customer_billing.models.CheckoutIntent.for_user')
+    def test_get_checkout_intent_handles_stripe_errors(
+        self,
+        mock_for_user,
+        mock_serializer,
+        mock_get_session,
+    ):
+        """Stripe errors while fetching the client secret should not break checkout intent loading."""
+        mock_for_user.return_value = mock.MagicMock()
+        serializer_instance = mock.MagicMock()
+        serializer_instance.data = {
+            'id': 101,
+            'stripe_checkout_session_id': 'cs_test_error',
+        }
+        mock_serializer.return_value = serializer_instance
+        mock_get_session.side_effect = stripe.StripeError("boom")
+
+        context = self._create_context()
+        handler = CheckoutContextHandler(context)
+
+        checkout_intent = handler._get_checkout_intent()
+
+        self.assertNotIn('checkout_session_client_secret', checkout_intent)
+        mock_get_session.assert_called_once_with('cs_test_error')
+
 
 class TestCheckoutValidationHandler(APITest):
     """
