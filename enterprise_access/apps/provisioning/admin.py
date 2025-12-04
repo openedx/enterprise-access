@@ -167,6 +167,7 @@ class ProvisionWorkflowStepAdminBase(admin.ModelAdmin):
         'modified',
         'workflow_record_link',
     )
+    actions = ['process_input']
 
     @admin.display(
         description='Workflow Record'
@@ -182,6 +183,14 @@ class ProvisionWorkflowStepAdminBase(admin.ModelAdmin):
             reverse("admin:provisioning_provisionnewcustomerworkflow_change", args=(workflow_record.pk,)),
             workflow_record.pk,
         ))
+
+    @admin.action(description='Re-process the input for this step')
+    def process_input(self, request, queryset):
+        """Re-process the input for this step"""
+        for obj in queryset:
+            workflow = obj.get_workflow_record()
+            if workflow:
+                obj.process_input(accumulated_output=workflow.output_object)
 
 
 @admin.register(models.GetCreateCustomerStep)
@@ -291,6 +300,13 @@ class GetCreateTrialSubscriptionPlanStepAdmin(DjangoQLSearchMixin, ProvisionWork
 class GetCreateSubscriptionPlanRenewalStepAdmin(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
     """
     Admin model for the subscription plan renewal creation step.
+    """
+
+
+@admin.register(models.NotificationStep)
+class NotificationStepAdmin(DjangoQLSearchMixin, ProvisionWorkflowStepAdminBase):
+    """
+    Admin model for the notification step.
     """
 
 
