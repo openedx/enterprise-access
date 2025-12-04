@@ -226,7 +226,7 @@ class LicenseManagerApiClient(BaseOAuthClient):
         Raises:
             APIClientException: If the API call fails
         """
-        endpoint = f"{self.api_base_url}subscription-plans/{subscription_uuid}/"
+        endpoint = f"{self.subscriptions_endpoint}{subscription_uuid}/"
         payload = {
             'salesforce_opportunity_line_item': salesforce_opportunity_line_item
         }
