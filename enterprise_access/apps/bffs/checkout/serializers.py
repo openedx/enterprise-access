@@ -134,6 +134,11 @@ class CheckoutIntentMinimalResponseSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
     )
+    checkout_session_client_secret = serializers.CharField(
+        help_text='The stripe checkout session client secret for this intent',
+        required=False,
+        allow_null=True,
+    )
     stripe_customer_id = serializers.CharField(
         help_text='The stripe checkout id for this intent',
         required=False,
@@ -254,7 +259,7 @@ class FirstBillableInvoiceSerializer(serializers.Serializer):
     """Serializer for first billable invoice information."""
     start_time = serializers.DateTimeField(allow_null=True)
     end_time = serializers.DateTimeField(allow_null=True)
-    last4 = serializers.IntegerField(allow_null=True)
+    last4 = serializers.CharField(allow_null=True, allow_blank=True, max_length=4)
     card_brand = serializers.CharField(allow_null=True, allow_blank=True)
     quantity = serializers.IntegerField(allow_null=True)
     unit_amount_decimal = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)

@@ -26,7 +26,6 @@ from enterprise_access.apps.customer_billing.embargo import get_embargoed_countr
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
 from enterprise_access.apps.customer_billing.pricing_api import get_ssp_product_pricing
 from enterprise_access.apps.customer_billing.stripe_api import (
-    get_stripe_checkout_session,
     get_stripe_customer,
     get_stripe_invoice,
     get_stripe_payment_intent,
@@ -36,6 +35,11 @@ from enterprise_access.apps.customer_billing.stripe_api import (
 from enterprise_access.utils import cents_to_dollars
 
 logger = logging.getLogger(__name__)
+
+
+def get_stripe_checkout_session(session_id):
+    """Fetch Stripe checkout session without using the cached helper."""
+    return stripe.checkout.Session.retrieve(session_id)
 
 
 class CheckoutIntentAwareHandlerMixin:
@@ -50,6 +54,16 @@ class CheckoutIntentAwareHandlerMixin:
         checkout_intent_data = None
         if checkout_intent_instance:
             checkout_intent_data = CheckoutIntentModelSerializer(checkout_intent_instance).data
+            session_id = checkout_intent_data.get('stripe_checkout_session_id')
+            if session_id:
+                try:
+                    session = get_stripe_checkout_session(session_id)
+                    checkout_intent_data['checkout_session_client_secret'] = session.get('client_secret')
+                except stripe.StripeError:
+                    logger.exception(
+                        "Error retrieving Stripe checkout session client secret for intent %s",
+                        checkout_intent_data.get('id'),
+                    )
         return checkout_intent_data
 
 
