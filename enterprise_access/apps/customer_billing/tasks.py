@@ -13,6 +13,7 @@ from django.utils import timezone
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
 from enterprise_access.apps.customer_billing.api import create_stripe_billing_portal_session
+from enterprise_access.apps.customer_billing.constants import BRAZE_TIMESTAMP_FORMAT
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventSummary
 from enterprise_access.apps.customer_billing.stripe_api import get_stripe_subscription, get_stripe_trialing_subscription
 from enterprise_access.apps.provisioning.utils import validate_trial_subscription
@@ -278,8 +279,8 @@ def send_enterprise_provision_signup_confirmation_email(
         'number_of_licenses': number_of_licenses,
         'organization': organization_name,
         'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}',
-        'trial_start_date': format_datetime_obj(trial_start_date),
-        'trial_end_date': format_datetime_obj(trial_end_date),
+        'trial_start_datetime': format_datetime_obj(trial_start_date, output_pattern=BRAZE_TIMESTAMP_FORMAT),
+        'trial_end_datetime': format_datetime_obj(trial_end_date, output_pattern=BRAZE_TIMESTAMP_FORMAT),
         'plan_amount': float(cents_to_dollars(subscription['plan']['amount'])),  # the per-unit cost
         'total_amount': float(cents_to_dollars(total_cost_cents)),
     }
@@ -542,7 +543,8 @@ def send_trial_ending_reminder_email_task(checkout_intent_id):  # pylint: disabl
 
         first_item = subscription["items"].data[0]
         renewal_date_formatted = format_datetime_obj(
-            timezone.make_aware(datetime.fromtimestamp(first_item.current_period_end))
+            timezone.make_aware(datetime.fromtimestamp(first_item.current_period_end)),
+            output_pattern=BRAZE_TIMESTAMP_FORMAT,
         )
         license_count = first_item.quantity
 
@@ -593,7 +595,7 @@ def send_trial_ending_reminder_email_task(checkout_intent_id):  # pylint: disabl
     subscription_management_url = _get_billing_portal_url(checkout_intent)
 
     braze_trigger_properties = {
-        "renewal_date": renewal_date_formatted,
+        "renewal_datetime": renewal_date_formatted,
         "subscription_management_url": subscription_management_url,
         "license_count": license_count,
         "payment_method": payment_method_info,

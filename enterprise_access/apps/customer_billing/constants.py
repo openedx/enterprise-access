@@ -108,3 +108,5 @@ ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS = {
     ],
     CheckoutIntentState.FULFILLED: [],
 }
+
+BRAZE_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
