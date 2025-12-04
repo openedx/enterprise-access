@@ -7,8 +7,10 @@ from unittest import mock
 import stripe
 from django.conf import settings
 from django.test import TestCase
+from django.utils import timezone
 
 from enterprise_access.apps.core.tests.factories import UserFactory
+from enterprise_access.apps.customer_billing.constants import BRAZE_TIMESTAMP_FORMAT
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData, StripeEventSummary
 from enterprise_access.apps.customer_billing.tasks import (
     send_enterprise_provision_signup_confirmation_email,
@@ -17,6 +19,7 @@ from enterprise_access.apps.customer_billing.tasks import (
     send_trial_end_and_subscription_started_email_task,
     send_trial_ending_reminder_email_task
 )
+from enterprise_access.utils import format_datetime_obj
 
 
 class TestSendTrialCancellationEmailTask(TestCase):
@@ -127,16 +130,18 @@ class TestSendEnterpriseProvisionSignupConfirmationEmail(TestCase):
     """
     def setUp(self):
         super().setUp()
+        self.trial_start = timezone.make_aware(datetime(2025, 1, 1))
+        self.trial_end = timezone.make_aware(datetime(2026, 1, 1))
         self.test_data = {
-            'subscription_start_date': datetime(2025, 1, 1),
-            'subscription_end_date': datetime(2026, 1, 1),
+            'subscription_start_date': self.trial_start,
+            'subscription_end_date': self.trial_end,
             'number_of_licenses': 100,
             'organization_name': 'Test Corp',
             'enterprise_slug': 'test-corp',
         }
         self.mock_subscription = {
-            'trial_start': int(datetime(2025, 1, 1).timestamp()),
-            'trial_end': int(datetime(2025, 2, 1).timestamp()),
+            'trial_start': int(self.trial_start.timestamp()),
+            'trial_end': int(self.trial_end.timestamp()),
             'plan': {
                 'amount': 10000  # $100.00 in cents
             }
@@ -157,8 +162,8 @@ class TestSendEnterpriseProvisionSignupConfirmationEmail(TestCase):
             'number_of_licenses': 100,
             'organization': 'Test Corp',
             'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/test-corp',
-            'trial_start_date': 'Jan 01, 2025',
-            'trial_end_date': 'Feb 01, 2025',
+            'trial_start_datetime': format_datetime_obj(self.trial_start, output_pattern=BRAZE_TIMESTAMP_FORMAT),
+            'trial_end_datetime': format_datetime_obj(self.trial_end, output_pattern=BRAZE_TIMESTAMP_FORMAT),
             'plan_amount': 100.00,
             'total_amount': 100.00 * 100,
         }
@@ -505,8 +510,11 @@ class TestSendTrialEndingReminderEmailTask(TestCase):
         self.assertEqual(len(recipients), 2)
 
         trigger_props = call_args[1]["trigger_properties"]
-        self.assertIn("renewal_date", trigger_props)
-        self.assertEqual(trigger_props["renewal_date"], "Jan 01, 2022")
+        self.assertIn("renewal_datetime", trigger_props)
+        self.assertEqual(
+            trigger_props["renewal_datetime"],
+            format_datetime_obj(datetime(2022, 1, 1), output_pattern=BRAZE_TIMESTAMP_FORMAT),
+        )
         self.assertIn("subscription_management_url", trigger_props)
         self.assertEqual(trigger_props["license_count"], 10)
         self.assertEqual(trigger_props["payment_method"], "Visa ending in 4242")
