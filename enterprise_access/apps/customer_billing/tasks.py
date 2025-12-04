@@ -22,6 +22,84 @@ from enterprise_access.utils import cents_to_dollars, format_cents_for_user_disp
 logger = logging.getLogger(__name__)
 
 
+def get_enterprise_admins(enterprise_slug, raise_if_empty=False):
+    """
+    Fetches enterprise admin users for the given slug.
+    """
+    lms_client = LmsApiClient()
+    enterprise_data = lms_client.get_enterprise_customer_data(
+        enterprise_customer_slug=enterprise_slug,
+    )
+    admin_users = enterprise_data.get('admin_users', [])
+
+    if not admin_users:
+        logger.error(
+            'No admin users found for enterprise slug: %s. Verify admin setup in LMS.',
+            enterprise_slug,
+        )
+        if raise_if_empty:
+            raise Exception(f'No admin users for enterprise slug {enterprise_slug}')
+    return admin_users
+
+
+def prepare_admin_braze_recipients(braze_client, admin_users, enterprise_slug, raise_if_empty=False):
+    """
+    Creates a list of braze recipients for the given enterprise admins.
+    """
+    recipients = []
+    for admin in admin_users:
+        try:
+            admin_email = admin['email']
+            recipient = braze_client.create_braze_recipient(
+                user_email=admin_email,
+                lms_user_id=admin.get('lms_user_id'),
+            )
+            recipients.append(recipient)
+
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.warning(
+                'Failed to create Braze recipient for admin email %s: %s',
+                admin_email,
+                str(exc)
+            )
+
+    if not recipients:
+        logger.error('No valid Braze recipients created for enterprise %s.', enterprise_slug)
+        if raise_if_empty:
+            raise Exception(f'No Braze recipients created for enterprise {enterprise_slug}')
+    return recipients
+
+
+def send_campaign_message(
+    braze_client,
+    braze_campaign_uuid,
+    recipients,
+    trigger_properties,
+    organization_name,
+    email_description,
+):
+    """
+    Helper to send a braze campaign email to a list of recipients,
+    using the given API-triggered campaign properties.
+    """
+    try:
+        braze_client.send_campaign_message(
+            braze_campaign_uuid,
+            recipients=recipients,
+            trigger_properties=trigger_properties,
+        )
+        logger.info(
+            'Successfully sent %s for enterprise %s to %d recipients',
+            email_description, organization_name, len(recipients),
+        )
+    except Exception as exc:
+        logger.exception(
+            'Braze API error: Failed to send %s for enterprise %s. Error: %s',
+            email_description, organization_name, str(exc),
+        )
+        raise
+
+
 @shared_task(base=LoggedTaskWithRetry)
 def send_payment_receipt_email(
     invoice_data,
@@ -172,7 +250,6 @@ def send_enterprise_provision_signup_confirmation_email(
         BrazeClientError: If there's an error communicating with Braze
         Exception: For any other unexpected errors during email sending
     """
-
     is_valid, subscription = validate_trial_subscription(enterprise_slug)
     if not is_valid or not subscription:
         logger.error(
@@ -183,24 +260,10 @@ def send_enterprise_provision_signup_confirmation_email(
         return
 
     logger.info(
-        'Sending signup confirmation email for enterprise %s (slug: %s)',
-        organization_name,
-        enterprise_slug,
+        'Sending signup confirmation email for enterprise %s (slug: %s)', organization_name, enterprise_slug,
     )
 
-    braze_client = BrazeApiClient()
-    lms_client = LmsApiClient()
-
-    enterprise_data = lms_client.get_enterprise_customer_data(enterprise_customer_slug=enterprise_slug)
-    admin_users = enterprise_data.get('admin_users', [])
-
-    if not admin_users:
-        logger.error(
-            'Signup email not sent: No admin users found for enterprise %s (slug: %s). Verify admin setup in LMS.',
-            organization_name,
-            enterprise_slug,
-        )
-        return
+    admin_users = get_enterprise_admins(enterprise_slug, raise_if_empty=True)
 
     trial_start_date = timezone.make_aware(datetime.fromtimestamp(subscription['trial_start']))
     trial_end_date = timezone.make_aware(datetime.fromtimestamp(subscription['trial_end']))
@@ -221,50 +284,19 @@ def send_enterprise_provision_signup_confirmation_email(
         'total_amount': float(cents_to_dollars(total_cost_cents)),
     }
 
-    recipients = []
-    for admin in admin_users:
-        try:
-            admin_email = admin['email']
-            recipient = braze_client.create_braze_recipient(
-                user_email=admin_email,
-                lms_user_id=admin.get('lms_user_id'),
-            )
-            recipients.append(recipient)
+    braze_client = BrazeApiClient()
+    recipients = prepare_admin_braze_recipients(
+        braze_client, admin_users, enterprise_slug, raise_if_empty=True,
+    )
 
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            logger.warning(
-                'Failed to create Braze recipient for admin email %s: %s',
-                admin_email,
-                str(exc)
-            )
-
-    if not recipients:
-        logger.error(
-            'Signup email not sent: No valid Braze recipients created for enterprise %s.'
-            ' Check admin email errors above.',
-            organization_name
-        )
-        return
-
-    try:
-        braze_client.send_campaign_message(
-            settings.BRAZE_ENTERPRISE_PROVISION_SIGNUP_CONFIRMATION_CAMPAIGN,
-            recipients=recipients,
-            trigger_properties=braze_trigger_properties,
-        )
-        logger.info(
-            'Successfully sent signup confirmation emails for enterprise %s to %d recipients',
-            organization_name,
-            len(recipients)
-        )
-
-    except Exception as exc:
-        logger.exception(
-            'Braze API error: Failed to send signup email for enterprise %s. Error: %s',
-            organization_name,
-            str(exc)
-        )
-        raise
+    send_campaign_message(
+        braze_client,
+        settings.BRAZE_ENTERPRISE_PROVISION_SIGNUP_CONFIRMATION_CAMPAIGN,
+        recipients=recipients,
+        trigger_properties=braze_trigger_properties,
+        organization_name=organization_name,
+        email_description='signup confirmation email',
+    )
 
 
 def _get_billing_portal_url(checkout_intent):

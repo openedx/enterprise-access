@@ -183,7 +183,10 @@ class TestSendEnterpriseProvisionSignupConfirmationEmail(TestCase):
         mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
             'admin_users': []
         }
-        send_enterprise_provision_signup_confirmation_email(**self.test_data)
+
+        with self.assertRaisesRegex(Exception, 'No admin users'):
+            send_enterprise_provision_signup_confirmation_email(**self.test_data)
+
         mock_validate_trial.assert_called_once_with(self.test_data['enterprise_slug'])
         mock_lms_client.return_value.get_enterprise_customer_data.assert_called_once_with(
             enterprise_customer_slug=self.test_data['enterprise_slug']
