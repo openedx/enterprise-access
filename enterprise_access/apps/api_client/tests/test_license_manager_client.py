@@ -12,6 +12,7 @@ from requests.exceptions import HTTPError
 from enterprise_access.apps.api_client.exceptions import APIClientException
 from enterprise_access.apps.api_client.license_manager_client import (
     NEW_SUBSCRIPTION_CHANGE_REASON,
+    OTHER_SUBSCRIPTION_CHANGE_REASON,
     LicenseManagerApiClient,
     LicenseManagerUserApiClient
 )
@@ -131,6 +132,33 @@ class TestLicenseManagerApiClient(TestCase):
         mock_post.assert_called_once_with(
             expected_url,
             json=expected_payload,
+        )
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient', autospec=True)
+    def test_update_subscription_plan(self, mock_oauth_client):
+        mock_patch = mock_oauth_client.return_value.patch
+        subs_plan_uuid = uuid.uuid4()
+        new_oli_value = '1234512345'
+
+        lm_client = LicenseManagerApiClient()
+
+        result = lm_client.update_subscription_plan(
+            subs_plan_uuid, new_oli_value,
+        )
+
+        self.assertEqual(result, mock_patch.return_value.json.return_value)
+        expected_url = (
+            'http://license-manager.example.com'
+            f'/api/v1/provisioning-admins/subscriptions/{subs_plan_uuid}/'
+        )
+        expected_payload = {
+            'salesforce_opportunity_line_item': new_oli_value,
+            'change_reason': OTHER_SUBSCRIPTION_CHANGE_REASON,
+        }
+        mock_patch.assert_called_once_with(
+            expected_url,
+            json=expected_payload,
+            timeout=settings.LICENSE_MANAGER_CLIENT_TIMEOUT,
         )
 
 

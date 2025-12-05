@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 NEW_SUBSCRIPTION_CHANGE_REASON = 'new'
+OTHER_SUBSCRIPTION_CHANGE_REASON = 'other'
 
 
 class LicenseManagerApiClient(BaseOAuthClient):
@@ -226,9 +227,10 @@ class LicenseManagerApiClient(BaseOAuthClient):
         Raises:
             APIClientException: If the API call fails
         """
-        endpoint = f"{self.subscriptions_endpoint}{subscription_uuid}/"
+        endpoint = f"{self.subscription_provisioning_endpoint}{subscription_uuid}/"
         payload = {
-            'salesforce_opportunity_line_item': salesforce_opportunity_line_item
+            'salesforce_opportunity_line_item': salesforce_opportunity_line_item,
+            'change_reason': OTHER_SUBSCRIPTION_CHANGE_REASON,
         }
 
         try:
