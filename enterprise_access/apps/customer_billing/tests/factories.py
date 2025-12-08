@@ -11,7 +11,12 @@ from faker import Faker
 
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
-from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData, StripeEventSummary
+from enterprise_access.apps.customer_billing.models import (
+    CheckoutIntent,
+    SelfServiceSubscriptionRenewal,
+    StripeEventData,
+    StripeEventSummary
+)
 
 FAKER = Faker()
 
@@ -150,4 +155,17 @@ class StripeEventSummaryFactory(DjangoModelFactory):
     subscription_plan_renewal_uuid = factory.LazyFunction(uuid4)
 
     # Stripe identifiers
+    stripe_subscription_id = factory.LazyFunction(lambda: f'sub_{FAKER.bothify("?" * 24)}')
+
+
+class SelfServiceSubscriptionRenewalFactory(DjangoModelFactory):
+    """
+    Factory for creating StripeEventSummary instances for testing.
+    """
+    class Meta:
+        model = SelfServiceSubscriptionRenewal
+
+    checkout_intent = factory.SubFactory(CheckoutIntentFactory)
+    subscription_plan_renewal_id = factory.Faker('random_int', min=1, max=10000)
+    stripe_event_data = factory.SubFactory(StripeEventDataFactory)
     stripe_subscription_id = factory.LazyFunction(lambda: f'sub_{FAKER.bothify("?" * 24)}')

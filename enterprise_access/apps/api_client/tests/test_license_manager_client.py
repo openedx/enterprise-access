@@ -178,7 +178,7 @@ class TestLicenseManagerApiClient(TestCase):
         )
 
     @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient', autospec=True)
-    def test_update_subscription_plan(self, mock_oauth_client):
+    def test_update_subscription_plan_oli(self, mock_oauth_client):
         mock_patch = mock_oauth_client.return_value.patch
         subs_plan_uuid = uuid.uuid4()
         new_oli_value = '1234512345'
