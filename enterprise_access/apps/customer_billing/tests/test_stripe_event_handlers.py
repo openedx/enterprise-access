@@ -22,12 +22,9 @@ from enterprise_access.apps.customer_billing.models import (
     StripeEventData,
     StripeEventSummary
 )
-from enterprise_access.apps.customer_billing.stripe_event_handlers import (
-    StripeEventHandler,
-    cancel_all_future_plans,
-    future_plans_of_current
-)
+from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler, cancel_all_future_plans
 from enterprise_access.apps.customer_billing.tests.factories import (
+    SelfServiceSubscriptionRenewalFactory,
     StripeEventDataFactory,
     StripeEventSummaryFactory,
     get_stripe_object_for_event_type
@@ -351,91 +348,46 @@ class TestStripeEventHandler(TestCase):
 
         StripeEventHandler.dispatch(mock_event)
 
-        mock_cancel.assert_called_once()
+        mock_cancel.assert_called_once_with(self.checkout_intent)
         mock_send_billing_error.delay.assert_called_once_with(
             checkout_intent_id=self.checkout_intent.id,
         )
-        _, kwargs = mock_cancel.call_args
-        self.assertEqual(
-            kwargs["enterprise_uuid"], self.checkout_intent.enterprise_uuid
-        )
-        self.assertEqual(kwargs["reason"], "delayed_payment")
-        self.assertEqual(
-            kwargs["subscription_id_for_logs"], subscription_id
-        )
-
-    def test_future_plans_of_current_selects_children(self):
-        """future_plans_of_current returns plans whose prior_renewals link to current plan."""
-        current_uuid = "1111-aaaa"
-        plans = [
-            {"uuid": current_uuid, "prior_renewals": []},
-            {"uuid": "2222-bbbb", "prior_renewals": [{"prior_subscription_plan_id": current_uuid}]},
-            {"uuid": "3333-cccc", "prior_renewals": [{"prior_subscription_plan_id": current_uuid}]},
-            {"uuid": "4444-dddd", "prior_renewals": []},
-        ]
-
-        result = future_plans_of_current(current_uuid, plans)
-        self.assertEqual({p["uuid"] for p in result}, {"2222-bbbb", "3333-cccc"})
 
     @mock.patch(
-        (
-            "enterprise_access.apps.customer_billing."
-            "stripe_event_handlers._get_subscription_plan_uuid_from_checkout_intent"
-        ),
-        return_value="1111-aaaa",
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient",
+        autospec=True,
     )
-    @mock.patch("enterprise_access.apps.api_client.license_manager_client.LicenseManagerApiClient")
-    def test_cancel_all_future_plans_deactivates_all(self, MockClient, _mock_anchor):
+    def test_cancel_all_future_plans_deactivates_all(self, mock_lms_client):
         """cancel_all_future_plans patches all future plans and returns their uuids."""
-        enterprise_uuid = "ent-123"
-        current_uuid = "1111-aaaa"
-        future1 = {"uuid": "2222-bbbb", "prior_renewals": [{"prior_subscription_plan_id": current_uuid}]}
-        future2 = {"uuid": "3333-cccc", "prior_renewals": [{"prior_subscription_plan_id": current_uuid}]}
-
-        mock_client = MockClient.return_value
-        mock_client.list_subscriptions.return_value = {
-            "results": [
-                {"uuid": current_uuid, "prior_renewals": [], "is_current": True},
-                future1,
-                future2,
-            ]
-        }
-
-        deactivated = cancel_all_future_plans(
-            enterprise_uuid,
-            reason="delayed_payment",
-            subscription_id_for_logs="sub-1",
-            checkout_intent=object(),
+        mock_client = mock_lms_client.return_value
+        trial_plan_uuid = uuid.uuid4()
+        paid_plan_a_uuid = uuid.uuid4()
+        paid_plan_b_uuid = uuid.uuid4()
+        SelfServiceSubscriptionRenewalFactory.create(
+            checkout_intent=self.checkout_intent,
+            prior_subscription_plan_uuid=trial_plan_uuid,
+            renewed_subscription_plan_uuid=paid_plan_a_uuid,
+            processed_at=None,
+        )
+        SelfServiceSubscriptionRenewalFactory.create(
+            checkout_intent=self.checkout_intent,
+            prior_subscription_plan_uuid=paid_plan_a_uuid,
+            renewed_subscription_plan_uuid=paid_plan_b_uuid,
+            processed_at=None,
         )
 
-        self.assertEqual(set(deactivated), {"2222-bbbb", "3333-cccc"})
-        self.assertEqual(mock_client.update_subscription_plan.call_count, 2)
+        deactivated = cancel_all_future_plans(self.checkout_intent)
+
+        self.assertEqual(set(deactivated), {paid_plan_a_uuid, paid_plan_b_uuid})
+        self.assertEqual(2, mock_client.update_subscription_plan.call_count)
         mock_client.update_subscription_plan.assert_any_call(
-            "2222-bbbb",
+            str(paid_plan_a_uuid),
             is_active=False,
-            change_reason="delayed_payment",
         )
         mock_client.update_subscription_plan.assert_any_call(
-            "3333-cccc",
+            str(paid_plan_b_uuid),
             is_active=False,
-            change_reason="delayed_payment",
         )
-
-    @mock.patch("enterprise_access.apps.api_client.license_manager_client.LicenseManagerApiClient")
-    def test_cancel_all_future_plans_requires_anchor(self, MockClient):
-        """When no anchor can be resolved, function returns without updates."""
-        enterprise_uuid = "ent-123"
-        mock_client = MockClient.return_value
-
-        deactivated = cancel_all_future_plans(
-            enterprise_uuid,
-            reason="delayed_payment",
-            subscription_id_for_logs="sub-1",
-            checkout_intent=None,
-        )
-
-        self.assertEqual(deactivated, [])
-        mock_client.update_subscription_plan.assert_not_called()
 
     @mock.patch(
         "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_ending_reminder_email_task"

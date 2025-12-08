@@ -4,9 +4,9 @@ Stripe event handlers
 import logging
 from collections.abc import Callable
 from functools import wraps
+from uuid import UUID
 
 import stripe
-from django.apps import apps
 
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.customer_billing.models import (
@@ -137,235 +137,21 @@ def link_event_data_to_checkout_intent(event, checkout_intent):
         event_data.save()  # this triggers a post_save signal that updates the related summary record
 
 
-def handle_trial_cancellation(
-    checkout_intent: CheckoutIntent,
-    checkout_intent_id: int,
-    subscription_id: str,
-    trial_end
-):
-    """
-    Send cancellation email for a trial subscription that has just transitioned to canceled.
-    Assumes caller validated status transition and presence of trial_end.
-    """
-    logger.info(
-        (
-            "Subscription %s transitioned to 'canceled'. "
-            "Sending cancellation email for checkout_intent_id=%s"
-        ),
-        subscription_id,
-        checkout_intent_id,
-    )
-
-    send_trial_cancellation_email_task.delay(
-        checkout_intent_id=checkout_intent.id,
-        trial_end_timestamp=trial_end,
-    )
-
-
-def future_plans_of_current(current_plan_uuid: str, plans: list[dict]) -> list[dict]:
-    """
-    Return plans that are future renewals of the current plan,
-    based on prior_renewals linkage.
-    """
-    def is_future_of_current(plan_dict):
-        if str(plan_dict.get('uuid')) == current_plan_uuid:
-            return False
-        for renewal in plan_dict.get('prior_renewals', []) or []:
-            if str(renewal.get('prior_subscription_plan_id')) == current_plan_uuid:
-                return True
-        return False
-
-    return [p for p in plans if is_future_of_current(p)]
-
-
-def _get_subscription_plan_uuid_from_checkout_intent(checkout_intent: CheckoutIntent | None) -> str | None:
-    """
-    Try to resolve the License Manager SubscriptionPlan UUID
-    associated with the given CheckoutIntent.
-
-    1) If the CheckoutIntent has a provisioning workflow,
-       read the GetCreateSubscriptionPlanStep output uuid.
-    2) Otherwise, look up the most recent StripeEventSummary for this
-       CheckoutIntent that contains a subscription_plan_uuid and use that value.
-    """
-    if not checkout_intent:
-        return None
-
-    # 1) From provisioning workflow step output
-    try:
-        workflow = checkout_intent.workflow
-        if workflow:
-            subscription_step_model = apps.get_model('provisioning', 'GetCreateSubscriptionPlanStep')
-            step = subscription_step_model.objects.filter(
-                workflow_record_uuid=workflow.uuid,
-            ).first()
-            output_obj = getattr(step, 'output_object', None)
-            if output_obj and getattr(output_obj, 'uuid', None):
-                return str(output_obj.uuid)
-    except Exception as exc:  # pylint: disable=broad-exception-caught
-        logger.exception(
-            "Failed resolving subscription plan uuid from workflow for CheckoutIntent %s: %s",
-            checkout_intent.id, exc,
-        )
-
-    # 2) From StripeEventSummary records linked to this CheckoutIntent
-    try:
-        summary_with_uuid = (
-            StripeEventSummary.objects
-            .filter(checkout_intent=checkout_intent, subscription_plan_uuid__isnull=False)
-            .order_by('-stripe_event_created_at')
-            .first()
-        )
-        if summary_with_uuid and summary_with_uuid.subscription_plan_uuid:
-            return str(summary_with_uuid.subscription_plan_uuid)
-    except Exception as exc:  # pylint: disable=broad-exception-caught
-        logger.exception(
-            "Failed resolving subscription plan uuid from StripeEventSummary for CheckoutIntent %s: %s",
-            checkout_intent.id, exc,
-        )
-
-    return None
-
-
-def _build_lineage_from_anchor(anchor_plan_uuid: str, plans: list[dict]) -> set[str]:
-    """
-    Return the anchor plan and all of its future renewals.
-    """
-    anchor = str(anchor_plan_uuid)
-
-    # Index: parent_plan_uuid -> set(child_plan_uuid)
-    children_index: dict[str, set[str]] = {}
-    for plan in plans:
-        child_uuid = str(plan.get('uuid'))
-        for renewal in plan.get('prior_renewals', []) or []:
-            parent_uuid = str(renewal.get('prior_subscription_plan_id'))
-            if parent_uuid:
-                children_index.setdefault(parent_uuid, set()).add(child_uuid)
-
-    # BFS/DFS from anchor through children links
-    lineage: set[str] = {anchor}
-    stack = [anchor]
-    while stack:
-        parent = stack.pop()
-        for child in children_index.get(parent, ()):  # empty tuple default avoids branch
-            if child not in lineage:
-                lineage.add(child)
-                stack.append(child)
-
-    return lineage
-
-
-def cancel_all_future_plans(
-    enterprise_uuid: str,
-    reason: str = 'delayed_payment',
-    subscription_id_for_logs: str | None = None,
-    checkout_intent: CheckoutIntent | None = None,
-) -> list[str]:
+def cancel_all_future_plans(checkout_intent):
     """
     Deactivate (cancel) all future renewal plans descending from the
     anchor plan for this enterprise.
-
-    Strict contract:
-    - We REQUIRE an anchor plan uuid resolvable from the provided
-      CheckoutIntent.
-    - If no anchor can be resolved, we perform NO cancellations
-      (safety: avoid wrong lineage).
-    - Only descendants (children, grandchildren, etc.) of the anchor
-      are canceled; the anchor/current plan is untouched.
-
-    Returns list of deactivated descendant plan UUIDs (may be empty).
     """
+    unprocessed_renewals = checkout_intent.renewals.filter(processed_at__isnull=True)
     client = LicenseManagerApiClient()
-    deactivated: list[str] = []
-    try:
-        anchor_uuid = _get_subscription_plan_uuid_from_checkout_intent(checkout_intent)
-        if not anchor_uuid:
-            logger.warning(
-                (
-                    "Skipping future plan cancellation for enterprise %s (subscription %s): "
-                    "no anchor SubscriptionPlan UUID could be resolved from CheckoutIntent."
-                ),
-                enterprise_uuid,
-                subscription_id_for_logs,
-            )
-            return deactivated
+    deactivated: list[UUID] = []
 
-        all_list = client.list_subscriptions(enterprise_uuid)
-        all_plans = (all_list or {}).get('results', [])
-
-        lineage_set = _build_lineage_from_anchor(str(anchor_uuid), all_plans)
-        lineage_plans = [p for p in all_plans if str(p.get('uuid')) in lineage_set]
-
-        logger.debug(
-            (
-                "[cancel_all_future_plans] anchor=%s enterprise=%s subscription=%s "
-                "total_plans=%d lineage_size=%d lineage=%s"
-            ),
-            anchor_uuid,
-            enterprise_uuid,
-            subscription_id_for_logs,
-            len(all_plans),
-            len(lineage_set),
-            list(lineage_set),
+    for renewal in unprocessed_renewals:
+        client.update_subscription_plan(
+            str(renewal.renewed_subscription_plan_uuid),
+            is_active=False,
         )
-
-        current_plan = next((p for p in lineage_plans if p.get('is_current')), None)
-        if not current_plan:
-            logger.warning(
-                (
-                    "No current subscription plan found within lineage for enterprise %s "
-                    "when canceling future plans (subscription %s)"
-                ),
-                enterprise_uuid,
-                subscription_id_for_logs,
-            )
-            return deactivated
-
-        current_plan_uuid = str(current_plan.get('uuid'))
-        future_plan_uuids = [str(uuid) for uuid in lineage_set if str(uuid) != current_plan_uuid]
-
-        logger.debug(
-            "[cancel_all_future_plans] current_plan=%s future_plan_uuids=%s",
-            current_plan_uuid,
-            future_plan_uuids,
-        )
-
-        if not future_plan_uuids:
-            logger.info(
-                (
-                    "No future plans (descendants) to deactivate for enterprise %s (current plan %s) "
-                    "(subscription %s)"
-                ),
-                enterprise_uuid,
-                current_plan_uuid,
-                subscription_id_for_logs,
-            )
-            return deactivated
-
-        for future_uuid in future_plan_uuids:
-            try:
-                client.update_subscription_plan(
-                    future_uuid,
-                    is_active=False,
-                    change_reason=reason,
-                )
-                deactivated.append(str(future_uuid))
-                logger.info(
-                    "Deactivated future plan %s for enterprise %s (reason=%s) (subscription %s)",
-                    future_uuid, enterprise_uuid, reason, subscription_id_for_logs,
-                )
-            except Exception as exc:  # pylint: disable=broad-except
-                logger.exception(
-                    "Failed to deactivate future plan %s for enterprise %s (reason=%s): %s",
-                    future_uuid, enterprise_uuid, reason, exc,
-                )
-    except Exception as exc:  # pylint: disable=broad-except
-        logger.exception(
-            "Unexpected error canceling future plans for enterprise %s (subscription %s): %s",
-            enterprise_uuid,
-            subscription_id_for_logs,
-            exc,
-        )
+        deactivated.append(renewal.renewed_subscription_plan_uuid)
 
     return deactivated
 
@@ -561,7 +347,6 @@ class StripeEventHandler:
             )
             trial_end = subscription.get("trial_end")
             if trial_end:
-                handle_trial_cancellation(checkout_intent, checkout_intent_id, subscription.id, trial_end)
                 logger.info(f"Queuing trial cancellation email for checkout_intent_id={checkout_intent_id}")
                 send_trial_cancellation_email_task.delay(
                     checkout_intent_id=checkout_intent.id,
@@ -574,24 +359,9 @@ class StripeEventHandler:
 
         # Past due transition
         if current_status == "past_due" and prior_status != "past_due":
-            # Fire billing error email to enterprise admins
-            try:
-                send_billing_error_email_task.delay(checkout_intent_id=checkout_intent.id)
-            except Exception as exc:  # pylint: disable=broad-exception-caught
-                logger.exception(
-                    "Failed to enqueue billing error email for CheckoutIntent %s: %s",
-                    checkout_intent.id,
-                    str(exc),
-                )
-
             enterprise_uuid = checkout_intent.enterprise_uuid
             if enterprise_uuid:
-                cancel_all_future_plans(
-                    enterprise_uuid=enterprise_uuid,
-                    reason='delayed_payment',
-                    subscription_id_for_logs=subscription.id,
-                    checkout_intent=checkout_intent,
-                )
+                cancel_all_future_plans(checkout_intent)
             else:
                 logger.error(
                     (
@@ -601,6 +371,7 @@ class StripeEventHandler:
                     subscription.id,
                     checkout_intent.id,
                 )
+            send_billing_error_email_task.delay(checkout_intent_id=checkout_intent.id)
 
     @on_stripe_event("customer.subscription.deleted")
     @staticmethod

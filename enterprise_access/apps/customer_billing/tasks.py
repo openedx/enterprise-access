@@ -12,7 +12,6 @@ from django.utils import timezone
 
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
-from enterprise_access.apps.customer_billing.api import create_stripe_billing_portal_session
 from enterprise_access.apps.customer_billing.constants import BRAZE_TIMESTAMP_FORMAT
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventSummary
 from enterprise_access.apps.customer_billing.stripe_api import get_stripe_subscription, get_stripe_trialing_subscription
@@ -256,7 +255,7 @@ def send_billing_error_email_task(checkout_intent_id: int):
     )
 
     braze_trigger_properties = {
-        "restart_subscription_url": portal_url,
+        "restart_subscription_url": f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}',
     }
 
     send_campaign_message(
@@ -408,7 +407,7 @@ def send_trial_ending_reminder_email_task(checkout_intent_id):
 def send_trial_end_and_subscription_started_email_task(
     subscription_id: str,
     checkout_intent_id: int,
-):  # pylint: disable=too-many-statements
+):
     """
     Send an email to all enterprise admins notifying about trial end and subscription start.
 
@@ -475,6 +474,7 @@ def send_trial_end_and_subscription_started_email_task(
     )
 
 
+@shared_task(base=LoggedTaskWithRetry)
 def send_payment_receipt_email(
     invoice_data,
     subscription_data,

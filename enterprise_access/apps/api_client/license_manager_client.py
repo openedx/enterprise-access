@@ -70,10 +70,11 @@ class LicenseManagerApiClient(BaseOAuthClient):
         """
         endpoint = f"{self.subscription_provisioning_endpoint}{subscription_uuid}/"
         payload = {
-            'salesforce_opportunity_line_item': salesforce_opportunity_line_item,
             'change_reason': OTHER_SUBSCRIPTION_CHANGE_REASON,
         }
         payload.update(kwargs)
+        if salesforce_opportunity_line_item:
+            payload['salesforce_opportunity_line_item'] = salesforce_opportunity_line_item
 
         try:
             response = self.client.patch(
