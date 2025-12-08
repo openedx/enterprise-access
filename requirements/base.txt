@@ -74,7 +74,7 @@ defusedxml==0.7.1
     # via
     #   python3-openid
     #   social-auth-core
-django==5.2.8
+django==5.2.9
     # via
     #   -c requirements/common_constraints.txt
     #   -r requirements/base.in
@@ -280,7 +280,7 @@ pyjwt[crypto]==2.10.1
     #   social-auth-core
 pymemcache==4.0.0
     # via -r requirements/base.in
-pymongo==4.15.4
+pymongo==4.15.5
     # via edx-opaque-keys
 pynacl==1.6.1
     # via edx-django-utils
@@ -372,7 +372,7 @@ uritemplate==4.2.0
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.5.0
+urllib3==2.6.0
     # via requests
 vine==5.1.0
     # via
