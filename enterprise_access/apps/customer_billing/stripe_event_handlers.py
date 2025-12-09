@@ -7,6 +7,7 @@ from functools import wraps
 from uuid import UUID
 
 import stripe
+from django.conf import settings
 
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.customer_billing.models import (
@@ -162,6 +163,9 @@ class StripeEventHandler:
     """
     @classmethod
     def dispatch(cls, event: stripe.Event) -> None:
+        if event.type not in _handlers_by_type:
+            logger.warning('No stripe event handler configured for event type %s', event.type)
+            return
         _handlers_by_type[event.type](event)
 
     @staticmethod
@@ -214,12 +218,21 @@ class StripeEventHandler:
             )
             return
 
-        logger.info(
-            'Marking checkout_intent_id=%s as paid via invoice=%s',
-            checkout_intent_id,
-            invoice.id,
-        )
-        checkout_intent.mark_as_paid(stripe_customer_id=stripe_customer_id)
+        try:
+            checkout_intent.mark_as_paid(stripe_customer_id=stripe_customer_id)
+            logger.info(
+                'Marked checkout_intent_id=%s as paid via invoice=%s',
+                checkout_intent_id, invoice.id,
+            )
+        except ValueError as exc:
+            logger.warning(
+                'Could not mark checkout intent % as paid via invoice %s, because %s',
+                checkout_intent_id, invoice.id, exc,
+            )
+            if settings.STRIPE_GRACEFUL_EXCEPTION_MODE:
+                return
+            raise
+
         link_event_data_to_checkout_intent(event, checkout_intent)
 
         send_payment_receipt_email.delay(
@@ -305,7 +318,12 @@ class StripeEventHandler:
             logger.error('Failed to enable pending updates for subscription %s: %s', subscription.id, e)
 
         summary = StripeEventSummary.objects.get(event_id=event.id)
-        summary.update_upcoming_invoice_amount_due()
+        try:
+            summary.update_upcoming_invoice_amount_due()
+        except stripe.StripeError as exc:
+            logger.warning('Error updating upcoming invoice amount due: %s', exc)
+            if not settings.STRIPE_GRACEFUL_EXCEPTION_MODE:
+                raise
 
     @on_stripe_event('customer.subscription.updated')
     @staticmethod
