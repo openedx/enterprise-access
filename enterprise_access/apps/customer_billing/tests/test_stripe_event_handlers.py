@@ -150,11 +150,10 @@ class TestStripeEventHandler(TestCase):
         return event_data, summary_record
 
     def test_dispatch_unknown_event_type(self):
-        """Test that dispatching an unknown event type raises KeyError."""
+        """Test that dispatching an unknown event type doesn't raise."""
         mock_event = self._create_mock_stripe_event('unknown.event.type', {})
 
-        with self.assertRaises(KeyError):
-            StripeEventHandler.dispatch(mock_event)
+        StripeEventHandler.dispatch(mock_event)
 
     @ddt.data(
         # Happy Test case: successful invoice.paid handling
