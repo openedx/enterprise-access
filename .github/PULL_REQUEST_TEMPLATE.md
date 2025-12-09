@@ -1,14 +1,8 @@
-**Description:**
-Add a description of your changes here. 
+⚠️ **DEPRECATION NOTICE**
+-------------------------
 
-**Jira:**
-ENT-XXXX
+This repository is **deprecated** and no longer actively developed.
 
-**Merge checklist:**
-- [ ] `./manage.py makemigrations` has been run
-    - *Note*: This **must** be run if you modified any models.
-      - It may or may not make a migration depending on exactly what you modified, but it should still be run.
-
-**Post merge:**
-- [ ] Ensure that your changes went out to the stage instance
-- [ ] Deploy to prod instance
+- 2U maintains a fork located at [edx/enterprise-access](https://github.com/edx/enterprise-access).
+- If you or your organization wants to adopt maintenance of openedx/enterprise-access,
+  please reach out to OpenEdx via [Slack](https://openedx.org/slack).
