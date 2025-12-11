@@ -1,15 +1,3 @@
-⚠️ **DEPRECATION NOTICE**
-##########################
-
-This repository is **deprecated** and no longer actively developed.
-
-- 2U maintains a fork located at `edx/enterprise-access <https://github.com/edx/enterprise-access>`_.
-- If you or your organization wants to adop maintenance of openedx/enterprise-access,
-  please reach out to OpenEdx via `Slack <https://openedx.org/slack>`_.
-
-Original README
-################
-
 Service to manage access to content for enterprise users.
 
 Setting up enterprise-access
@@ -163,7 +151,7 @@ Our real-time conversations are on Slack. You can request a `Slack invitation`_,
 
 For more information about these options, see the `Getting Help`_ page.
 
-.. _Slack invitation: https://openedx.org/slack
+.. _Slack invitation: https://openedx-slack-invite.herokuapp.com/
 .. _community Slack workspace: https://openedx.slack.com/
 .. _Getting Help: https://openedx.org/getting-help
 
@@ -190,5 +178,3 @@ For more information about these options, see the `Getting Help`_ page.
 .. |license-badge| image:: https://img.shields.io/github/license/edx/enterprise-access.svg
     :target: https://github.com/edx/enterprise-access/blob/main/LICENSE.txt
     :alt: License
-
-

@@ -389,6 +389,19 @@ class TestStripeEventHandler(TestCase):
         )
 
     @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.LicenseManagerApiClient",
+        autospec=True,
+    )
+    def test_cancel_all_future_plans_nothing_to_deactivate(self, mock_lms_client):
+        """cancel_all_future_plans returns an empty list if nothing exists to deactivate."""
+        mock_client = mock_lms_client.return_value
+
+        deactivated = cancel_all_future_plans(self.checkout_intent)
+
+        self.assertEqual([], deactivated)
+        self.assertFalse(mock_client.called)
+
+    @mock.patch(
         "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_ending_reminder_email_task"
     )
     def test_trial_will_end_handler_success(self, mock_email_task):
