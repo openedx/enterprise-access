@@ -62,8 +62,8 @@ in this repo and we'll *produce* a ping event::
 
 If this event was successfully produced, you'll see a log message that says
 ``Message delivered to Kafka event bus: topic=dev-events-testing``.
-You should also now see the ``dev-events-testing`` topic available in your local confluent control center,
-and even the test events that are being published to the topic.
+You should also now see the ``dev-events-testing`` topic available in your local confluent
+control center, and even the test events that are being published to the topic.
 
 A note on creating SubsidyRequestCustomerConfiguration Objects locally
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
