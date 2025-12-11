@@ -144,6 +144,10 @@ def cancel_all_future_plans(checkout_intent):
     anchor plan for this enterprise.
     """
     unprocessed_renewals = checkout_intent.renewals.filter(processed_at__isnull=True)
+    if not unprocessed_renewals.exists():
+        logger.warning('No renewals to cancel for Checkout Intent %s', checkout_intent.uuid)
+        return []
+
     client = LicenseManagerApiClient()
     deactivated: list[UUID] = []
 
@@ -377,6 +381,11 @@ class StripeEventHandler:
 
         # Past due transition
         if current_status == "past_due" and prior_status != "past_due":
+            logger.warning(
+                'Stripe subscription %s was %s but is now past_due. '
+                'Checkout intent: %s',
+                subscription.id, prior_status, checkout_intent.id,
+            )
             enterprise_uuid = checkout_intent.enterprise_uuid
             if enterprise_uuid:
                 cancel_all_future_plans(checkout_intent)
