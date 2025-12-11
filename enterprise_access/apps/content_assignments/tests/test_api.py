@@ -929,8 +929,10 @@ class TestAssignmentExpiration(TestCase):
         mock_expired_email,
     ):
         """
-        Test that we expire an assignment and clear
-        its PII, as long the state is not "accepted".
+        Test that we expire an assignment due to 90-day timeout.
+        PII is NOT cleared immediately - it is handled by a separate daily task
+        (clear_pii_for_expired_assignments) to ensure expiration emails are sent
+        to the actual learner email address first.
         """
         # set the allocation time to be more than the threshold number of days ago
         enough_days_to_be_cancelled = NUM_DAYS_BEFORE_AUTO_EXPIRATION + 1
@@ -954,12 +956,9 @@ class TestAssignmentExpiration(TestCase):
         assignment.refresh_from_db()
         self.assertEqual(assignment.state, LearnerContentAssignmentStateChoices.EXPIRED)
         self.assertEqual(12345, assignment.lms_user_id)
-        pattern = RETIRED_EMAIL_ADDRESS_FORMAT.format('[a-f0-9]{16}')
-        self.assertIsNotNone(re.match(pattern, assignment.learner_email))
-
-        for historical_record in assignment.history.all():
-            self.assertEqual(12345, historical_record.lms_user_id)
-            self.assertIsNotNone(re.match(pattern, historical_record.learner_email))
+        # PII is NOT cleared immediately - verify original email is retained
+        # so that expiration email can be sent to the actual learner
+        self.assertEqual(assignment.learner_email, 'larry@stooges.com')
 
         mock_expired_email.delay.assert_called_once_with(assignment.uuid)
 

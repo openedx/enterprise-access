@@ -33,7 +33,7 @@ from enterprise_access.utils import (
     localized_utcnow
 )
 
-from .constants import AssignmentAutomaticExpiredReason, LearnerContentAssignmentStateChoices
+from .constants import LearnerContentAssignmentStateChoices
 from .models import AssignmentConfiguration, LearnerContentAssignment
 from .tasks import (
     create_pending_enterprise_learner_for_assignment_task,
@@ -1137,8 +1137,10 @@ def expire_assignment(
         assignment.state = LearnerContentAssignmentStateChoices.EXPIRED
         assignment.expired_at = localized_utcnow()
 
-        if automatic_expiration_reason == AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED:
-            assignment.clear_pii()
+        # Note: clear_pii() is intentionally NOT called here to ensure expiration emails
+        # are sent to the actual learner email address. PII clearing is handled by a
+        # separate daily task (clear_pii_for_expired_assignments) that runs after
+        # expiration emails have been sent.
 
         credit_request = getattr(assignment, 'credit_request', None)
 
