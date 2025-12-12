@@ -672,7 +672,7 @@ class CheckoutIntent(TimeStampedModel):
         self.stripe_checkout_session_id = session_id
         self.save(update_fields=['stripe_checkout_session_id', 'modified'])
 
-    def previous_summary(self, stripe_event: stripe.Event) -> 'StripeEventSummary':
+    def previous_summary(self, stripe_event: stripe.Event, **filter_kwargs) -> 'StripeEventSummary':
         """
         Return the most recent StripeEventSummary for this CheckoutIntent prior to the given event.
 
@@ -688,7 +688,8 @@ class CheckoutIntent(TimeStampedModel):
         # Find the most recent summary before this event
         return StripeEventSummary.objects.filter(
             checkout_intent=self,
-            stripe_event_created_at__lt=event_timestamp
+            stripe_event_created_at__lt=event_timestamp,
+            **filter_kwargs,
         ).order_by('-stripe_event_created_at').first()
 
     def update_stripe_identifiers(self, session_id=None, customer_id=None):
@@ -809,6 +810,11 @@ class StripeEventData(TimeStampedModel):
         """Mark this event as handled by setting handled_at to now."""
         self.handled_at = timezone.now()
         self.save()
+
+    @property
+    def object_data(self):
+        """Shortcut to the nested stripe object data for this event."""
+        return self.data['data']['object']
 
 
 class StripeEventSummary(TimeStampedModel):

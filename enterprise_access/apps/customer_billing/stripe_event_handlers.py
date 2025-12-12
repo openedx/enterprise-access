@@ -164,6 +164,27 @@ def cancel_all_future_plans(checkout_intent):
     return deactivated
 
 
+def _try_enable_pending_updates(stripe_subscription_id):
+    """
+    We rely on Stripe’s Pending Updates feature to help prevent subscriptions from becoming active
+    before a payment is *successfully* processed
+    See: https://docs.stripe.com/billing/subscriptions/pending-updates
+    """
+    try:
+        # Update the subscription to enable pending updates for future modifications
+        # This ensures that quantity changes through the billing portal will only
+        # be applied if payment succeeds, preventing license count drift
+        logger.info(f'Enabling pending updates for created subscription {stripe_subscription_id}')
+        stripe.Subscription.modify(
+            stripe_subscription_id,
+            payment_behavior='pending_if_incomplete',
+        )
+
+        logger.info('Successfully enabled pending updates for subscription %s', stripe_subscription_id)
+    except stripe.StripeError as e:
+        logger.error('Failed to enable pending updates for subscription %s: %s', stripe_subscription_id, e)
+
+
 class StripeEventHandler:
     """
     Container for Stripe event handler logic.
@@ -310,19 +331,7 @@ class StripeEventHandler:
         )
         link_event_data_to_checkout_intent(event, checkout_intent)
 
-        try:
-            # Update the subscription to enable pending updates for future modifications
-            # This ensures that quantity changes through the billing portal will only
-            # be applied if payment succeeds, preventing license count drift
-            logger.info(f'Enabling pending updates for created subscription {subscription.id}')
-            stripe.Subscription.modify(
-                subscription.id,
-                payment_behavior='pending_if_incomplete',
-            )
-
-            logger.info('Successfully enabled pending updates for subscription %s', subscription.id)
-        except stripe.StripeError as e:
-            logger.error('Failed to enable pending updates for subscription %s: %s', subscription.id, e)
+        _try_enable_pending_updates(subscription.id)
 
         summary = StripeEventSummary.objects.get(event_id=event.id)
         try:
@@ -351,7 +360,28 @@ class StripeEventHandler:
             handle_pending_update(subscription.id, checkout_intent_id, pending_update)
 
         current_status = subscription.get("status")
-        prior_status = getattr(checkout_intent.previous_summary(event), 'subscription_status', None)
+        previous_summary = checkout_intent.previous_summary(event, stripe_object_type='subscription')
+        if not previous_summary:
+            logger.warning(
+                'No previous subscription summary for stripe subscription %s, event %s',
+                subscription.id, event.id,
+            )
+            return
+
+        # Handle changes to the default payment method on the subscription
+        # Changing the default payment method of a subscription can cause the
+        # payment_behavior to reset to the default. We need to force it to be "pending_if_incomplete"
+        # again, as we do on subscription creation (see above).
+        prior_default_payment_method = previous_summary.stripe_event_data.object_data.get('default_payment_method')
+        new_default_payment_method = subscription.get('default_payment_method')
+        if new_default_payment_method != prior_default_payment_method:
+            logger.warning(
+                'The default_payment_method for subscription %s has changed from %s to %s',
+                subscription.id, prior_default_payment_method, new_default_payment_method,
+            )
+            _try_enable_pending_updates(subscription.id)
+
+        prior_status = previous_summary.subscription_status
 
         # Handle trial-to-paid transition for renewal processing
         if prior_status == "trialing" and current_status == "active":
