@@ -141,9 +141,10 @@ def link_event_data_to_checkout_intent(event, checkout_intent):
 def cancel_all_future_plans(checkout_intent):
     """
     Deactivate (cancel) all future renewal plans descending from the
-    anchor plan for this enterprise.
+    anchor plan for this enterprise, regardless of whether
+    the renewal has already been processed.
     """
-    unprocessed_renewals = checkout_intent.renewals.filter(processed_at__isnull=True)
+    unprocessed_renewals = checkout_intent.renewals.all()
     if not unprocessed_renewals.exists():
         logger.warning('No renewals to cancel for Checkout Intent %s', checkout_intent.uuid)
         return []

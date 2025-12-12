@@ -357,7 +357,10 @@ class TestStripeEventHandler(TestCase):
         autospec=True,
     )
     def test_cancel_all_future_plans_deactivates_all(self, mock_lms_client):
-        """cancel_all_future_plans patches all future plans and returns their uuids."""
+        """
+        cancel_all_future_plans() patches all future plans, even the ones on processed renewals,
+        and returns their uuids.
+        """
         mock_client = mock_lms_client.return_value
         trial_plan_uuid = uuid.uuid4()
         paid_plan_a_uuid = uuid.uuid4()
@@ -366,7 +369,7 @@ class TestStripeEventHandler(TestCase):
             checkout_intent=self.checkout_intent,
             prior_subscription_plan_uuid=trial_plan_uuid,
             renewed_subscription_plan_uuid=paid_plan_a_uuid,
-            processed_at=None,
+            processed_at=timezone.now(),
         )
         SelfServiceSubscriptionRenewalFactory.create(
             checkout_intent=self.checkout_intent,

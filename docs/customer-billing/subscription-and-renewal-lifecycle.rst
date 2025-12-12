@@ -124,6 +124,17 @@ During the active subscription period:
 * Salesforce creates a paid Opportunity Line Item
 * Salesforce calls ``/api/v1/provisioning/subscription-plan-oli-update`` API to associate the OLI with the paid subscription plan
 
+**Payment Errors**
+
+We rely on Stripe’s Pending Updates feature to help prevent subscriptions from becoming active
+before a payment is *successfully* processed. When a payment fails, the Stripe subscription enters a ``past_due``
+state. When we observe this state:
+
+* All *future* license-manager subscription plans related to the stripe subscription are updated to
+  have ``active=False``.
+* We do this regardless of whether the corresponding renewal has been processed (in case there's some other
+  state change that temporarily puts the stripe subscription in an ``active`` state.
+
 **Annual Renewals**
 
 i.e. the second and ensuing paid periods. TBD on the actual flow, here.
