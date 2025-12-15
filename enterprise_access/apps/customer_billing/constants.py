@@ -110,3 +110,27 @@ ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS = {
 }
 
 BRAZE_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+
+class StripeSubscriptionStatus(StrEnum):
+    """
+    Namespace for allowed Stripe subscription status values.
+    https://docs.stripe.com/api/subscriptions/object#subscription_object-status
+    """
+    TRIALING = 'trialing'
+    ACTIVE = 'active'
+    PAST_DUE = 'past_due'
+    CANCELED = 'canceled'
+    UNPAID = 'unpaid'
+    PAUSED = 'paused'
+
+
+# Per subscription docs above: "If subscription collection_method=charge_automatically,
+# it becomes past_due when payment is required but cannot be paid
+# (due to failed payment or awaiting additional user actions).
+# Once Stripe has exhausted all payment retry attempts, the subscription will become
+# canceled or unpaid (depending on your subscriptions settings)."
+STRIPE_CANCELED_STATUSES = [
+    StripeSubscriptionStatus.CANCELED,
+    StripeSubscriptionStatus.UNPAID,
+]

@@ -8,8 +8,10 @@ from uuid import UUID
 
 import stripe
 from django.conf import settings
+from django.utils import timezone
 
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
+from enterprise_access.apps.customer_billing.constants import STRIPE_CANCELED_STATUSES, StripeSubscriptionStatus
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
     SelfServiceSubscriptionRenewal,
@@ -348,6 +350,9 @@ class StripeEventHandler:
         Handle customer.subscription.updated events.
         Track when subscriptions have pending updates and update related CheckoutIntent state.
         Send cancellation notification email when a trial subscription is canceled.
+
+        See https://docs.stripe.com/api/subscriptions/object#subscription_object-status for
+        important information about allowed state transitions.
         """
         subscription = event.data.object
         checkout_intent_id = get_checkout_intent_id_from_subscription(subscription)
@@ -383,8 +388,13 @@ class StripeEventHandler:
 
         prior_status = previous_summary.subscription_status
 
+        # Everything belows handles a subscription state change. If the status
+        # hasn't changed, we're all done.
+        if prior_status == current_status:
+            return
+
         # Handle trial-to-paid transition for renewal processing
-        if prior_status == "trialing" and current_status == "active":
+        if prior_status == StripeSubscriptionStatus.TRIALING and current_status == StripeSubscriptionStatus.ACTIVE:
             logger.info(
                 f"Subscription {subscription.id} transitioned from trial to active. "
                 f"Processing renewal for checkout_intent_id={checkout_intent_id}"
@@ -395,8 +405,8 @@ class StripeEventHandler:
                 checkout_intent_id=checkout_intent.id,
             )
 
-        # Trial cancellation transition
-        if current_status == "canceled" and prior_status != "canceled":
+        # Trial cancelation (or unpaid) transition
+        if current_status != prior_status and current_status in STRIPE_CANCELED_STATUSES:
             logger.info(
                 f"Subscription {subscription.id} status changed from '{prior_status}' to 'canceled'. "
             )
@@ -413,7 +423,7 @@ class StripeEventHandler:
                 )
 
         # Past due transition
-        if current_status == "past_due" and prior_status != "past_due":
+        if current_status != prior_status and current_status == StripeSubscriptionStatus.PAST_DUE:
             logger.warning(
                 'Stripe subscription %s was %s but is now past_due. '
                 'Checkout intent: %s',
@@ -439,6 +449,39 @@ class StripeEventHandler:
         """
         Handle customer.subscription.deleted events.
         """
+        subscription = event.data.object
+        checkout_intent_id = get_checkout_intent_id_from_subscription(subscription)
+        checkout_intent = get_checkout_intent_or_raise(checkout_intent_id, event.id)
+        link_event_data_to_checkout_intent(event, checkout_intent)
+
+        logger.info(
+            "Subscription %s status was deleted via event %s", subscription.id, event.id,
+        )
+
+        enterprise_uuid = checkout_intent.enterprise_uuid
+        if enterprise_uuid:
+            cancel_all_future_plans(checkout_intent)
+        else:
+            logger.error(
+                (
+                    "Cannot deactivate future plans for subscription %s: "
+                    "missing enterprise_uuid on CheckoutIntent %s"
+                ),
+                subscription.id,
+                checkout_intent.id,
+            )
+
+        previous_summary = checkout_intent.previous_summary(event, stripe_object_type='subscription')
+        if previous_summary.subscription_status == StripeSubscriptionStatus.TRIALING:
+            trial_end = subscription.get("trial_end") or timezone.now().timestamp()
+            logger.info(
+                "Queuing trial cancelation (deletion) email for checkout_intent_id=%s",
+                checkout_intent_id,
+            )
+            send_trial_cancellation_email_task.delay(
+                checkout_intent_id=checkout_intent.id,
+                trial_end_timestamp=trial_end,
+            )
 
 
 def _process_trial_to_paid_renewal(checkout_intent: CheckoutIntent, stripe_subscription_id: str, event: stripe.Event):

@@ -15,7 +15,11 @@ from django.test import TestCase
 from django.utils import timezone
 
 from enterprise_access.apps.core.tests.factories import UserFactory
-from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
+from enterprise_access.apps.customer_billing.constants import (
+    STRIPE_CANCELED_STATUSES,
+    CheckoutIntentState,
+    StripeSubscriptionStatus
+)
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
     SelfServiceSubscriptionRenewal,
@@ -126,7 +130,7 @@ class TestStripeEventHandler(TestCase):
         self,
         stripe_subscription_id,
         event_type='customer.subscription.created',
-        subscription_status='trialing',
+        subscription_status=StripeSubscriptionStatus.TRIALING,
         stripe_object_type='subscription',
         **extra_object_data,
     ):
@@ -276,15 +280,16 @@ class TestStripeEventHandler(TestCase):
     @mock.patch(
         "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_cancellation_email_task"
     )
+    @ddt.data(*STRIPE_CANCELED_STATUSES)
     def test_subscription_updated_sends_cancellation_email_for_canceled_trial(
-        self, mock_email_task
+            self, subscription_status, mock_email_task
     ):
         """Test that subscription_updated sends email when trial is canceled."""
         trial_end_timestamp = 1234567890
         subscription_id = "sub_test_canceled_123"
         subscription_data = {
             "id": subscription_id,
-            "status": "canceled",
+            "status": subscription_status,
             "trial_end": trial_end_timestamp,
             "metadata": self._create_mock_stripe_subscription(
                 self.checkout_intent.id
@@ -423,7 +428,7 @@ class TestStripeEventHandler(TestCase):
         subscription_id = 'sub_test_payment_method_123'
         subscription_data = {
             'id': subscription_id,
-            'status': 'trialing',
+            'status': StripeSubscriptionStatus.TRIALING,
             'default_payment_method': 'new_payment_method',
             'metadata': self._create_mock_stripe_subscription(self.checkout_intent.id),
         }
@@ -442,6 +447,50 @@ class TestStripeEventHandler(TestCase):
         mock_subs_modify.assert_called_once_with(
             subscription_id, payment_behavior='pending_if_incomplete',
         )
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.cancel_all_future_plans"
+    )
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_cancellation_email_task"
+    )
+    def test_subscription_deleted_cancels_future_plans(
+        self, mock_send_cancelation_email, mock_cancel,
+    ):
+        """Subscription deleted event triggers cancel_all_future_plans with expected args."""
+        subscription_id = "sub_test_past_due_123"
+        subscription_data = {
+            "id": subscription_id,
+            "status": "canceled",
+            "default_payment_method": None,
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        self._create_existing_event_data_records(
+            subscription_id,
+            subscription_status=StripeSubscriptionStatus.TRIALING,
+        )
+
+        # Ensure enterprise_uuid is present so handler proceeds with cancellation
+        self.checkout_intent.enterprise_uuid = uuid.uuid4()
+        self.checkout_intent.save(update_fields=["enterprise_uuid"])
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.deleted", subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        mock_cancel.assert_called_once_with(self.checkout_intent)
+        mock_send_cancelation_email.delay.assert_called_once_with(
+            checkout_intent_id=self.checkout_intent.id,
+            trial_end_timestamp=mock.ANY,
+        )
+        trial_end_value = mock_send_cancelation_email.delay.call_args_list[0].kwargs['trial_end_timestamp']
+        # Test that we use a default trial end of now if no value can be found in the event.
+        # The different between these two integer timestamps should be small,
+        # certainly less than one second.
+        self.assertLess(timezone.now().timestamp() - trial_end_value, 1)
 
     @mock.patch(
         "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_ending_reminder_email_task"
@@ -519,13 +568,13 @@ class TestStripeEventHandler(TestCase):
         # Create previous summary with trial status but NO renewal record
         StripeEventSummaryFactory(
             checkout_intent=self.checkout_intent,
-            subscription_status='trialing',
+            subscription_status=StripeSubscriptionStatus.TRIALING,
             stripe_subscription_id='sub_test_456'
         )
 
         subscription_data = {
             "id": "sub_test_456",
-            "status": "active",
+            "status": StripeSubscriptionStatus.ACTIVE,
             "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
         }
 
@@ -563,7 +612,7 @@ class TestStripeEventHandler(TestCase):
         subscription_data = get_stripe_object_for_event_type(
             'customer.subscription.updated',
             id=stripe_subscription_id,
-            status="active",
+            status=StripeSubscriptionStatus.ACTIVE,
             metadata=self._create_mock_stripe_subscription(self.checkout_intent.id),
         )
 
@@ -608,7 +657,7 @@ class TestStripeEventHandler(TestCase):
         subscription_data = get_stripe_object_for_event_type(
             'customer.subscription.updated',
             id=stripe_subscription_id,
-            status="active",
+            status=StripeSubscriptionStatus.ACTIVE,
             metadata=self._create_mock_stripe_subscription(self.checkout_intent.id),
         )
 
@@ -664,7 +713,7 @@ class TestStripeEventHandler(TestCase):
         subscription_data = get_stripe_object_for_event_type(
             'customer.subscription.updated',
             id=stripe_subscription_id,
-            status="active",
+            status=StripeSubscriptionStatus.ACTIVE,
             metadata=self._create_mock_stripe_subscription(self.checkout_intent.id),
         )
 
@@ -703,7 +752,7 @@ class TestStripeEventHandler(TestCase):
 
         # Verify StripeEventSummary was created for the new event
         new_summary = event_data.summary
-        self.assertEqual(new_summary.subscription_status, 'active')
+        self.assertEqual(new_summary.subscription_status, StripeSubscriptionStatus.ACTIVE)
         self.assertEqual(new_summary.stripe_subscription_id, stripe_subscription_id)
         self.assertEqual(new_summary.checkout_intent, self.checkout_intent)
 
@@ -718,7 +767,7 @@ class TestStripeEventHandler(TestCase):
         subscription_id = 'sub_test_created_123'
         subscription_data = {
             'id': subscription_id,
-            'status': 'trialing',
+            'status': StripeSubscriptionStatus.TRIALING,
             'object': 'subscription',
             'metadata': self._create_mock_stripe_subscription(self.checkout_intent.id),
         }
@@ -744,14 +793,14 @@ class TestStripeEventHandler(TestCase):
         # Verify summary was created and updated
         summary = event_data.summary
         self.assertEqual(summary.checkout_intent, self.checkout_intent)
-        self.assertEqual(summary.subscription_status, 'trialing')
+        self.assertEqual(summary.subscription_status, StripeSubscriptionStatus.TRIALING)
 
     @mock.patch('stripe.Subscription.modify')
     def test_subscription_created_handler_checkout_intent_not_found(self, mock_stripe_modify):
         """Test customer.subscription.created when CheckoutIntent is not found."""
         subscription_data = {
             'id': 'sub_test_not_found_123',
-            'status': 'trialing',
+            'status': StripeSubscriptionStatus.TRIALING,
             'object': 'subscription',
             'metadata': self._create_mock_stripe_subscription(99999),  # Non-existent ID
         }
@@ -773,7 +822,7 @@ class TestStripeEventHandler(TestCase):
         subscription_id = 'sub_test_stripe_error_123'
         subscription_data = {
             'id': subscription_id,
-            'status': 'trialing',
+            'status': StripeSubscriptionStatus.TRIALING,
             'object': 'subscription',
             'metadata': self._create_mock_stripe_subscription(self.checkout_intent.id),
         }
