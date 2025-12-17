@@ -111,6 +111,8 @@ ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS = {
 
 BRAZE_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
+INVOICE_PAID_PARENT_TYPE_IDENTIFIER = "subscription_item_details"
+
 
 class StripeSubscriptionStatus(StrEnum):
     """

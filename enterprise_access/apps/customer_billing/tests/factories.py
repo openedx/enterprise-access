@@ -10,7 +10,7 @@ from factory.django import DjangoModelFactory
 from faker import Faker
 
 from enterprise_access.apps.core.tests.factories import UserFactory
-from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
+from enterprise_access.apps.customer_billing.constants import INVOICE_PAID_PARENT_TYPE_IDENTIFIER, CheckoutIntentState
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
     SelfServiceSubscriptionRenewal,
@@ -37,6 +37,9 @@ def get_stripe_object_for_event_type(event_type, **overrides):
                         'pricing': {
                             'unit_amount': FAKER.random_int(min=100, max=5000),
                             'unit_amount_decimal': f'{FAKER.random_int(min=100, max=5000)}.0'
+                        },
+                        'parent': {
+                            'type': INVOICE_PAID_PARENT_TYPE_IDENTIFIER
                         }
                     }
                 ]

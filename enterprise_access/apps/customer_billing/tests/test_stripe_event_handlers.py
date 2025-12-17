@@ -16,6 +16,7 @@ from django.utils import timezone
 
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.customer_billing.constants import (
+    INVOICE_PAID_PARENT_TYPE_IDENTIFIER,
     STRIPE_CANCELED_STATUSES,
     CheckoutIntentState,
     StripeSubscriptionStatus
@@ -26,7 +27,11 @@ from enterprise_access.apps.customer_billing.models import (
     StripeEventData,
     StripeEventSummary
 )
-from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler, cancel_all_future_plans
+from enterprise_access.apps.customer_billing.stripe_event_handlers import (
+    StripeEventHandler,
+    _valid_invoice_paid_type,
+    cancel_all_future_plans
+)
 from enterprise_access.apps.customer_billing.tests.factories import (
     SelfServiceSubscriptionRenewalFactory,
     StripeEventDataFactory,
@@ -166,6 +171,95 @@ class TestStripeEventHandler(TestCase):
         StripeEventHandler.dispatch(mock_event)
 
     @ddt.data(
+        # Happy path: correct parent type at lines.data[0].parent.type
+        {
+            'name': 'valid_parent_type',
+            'invoice': {
+                'object': 'invoice',
+                'lines': {'data': [{'parent': {'type': INVOICE_PAID_PARENT_TYPE_IDENTIFIER}}]},
+            },
+            'expected': True,
+        },
+        # wrong parent type
+        {
+            'name': 'wrong_parent_type',
+            'invoice': {
+                'object': 'invoice',
+                'lines': {'data': [{'parent': {'type': 'invoice_item_details'}}]},
+            },
+            'expected': False,
+        },
+        # missing lines key
+        {
+            'name': 'missing_lines',
+            'invoice': {'object': 'invoice'},
+            'expected': False,
+        },
+        # lines.data empty
+        {
+            'name': 'empty_lines_data',
+            'invoice': {'object': 'invoice', 'lines': {'data': []}},
+            'expected': False,
+        },
+        # first line missing parent
+        {
+            'name': 'missing_parent',
+            'invoice': {'object': 'invoice', 'lines': {'data': [{}]}},
+            'expected': False,
+        },
+        # parent present but missing type
+        {
+            'name': 'missing_parent_type',
+            'invoice': {'object': 'invoice', 'lines': {'data': [{'parent': {}}]}},
+            'expected': False,
+        },
+        # lines wrong shape -> should hit TypeError protection
+        {
+            'name': 'lines_wrong_shape',
+            'invoice': {'object': 'invoice', 'lines': 'not-a-dict'},
+            'expected': False,
+        },
+    )
+    @ddt.unpack
+    def test__valid_invoice_paid_type_cases(self, name, invoice, expected):
+        mock_event = self._create_mock_stripe_event('invoice.paid', invoice)
+        self.assertEqual(_valid_invoice_paid_type(mock_event), expected, msg=name)
+
+    @ddt.data(
+        {
+            'name': 'wrapper_noops_on_invalid_parent_type',
+            'invoice': {'object': 'invoice', 'lines': {'data': [{'parent': {'type': 'invoice_item_details'}}]}},
+            'should_persist': False,
+        },
+        {
+            'name': 'wrapper_proceeds_on_valid_parent_type',
+            'invoice': {
+                'object': 'invoice',
+                'customer': 'cus_test_customer_456',
+                'parent': {'subscription_details': {'metadata': {}, 'subscription': 'subs_uuid'}},
+                'lines': {'data': [{'parent': {'type': INVOICE_PAID_PARENT_TYPE_IDENTIFIER}}]},
+            },
+            'should_persist': True,
+        },
+    )
+    @ddt.unpack
+    def test_wrapper_gates_invoice_paid_before_persist(self, name, invoice, should_persist):
+        mock_event = self._create_mock_stripe_event('invoice.paid', invoice)
+
+        with mock.patch(
+                'enterprise_access.apps.customer_billing.stripe_event_handlers.persist_stripe_event',
+                autospec=True,
+        ) as mock_persist:
+            mock_persist.return_value = None
+            StripeEventHandler.dispatch(mock_event)
+
+        self.assertEqual(
+            mock_persist.called,
+            should_persist,
+            msg=f'{name}: persist_stripe_event called mismatch',
+        )
+
+    @ddt.data(
         # Happy Test case: successful invoice.paid handling
         {
             'checkout_intent_state': CheckoutIntentState.CREATED,  # Simulate a typical scenario.
@@ -214,6 +308,20 @@ class TestStripeEventHandler(TestCase):
 
         subscription_id = 'sub_test_123456'
         mock_subscription = self._create_mock_stripe_subscription(intent_id_override or self.checkout_intent.id)
+        invoice_line_data = {
+            'data': [
+                {
+                    'parent': {
+                        'type': INVOICE_PAID_PARENT_TYPE_IDENTIFIER
+                    },
+                    'pricing': {
+                        'unit_amount': 42,
+                        'unit_amount_decimal': 42.0
+                    },
+                    'quantity': 12,
+                },
+            ]
+        }
         invoice_data = {
             'id': 'in_test_123456',
             'customer': stripe_customer_id,
@@ -224,6 +332,7 @@ class TestStripeEventHandler(TestCase):
                     'subscription': subscription_id,
                 },
             },
+            'lines': invoice_line_data
         }
 
         mock_event = self._create_mock_stripe_event('invoice.paid', invoice_data)
@@ -253,6 +362,15 @@ class TestStripeEventHandler(TestCase):
         self.assertEqual(self.checkout_intent.state, CheckoutIntentState.PAID)
         self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)
 
+        invoice_line_data = {
+            'data': [
+                {
+                    'parent': {
+                        'type': INVOICE_PAID_PARENT_TYPE_IDENTIFIER
+                    }
+                },
+            ]
+        }
         invoice_data = {
             'id': 'in_test_idempotent_123',
             'object': 'invoice',
@@ -263,6 +381,7 @@ class TestStripeEventHandler(TestCase):
                     'subscription': subscription_id
                 }
             },
+            'lines': invoice_line_data,
         }
 
         mock_event = self._create_mock_stripe_event('invoice.paid', invoice_data)
