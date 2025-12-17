@@ -266,8 +266,8 @@ class StripeEventHandler:
         link_event_data_to_checkout_intent(event, checkout_intent)
 
         send_payment_receipt_email.delay(
+            invoice_id=invoice.id,
             invoice_data=invoice,
-            subscription_data=subscription_details,
             enterprise_customer_name=checkout_intent.enterprise_name,
             enterprise_slug=checkout_intent.enterprise_slug,
         )
