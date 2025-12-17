@@ -9,6 +9,7 @@ from django.test import TestCase
 
 from enterprise_access.apps.api_client.license_manager_client import LicenseManagerApiClient
 from enterprise_access.apps.core.tests.factories import UserFactory
+from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
     SelfServiceSubscriptionRenewal,
@@ -223,6 +224,8 @@ class TestGetCreateSubscriptionPlanRenewalStep(TestCase):
         mock_accumulated_output.create_first_paid_subscription_plan_output.uuid = str(uuid4())
         mock_accumulated_output.create_first_paid_subscription_plan_output.expiration_date = datetime(2027, 1, 1)
 
+        self.checkout_intent.state = CheckoutIntentState.PAID
+        self.checkout_intent.save()
         # Process the input and expect the exception to propagate
         with self.assertRaises(Exception) as context:
             self.renewal_step.process_input(mock_accumulated_output)

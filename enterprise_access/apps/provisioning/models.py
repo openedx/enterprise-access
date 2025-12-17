@@ -84,7 +84,7 @@ class CheckoutIntentStepMixin:
         checkout_intent = self.get_fulfillable_checkout_intent_via_slug()
         checkout_intent.workflow = workflow
         checkout_intent.enterprise_uuid = enterprise_customer_uuid
-        checkout_intent.save()
+        checkout_intent.save(update_fields=['workflow', 'enterprise_uuid'])
 
     def error_checkout_intent(self, exc: Exception) -> None:
         """
@@ -94,9 +94,7 @@ class CheckoutIntentStepMixin:
             - CheckoutIntent.DoesNotExist: If there is no linked checkout intent.
         """
         checkout_intent = self.get_linked_checkout_intent()
-        checkout_intent.last_provisioning_error = str(exc)
-        checkout_intent.state = CheckoutIntentState.ERRORED_PROVISIONING
-        checkout_intent.save()
+        checkout_intent.mark_provisioning_error(str(exc))
 
     def fulfill_checkout_intent(self) -> None:
         """
@@ -106,8 +104,7 @@ class CheckoutIntentStepMixin:
             - CheckoutIntent.DoesNotExist: If there is no linked checkout intent.
         """
         checkout_intent = self.get_linked_checkout_intent()
-        checkout_intent.state = CheckoutIntentState.FULFILLED
-        checkout_intent.save()
+        checkout_intent.mark_as_fulfilled()
 
 
 @define

@@ -5,9 +5,14 @@ import logging
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from edx_django_utils.monitoring import set_custom_attribute
 
 from enterprise_access.apps.api.serializers import CheckoutIntentReadOnlySerializer
-from enterprise_access.apps.customer_billing.constants import CheckoutIntentSegmentEvents
+from enterprise_access.apps.customer_billing.constants import (
+    CHECKOUT_LIFECYCLE_IS_ERROR_MONITORING_KEY,
+    CHECKOUT_LIFECYCLE_STATE_MONITORING_KEY,
+    CheckoutIntentSegmentEvents
+)
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventData, StripeEventSummary
 from enterprise_access.apps.track.segment import track_event
 
@@ -24,6 +29,10 @@ def track_checkout_intent_changes(sender, instance, created, **kwargs):  # pylin
     # Only track if it's a creation or if the state actually changed
     if created or (prev_record is not None and prev_record.state != instance.state):
         previous_state = None if created else (prev_record.state if prev_record else None)
+
+        set_custom_attribute(CHECKOUT_LIFECYCLE_STATE_MONITORING_KEY, instance.state)
+        if instance.state in CheckoutIntent.FAILURE_STATES:
+            set_custom_attribute(CHECKOUT_LIFECYCLE_IS_ERROR_MONITORING_KEY, 'true')
 
         properties = dict(CheckoutIntentReadOnlySerializer(instance).data)
         properties["previous_state"] = previous_state

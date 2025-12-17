@@ -134,3 +134,6 @@ STRIPE_CANCELED_STATUSES = [
     StripeSubscriptionStatus.CANCELED,
     StripeSubscriptionStatus.UNPAID,
 ]
+
+CHECKOUT_LIFECYCLE_STATE_MONITORING_KEY = 'ssp_ci_lifecycle_change'
+CHECKOUT_LIFECYCLE_IS_ERROR_MONITORING_KEY = 'ssp_ci_lifecycle_is_error'
