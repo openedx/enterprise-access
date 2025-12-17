@@ -1190,7 +1190,9 @@ class LearnerCreditRequestViewSet(SubsidyRequestViewSet):
 
         try:
             with transaction.atomic():
-                learner_credit_request.decline(self.user)
+                # Extract decline_reason from validated data
+                # If not present, reason will be None
+                learner_credit_request.decline(self.user, reason=validated_data.get("decline_reason"))
         except (ValidationError, IntegrityError, DatabaseError) as exc:
             action_instance.status = get_user_message_choice(SubsidyRequestStates.REQUESTED)
             action_instance.error_reason = get_error_reason_choice(

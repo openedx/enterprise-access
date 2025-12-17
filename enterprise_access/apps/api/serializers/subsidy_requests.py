@@ -233,6 +233,14 @@ class LearnerCreditRequestDeclineSerializer(serializers.Serializer):
     disassociate_from_org = serializers.BooleanField(
         default=False, help_text="Whether to unlink the user from the enterprise organization"
     )
+    # Add a new optional field 'decline_reason' to capture reason for decline
+    # Default value is None (null) if not provided
+    decline_reason = serializers.CharField(
+        required=False,     # makes the field optional
+        allow_blank=True,   # allows empty string ""
+        allow_null=True,    # allows null value
+        help_text="Reason for declining"
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
