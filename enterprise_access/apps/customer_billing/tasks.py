@@ -476,8 +476,8 @@ def send_trial_end_and_subscription_started_email_task(
 
 @shared_task(base=LoggedTaskWithRetry)
 def send_payment_receipt_email(
+    invoice_id,
     invoice_data,
-    subscription_data,
     enterprise_customer_name,
     enterprise_slug,
 ):
@@ -485,8 +485,8 @@ def send_payment_receipt_email(
     Send payment receipt emails to enterprise admins after successful payment.
 
     Args:
+        invoice_id (str): The Stripe invoice ID used to look up the StripeEventSummary
         invoice_data (dict): The Stripe invoice data containing payment details
-        subscription_data (dict): The Stripe subscription data
         enterprise_customer_name (str): Name of the enterprise organization
         enterprise_slug (str): URL-friendly slug for the enterprise
 
@@ -506,6 +506,16 @@ def send_payment_receipt_email(
         braze_client, admin_users, enterprise_slug, raise_if_empty=True,
     )
 
+    # Get invoice summary from StripeEventSummary for accurate quantity and amount data
+    invoice_summary = StripeEventSummary.get_latest_invoice_paid(invoice_id)
+    if not invoice_summary:
+        logger.error(
+            'Payment receipt confirmation email not sent: No invoice summary found for invoice %s (enterprise: %s)',
+            invoice_id,
+            enterprise_customer_name,
+        )
+        return
+
     # Format the payment date
     payment_date = datetime.fromtimestamp(invoice_data.get('created', 0))
     formatted_date = format_datetime_obj(payment_date, '%d %B %Y')
@@ -515,10 +525,10 @@ def send_payment_receipt_email(
     card_details = payment_method.get('card', {})
     payment_method_display = f"{card_details.get('brand', 'Card')} - {card_details.get('last4', '****')}"
 
-    # Get subscription details
-    quantity = subscription_data.get('quantity', 0)
-    price_per_license = subscription_data.get('plan', {}).get('amount', 0)
-    total_amount = quantity * price_per_license
+    # Get subscription details from invoice summary
+    quantity = invoice_summary.invoice_quantity or 0
+    price_per_license = invoice_summary.invoice_unit_amount or 0
+    total_amount = invoice_summary.invoice_amount_paid or 0
 
     # Get billing address
     billing_details = payment_method.get('billing_details', {})
@@ -540,7 +550,7 @@ def send_payment_receipt_email(
         'organization': enterprise_customer_name,
         'billing_address': billing_address,
         'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}',
-        'receipt_number': invoice_data.get('id', ''),
+        'receipt_number': invoice_id,
     }
 
     send_campaign_message(

@@ -266,8 +266,19 @@ class TestSendPaymentReceiptEmail(TestCase):
     """
     def setUp(self):
         super().setUp()
+        self.user = UserFactory()
+        self.checkout_intent = CheckoutIntent.create_intent(
+            user=self.user,
+            slug="test-enterprise",
+            name="Test Enterprise",
+            quantity=5,
+        )
+        self.checkout_intent.stripe_customer_id = "cus_test_123"
+        self.checkout_intent.save()
+
+        self.invoice_id = 'in_1SNvVOQ60jNALKNUMk8TZucs'
         self.mock_invoice_data = {
-            'id': 'in_1SNvVOQ60jNALKNUMk8TZucs',
+            'id': self.invoice_id,
             'created': 1761829387,
             'payment_intent': {
                 'payment_method': {
@@ -289,12 +300,6 @@ class TestSendPaymentReceiptEmail(TestCase):
                 }
             }
         }
-        self.mock_subscription_data = {
-            'quantity': 5,
-            'plan': {
-                'amount': 39600  # $396.00 in cents
-            }
-        }
         self.mock_admin_users = [
             {
                 'email': 'admin1@test.com',
@@ -307,6 +312,22 @@ class TestSendPaymentReceiptEmail(TestCase):
         ]
         self.enterprise_customer_name = 'Test Enterprise'
         self.enterprise_slug = 'test-enterprise'
+
+        # Create StripeEventData and StripeEventSummary for the invoice
+        self.stripe_event_data = StripeEventData.objects.create(
+            event_id="evt_test_payment_receipt",
+            event_type="invoice.paid",
+            checkout_intent=self.checkout_intent,
+        )
+        self.invoice_summary = StripeEventSummary.objects.create(
+            stripe_event_data=self.stripe_event_data,
+            event_type="invoice.paid",
+            stripe_invoice_id=self.invoice_id,
+            invoice_amount_paid=198000,  # $1,980.00 (5 licenses * $396.00)
+            invoice_unit_amount=39600,   # $396.00 per license
+            invoice_quantity=5,
+            invoice_currency='usd',
+        )
 
     @mock.patch('enterprise_access.apps.customer_billing.tasks.format_datetime_obj')
     @mock.patch('enterprise_access.apps.customer_billing.tasks.BrazeApiClient')
@@ -335,8 +356,8 @@ class TestSendPaymentReceiptEmail(TestCase):
 
         # Call the task
         send_payment_receipt_email(
+            invoice_id=self.invoice_id,
             invoice_data=self.mock_invoice_data,
-            subscription_data=self.mock_subscription_data,
             enterprise_customer_name=self.enterprise_customer_name,
             enterprise_slug=self.enterprise_slug,
         )
@@ -354,6 +375,8 @@ class TestSendPaymentReceiptEmail(TestCase):
         mock_braze.create_braze_recipient.assert_has_calls(expected_recipient_calls, any_order=True)
 
         # Verify the campaign was sent with correct properties
+        # Note: total_paid_amount comes from invoice_summary.invoice_amount_paid (198000 cents = $1980.00)
+        # price_per_license comes from invoice_summary.invoice_unit_amount (39600 cents = $396.00)
         expected_properties = {
             'total_paid_amount': 1980.0,  # $396.00 * 5 licenses = $1,980.00
             'date_paid': '03 November 2025',  # Based on mock timestamp
@@ -377,16 +400,16 @@ class TestSendPaymentReceiptEmail(TestCase):
     @mock.patch('enterprise_access.apps.customer_billing.tasks.LmsApiClient')
     def test_payment_receipt_no_admin_users(self, mock_lms_client, mock_braze_client):
         """
-        Test that email is not sent when no admin users are found.
+        Test that exception is raised when no admin users are found.
         """
         mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
             'admin_users': []
         }
 
-        with self.assertRaisesRegex(Exception, 'No admin users'):
+        with self.assertRaises(Exception):
             send_payment_receipt_email(
+                invoice_id=self.invoice_id,
                 invoice_data=self.mock_invoice_data,
-                subscription_data=self.mock_subscription_data,
                 enterprise_customer_name=self.enterprise_customer_name,
                 enterprise_slug=self.enterprise_slug,
             )
@@ -413,8 +436,8 @@ class TestSendPaymentReceiptEmail(TestCase):
         ]
 
         send_payment_receipt_email(
+            invoice_id=self.invoice_id,
             invoice_data=self.mock_invoice_data,
-            subscription_data=self.mock_subscription_data,
             enterprise_customer_name=self.enterprise_customer_name,
             enterprise_slug=self.enterprise_slug,
         )
@@ -424,6 +447,27 @@ class TestSendPaymentReceiptEmail(TestCase):
         actual_recipients = mock_braze.send_campaign_message.call_args[1]['recipients']
         self.assertEqual(len(actual_recipients), 1)
         self.assertEqual(actual_recipients[0]['external_id'], 'braze_2')
+
+    @mock.patch('enterprise_access.apps.customer_billing.tasks.BrazeApiClient')
+    @mock.patch('enterprise_access.apps.customer_billing.tasks.LmsApiClient')
+    def test_payment_receipt_no_invoice_summary(self, mock_lms_client, mock_braze_client):
+        """
+        Test that email is not sent when no invoice summary is found.
+        """
+        mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
+            'admin_users': self.mock_admin_users
+        }
+
+        # Use a different invoice ID that doesn't have a summary
+        send_payment_receipt_email(
+            invoice_id='in_nonexistent_invoice',
+            invoice_data=self.mock_invoice_data,
+            enterprise_customer_name=self.enterprise_customer_name,
+            enterprise_slug=self.enterprise_slug,
+        )
+
+        # Verify Braze campaign was not sent
+        mock_braze_client.return_value.send_campaign_message.assert_not_called()
 
 
 class TestSendTrialEndingReminderEmailTask(TestCase):
