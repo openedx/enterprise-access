@@ -22,6 +22,7 @@ from enterprise_access.utils import cents_to_dollars, format_cents_for_user_disp
 logger = logging.getLogger(__name__)
 
 
+
 def get_enterprise_admins(enterprise_slug, raise_if_empty=False):
     """
     Fetches enterprise admin users for the given slug.
@@ -89,8 +90,8 @@ def send_campaign_message(
             trigger_properties=trigger_properties,
         )
         logger.info(
-            'Successfully sent %s for enterprise %s to %d recipients',
-            email_description, organization_name, len(recipients),
+            'Successfully sent %s for enterprise %s to %d recipients with properties %s',
+            email_description, organization_name, len(recipients), trigger_properties,
         )
     except Exception as exc:
         logger.exception(
