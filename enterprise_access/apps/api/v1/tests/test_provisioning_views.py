@@ -118,7 +118,7 @@ DEFAULT_REQUEST_PAYLOAD = {
     'pending_admins': [],
     'enterprise_catalog': {
         'title': 'Test catalog',
-        'catalog_query_id': 2,
+        # omit catalog_query_id to ensure the default is correct
     },
     'customer_agreement': {},
     'trial_subscription_plan': {

@@ -59,7 +59,7 @@ class EnterpriseCatalogRequestSerializer(BaseSerializer):
     )
     catalog_query_id = serializers.ChoiceField(
         choices=settings.PROVISIONING_DEFAULTS['catalog']['all_catalog_query_choices'],
-        default=settings.PROVISIONING_DEFAULTS['subscription']['trial_catalog_query_choices'],
+        default=settings.PROVISIONING_DEFAULTS['subscription']['trial_catalog_query_choices'][0][0],
         help_text='The id of the related Catalog Query.',
     )
 
