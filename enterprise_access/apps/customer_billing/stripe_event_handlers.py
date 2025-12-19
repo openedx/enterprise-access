@@ -369,7 +369,6 @@ class StripeEventHandler:
         Enable pending updates to prevent license count drift on failed payments.
         """
         subscription = event.data.object
-
         checkout_intent_id = get_checkout_intent_id_from_subscription(
             subscription
         )
@@ -377,6 +376,9 @@ class StripeEventHandler:
             checkout_intent_id, event.id
         )
         link_event_data_to_checkout_intent(event, checkout_intent)
+
+        checkout_intent.stripe_customer_id = subscription.get('customer', None)
+        checkout_intent.save()
 
         _try_enable_pending_updates(subscription.id)
 

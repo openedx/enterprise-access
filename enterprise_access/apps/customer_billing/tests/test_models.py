@@ -1103,25 +1103,20 @@ class TestStripeEventSummary(TestCase):
         Test that the `upcoming_invoice_amount_due` value in the StripeEventSummary model is populated
         from the upcoming invoice
         """
-        subscription_event_data = {
-            'id': 'evt_test_sub_created',
-            'type': 'customer.subscription.created',
-            'data': {
-                'object': {
-                    'object': 'subscription',
-                    'id': 'sub_test_789',
-                    'status': 'active',
-                    'currency': 'usd',
-                    'items': {
-                        'data': [
-                            {
-                                'object': 'subscription_item',
-                                'current_period_start': 1609459200,  # 2021-01-01 00:00:00 UTC
-                                'current_period_end': 1640995200,    # 2022-01-01 00:00:00 UTC
-                            }
-                        ]
-                    },
-                }
+        subscription_data_object = {
+            'object': 'subscription',
+            'id': 'sub_test_789',
+            'status': 'active',
+            'currency': 'usd',
+            'customer': 'cus_test_456',
+            'items': {
+                'data': [
+                    {
+                        'object': 'subscription_item',
+                        'current_period_start': 1609459200,  # 2021-01-01 00:00:00 UTC
+                        'current_period_end': 1640995200,    # 2022-01-01 00:00:00 UTC
+                    }
+                ]
             },
             'metadata': {
                 'checkout_intent_id': self.checkout_intent.id,
@@ -1129,10 +1124,17 @@ class TestStripeEventSummary(TestCase):
                 'enterprise_customer_slug': 'test-enterprise',
             }
         }
+        subscription_event_data = {
+            'id': 'evt_test_sub_created',
+            'type': 'customer.subscription.created',
+            'data': {
+                'object': subscription_data_object
+            }
+        }
 
         # Create subscription created stripe event
         mock_event = self._create_mock_stripe_event(
-            "customer.subscription.created", subscription_event_data
+            "customer.subscription.created", subscription_data_object
         )
 
         # Create StripeEventData

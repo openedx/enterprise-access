@@ -524,14 +524,14 @@ class TestSendTrialEndingReminderEmailTask(TestCase):
 
         stripe_event_data = StripeEventData.objects.create(
             event_id="evt_test_123",
-            event_type="invoice.paid",
+            event_type="customer.subscription.created",
             checkout_intent=self.checkout_intent,
         )
         StripeEventSummary.objects.create(
             stripe_event_data=stripe_event_data,
-            event_type="invoice.paid",
-            stripe_invoice_id="in_test_789",
-            invoice_amount_paid=633600,
+            event_type="customer.subscription.created",
+            stripe_subscription_id="sub_test_123",
+            upcoming_invoice_amount_due=633600,
         )
 
         mock_braze_instance = mock_braze_client.return_value

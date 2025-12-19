@@ -1047,7 +1047,6 @@ class StripeEventSummary(TimeStampedModel):
             return
         stripe_subscription_id = self.stripe_subscription_id
         stripe_customer_id = self.checkout_intent.stripe_customer_id
-
         if not (stripe_subscription_id and stripe_customer_id):
             logger.warning('Cannot update with upcoming invoice for event %s', self.event_id)
             return
@@ -1098,4 +1097,20 @@ class StripeEventSummary(TimeStampedModel):
         return cls.objects.filter(
             stripe_invoice_id=invoice_id,
             event_type='invoice.paid',
+        ).order_by('-stripe_event_created_at').first()
+
+    @classmethod
+    def get_latest_subscription_created(cls, subscription_id):
+        """
+        Retrieve the most recent customer.subscription.created event summary for a given subscription ID.
+
+        Args:
+            subscription_id (str): The Stripe subscription ID to look up
+
+        Returns:
+            StripeEventSummary: The most recent customer.subscription.created event summary, or None if not found
+        """
+        return cls.objects.filter(
+            stripe_subscription_id=subscription_id,
+            event_type='customer.subscription.created',
         ).order_by('-stripe_event_created_at').first()
