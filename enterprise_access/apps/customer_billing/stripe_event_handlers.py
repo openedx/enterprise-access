@@ -385,8 +385,6 @@ class StripeEventHandler:
             summary.update_upcoming_invoice_amount_due()
         except stripe.StripeError as exc:
             logger.warning('Error updating upcoming invoice amount due: %s', exc)
-            if not settings.STRIPE_GRACEFUL_EXCEPTION_MODE:
-                raise
 
     @on_stripe_event('customer.subscription.updated')
     @staticmethod
