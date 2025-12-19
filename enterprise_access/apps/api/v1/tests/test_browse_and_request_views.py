@@ -2087,6 +2087,37 @@ class TestLearnerCreditRequestViewSet(BaseEnterpriseAccessTestCase):
         )
 
     @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
+    def test_decline_reason_saved(self, mock_get_enterprise_uuid):
+        """
+        Test decline reason is persisted when learner credit request is declined.
+        """
+        # Mock enterprise UUID
+        mock_get_enterprise_uuid.return_value = str(self.enterprise_customer_uuid_1)
+
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': str(self.enterprise_customer_uuid_1)
+        }])
+
+        url = reverse('api:v1:learner-credit-requests-decline')
+        data = {
+            'enterprise_customer_uuid': str(self.enterprise_customer_uuid_1),
+            'subsidy_request_uuid': str(self.user_request_1.uuid),
+            'send_notification': False,
+            'decline_reason': 'Request outside program scope'
+        }
+
+        response = self.client.post(url, data)
+
+        assert response.status_code == status.HTTP_200_OK
+
+        # Verify request was declined and reason saved
+        self.user_request_1.refresh_from_db()
+        assert self.user_request_1.state == SubsidyRequestStates.DECLINED
+        assert self.user_request_1.reviewer == self.user
+        assert self.user_request_1.decline_reason == 'Request outside program scope'
+
+    @mock.patch('enterprise_access.apps.api.v1.views.browse_and_request.get_enterprise_uuid_from_request_data')
     @mock.patch(
         'enterprise_access.apps.api_client.enterprise_catalog_client.'
         'EnterpriseCatalogApiClient.catalog_content_metadata'
