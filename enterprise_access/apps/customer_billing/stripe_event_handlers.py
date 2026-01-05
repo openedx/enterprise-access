@@ -20,7 +20,8 @@ from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
     SelfServiceSubscriptionRenewal,
     StripeEventData,
-    StripeEventSummary
+    StripeEventSummary,
+    _datetime_from_timestamp
 )
 from enterprise_access.apps.customer_billing.stripe_event_types import StripeEventType
 from enterprise_access.apps.customer_billing.tasks import (
@@ -390,7 +391,7 @@ class StripeEventHandler:
 
     @on_stripe_event('customer.subscription.updated')
     @staticmethod
-    def subscription_updated(event: stripe.Event) -> None:
+    def subscription_updated(event: stripe.Event) -> None:  # pylint: disable=too-many-statements
         """
         Handle customer.subscription.updated events.
         Track when subscriptions have pending updates and update related CheckoutIntent state.
@@ -433,6 +434,33 @@ class StripeEventHandler:
 
         prior_status = previous_summary.subscription_status
 
+        # Handle subscription cancellation scheduling (when user clicks cancel in Stripe)
+        # This triggers before the subscription status actually changes
+        prior_cancel_at = previous_summary.subscription_cancel_at
+        current_cancel_at = subscription.get('cancel_at')
+        current_cancel_at_datetime = None
+        if current_cancel_at:
+            current_cancel_at_datetime = _datetime_from_timestamp(current_cancel_at)
+
+        # Detect when cancellation is newly scheduled (was None, now has value)
+        if prior_cancel_at is None and current_cancel_at_datetime is not None:
+            logger.info(
+                f"Subscription {subscription.id} was scheduled for cancellation at {current_cancel_at_datetime}. "
+                f"Processing cancellation notification for checkout_intent_id={checkout_intent_id}"
+            )
+            trial_end = subscription.get("trial_end")
+            if trial_end:
+                logger.info(f"Queuing trial cancellation email for checkout_intent_id={checkout_intent_id}")
+                send_trial_cancellation_email_task.delay(
+                    checkout_intent_id=checkout_intent.id,
+                    trial_end_timestamp=trial_end,
+                )
+            else:
+                logger.info(
+                    f"Subscription {subscription.id} scheduled for cancellation but has no trial_end, "
+                    f"skipping cancellation email"
+                )
+
         # Everything belows handles a subscription state change. If the status
         # hasn't changed, we're all done.
         if prior_status == current_status:
@@ -451,17 +479,25 @@ class StripeEventHandler:
             )
 
         # Trial cancelation (or unpaid) transition
+        # This is a fallback in case the cancel_at detection didn't trigger
         if current_status != prior_status and current_status in STRIPE_CANCELED_STATUSES:
             logger.info(
-                f"Subscription {subscription.id} status changed from '{prior_status}' to 'canceled'. "
+                f"Subscription {subscription.id} status changed from '{prior_status}' to '{current_status}'. "
             )
             trial_end = subscription.get("trial_end")
             if trial_end:
-                logger.info(f"Queuing trial cancellation email for checkout_intent_id={checkout_intent_id}")
-                send_trial_cancellation_email_task.delay(
-                    checkout_intent_id=checkout_intent.id,
-                    trial_end_timestamp=trial_end,
-                )
+                # Check if we already sent email when cancel_at was set (duplicate prevention)
+                if not subscription.get('cancel_at'):
+                    logger.info(f"Queuing trial cancellation email for checkout_intent_id={checkout_intent_id}")
+                    send_trial_cancellation_email_task.delay(
+                        checkout_intent_id=checkout_intent.id,
+                        trial_end_timestamp=trial_end,
+                    )
+                else:
+                    logger.info(
+                        f"Subscription {subscription.id} has cancel_at set, "
+                        f"skipping duplicate cancellation email"
+                    )
             else:
                 logger.info(
                     f"Subscription {subscription.id} canceled but has no trial_end, skipping cancellation email"

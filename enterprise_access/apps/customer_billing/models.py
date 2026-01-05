@@ -896,6 +896,11 @@ class StripeEventSummary(TimeStampedModel):
         blank=True,
         help_text='End date of the subscription period'
     )
+    subscription_cancel_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Timestamp when the subscription is scheduled to be canceled'
+    )
 
     # Invoice-related fields
     invoice_amount_paid = models.IntegerField(
@@ -947,7 +952,7 @@ class StripeEventSummary(TimeStampedModel):
     def __str__(self):
         return f"Summary of {self.event_type} - {self.event_id}"
 
-    def populate_with_summary_data(self):
+    def populate_with_summary_data(self):  # pylint: disable=too-many-statements
         """
         Extract and populate normalized fields from the related StripeEventData.
         """
@@ -1000,6 +1005,9 @@ class StripeEventSummary(TimeStampedModel):
             self.stripe_subscription_id = subscription_obj.id
             self.subscription_status = subscription_obj.get('status')
             self.currency = subscription_obj.get('currency')
+            self.subscription_cancel_at = self._timestamp_to_datetime(
+                subscription_obj.get('cancel_at')
+            )
 
             if 'items' not in subscription_obj or not subscription_obj['items'].get('data', []):
                 return

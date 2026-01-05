@@ -450,6 +450,118 @@ class TestStripeEventHandler(TestCase):
             mock_task.delay.assert_not_called()
 
     @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_cancellation_email_task"
+    )
+    def test_subscription_updated_sends_email_when_cancel_at_set(self, mock_email_task):
+        """Test that subscription_updated sends email when cancel_at is newly set."""
+        subscription_id = "sub_test_cancel_at_123"
+        trial_end_timestamp = int((timezone.now() + timedelta(days=14)).timestamp())
+        cancel_at_timestamp = int((timezone.now() + timedelta(hours=1)).timestamp())
+
+        # Create prior event WITHOUT cancel_at (subscription is active/trialing)
+        _, prior_summary = self._create_existing_event_data_records(
+            subscription_id,
+            subscription_status=StripeSubscriptionStatus.TRIALING,
+        )
+        # Explicitly set cancel_at to None on prior summary
+        prior_summary.subscription_cancel_at = None
+        prior_summary.save()
+
+        # Create new event WITH cancel_at (user just clicked cancel)
+        subscription_data = {
+            "id": subscription_id,
+            "status": "trialing",  # Status hasn't changed yet
+            "trial_end": trial_end_timestamp,
+            "cancel_at": cancel_at_timestamp,
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        mock_email_task.delay.assert_called_once_with(
+            checkout_intent_id=self.checkout_intent.id,
+            trial_end_timestamp=trial_end_timestamp,
+        )
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_cancellation_email_task"
+    )
+    def test_subscription_updated_no_duplicate_email_when_cancel_at_already_set(self, mock_email_task):
+        """Test that we don't send duplicate email if cancel_at was already set."""
+        subscription_id = "sub_test_cancel_at_dupe_123"
+        trial_end_timestamp = int((timezone.now() + timedelta(days=14)).timestamp())
+        cancel_at_timestamp = int((timezone.now() + timedelta(hours=1)).timestamp())
+
+        # Create prior event WITH cancel_at already set
+        _, prior_summary = self._create_existing_event_data_records(
+            subscription_id,
+            subscription_status=StripeSubscriptionStatus.TRIALING,
+        )
+        # Set cancel_at on the prior summary
+        cancel_at_datetime = timezone.now() + timedelta(hours=1)
+        prior_summary.subscription_cancel_at = cancel_at_datetime
+        prior_summary.save()
+
+        # Create new event with same cancel_at (some other field changed)
+        subscription_data = {
+            "id": subscription_id,
+            "status": "trialing",
+            "trial_end": trial_end_timestamp,
+            "cancel_at": cancel_at_timestamp,
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        # Should NOT send email since cancel_at was already set
+        mock_email_task.delay.assert_not_called()
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_cancellation_email_task"
+    )
+    def test_subscription_updated_status_change_with_cancel_at_no_duplicate(self, mock_email_task):
+        """Test that status change to canceled doesn't send duplicate email when cancel_at is set."""
+        subscription_id = "sub_test_no_dupe_123"
+        trial_end_timestamp = int((timezone.now() + timedelta(days=14)).timestamp())
+        cancel_at_timestamp = int((timezone.now() + timedelta(hours=1)).timestamp())
+
+        # Create prior event with trialing status and cancel_at already set
+        # (This would have triggered the cancel_at email previously)
+        _, prior_summary = self._create_existing_event_data_records(
+            subscription_id,
+            subscription_status=StripeSubscriptionStatus.TRIALING,
+        )
+        cancel_at_datetime = timezone.now() + timedelta(hours=1)
+        prior_summary.subscription_cancel_at = cancel_at_datetime
+        prior_summary.save()
+
+        # Now subscription status changes to canceled (at end of trial)
+        subscription_data = {
+            "id": subscription_id,
+            "status": "canceled",  # Status changed
+            "trial_end": trial_end_timestamp,
+            "cancel_at": cancel_at_timestamp,  # Still set
+            "metadata": self._create_mock_stripe_subscription(self.checkout_intent.id),
+        }
+
+        mock_event = self._create_mock_stripe_event(
+            "customer.subscription.updated", subscription_data
+        )
+
+        StripeEventHandler.dispatch(mock_event)
+
+        # Should NOT send email because cancel_at is set (indicates we already sent it)
+        mock_email_task.delay.assert_not_called()
+
+    @mock.patch(
         "enterprise_access.apps.customer_billing.stripe_event_handlers.cancel_all_future_plans"
     )
     @mock.patch(

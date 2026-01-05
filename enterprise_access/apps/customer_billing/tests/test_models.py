@@ -891,6 +891,53 @@ class TestStripeEventSummary(TestCase):
         self.assertEqual(summary.subscription_period_start.year, 2021)
         self.assertEqual(summary.subscription_period_end.year, 2022)
 
+    def test_populate_with_summary_data_extracts_cancel_at(self):
+        """Test that populate_with_summary_data correctly extracts subscription cancel_at."""
+        # Create timestamp for cancel_at (14 days from now)
+        cancel_at_timestamp = int((timezone.now() + timedelta(days=14)).timestamp())
+
+        # Create mock subscription event data with cancel_at
+        subscription_event_data = {
+            'id': 'evt_test_sub_cancel_at',
+            'type': 'customer.subscription.updated',
+            'data': {
+                'object': {
+                    'object': 'subscription',
+                    'id': 'sub_test_cancel_123',
+                    'status': 'trialing',
+                    'currency': 'usd',
+                    'cancel_at': cancel_at_timestamp,
+                    'items': {
+                        'data': [
+                            {
+                                'current_period_start': 1609459200,  # 2021-01-01 00:00:00 UTC
+                                'current_period_end': 1640995200,    # 2022-01-01 00:00:00 UTC
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+        # Create StripeEventData
+        stripe_event_data = StripeEventData.objects.create(
+            event_id='evt_test_sub_cancel_at',
+            event_type='customer.subscription.updated',
+            checkout_intent=self.checkout_intent,
+            data=subscription_event_data,
+        )
+
+        # Create and populate summary
+        summary = StripeEventSummary(stripe_event_data=stripe_event_data)
+        summary.populate_with_summary_data()
+
+        # Verify cancel_at is extracted and converted to datetime
+        self.assertIsNotNone(summary.subscription_cancel_at)
+        # Verify it's within a reasonable range (should be around 14 days from now)
+        expected_cancel_at = timezone.now() + timedelta(days=14)
+        time_diff = abs((summary.subscription_cancel_at - expected_cancel_at).total_seconds())
+        self.assertLess(time_diff, 60, "cancel_at timestamp should be within 60 seconds of expected value")
+
     def test_populate_with_summary_data_with_subscription_plan_uuid(self):
         """Test that subscription_plan_uuid is extracted from related workflow."""
         # Create a workflow
