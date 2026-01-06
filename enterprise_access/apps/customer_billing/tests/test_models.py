@@ -795,6 +795,7 @@ class TestStripeEventSummary(TestCase):
                     'subscription': 'sub_test_456',
                     'amount_paid': 2500,  # $25.00 in cents
                     'currency': 'usd',
+                    'cancel_at': None,
                     'lines': {
                         'data': [
                             {
@@ -851,6 +852,7 @@ class TestStripeEventSummary(TestCase):
                     'id': 'sub_test_789',
                     'status': 'active',
                     'currency': 'usd',
+                    'cancel_at': None,
                     'items': {
                         'data': [
                             {
@@ -890,6 +892,57 @@ class TestStripeEventSummary(TestCase):
         # Check that the converted dates are reasonable (2021-2022)
         self.assertEqual(summary.subscription_period_start.year, 2021)
         self.assertEqual(summary.subscription_period_end.year, 2022)
+
+    def test_populate_with_summary_data_subscription_updated_event(self):
+        """Test populating summary from customer.subscription.updated event."""
+        # Create mock subscription event data
+        subscription_event_data = {
+            'id': 'evt_test_sub_updated',
+            'type': 'customer.subscription.updated',
+            'data': {
+                'object': {
+                    'object': 'subscription',
+                    'id': 'sub_test_987',
+                    'status': 'trialing',
+                    'currency': 'usd',
+                    'cancel_at': 1631664000,  # 2021-09-15 00:00:00 UTC
+                    'items': {
+                        'data': [
+                            {
+                                'current_period_start': 1609459200,  # 2021-01-01 00:00:00 UTC
+                                'current_period_end': 1640995200,    # 2022-01-01 00:00:00 UTC
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+        # Create StripeEventData
+        stripe_event_data = StripeEventData.objects.create(
+            event_id='evt_test_sub_updated',
+            event_type='customer.subscription.updated',
+            checkout_intent=self.checkout_intent,
+            data=subscription_event_data,
+        )
+
+        # Create and populate summary
+        summary = StripeEventSummary(stripe_event_data=stripe_event_data)
+        summary.populate_with_summary_data()
+
+        # Verify subscription-specific fields are populated
+        self.assertEqual(summary.event_id, 'evt_test_sub_updated')
+        self.assertEqual(summary.event_type, 'customer.subscription.updated')
+        self.assertEqual(summary.checkout_intent, self.checkout_intent)
+        self.assertEqual(summary.stripe_object_type, 'subscription')
+        self.assertEqual(summary.stripe_subscription_id, 'sub_test_987')
+        self.assertEqual(summary.subscription_status, 'trialing')
+
+        # Verify datetime conversion for canceled date
+        self.assertIsNotNone(summary.canceled_at)
+
+        # Check that the converted date is reasonable (2021)
+        self.assertEqual(summary.canceled_at.year, 2021)
 
     def test_populate_with_summary_data_with_subscription_plan_uuid(self):
         """Test that subscription_plan_uuid is extracted from related workflow."""

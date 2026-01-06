@@ -905,6 +905,11 @@ class StripeEventSummary(TimeStampedModel):
         blank=True,
         help_text='End date of the subscription period'
     )
+    canceled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Timestamp when the subscription was cancelled, null if still active'
+    )
 
     # Invoice-related fields
     invoice_amount_paid = models.IntegerField(
@@ -1009,6 +1014,7 @@ class StripeEventSummary(TimeStampedModel):
             self.stripe_subscription_id = subscription_obj.id
             self.subscription_status = subscription_obj.get('status')
             self.currency = subscription_obj.get('currency')
+            self.canceled_at = self._timestamp_to_datetime(subscription_obj.get('cancel_at'))
 
             if 'items' not in subscription_obj or not subscription_obj['items'].get('data', []):
                 return
