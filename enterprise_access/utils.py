@@ -21,8 +21,6 @@ from enterprise_access.apps.subsidy_request.constants import SubsidyTypeChoices
 
 _MEMO_MISS = object()
 
-DEFAULT_STRFTIME_PATTERN = '%b %d, %Y'
-
 logger = logging.getLogger(__name__)
 
 
@@ -314,5 +312,5 @@ def format_cents_for_user_display(amount_cents):
     return f"${dollars:,.2f} USD"
 
 
-def format_datetime_obj(datetime_obj, output_pattern=DEFAULT_STRFTIME_PATTERN):
+def format_datetime_obj(datetime_obj, output_pattern):
     return datetime_obj.strftime(output_pattern)

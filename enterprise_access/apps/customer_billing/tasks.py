@@ -8,13 +8,17 @@ from datetime import datetime
 import stripe
 from celery import shared_task
 from django.conf import settings
-from django.utils import timezone
 
 from enterprise_access.apps.api_client.braze_client import BrazeApiClient
 from enterprise_access.apps.api_client.lms_client import LmsApiClient
-from enterprise_access.apps.customer_billing.constants import BRAZE_TIMESTAMP_FORMAT
+from enterprise_access.apps.customer_billing.constants import (
+    BRAZE_DATE_FORMAT_1,
+    BRAZE_DATE_FORMAT_2,
+    BRAZE_TIMESTAMP_FORMAT
+)
 from enterprise_access.apps.customer_billing.models import CheckoutIntent, StripeEventSummary
 from enterprise_access.apps.customer_billing.stripe_api import get_stripe_subscription, get_stripe_trialing_subscription
+from enterprise_access.apps.customer_billing.utils import datetime_from_timestamp
 from enterprise_access.apps.provisioning.utils import validate_trial_subscription
 from enterprise_access.tasks import LoggedTaskWithRetry
 from enterprise_access.utils import cents_to_dollars, format_cents_for_user_display, format_datetime_obj
@@ -139,16 +143,17 @@ def send_enterprise_provision_signup_confirmation_email(
         'Sending signup confirmation email for enterprise %s (slug: %s)', organization_name, enterprise_slug,
     )
 
-    trial_start_date = timezone.make_aware(datetime.fromtimestamp(subscription['trial_start']))
-    trial_end_date = timezone.make_aware(datetime.fromtimestamp(subscription['trial_end']))
+    trial_start_date = datetime_from_timestamp(subscription['trial_start'])
+    trial_end_date = datetime_from_timestamp(subscription['trial_end'])
 
     total_cost_cents = subscription['plan']['amount'] * number_of_licenses
 
-    # All trigger properties values must be JSON-serializable to eventuallly
+    # All trigger properties values must be JSON-serializable to eventually
     # send in the request payload to Braze.
+    # TODO: Cleanup unused trigger properties for Enterprise Provision Signup Confirmation Email campaign
     braze_trigger_properties = {
-        'subscription_start_date': format_datetime_obj(subscription_start_date),
-        'subscription_end_date': format_datetime_obj(subscription_end_date),
+        'subscription_start_date': format_datetime_obj(subscription_start_date, output_pattern=BRAZE_DATE_FORMAT_2),
+        'subscription_end_date': format_datetime_obj(subscription_end_date, output_pattern=BRAZE_DATE_FORMAT_2),
         'number_of_licenses': number_of_licenses,
         'organization': organization_name,
         'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}',
@@ -210,7 +215,10 @@ def send_trial_cancellation_email_task(
     )
 
     # Format trial end date for email template
-    trial_end_date = format_datetime_obj(timezone.make_aware(datetime.fromtimestamp(trial_end_timestamp)))
+    trial_end_date = format_datetime_obj(
+        datetime_from_timestamp(trial_end_timestamp),
+        output_pattern=BRAZE_DATE_FORMAT_2
+    )
 
     braze_trigger_properties = {
         "trial_end_date": trial_end_date,
@@ -336,7 +344,7 @@ def send_trial_ending_reminder_email_task(checkout_intent_id):
 
         first_item = subscription["items"].data[0]
         renewal_date_formatted = format_datetime_obj(
-            timezone.make_aware(datetime.fromtimestamp(first_item.current_period_end)),
+            datetime_from_timestamp(first_item.current_period_end),
             output_pattern=BRAZE_TIMESTAMP_FORMAT,
         )
         license_count = first_item.quantity
@@ -432,13 +440,13 @@ def send_trial_end_and_subscription_started_email_task(
 
     period_start = subscription.get('current_period_start')
     period_end = subscription.get('current_period_end')
-    subscription_period = None
+    subscription_start_period = None
+    subscription_end_period = None
     next_payment_date = None
     if period_start and period_end:
-        start_str = format_datetime_obj(datetime.utcfromtimestamp(period_start))
-        end_str = format_datetime_obj(datetime.utcfromtimestamp(period_end))
-        subscription_period = f"{start_str} – {end_str}"
-        next_payment_date = end_str
+        subscription_start_period = format_datetime_obj(datetime_from_timestamp(period_start), BRAZE_TIMESTAMP_FORMAT)
+        subscription_end_period = format_datetime_obj(datetime_from_timestamp(period_end), BRAZE_TIMESTAMP_FORMAT)
+        next_payment_date = subscription_end_period
 
     organization_name = checkout_intent.enterprise_name
     enterprise_slug = checkout_intent.enterprise_slug
@@ -459,7 +467,8 @@ def send_trial_end_and_subscription_started_email_task(
     braze_trigger_properties = {
         'total_license': total_license,
         'billing_amount': billing_amount,
-        'subscription_period': subscription_period,
+        'subscription_start_period': subscription_start_period,
+        'subscription_end_period': subscription_end_period,
         'next_payment_date': next_payment_date,
         'organization': organization_name,
         'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}',
@@ -519,8 +528,9 @@ def send_payment_receipt_email(
         return
 
     # Format the payment date
-    payment_date = datetime.fromtimestamp(invoice_data.get('created', 0))
-    formatted_date = format_datetime_obj(payment_date, '%d %B %Y')
+    formatted_payment_date = format_datetime_obj(
+        datetime_from_timestamp(invoice_data.get('created', 0)), BRAZE_DATE_FORMAT_1
+    )
 
     # Get payment method details
     payment_method = invoice_data.get('payment_intent', {}).get('payment_method', {})
@@ -544,7 +554,7 @@ def send_payment_receipt_email(
 
     braze_trigger_properties = {
         'total_paid_amount': cents_to_dollars(total_amount),
-        'date_paid': formatted_date,
+        'date_paid': formatted_payment_date,
         'payment_method': payment_method_display,
         'license_count': quantity,
         'price_per_license': cents_to_dollars(price_per_license),

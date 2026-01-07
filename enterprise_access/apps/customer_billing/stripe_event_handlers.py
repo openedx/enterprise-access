@@ -20,8 +20,7 @@ from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
     SelfServiceSubscriptionRenewal,
     StripeEventData,
-    StripeEventSummary,
-    _datetime_from_timestamp
+    StripeEventSummary
 )
 from enterprise_access.apps.customer_billing.stripe_event_types import StripeEventType
 from enterprise_access.apps.customer_billing.tasks import (
@@ -31,6 +30,7 @@ from enterprise_access.apps.customer_billing.tasks import (
     send_trial_end_and_subscription_started_email_task,
     send_trial_ending_reminder_email_task
 )
+from enterprise_access.apps.customer_billing.utils import datetime_from_timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -440,7 +440,7 @@ class StripeEventHandler:
         current_cancel_at = subscription.get('cancel_at')
         current_cancel_at_datetime = None
         if current_cancel_at:
-            current_cancel_at_datetime = _datetime_from_timestamp(current_cancel_at)
+            current_cancel_at_datetime = datetime_from_timestamp(current_cancel_at)
 
         # Detect when cancellation is newly scheduled (was None, now has value)
         if prior_cancel_at is None and current_cancel_at_datetime is not None:

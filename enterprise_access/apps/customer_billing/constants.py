@@ -109,7 +109,10 @@ ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS = {
     CheckoutIntentState.FULFILLED: [],
 }
 
+# Patterns used to serialize date/time to be machine-readable by Braze.
 BRAZE_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+BRAZE_DATE_FORMAT_1 = "%d %B %Y"
+BRAZE_DATE_FORMAT_2 = "%b %d, %Y"
 
 INVOICE_PAID_PARENT_TYPE_IDENTIFIER = "subscription_item_details"
 

@@ -854,7 +854,8 @@ class TestSendTrialEndAndSubscriptionStartedEmailTask(TestCase):
         props = kwargs['trigger_properties']
         assert props['total_license'] == 5
         assert props['billing_amount'] == '100'
-        assert 'subscription_period' in props
+        assert 'subscription_start_period' in props
+        assert 'subscription_end_period' in props
         assert 'next_payment_date' in props
         assert props['organization'] == 'Test Org'
         assert props['invoice_url'] == 'https://invoice.url'

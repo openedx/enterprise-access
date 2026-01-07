@@ -1,7 +1,6 @@
 """
 Models for customer billing app.
 """
-import datetime
 import logging
 from datetime import timedelta
 from decimal import Decimal
@@ -27,13 +26,10 @@ from enterprise_access.apps.customer_billing import stripe_api
 from enterprise_access.apps.customer_billing.constants import ALLOWED_CHECKOUT_INTENT_STATE_TRANSITIONS
 
 from .constants import INTENT_RESERVATION_DURATION_MINUTES, CheckoutIntentState
+from .utils import datetime_from_timestamp
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
-
-
-def _datetime_from_timestamp(timestamp):
-    return timezone.make_aware(datetime.datetime.fromtimestamp(timestamp))
 
 
 class FailedCheckoutIntentConflict(Exception):
@@ -668,7 +664,7 @@ class CheckoutIntent(TimeStampedModel):
             The most recent StripeEventSummary before the given event, or None if none exists
         """
         # Convert Stripe event timestamp to datetime
-        event_timestamp = _datetime_from_timestamp(stripe_event.created)
+        event_timestamp = datetime_from_timestamp(stripe_event.created)
 
         # Find the most recent summary before this event
         return StripeEventSummary.objects.filter(
@@ -1072,7 +1068,7 @@ class StripeEventSummary(TimeStampedModel):
     def _timestamp_to_datetime(timestamp):
         """Convert Unix timestamp to Django datetime."""
         if timestamp:
-            return _datetime_from_timestamp(timestamp)
+            return datetime_from_timestamp(timestamp)
         return None
 
     @classmethod
