@@ -136,6 +136,7 @@ class TestSendEnterpriseProvisionSignupConfirmationEmail(TestCase):
             'subscription_start_date': self.trial_start,
             'subscription_end_date': self.trial_end,
             'number_of_licenses': 100,
+            'activation_link': f"{settings.LMS_URL}/activate/some-activation-key",
             'organization_name': 'Test Corp',
             'enterprise_slug': 'test-corp',
         }
@@ -161,7 +162,8 @@ class TestSendEnterpriseProvisionSignupConfirmationEmail(TestCase):
             'subscription_end_date': 'Jan 01, 2026',
             'number_of_licenses': 100,
             'organization': 'Test Corp',
-            'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/test-corp',
+            'activation_link': f"{settings.LMS_URL}/activate/some-activation-key",
+            'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/test-corp/admin/subscriptions',
             'trial_start_datetime': format_datetime_obj(self.trial_start, output_pattern=BRAZE_TIMESTAMP_FORMAT),
             'trial_end_datetime': format_datetime_obj(self.trial_end, output_pattern=BRAZE_TIMESTAMP_FORMAT),
             'plan_amount': 100.00,

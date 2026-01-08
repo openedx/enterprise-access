@@ -109,6 +109,7 @@ def send_enterprise_provision_signup_confirmation_email(
         subscription_start_date: datetime,
         subscription_end_date: datetime,
         number_of_licenses: int,
+        activation_link: str,
         organization_name: str,
         enterprise_slug: str,
 ):
@@ -155,8 +156,9 @@ def send_enterprise_provision_signup_confirmation_email(
         'subscription_start_date': format_datetime_obj(subscription_start_date, output_pattern=BRAZE_DATE_FORMAT_2),
         'subscription_end_date': format_datetime_obj(subscription_end_date, output_pattern=BRAZE_DATE_FORMAT_2),
         'number_of_licenses': number_of_licenses,
+        'activation_link': activation_link,
         'organization': organization_name,
-        'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}',
+        'enterprise_admin_portal_url': f'{settings.ENTERPRISE_ADMIN_PORTAL_URL}/{enterprise_slug}/admin/subscriptions',
         'trial_start_datetime': format_datetime_obj(trial_start_date, output_pattern=BRAZE_TIMESTAMP_FORMAT),
         'trial_end_datetime': format_datetime_obj(trial_end_date, output_pattern=BRAZE_TIMESTAMP_FORMAT),
         'plan_amount': float(cents_to_dollars(subscription['plan']['amount'])),  # the per-unit cost

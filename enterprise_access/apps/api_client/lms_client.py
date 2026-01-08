@@ -786,6 +786,7 @@ class LmsApiClient(BaseOAuthClient):
         self,
         username: str | None = None,
         email: str | None = None,
+        user_email: str | None = None,
     ) -> dict | None:
         """
         Fetch LMS learner data for a given username or email.
@@ -794,8 +795,10 @@ class LmsApiClient(BaseOAuthClient):
             raise ValueError('Expected exactly one of `username` or `email`.')
         if username:
             query_params = {'username': username}
-        else:
+        elif email:
             query_params = {'email': email}
+        else:
+            query_params = {'user_email': user_email}
         response = self.client.get(
             self.user_accounts_endpoint,
             params=query_params,
@@ -805,6 +808,27 @@ class LmsApiClient(BaseOAuthClient):
             return None
         response.raise_for_status()
         return response.json()
+
+    def get_lms_user_activation_link(
+            self,
+            user_email: str,
+    ) -> str | None:
+        """
+        Returns either the activation link or None if no activation key is available from hte lms user account.
+        """
+        if not user_email:
+            logger.error(f"Unable to create customer activation link, invalid user_email: {user_email}")
+            return None
+
+        customer_data = self.get_lms_user_account(
+            user_email=user_email
+        )
+        activation_key = customer_data[0].get('activation_key', None)
+        activation_link = None
+        if activation_key:
+            activation_link = settings.LMS_URL + f'/activate/{activation_key}'
+        logger.error(f"Unable to create customer activation link, invalid activation key for user_email: {user_email}")
+        return activation_link
 
 
 class LmsUserApiClient(BaseUserApiClient):
