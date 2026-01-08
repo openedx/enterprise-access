@@ -438,8 +438,10 @@ def send_trial_end_and_subscription_started_email_task(
     amount_cents = plan.get('amount', 0)
     billing_amount = str(cents_to_dollars(amount_cents)) if amount_cents else None
 
-    period_start = subscription.get('current_period_start')
-    period_end = subscription.get('current_period_end')
+    items = (subscription.get("items") or {}).get("data") or []
+    first_item = items[0] if items else {}
+    period_start = first_item.get("current_period_start")
+    period_end = first_item.get("current_period_end")
     subscription_start_period = None
     subscription_end_period = None
     next_payment_date = None

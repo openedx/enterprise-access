@@ -825,8 +825,14 @@ class TestSendTrialEndAndSubscriptionStartedEmailTask(TestCase):
             'id': 'sub_123',
             'quantity': 5,
             'plan': {'amount': 10000},
-            'current_period_start': 1762273481,  # 05 Dec 2025
-            'current_period_end': 1793809481,    # 05 Dec 2026
+            'items': {
+                "data": [
+                    {
+                        'current_period_start': 1762273481,  # 05 Dec 2025
+                        'current_period_end': 1793809481,  # 05 Dec 2026
+                    }
+                ]
+            },
             'latest_invoice': {'hosted_invoice_url': 'https://invoice.url'},
         }
         checkout_intent_obj = mock.Mock()
@@ -875,8 +881,14 @@ class TestSendTrialEndAndSubscriptionStartedEmailTask(TestCase):
             'id': 'sub_123',
             'quantity': 5,
             'plan': {'amount': 10000},
-            'current_period_start': 1762273481,  # 05 Dec 2025
-            'current_period_end': 1793809481,    # 05 Dec 2026
+            'items': {
+                "data": [
+                    {
+                        'current_period_start': 1762273481,  # 05 Dec 2025
+                        'current_period_end': 1793809481,  # 05 Dec 2026
+                    }
+                ]
+            },
             'latest_invoice': {'hosted_invoice_url': 'https://invoice.url'},
         }
         checkout_intent_obj = mock.Mock()
