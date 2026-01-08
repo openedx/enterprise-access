@@ -2,7 +2,7 @@
 Tests for StripEventSummary viewset.
 """
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as tz
 from urllib.parse import urlencode
 
 from django.urls import reverse
@@ -203,7 +203,7 @@ class StripeEventUpcomingInvoiceAmountDueTests(APITest):
             expires_at=timezone.now() + timedelta(hours=1),
         )
 
-        subscription_event_data = {
+        self.subscription_created_event_data = {
             'id': 'evt_test_sub_created',
             'type': 'customer.subscription.created',
             'data': {
@@ -230,12 +230,31 @@ class StripeEventUpcomingInvoiceAmountDueTests(APITest):
             }
         }
 
+        self.subscription_updated_event_data = {
+            'id': 'evt_test_sub_updated',
+            'type': 'customer.subscription.updated',
+            'data': {
+                'object': {
+                    'object': 'subscription',
+                    'id': 'sub_test_789',
+                    'status': 'active',
+                    'currency': 'usd',
+                    'cancel_at': 1631664000,  # 2021-09-15 00:00:00 UTC
+                }
+            },
+            'metadata': {
+                'checkout_intent_id': self.checkout_intent.id,
+                'enterprise_customer_name': 'Test Enterprise',
+                'enterprise_customer_slug': 'test-enterprise',
+            }
+        }
+
         # Creating a StripeEventData record triggers a create of related StripeEventSummary
         self.stripe_event_data = StripeEventData.objects.create(
             event_id='evt_test_subscription',
             event_type='customer.subscription.created',
             checkout_intent=self.checkout_intent,
-            data=subscription_event_data,
+            data=self.subscription_created_event_data,
         )
 
         test_summary = StripeEventSummary.objects.filter(event_id='evt_test_subscription').first()
@@ -244,6 +263,41 @@ class StripeEventUpcomingInvoiceAmountDueTests(APITest):
         test_summary.save(update_fields=['upcoming_invoice_amount_due', 'subscription_plan_uuid'])
 
     def test_get_first_upcoming_invoice_amount_due(self):
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': self.enterprise_uuid,  # implicit access to this enterprise
+        }])
+        query_params = {
+            'subscription_plan_uuid': self.subscription_plan_uuid,
+        }
+
+        url = reverse('api:v1:stripe-event-summary-first-upcoming-invoice-amount-due')
+        url += f"?{urlencode(query_params)}"
+        response = self.client.get(url)
+        assert response.status_code == 200
+        # make sure that if there is not a customer.subscription.updated event, that the canceled_date is None
+        assert response.data == {
+            'canceled_date': None,
+            'currency': 'usd',
+            'upcoming_invoice_amount_due': 200,
+        }
+
+    def test_get_canceled_date(self):
+        # updated Stripe event triggered after cancellation
+        self.stripe_event_data = StripeEventData.objects.create(
+            event_id='evt_test_subscription_update',
+            event_type='customer.subscription.updated',
+            checkout_intent=self.checkout_intent,
+            data=self.subscription_updated_event_data,
+        )
+
+        canceled_datetime = datetime(2021, 9, 15, 0, 0, 0, tzinfo=tz.utc)
+
+        test_summary = StripeEventSummary.objects.filter(event_id='evt_test_subscription_update').first()
+        test_summary.subscription_cancel_at = canceled_datetime
+        test_summary.subscription_plan_uuid = self.subscription_plan_uuid
+        test_summary.save(update_fields=['subscription_cancel_at', 'subscription_plan_uuid'])
+
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
             'context': self.enterprise_uuid,  # implicit access to this enterprise
@@ -258,6 +312,7 @@ class StripeEventUpcomingInvoiceAmountDueTests(APITest):
         response = self.client.get(url)
         assert response.status_code == 200
         assert response.data == {
+            'canceled_date': canceled_datetime,
             'currency': 'usd',
             'upcoming_invoice_amount_due': 200,
         }

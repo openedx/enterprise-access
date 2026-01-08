@@ -604,17 +604,27 @@ class StripeEventSummaryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     )
     def first_upcoming_invoice_amount_due(self, request, *args, **kwargs):
         """
-        Given a license-manager SubscriptionPlan uuid, returns an upcoming
-        invoice amount due, dervied from Stripe's preview invoice API.
+        Given a license-manager SubscriptionPlan uuid, returns information needed for the
+        Subscription management page on admin portal, like the upcoming subscription price
+        and if the subscription has been cancelled
         """
         subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
-        summary = StripeEventSummary.objects.filter(
+        created_summary = StripeEventSummary.objects.filter(
             event_type='customer.subscription.created',
             subscription_plan_uuid=subscription_plan_uuid,
         ).first()
-        if not (subscription_plan_uuid and summary):
+        update_summary = StripeEventSummary.objects.filter(
+            event_type='customer.subscription.updated',
+            subscription_plan_uuid=subscription_plan_uuid,
+        ).first()
+
+        canceled_date = None
+        if update_summary:
+            canceled_date = update_summary.subscription_cancel_at
+        if not (subscription_plan_uuid and created_summary):
             return Response({})
         return Response({
-            'upcoming_invoice_amount_due': summary.upcoming_invoice_amount_due,
-            'currency': summary.currency,
+            'upcoming_invoice_amount_due': created_summary.upcoming_invoice_amount_due,
+            'currency': created_summary.currency,
+            'canceled_date': canceled_date,
         })
