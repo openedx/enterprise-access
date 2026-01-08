@@ -11,7 +11,6 @@ from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django_countries import countries
 
-from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
     SelfServiceSubscriptionRenewal,
@@ -22,7 +21,6 @@ from enterprise_access.apps.workflow.exceptions import UnitOfWorkException
 from enterprise_access.apps.workflow.models import AbstractWorkflow, AbstractWorkflowStep
 from enterprise_access.apps.workflow.serialization import BaseInputOutput
 
-from ...settings.base import LMS_URL
 from ..api_client import LmsApiClient
 from .api import (
     get_or_create_customer_agreement,
