@@ -2,7 +2,8 @@
 Tests for StripEventSummary viewset.
 """
 import uuid
-from datetime import datetime, timedelta, timezone as tz
+from datetime import datetime, timedelta
+from datetime import timezone as tz
 from urllib.parse import urlencode
 
 from django.urls import reverse
@@ -180,9 +181,9 @@ class StripeEventSummaryTests(APITest):
         assert response.status_code == 403
 
 
-class StripeEventUpcomingInvoiceAmountDueTests(APITest):
+class StripeSubscriptionPlanInfoTests(APITest):
     """
-    Tests for first_upcoming_invoice_amount_due endpoint.
+    Tests for get_stripe_subscription_plan_info endpoint.
     """
 
     def setUp(self):
@@ -262,7 +263,7 @@ class StripeEventUpcomingInvoiceAmountDueTests(APITest):
         test_summary.subscription_plan_uuid = self.subscription_plan_uuid
         test_summary.save(update_fields=['upcoming_invoice_amount_due', 'subscription_plan_uuid'])
 
-    def test_get_first_upcoming_invoice_amount_due(self):
+    def test_get_stripe_subscription_plan_info(self):
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
             'context': self.enterprise_uuid,  # implicit access to this enterprise
@@ -271,7 +272,7 @@ class StripeEventUpcomingInvoiceAmountDueTests(APITest):
             'subscription_plan_uuid': self.subscription_plan_uuid,
         }
 
-        url = reverse('api:v1:stripe-event-summary-first-upcoming-invoice-amount-due')
+        url = reverse('api:v1:stripe-event-summary-get-stripe-subscription-plan-info')
         url += f"?{urlencode(query_params)}"
         response = self.client.get(url)
         assert response.status_code == 200
@@ -307,7 +308,7 @@ class StripeEventUpcomingInvoiceAmountDueTests(APITest):
             'subscription_plan_uuid': self.subscription_plan_uuid,
         }
 
-        url = reverse('api:v1:stripe-event-summary-first-upcoming-invoice-amount-due')
+        url = reverse('api:v1:stripe-event-summary-get-stripe-subscription-plan-info')
         url += f"?{urlencode(query_params)}"
         response = self.client.get(url)
         assert response.status_code == 200

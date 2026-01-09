@@ -600,31 +600,31 @@ class StripeEventSummaryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     @action(
         detail=False,
         methods=['get'],
-        url_path='first-invoice-upcoming-amount-due',
+        url_path='get-stripe-subscription-plan-info',
     )
-    def first_upcoming_invoice_amount_due(self, request, *args, **kwargs):
+    def get_stripe_subscription_plan_info(self, request, *args, **kwargs):
         """
         Given a license-manager SubscriptionPlan uuid, returns information needed for the
         Subscription management page on admin portal, like the upcoming subscription price
         and if the subscription has been cancelled
         """
         subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
-        created_summary = StripeEventSummary.objects.filter(
+        created_event_summary = StripeEventSummary.objects.filter(
             event_type='customer.subscription.created',
             subscription_plan_uuid=subscription_plan_uuid,
-        ).first()
-        update_summary = StripeEventSummary.objects.filter(
+        ).order_by('-stripe_event_created_at').first()
+        updated_event_summary = StripeEventSummary.objects.filter(
             event_type='customer.subscription.updated',
             subscription_plan_uuid=subscription_plan_uuid,
-        ).first()
+        ).order_by('-stripe_event_created_at').first()
 
         canceled_date = None
-        if update_summary:
-            canceled_date = update_summary.subscription_cancel_at
-        if not (subscription_plan_uuid and created_summary):
+        if updated_event_summary:
+            canceled_date = updated_event_summary.subscription_cancel_at
+        if not (subscription_plan_uuid and created_event_summary):
             return Response({})
         return Response({
-            'upcoming_invoice_amount_due': created_summary.upcoming_invoice_amount_due,
-            'currency': created_summary.currency,
+            'upcoming_invoice_amount_due': created_event_summary.upcoming_invoice_amount_due,
+            'currency': created_event_summary.currency,
             'canceled_date': canceled_date,
         })
