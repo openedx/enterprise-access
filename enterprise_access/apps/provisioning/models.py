@@ -849,12 +849,11 @@ class NotificationStep(CheckoutIntentStepMixin, AbstractWorkflowStep):
         activation_link = None
 
         user_email = (
-                getattr(
-                    getattr(workflow.input_object, "create_enterprise_admin_users_input", None),
-                    "user_email",
-                    [],
-                )
-                or []
+            getattr(
+                getattr(workflow.input_object, "create_enterprise_admin_users_input", None),
+                "user_email",
+                [],
+            ) or []
         )
 
         if user_email and user_email[0]:

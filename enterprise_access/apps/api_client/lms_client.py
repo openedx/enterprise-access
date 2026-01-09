@@ -826,11 +826,11 @@ class LmsApiClient(BaseOAuthClient):
             user_email=user_email
         )
 
-        # The LMS API may return a list of user records or a single record.
         if isinstance(customer_data, list):
             if not customer_data:
                 logger.error(
-                    f"Unable to create customer activation link, empty LMS user account list for user_email: {user_email}"
+                    f"Unable to create customer activation link, "
+                    f"empty LMS user account list for user_email: {user_email}"
                 )
                 return None
             customer_record = customer_data[0]
@@ -839,7 +839,8 @@ class LmsApiClient(BaseOAuthClient):
 
         if not isinstance(customer_record, dict):
             logger.error(
-                f"Unable to create customer activation link, unexpected LMS user account format for user_email: {user_email}"
+                f"Unable to create customer activation link, "
+                f"unexpected LMS user account format for user_email: {user_email}"
             )
             return None
 
@@ -848,7 +849,8 @@ class LmsApiClient(BaseOAuthClient):
         if activation_key:
             activation_link = settings.LMS_URL + f'/activate/{activation_key}'
         else:
-            logger.error(f"Unable to create customer activation link, invalid activation key for user_email: {user_email}")
+            logger.error(f"Unable to create customer activation link, "
+                         f"invalid activation key for user_email: {user_email}")
         return activation_link
 
 
