@@ -789,7 +789,7 @@ class LmsApiClient(BaseOAuthClient):
         user_email: str | None = None,
     ) -> dict | None:
         """
-        Fetch LMS learner data for a given username or email.
+        Fetch LMS learner data using exactly one of: username, email, or user_email.
         """
         if bool(username) == bool(email):
             raise ValueError('Expected exactly one of `username` or `email`.')
@@ -814,7 +814,7 @@ class LmsApiClient(BaseOAuthClient):
             user_email: str,
     ) -> str | None:
         """
-        Returns either the activation link or None if no activation key is available from hte lms user account.
+        Returns either the activation link or None if no activation key is available from the lms user account.
         """
         if not user_email:
             logger.error(f"Unable to create customer activation link, invalid user_email: {user_email}")
@@ -823,11 +823,36 @@ class LmsApiClient(BaseOAuthClient):
         customer_data = self.get_lms_user_account(
             user_email=user_email
         )
-        activation_key = customer_data[0].get('activation_key', None)
+
+        if not customer_data:
+            logger.error(
+                f"Unable to create customer activation link, no LMS user account data for user_email: {user_email}"
+            )
+            return None
+
+        # The LMS API may return a list of user records or a single record.
+        if isinstance(customer_data, list):
+            if not customer_data:
+                logger.error(
+                    f"Unable to create customer activation link, empty LMS user account list for user_email: {user_email}"
+                )
+                return None
+            customer_record = customer_data[0]
+        else:
+            customer_record = customer_data
+
+        if not isinstance(customer_record, dict):
+            logger.error(
+                f"Unable to create customer activation link, unexpected LMS user account format for user_email: {user_email}"
+            )
+            return None
+
+        activation_key = customer_record.get('activation_key', None)
         activation_link = None
         if activation_key:
             activation_link = settings.LMS_URL + f'/activate/{activation_key}'
-        logger.error(f"Unable to create customer activation link, invalid activation key for user_email: {user_email}")
+        else:
+            logger.error(f"Unable to create customer activation link, invalid activation key for user_email: {user_email}")
         return activation_link
 
 
