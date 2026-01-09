@@ -266,7 +266,7 @@ class TestSendPaymentReceiptEmail(TestCase):
     """
     def setUp(self):
         super().setUp()
-        self.user = UserFactory()
+        self.user = UserFactory(email='hello@world.com')
         self.checkout_intent = CheckoutIntent.create_intent(
             user=self.user,
             slug="test-enterprise",
@@ -400,23 +400,31 @@ class TestSendPaymentReceiptEmail(TestCase):
     @mock.patch('enterprise_access.apps.customer_billing.tasks.LmsApiClient')
     def test_payment_receipt_no_admin_users(self, mock_lms_client, mock_braze_client):
         """
-        Test that exception is raised when no admin users are found.
+        Test that exception is not raised when no admin users are found, and instead the email is
+        sent to the email address of the CheckoutIntent user.
         """
         mock_lms_client.return_value.get_enterprise_customer_data.return_value = {
             'admin_users': []
         }
+        mock_braze = mock_braze_client.return_value
 
-        with self.assertRaises(Exception):
-            send_payment_receipt_email(
-                invoice_id=self.invoice_id,
-                invoice_data=self.mock_invoice_data,
-                enterprise_customer_name=self.enterprise_customer_name,
-                enterprise_slug=self.enterprise_slug,
-            )
+        send_payment_receipt_email(
+            invoice_id=self.invoice_id,
+            invoice_data=self.mock_invoice_data,
+            enterprise_customer_name=self.enterprise_customer_name,
+            enterprise_slug=self.enterprise_slug,
+        )
 
-        # Verify LMS API was called but Braze API was not
+        mock_braze.create_braze_recipient.assert_called_once_with(
+            user_email=self.checkout_intent.user.email,
+            lms_user_id=self.checkout_intent.user.lms_user_id,
+        )
         mock_lms_client.return_value.get_enterprise_customer_data.assert_called_once()
-        mock_braze_client.return_value.send_campaign_message.assert_not_called()
+        mock_braze_client.return_value.send_campaign_message.assert_called_once_with(
+            settings.BRAZE_ENTERPRISE_PROVISION_PAYMENT_RECEIPT_CAMPAIGN,
+            recipients=[mock_braze.create_braze_recipient.return_value],
+            trigger_properties=mock.ANY,
+        )
 
     @mock.patch('enterprise_access.apps.customer_billing.tasks.BrazeApiClient')
     @mock.patch('enterprise_access.apps.customer_billing.tasks.LmsApiClient')

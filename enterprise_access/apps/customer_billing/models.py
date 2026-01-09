@@ -948,6 +948,15 @@ class StripeEventSummary(TimeStampedModel):
     def __str__(self):
         return f"Summary of {self.event_type} - {self.event_id}"
 
+    def save(self, *args, **kwargs):
+        """
+        Infer checkout_intent from related event data if not present on self.
+        """
+        if not self.checkout_intent:
+            if self.stripe_event_data.checkout_intent:
+                self.checkout_intent = self.stripe_event_data.checkout_intent
+        super().save(*args, **kwargs)
+
     def populate_with_summary_data(self):  # pylint: disable=too-many-statements
         """
         Extract and populate normalized fields from the related StripeEventData.
