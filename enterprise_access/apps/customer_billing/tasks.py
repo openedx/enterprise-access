@@ -513,12 +513,6 @@ def send_payment_receipt_email(
         enterprise_slug,
     )
 
-    admin_users = get_enterprise_admins(enterprise_slug, raise_if_empty=True)
-    braze_client = BrazeApiClient()
-    recipients = prepare_admin_braze_recipients(
-        braze_client, admin_users, enterprise_slug, raise_if_empty=True,
-    )
-
     # Get invoice summary from StripeEventSummary for accurate quantity and amount data
     invoice_summary = StripeEventSummary.get_latest_invoice_paid(invoice_id)
     if not invoice_summary:
@@ -528,6 +522,21 @@ def send_payment_receipt_email(
             enterprise_customer_name,
         )
         return
+
+    admin_users = get_enterprise_admins(enterprise_slug, raise_if_empty=False)
+    if not admin_users:
+        # The customer might not yet be provisioned. If so, fall back to using the
+        # email address associated with the CheckoutIntent.
+        user = invoice_summary.checkout_intent.user
+        admin_users = [{
+            'email': user.email,
+            'lms_user_id': user.lms_user_id,
+        }]
+
+    braze_client = BrazeApiClient()
+    recipients = prepare_admin_braze_recipients(
+        braze_client, admin_users, enterprise_slug, raise_if_empty=True,
+    )
 
     # Format the payment date
     formatted_payment_date = format_datetime_obj(
