@@ -826,13 +826,13 @@ class LmsApiClient(BaseOAuthClient):
             user_email=user_email
         )
 
+        if not customer_data:
+            logger.error(
+                f"Unable to create customer activation link, no LMS user account data for user_email: {user_email}"
+            )
+            return None
+
         if isinstance(customer_data, list):
-            if not customer_data:
-                logger.error(
-                    f"Unable to create customer activation link, "
-                    f"empty LMS user account list for user_email: {user_email}"
-                )
-                return None
             customer_record = customer_data[0]
         else:
             customer_record = customer_data

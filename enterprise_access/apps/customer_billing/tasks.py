@@ -109,7 +109,7 @@ def send_enterprise_provision_signup_confirmation_email(
         subscription_start_date: datetime,
         subscription_end_date: datetime,
         number_of_licenses: int,
-        activation_link: str,
+        activation_link: str | None,
         organization_name: str,
         enterprise_slug: str,
 ):
@@ -124,6 +124,7 @@ def send_enterprise_provision_signup_confirmation_email(
         subscription_start_date (str): The start date of the subscription
         subscription_end_date (str): The end date of the subscription
         number_of_licenses (int): Number of licenses purchased/allocated
+        activation_link (str | None): Link to activate the user account
         organization_name (str): Name of the enterprise organization
         enterprise_slug (str): URL-friendly slug for the enterprise
 
