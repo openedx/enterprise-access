@@ -791,8 +791,10 @@ class LmsApiClient(BaseOAuthClient):
         """
         Fetch LMS learner data using exactly one of: username, email, or user_email.
         """
-        if bool(username) == bool(email):
-            raise ValueError('Expected exactly one of `username` or `email`.')
+        # Ensure exactly one of username, email, or user_email is provided.
+        provided_params = [param for param in (username, email, user_email) if param]
+        if len(provided_params) != 1:
+            raise ValueError('Expected exactly one of `username`, `email`, or `user_email`.')
         if username:
             query_params = {'username': username}
         elif email:
@@ -810,8 +812,8 @@ class LmsApiClient(BaseOAuthClient):
         return response.json()
 
     def get_lms_user_activation_link(
-            self,
-            user_email: str,
+        self,
+        user_email: str,
     ) -> str | None:
         """
         Returns either the activation link or None if no activation key is available from the lms user account.
@@ -823,12 +825,6 @@ class LmsApiClient(BaseOAuthClient):
         customer_data = self.get_lms_user_account(
             user_email=user_email
         )
-
-        if not customer_data:
-            logger.error(
-                f"Unable to create customer activation link, no LMS user account data for user_email: {user_email}"
-            )
-            return None
 
         # The LMS API may return a list of user records or a single record.
         if isinstance(customer_data, list):
