@@ -275,3 +275,25 @@ class StripeEventSummaryReadOnlySerializer(serializers.ModelSerializer):
         model = StripeEventSummary
         fields = '__all__'
         read_only_fields = [field.name for field in StripeEventSummary._meta.get_fields()]
+
+
+# pylint: disable=abstract-method
+class StripeSubscriptionPlanInfoResponseSerializer(serializers.Serializer):
+    """
+    Response serializer for response body from GET /api/v1/stripe-event-summary/get-stripe-subscription-plan-info
+    """
+    upcoming_invoice_amount_due = serializers.CharField(
+        required=False,
+        help_text='Upcoming invoice amount due related to this event/subscription',
+    )
+
+    currency = serializers.CharField(
+        required=False,
+        help_text='Three-letter ISO currency code associated with the subscription.',
+    )
+
+    canceled_date = serializers.DateTimeField(
+        required=False,
+        help_text='Timestamp when the subscription is scheduled to be canceled'
+
+    )

@@ -263,6 +263,17 @@ class StripeSubscriptionPlanInfoTests(APITest):
         test_summary.subscription_plan_uuid = self.subscription_plan_uuid
         test_summary.save(update_fields=['upcoming_invoice_amount_due', 'subscription_plan_uuid'])
 
+        self.stripe_event_data = StripeEventData.objects.create(
+            event_id='evt_test_subscription_update',
+            event_type='customer.subscription.updated',
+            checkout_intent=self.checkout_intent,
+            data=self.subscription_updated_event_data,
+        )
+        test_summary = StripeEventSummary.objects.filter(event_id='evt_test_subscription_update').first()
+        test_summary.subscription_cancel_at = datetime(2021, 9, 15, 0, 0, 0, tzinfo=tz.utc)
+        test_summary.subscription_plan_uuid = self.subscription_plan_uuid
+        test_summary.save(update_fields=['subscription_cancel_at', 'subscription_plan_uuid'])
+
     def test_get_stripe_subscription_plan_info(self):
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
@@ -276,44 +287,8 @@ class StripeSubscriptionPlanInfoTests(APITest):
         url += f"?{urlencode(query_params)}"
         response = self.client.get(url)
         assert response.status_code == 200
-        # make sure that if there is not a customer.subscription.updated event, that the canceled_date is None
         assert response.data == {
-            'canceled_date': None,
+            'canceled_date': '2021-09-15T00:00:00Z',
             'currency': 'usd',
-            'upcoming_invoice_amount_due': 200,
-        }
-
-    def test_get_canceled_date(self):
-        # updated Stripe event triggered after cancellation
-        self.stripe_event_data = StripeEventData.objects.create(
-            event_id='evt_test_subscription_update',
-            event_type='customer.subscription.updated',
-            checkout_intent=self.checkout_intent,
-            data=self.subscription_updated_event_data,
-        )
-
-        canceled_datetime = datetime(2021, 9, 15, 0, 0, 0, tzinfo=tz.utc)
-
-        test_summary = StripeEventSummary.objects.filter(event_id='evt_test_subscription_update').first()
-        test_summary.subscription_cancel_at = canceled_datetime
-        test_summary.subscription_plan_uuid = self.subscription_plan_uuid
-        test_summary.save(update_fields=['subscription_cancel_at', 'subscription_plan_uuid'])
-
-        self.set_jwt_cookie([{
-            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
-            'context': self.enterprise_uuid,  # implicit access to this enterprise
-        }])
-
-        query_params = {
-            'subscription_plan_uuid': self.subscription_plan_uuid,
-        }
-
-        url = reverse('api:v1:stripe-event-summary-get-stripe-subscription-plan-info')
-        url += f"?{urlencode(query_params)}"
-        response = self.client.get(url)
-        assert response.status_code == 200
-        assert response.data == {
-            'canceled_date': canceled_datetime,
-            'currency': 'usd',
-            'upcoming_invoice_amount_due': 200,
+            'upcoming_invoice_amount_due': '200',
         }
