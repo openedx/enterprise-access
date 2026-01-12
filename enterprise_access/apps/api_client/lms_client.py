@@ -786,21 +786,17 @@ class LmsApiClient(BaseOAuthClient):
         self,
         username: str | None = None,
         email: str | None = None,
-        user_email: str | None = None,
     ) -> dict | None:
         """
-        Fetch LMS learner data using exactly one of: username, email, or user_email.
+        Fetch LMS learner data using exactly one of: username, or email.
         """
-        # Ensure exactly one of username, email, or user_email is provided.
-        provided_params = [param for param in (username, email, user_email) if param]
-        if len(provided_params) != 1:
-            raise ValueError('Expected exactly one of `username`, `email`, or `user_email`.')
+        # Ensure exactly one of username, or email is provided.
+        if bool(username) == bool(email):
+            raise ValueError('Expected exactly one of `username` or `email`.')
         if username:
             query_params = {'username': username}
-        elif email:
-            query_params = {'email': email}
         else:
-            query_params = {'user_email': user_email}
+            query_params = {'email': email}
         response = self.client.get(
             self.user_accounts_endpoint,
             params=query_params,
@@ -823,7 +819,7 @@ class LmsApiClient(BaseOAuthClient):
             return None
 
         customer_data = self.get_lms_user_account(
-            user_email=user_email
+            email=user_email
         )
 
         if not customer_data:
