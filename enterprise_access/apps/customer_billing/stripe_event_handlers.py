@@ -280,6 +280,8 @@ class StripeEventHandler:
     def invoice_paid(event: stripe.Event) -> None:
         """
         Handle invoice.paid events.
+        If the amount is greater than zero (i.e. no longer in free trial),
+        send a receipt email.
         """
         invoice, subscription_details = get_invoice_and_subscription(event)
         stripe_customer_id = invoice['customer']
@@ -311,12 +313,13 @@ class StripeEventHandler:
 
         link_event_data_to_checkout_intent(event, checkout_intent)
 
-        send_payment_receipt_email.delay(
-            invoice_id=invoice.id,
-            invoice_data=invoice,
-            enterprise_customer_name=checkout_intent.enterprise_name,
-            enterprise_slug=checkout_intent.enterprise_slug,
-        )
+        if invoice.total > 0:
+            send_payment_receipt_email.delay(
+                invoice_id=invoice.id,
+                invoice_data=invoice,
+                enterprise_customer_name=checkout_intent.enterprise_name,
+                enterprise_slug=checkout_intent.enterprise_slug,
+            )
 
     @on_stripe_event('customer.subscription.trial_will_end')
     @staticmethod
