@@ -287,6 +287,7 @@ class TestGetCreateSubscriptionPlanRenewalStep(TestCase):
         )
         self.assertEqual(renewal_record.stripe_subscription_id, 'sub_latest_456')
 
+
 class TestNotificationStep(TestCase):
     """
     Tests for NotificationStep activation link behavior.
@@ -320,7 +321,7 @@ class TestNotificationStep(TestCase):
 
         workflow = mock.Mock()
         workflow.input_object.create_trial_subscription_plan_input.desired_num_licenses = 10
-        workflow.input_object.create_enterprise_admin_users_input.user_email = ['test@example.com']
+        workflow.input_object.create_enterprise_admin_users_input.user_emails = ['test@example.com']
         step.get_workflow_record = mock.Mock(return_value=workflow)
 
         mock_accumulated_output = mock.Mock()

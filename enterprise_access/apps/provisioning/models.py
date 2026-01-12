@@ -850,18 +850,15 @@ class NotificationStep(CheckoutIntentStepMixin, AbstractWorkflowStep):
         checkout_intent = self.get_linked_checkout_intent()
 
         username = (
-            getattr(
-                getattr(checkout_intent, "user", None),
-                "username",
-                None,
-            )
-            if checkout_intent
+            checkout_intent.user.username
+            if checkout_intent and checkout_intent.user
             else None
         )
+
         user_email = (
             getattr(
                 getattr(workflow.input_object, "create_enterprise_admin_users_input", None),
-                "user_email",
+                "user_emails",
                 [],
             ) or [None]
         )[0]

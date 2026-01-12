@@ -851,7 +851,7 @@ class LmsApiClient(BaseOAuthClient):
             return None
 
         customer_record = (
-            customer_data[0] if isinstance(customer_data, list) and customer_data else customer_data
+            customer_data[0] if isinstance(customer_data, list) else customer_data
         )
 
         if not isinstance(customer_record, dict):
