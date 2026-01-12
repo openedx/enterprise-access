@@ -600,9 +600,9 @@ class StripeEventSummaryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     @action(
         detail=False,
         methods=['get'],
-        url_path='get-stripe-subscription-plan-info',
+        url_path='first-invoice-upcoming-amount-due',
     )
-    def get_stripe_subscription_plan_info(self, request, *args, **kwargs):
+    def first_upcoming_invoice_amount_due(self, request, *args, **kwargs):
         """
         Deprecated first-invoice-upcoming-amount-due endpoint.
 
@@ -650,8 +650,8 @@ class StripeEventSummaryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
                 'canceled_date': canceled_date,
             },
         )
-        if not response_serializer.is_valid():
-            return HttpResponseServerError()
         if not (subscription_plan_uuid and (updated_event_summary or created_event_summary)):
             return Response({})
+        if not response_serializer.is_valid():
+            return HttpResponseServerError()
         return Response(response_serializer.data, status=status.HTTP_200_OK)

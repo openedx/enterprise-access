@@ -292,3 +292,34 @@ class StripeSubscriptionPlanInfoTests(APITest):
             'currency': 'usd',
             'upcoming_invoice_amount_due': '200',
         }
+
+    def test_get_stripe_subscription_plan_info_missing_subscription_plan_uuid(self):
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': self.enterprise_uuid,
+        }])
+
+        url = reverse('api:v1:stripe-event-summary-get-stripe-subscription-plan-info')
+        response = self.client.get(url)
+
+        assert response.status_code == 400
+        assert response.data[0] == 'subscription_plan_uuid query param is required'
+
+    def test_get_stripe_subscription_plan_info_old_url_passthrough(self):
+        self.set_jwt_cookie([{
+            'system_wide_role': SYSTEM_ENTERPRISE_ADMIN_ROLE,
+            'context': self.enterprise_uuid,  # implicit access to this enterprise
+        }])
+        query_params = {
+            'subscription_plan_uuid': self.subscription_plan_uuid,
+        }
+
+        url = reverse('api:v1:stripe-event-summary-first-upcoming-invoice-amount-due')
+        url += f"?{urlencode(query_params)}"
+        response = self.client.get(url)
+        assert response.status_code == 200
+        assert response.data == {
+            'canceled_date': '2021-09-15T00:00:00Z',
+            'currency': 'usd',
+            'upcoming_invoice_amount_due': '200',
+        }

@@ -294,6 +294,5 @@ class StripeSubscriptionPlanInfoResponseSerializer(serializers.Serializer):
 
     canceled_date = serializers.DateTimeField(
         required=False,
-        help_text='Timestamp when the subscription is scheduled to be canceled'
-
+        help_text='Timestamp when the subscription is scheduled to be canceled',
     )
