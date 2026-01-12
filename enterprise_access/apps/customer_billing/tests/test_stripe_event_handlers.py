@@ -114,6 +114,8 @@ class TestStripeEventHandler(TestCase):
         event.created = int(_rand_created_at().timestamp())
         event.type = event_type
         event.data = stripe.StripeObject()
+        if event_type == 'invoice.paid' and 'total' not in event_data:
+            event_data['total'] = 0
         event.data.object = AttrDict.wrap(event_data)
 
         for k, v in event_attrs.items():
@@ -265,6 +267,12 @@ class TestStripeEventHandler(TestCase):
             'checkout_intent_state': CheckoutIntentState.CREATED,  # Simulate a typical scenario.
             'expected_final_state': CheckoutIntentState.PAID,  # Changed!
         },
+        # Happy Test case: successful invoice.paid handling, non-zero total
+        {
+            'checkout_intent_state': CheckoutIntentState.CREATED,  # Simulate a typical scenario.
+            'expected_final_state': CheckoutIntentState.PAID,  # Changed!
+            'invoice_total': 599,  # Non-zero total means email is sent
+        },
         # Happy Test case: CheckoutIntent already paid - result should be idempotent w/ no errors.
         {
             'checkout_intent_state': CheckoutIntentState.PAID,  # Network outage led to redundant webhook retries.
@@ -296,6 +304,7 @@ class TestStripeEventHandler(TestCase):
         expected_exception=None,
         expect_matching_intent=True,
         expected_final_state=CheckoutIntentState.PAID,
+        invoice_total=0,
     ):
         """Test various scenarios for the invoice.paid event handler."""
         stripe_customer_id = 'cus_test_customer_456'
@@ -332,7 +341,8 @@ class TestStripeEventHandler(TestCase):
                     'subscription': subscription_id,
                 },
             },
-            'lines': invoice_line_data
+            'lines': invoice_line_data,
+            'total': invoice_total,
         }
 
         mock_event = self._create_mock_stripe_event('invoice.paid', invoice_data)
@@ -351,7 +361,20 @@ class TestStripeEventHandler(TestCase):
             self.assertIsNotNone(event_data.handled_at)
             self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)
 
-    def test_invoice_paid_handler_idempotent_with_same_customer_id(self):
+        if invoice_total:
+            mock_send_payment_receipt_email.delay.assert_called_once_with(
+                invoice_id=invoice_data['id'],
+                invoice_data=mock_event.data.object,
+                enterprise_customer_name=self.checkout_intent.enterprise_name,
+                enterprise_slug=self.checkout_intent.enterprise_slug,
+            )
+        else:
+            self.assertFalse(mock_send_payment_receipt_email.delay.called)
+
+    @mock.patch(
+        "enterprise_access.apps.customer_billing.stripe_event_handlers.send_payment_receipt_email"
+    )
+    def test_invoice_paid_handler_idempotent_with_same_customer_id(self, mock_send_payment_receipt_email):
         """Test that invoice.paid handler is idempotent when called with same stripe_customer_id."""
         subscription_id = 'sub_test_idempotent_123'
         stripe_customer_id = 'cus_test_idempotent_456'
@@ -382,6 +405,7 @@ class TestStripeEventHandler(TestCase):
                 }
             },
             'lines': invoice_line_data,
+            'total': 0,
         }
 
         mock_event = self._create_mock_stripe_event('invoice.paid', invoice_data)
@@ -395,6 +419,8 @@ class TestStripeEventHandler(TestCase):
         self.assertEqual(self.checkout_intent.stripe_customer_id, stripe_customer_id)
         event_data = StripeEventData.objects.get(event_id=mock_event.id)
         self.assertEqual(event_data.checkout_intent, self.checkout_intent)
+
+        self.assertFalse(mock_send_payment_receipt_email.delay.called)
 
     @mock.patch(
         "enterprise_access.apps.customer_billing.stripe_event_handlers.send_trial_cancellation_email_task"
