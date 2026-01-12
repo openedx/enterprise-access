@@ -20,7 +20,7 @@ from enterprise_access.apps.customer_billing.tests.factories import (
     StripeEventDataFactory,
     StripeEventSummaryFactory
 )
-from enterprise_access.apps.provisioning.models import GetCreateSubscriptionPlanRenewalStep
+from enterprise_access.apps.provisioning.models import GetCreateSubscriptionPlanRenewalStep, NotificationStep
 from enterprise_access.apps.provisioning.tests.factories import ProvisionNewCustomerWorkflowFactory
 
 
@@ -286,3 +286,66 @@ class TestGetCreateSubscriptionPlanRenewalStep(TestCase):
             subscription_plan_renewal_id=expected_renewal_id
         )
         self.assertEqual(renewal_record.stripe_subscription_id, 'sub_latest_456')
+
+class TestNotificationStep(TestCase):
+    """
+    Tests for NotificationStep activation link behavior.
+    """
+
+    @mock.patch('enterprise_access.apps.provisioning.models.send_enterprise_provision_signup_confirmation_email')
+    @mock.patch('enterprise_access.apps.provisioning.models.LmsApiClient.get_lms_user_activation_link')
+    def test_process_input_includes_activation_link_when_username_or_email_present(
+            self,
+            mock_get_activation_link,
+            mock_send_signup_email,
+    ):
+        """
+        Verify NotificationStep attempts to fetch an activation link and passes it
+        through to the signup confirmation email task when username/email is present.
+        """
+        expected_activation_link = 'http://edx-platform.example.com/activate/abc123'
+        mock_get_activation_link.return_value = expected_activation_link
+
+        # Create a real step record (matches other tests' pattern of using .objects.create)
+        step = NotificationStep.objects.create(
+            workflow_record_uuid=uuid4(),
+            input_data={},
+        )
+
+        step.fulfill_checkout_intent = mock.Mock()
+
+        checkout_intent = mock.Mock()
+        checkout_intent.user.username = 'fake-username'
+        step.get_linked_checkout_intent = mock.Mock(return_value=checkout_intent)
+
+        workflow = mock.Mock()
+        workflow.input_object.create_trial_subscription_plan_input.desired_num_licenses = 10
+        workflow.input_object.create_enterprise_admin_users_input.user_email = ['test@example.com']
+        step.get_workflow_record = mock.Mock(return_value=workflow)
+
+        mock_accumulated_output = mock.Mock()
+        mock_accumulated_output.create_trial_subscription_plan_output.start_date = datetime(2025, 1, 1)
+        mock_accumulated_output.create_trial_subscription_plan_output.expiration_date = datetime(2025, 2, 1)
+        mock_accumulated_output.create_customer_output.name = 'Test Customer'
+        mock_accumulated_output.create_customer_output.slug = 'test-customer'
+
+        # Execute
+        step.process_input(mock_accumulated_output)
+
+        # Activation link fetched with expected args
+        mock_get_activation_link.assert_called_once_with(
+            username='fake-username',
+            user_email='test@example.com',
+        )
+
+        # Email task called with activation link in the right position
+        mock_send_signup_email.delay.assert_called_once()
+        delay_args, delay_kwargs = mock_send_signup_email.delay.call_args
+
+        # delay args are:
+        # 0 start_date, 1 expiration_date, 2 desired_num_licenses, 3 activation_link, 4 name, 5 slug
+        self.assertEqual(delay_args[2], 10)
+        self.assertEqual(delay_args[3], expected_activation_link)
+        self.assertEqual(delay_args[4], 'Test Customer')
+        self.assertEqual(delay_args[5], 'test-customer')
+        self.assertEqual(delay_kwargs, {})

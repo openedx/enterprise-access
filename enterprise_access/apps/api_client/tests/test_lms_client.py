@@ -1095,6 +1095,192 @@ class TestLmsApiClient(TestCase):
             json={'enrollments_info': enrollments_info},
         )
 
+    @ddt.data(
+        # Username-only lookup
+        {
+            'username': 'fake-username',
+            'email': None,
+            'expected_query': {'username': 'fake-username'},
+            'expects_value_error': False,
+        },
+        # Email-only lookup
+        {
+            'username': None,
+            'email': 'test@example.com',
+            'expected_query': {'email': 'test@example.com'},
+            'expects_value_error': False,
+        },
+        # Username + email lookup (should raise ValueError)
+        {
+            'username': 'fake-username',
+            'email': 'test@example.com',
+            'expected_query': None,
+            'expects_value_error': True,
+        },
+    )
+    @ddt.unpack
+    @mock.patch('requests.Response.json')
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_lms_user_account(
+            self,
+            mock_oauth_client,
+            mock_json,
+            username,
+            email,
+            expected_query,
+            expects_value_error,
+    ):
+        """
+        Verify get_lms_user_account hits an LMS user account endpoint and passes
+        username/email as query parameters, returning the JSON payload.
+
+        If both username and email are provided, a ValueError is raised.
+        """
+        mock_json.return_value = {'results': [{'id': 1, 'activation_key': 'abc123'}]}
+        mock_oauth_client.return_value.get.return_value = requests.Response()
+        mock_oauth_client.return_value.get.return_value.status_code = 200
+
+        client = LmsApiClient()
+
+        if expects_value_error:
+            with self.assertRaises(ValueError):
+                client.get_lms_user_account(username=username, email=email)
+
+            # Ensure we never attempted an HTTP request
+            self.assertFalse(mock_oauth_client.return_value.get.called)
+            return
+
+        result = client.get_lms_user_account(username=username, email=email)
+        self.assertEqual(result, {'results': [{'id': 1, 'activation_key': 'abc123'}]})
+
+        # Verify the request was made
+        self.assertTrue(mock_oauth_client.return_value.get.called)
+
+        called_args, called_kwargs = mock_oauth_client.return_value.get.call_args
+        called_url = called_args[0]
+
+        # Sanity check: looks like it hit an "accounts" or "user" endpoint on LMS
+        self.assertIn('http', called_url)
+        self.assertTrue(
+            ('accounts' in called_url),
+            f"Expected an LMS user accounts endpoint, got: {called_url}",
+        )
+
+        # Ensure timeout is passed
+        self.assertIn('timeout', called_kwargs)
+        self.assertEqual(called_kwargs['timeout'], settings.LMS_CLIENT_TIMEOUT)
+
+        # Assert query params in a way that supports either:
+        # 1) params={...} passed to requests, OR
+        # 2) querystring embedded into the URL itself.
+        params = called_kwargs.get('params')
+        if params is not None:
+            for key, value in expected_query.items():
+                self.assertEqual(params.get(key), value)
+        else:
+            parsed = parse_qs(urlparse(called_url).query)
+            for key, value in expected_query.items():
+                self.assertEqual(parsed.get(key), [value])
+
+    @mock.patch('enterprise_access.apps.api_client.base_oauth.OAuthAPIClient')
+    def test_get_lms_user_account_http_error(self, mock_oauth_client):
+        """
+        Verify get_lms_user_account raises HTTPError on request failure.
+        """
+        mock_oauth_client.return_value.get.side_effect = requests.exceptions.HTTPError('whoopsie')
+        mock_oauth_client.return_value.get.return_value = requests.Response()
+        mock_oauth_client.return_value.get.return_value.status_code = 400
+
+        client = LmsApiClient()
+        with self.assertRaises(requests.exceptions.HTTPError):
+            client.get_lms_user_account(username='fake-username', email=None)
+
+    @ddt.data(
+        # Username lookup returns a dict with activation key
+        {
+            'username': 'fake-username',
+            'user_email': None,
+            'mock_customer_data': {'activation_key': 'abc123'},
+            'expected_link': f'{settings.LMS_URL}/activate/abc123',
+            'expected_get_account_kwargs': {'username': 'fake-username', 'email': None},
+        },
+        # Email lookup returns a list with activation key
+        {
+            'username': None,
+            'user_email': 'test@example.com',
+            'mock_customer_data': [{'activation_key': 'def456'}],
+            'expected_link': f'{settings.LMS_URL}/activate/def456',
+            'expected_get_account_kwargs': {'username': None, 'email': 'test@example.com'},
+        },
+        # Neither username nor email => None (no call)
+        {
+            'username': None,
+            'user_email': None,
+            'mock_customer_data': None,
+            'expected_link': None,
+            'expected_get_account_kwargs': None,
+        },
+        # No customer data => None
+        {
+            'username': 'fake-username',
+            'user_email': None,
+            'mock_customer_data': None,
+            'expected_link': None,
+            'expected_get_account_kwargs': {'username': 'fake-username', 'email': None},
+        },
+        # Malformed record => None
+        {
+            'username': 'fake-username',
+            'user_email': None,
+            'mock_customer_data': 'not-a-dict',
+            'expected_link': None,
+            'expected_get_account_kwargs': {'username': 'fake-username', 'email': None},
+        },
+        # Missing activation_key => None
+        {
+            'username': 'fake-username',
+            'user_email': None,
+            'mock_customer_data': {},
+            'expected_link': None,
+            'expected_get_account_kwargs': {'username': 'fake-username', 'email': None},
+        },
+    )
+    @ddt.unpack
+    @mock.patch('enterprise_access.apps.api_client.lms_client.logger')
+    def test_get_lms_user_activation_link(
+            self,
+            mock_logger,
+            username,
+            user_email,
+            mock_customer_data,
+            expected_link,
+            expected_get_account_kwargs,
+    ):
+        """
+        Verify get_lms_user_activation_link returns activation URL when activation_key exists,
+        and returns None for invalid inputs or unexpected LMS responses.
+        """
+        client = LmsApiClient()
+
+        with mock.patch.object(client, 'get_lms_user_account', return_value=mock_customer_data) as mock_get_account:
+            activation_link = client.get_lms_user_activation_link(
+                username=username,
+                user_email=user_email,
+            )
+
+            self.assertEqual(activation_link, expected_link)
+
+            if expected_get_account_kwargs is None:
+                self.assertFalse(mock_get_account.called)
+            else:
+                mock_get_account.assert_called_once_with(
+                    username=expected_get_account_kwargs['username'],
+                    email=expected_get_account_kwargs['email'],
+                )
+
+        if expected_link is None:
+            self.assertTrue(mock_logger.error.called or mock_logger.exception.called)
+
 
 class TestLmsUserApiClient(TestCase):
     """

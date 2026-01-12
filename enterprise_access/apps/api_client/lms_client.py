@@ -828,10 +828,13 @@ class LmsApiClient(BaseOAuthClient):
             )
             return None
 
+        lookup_username = username if username else None
+        lookup_email = None if username else user_email
+
         try:
             customer_data = self.get_lms_user_account(
-                username=username,
-                email=user_email,
+                username=lookup_username,
+                email=lookup_email,
             )
         except Exception:  # pylint: disable=broad-except
             logger.exception(
