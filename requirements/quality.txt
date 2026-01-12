@@ -147,7 +147,7 @@ distlib==0.4.0
     # via
     #   -r requirements/test.txt
     #   virtualenv
-django==5.2.9
+django==5.2.10
     # via
     #   -c requirements/common_constraints.txt
     #   -r requirements/test.txt
@@ -315,7 +315,7 @@ fastavro==1.12.1
     #   -r requirements/test.txt
     #   confluent-kafka
     #   openedx-events
-filelock==3.20.2
+filelock==3.20.3
     # via
     #   -r requirements/test.txt
     #   tox
@@ -367,7 +367,7 @@ jsonfield==3.2.0
     #   edx-celeryutils
 jsonfield2==4.0.0.post0
     # via -r requirements/test.txt
-jsonschema==4.25.1
+jsonschema==4.26.0
     # via
     #   -r requirements/test.txt
     #   drf-spectacular
@@ -495,7 +495,7 @@ pylint-plugin-utils==0.9.0
     #   pylint-django
 pymemcache==4.0.0
     # via -r requirements/test.txt
-pymongo==4.15.5
+pymongo==4.16.0
     # via
     #   -r requirements/test.txt
     #   edx-opaque-keys
@@ -634,7 +634,7 @@ tomlkit==0.13.3
     # via
     #   -r requirements/test.txt
     #   pylint
-tox==4.33.0
+tox==4.34.1
     # via -r requirements/test.txt
 twine==6.2.0
     # via -r requirements/quality.in
@@ -661,7 +661,7 @@ uritemplate==4.2.0
     #   coreapi
     #   drf-spectacular
     #   drf-yasg
-urllib3==2.6.2
+urllib3==2.6.3
     # via
     #   -r requirements/test.txt
     #   requests
@@ -672,7 +672,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.35.4
+virtualenv==20.36.1
     # via
     #   -r requirements/test.txt
     #   tox
