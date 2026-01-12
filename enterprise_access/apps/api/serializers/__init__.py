@@ -23,7 +23,8 @@ from .customer_billing import (
     CustomerBillingCreateCheckoutSessionRequestSerializer,
     CustomerBillingCreateCheckoutSessionSuccessResponseSerializer,
     CustomerBillingCreateCheckoutSessionValidationFailedResponseSerializer,
-    StripeEventSummaryReadOnlySerializer
+    StripeEventSummaryReadOnlySerializer,
+    StripeSubscriptionPlanInfoResponseSerializer
 )
 from .provisioning import (
     ProvisioningRequestSerializer,

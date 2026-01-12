@@ -654,7 +654,7 @@ SSP_PRODUCTS = {
 }
 
 # Enable the customer billing API endpoints under /api/v1/customer-billing/*
-ENABLE_CUSTOMER_BILLING_API = False
+ENABLE_CUSTOMER_BILLING_API = True
 
 DEFAULT_SSP_PRICE_LOOKUP_KEY = 'teams_subscription_license_yearly'
 

@@ -604,17 +604,54 @@ class StripeEventSummaryViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
     )
     def first_upcoming_invoice_amount_due(self, request, *args, **kwargs):
         """
-        Given a license-manager SubscriptionPlan uuid, returns an upcoming
-        invoice amount due, dervied from Stripe's preview invoice API.
+        Deprecated first-invoice-upcoming-amount-due endpoint.
+
+        Temporary passthrough to aid with transitioning to get-stripe-subscription-plan-info.
+        """
+        return self.get_stripe_subscription_plan_info(request, *args, **kwargs)
+
+    @action(
+        detail=False,
+        methods=['get'],
+        url_path='get-stripe-subscription-plan-info',
+    )
+    def get_stripe_subscription_plan_info(self, request, *args, **kwargs):
+        """
+        Given a license-manager SubscriptionPlan uuid, returns information needed for the
+        Subscription management page on admin portal, like the upcoming subscription price
+        and if the subscription has been cancelled
         """
         subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
-        summary = StripeEventSummary.objects.filter(
+        if not subscription_plan_uuid:
+            raise exceptions.ValidationError(detail='subscription_plan_uuid query param is required')
+        subscription_plan_uuid = self.request.query_params.get('subscription_plan_uuid')
+        created_event_summary = StripeEventSummary.objects.filter(
             event_type='customer.subscription.created',
             subscription_plan_uuid=subscription_plan_uuid,
-        ).first()
-        if not (subscription_plan_uuid and summary):
+        ).order_by('-stripe_event_created_at').first()
+        updated_event_summary = StripeEventSummary.objects.filter(
+            event_type='customer.subscription.updated',
+            subscription_plan_uuid=subscription_plan_uuid,
+        ).order_by('-stripe_event_created_at').first()
+
+        canceled_date, currency, upcoming_invoice_amount_due = None, None, None
+
+        if updated_event_summary:
+            canceled_date = updated_event_summary.subscription_cancel_at
+
+        if created_event_summary:
+            currency = created_event_summary.currency
+            upcoming_invoice_amount_due = created_event_summary.upcoming_invoice_amount_due
+
+        response_serializer = serializers.StripeSubscriptionPlanInfoResponseSerializer(
+            data={
+                'upcoming_invoice_amount_due': upcoming_invoice_amount_due,
+                'currency': currency,
+                'canceled_date': canceled_date,
+            },
+        )
+        if not (subscription_plan_uuid and (updated_event_summary or created_event_summary)):
             return Response({})
-        return Response({
-            'upcoming_invoice_amount_due': summary.upcoming_invoice_amount_due,
-            'currency': summary.currency,
-        })
+        if not response_serializer.is_valid():
+            return HttpResponseServerError()
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
