@@ -813,14 +813,14 @@ class LmsApiClient(BaseOAuthClient):
         user_email: str | None = None,
     ) -> str | None:
         """
-       Returns the LMS user activation link, or None if no activation key
-       is available for the user.
+        Returns the LMS user activation link, or None if no activation key
+        is available for the user.
 
-       Resolution strategy:
-       - Prefer username when provided
-       - Fall back to email if username is missing
-       - Return None safely if neither identifier is usable
-       """
+        Resolution strategy:
+        - Prefer username when provided
+        - Fall back to email if username is missing
+        - Return None safely if neither identifier is usable
+        """
         if not username and not user_email:
             logger.error(
                 "Unable to create customer activation link, "
