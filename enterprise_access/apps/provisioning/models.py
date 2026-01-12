@@ -847,18 +847,29 @@ class NotificationStep(CheckoutIntentStepMixin, AbstractWorkflowStep):
         workflow = self.get_workflow_record()
         desired_num_licenses = workflow.input_object.create_trial_subscription_plan_input.desired_num_licenses
         activation_link = None
+        checkout_intent = self.get_linked_checkout_intent()
 
+        username = (
+            getattr(
+                getattr(checkout_intent, "user", None),
+                "username",
+                None,
+            )
+            if checkout_intent
+            else None
+        )
         user_email = (
             getattr(
                 getattr(workflow.input_object, "create_enterprise_admin_users_input", None),
                 "user_email",
                 [],
-            ) or []
-        )
+            ) or [None]
+        )[0]
 
-        if user_email and user_email[0]:
+        if username or user_email:
             activation_link = LmsApiClient().get_lms_user_activation_link(
-                user_email=user_email[0],
+                username=username,
+                user_email=user_email,
             )
 
         # Notify the customer admin via email.
