@@ -148,7 +148,7 @@ dictdiffer==0.9.0
     # via
     #   -r requirements/test.txt
     #   pytest-dictsdiff
-dill==0.4.0
+dill==0.4.1
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -262,7 +262,7 @@ drf-jwt==1.19.2
     #   edx-drf-extensions
 drf-spectacular==0.29.0
     # via -r requirements/test.txt
-drf-yasg==1.21.11
+drf-yasg==1.21.14
     # via
     #   -r requirements/test.txt
     #   edx-api-doc-tools
@@ -320,7 +320,7 @@ edx-toggles==5.4.1
     #   edx-event-bus-kafka
 factory-boy==3.3.3
     # via -r requirements/test.txt
-faker==40.1.0
+faker==40.1.2
     # via
     #   -r requirements/test.txt
     #   factory-boy
@@ -604,7 +604,7 @@ social-auth-core==4.8.3
     #   -r requirements/test.txt
     #   edx-auth-backends
     #   social-auth-app-django
-soupsieve==2.8.1
+soupsieve==2.8.2
     # via beautifulsoup4
 sphinx==9.1.0
     # via
@@ -636,13 +636,13 @@ stevedore==5.6.0
     #   doc8
     #   edx-django-utils
     #   edx-opaque-keys
-stripe==14.1.0
+stripe==14.2.0
     # via -r requirements/test.txt
 text-unidecode==1.3
     # via
     #   -r requirements/test.txt
     #   python-slugify
-tomlkit==0.13.3
+tomlkit==0.14.0
     # via
     #   -r requirements/test.txt
     #   pylint
@@ -661,7 +661,6 @@ typing-extensions==4.15.0
 tzdata==2025.3
     # via
     #   -r requirements/test.txt
-    #   faker
     #   kombu
 tzlocal==5.3.1
     # via
