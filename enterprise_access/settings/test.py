@@ -67,9 +67,11 @@ COUPON_CODE_REQUEST_TOPIC_NAME = "coupon-code-request-test"
 LICENSE_REQUEST_TOPIC_NAME = "license-request-test"
 ACCESS_POLICY_TOPIC_NAME = "access-policy-test"
 SUBSIDY_REDEMPTION_TOPIC_NAME = "subsidy-redemption-test"
+ENTERPRISE_GROUPS_LIFECYCLE_TOPIC_NAME = "enterprise-groups-lifecycle-test"
 KAFKA_TOPICS = [
     COUPON_CODE_REQUEST_TOPIC_NAME,
     LICENSE_REQUEST_TOPIC_NAME,
+    ENTERPRISE_GROUPS_LIFECYCLE_TOPIC_NAME,
 
     # Access policy events
     ACCESS_POLICY_TOPIC_NAME,
