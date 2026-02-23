@@ -13,14 +13,14 @@ analytics-python==1.4.post1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-asgiref==3.11.0
+asgiref==3.11.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django
     #   django-cors-headers
     #   django-countries
-astroid==4.0.3
+astroid==4.0.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -49,12 +49,12 @@ billiard==4.2.4
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   celery
-cachetools==6.2.4
+cachetools==7.0.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   tox
-cattrs==25.3.0
+cattrs==26.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -75,7 +75,7 @@ cffi==2.0.0
     #   -r requirements/test.txt
     #   cryptography
     #   pynacl
-chardet==5.2.0
+chardet==6.0.0.post1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -143,7 +143,7 @@ coreschema==0.0.4
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   coreapi
-coverage[toml]==7.13.1
+coverage[toml]==7.13.4
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -152,7 +152,7 @@ crispy-bootstrap5==2025.6
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-cryptography==46.0.3
+cryptography==46.0.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -173,7 +173,7 @@ dictdiffer==0.9.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pytest-dictsdiff
-dill==0.4.0
+dill==0.4.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -183,7 +183,7 @@ distlib==0.4.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   virtualenv
-django==5.2.10
+django==5.2.11
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -280,7 +280,7 @@ django-waffle==5.0.0
     #   edx-django-utils
     #   edx-drf-extensions
     #   edx-toggles
-djangoql==0.18.1
+djangoql==0.19.1
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -317,12 +317,12 @@ drf-spectacular==0.29.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-drf-yasg==1.21.11
+drf-yasg==1.21.14
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-api-doc-tools
-edx-api-doc-tools==2.1.0
+edx-api-doc-tools==2.1.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -362,7 +362,7 @@ edx-drf-extensions==10.6.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-rbac
-edx-enterprise-subsidy-client==2.0.19
+edx-enterprise-subsidy-client==2.1.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -400,7 +400,7 @@ factory-boy==3.3.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-faker==40.1.0
+faker==40.4.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -411,7 +411,7 @@ fastavro==1.12.1
     #   -r requirements/test.txt
     #   confluent-kafka
     #   openedx-events
-filelock==3.20.3
+filelock==3.24.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -421,7 +421,7 @@ freezegun==1.5.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-id==1.5.0
+id==1.6.1
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -441,7 +441,7 @@ iniconfig==2.3.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pytest
-isort==7.0.0
+isort==8.0.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -455,7 +455,7 @@ jaraco-classes==3.4.0
     # via
     #   -r requirements/quality.txt
     #   keyring
-jaraco-context==6.0.2
+jaraco-context==6.1.0
     # via
     #   -r requirements/quality.txt
     #   keyring
@@ -530,11 +530,11 @@ more-itertools==10.8.0
     #   -r requirements/quality.txt
     #   jaraco-classes
     #   jaraco-functools
-mysqlclient==2.2.7
+mysqlclient==2.2.8
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-nh3==0.3.2
+nh3==0.3.3
     # via
     #   -r requirements/quality.txt
     #   readme-renderer
@@ -554,7 +554,7 @@ openedx-events==10.5.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-event-bus-kafka
-packaging==25.0
+packaging==26.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -564,7 +564,7 @@ packaging==25.0
     #   pytest
     #   tox
     #   twine
-platformdirs==4.5.1
+platformdirs==4.9.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -588,14 +588,14 @@ prompt-toolkit==3.0.52
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   click-repl
-psutil==7.2.1
+psutil==7.2.2
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-django-utils
 pycodestyle==2.14.0
     # via -r requirements/quality.txt
-pycparser==2.23
+pycparser==3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -609,7 +609,7 @@ pygments==2.19.2
     #   pytest
     #   readme-renderer
     #   rich
-pyjwt[crypto]==2.10.1
+pyjwt[crypto]==2.11.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -618,7 +618,7 @@ pyjwt[crypto]==2.10.1
     #   edx-drf-extensions
     #   edx-rest-api-client
     #   social-auth-core
-pylint==4.0.4
+pylint==4.0.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -675,7 +675,7 @@ pytest-dictsdiff==0.5.8
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-pytest-django==4.11.1
+pytest-django==4.12.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -713,7 +713,7 @@ readme-renderer==44.0
     # via
     #   -r requirements/quality.txt
     #   twine
-redis==7.1.0
+redis==7.2.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -732,7 +732,6 @@ requests==2.32.5
     #   coreapi
     #   edx-drf-extensions
     #   edx-rest-api-client
-    #   id
     #   requests-oauthlib
     #   requests-toolbelt
     #   social-auth-core
@@ -751,7 +750,7 @@ rfc3986==2.0.0
     # via
     #   -r requirements/quality.txt
     #   twine
-rich==14.2.0
+rich==14.3.3
     # via
     #   -r requirements/quality.txt
     #   twine
@@ -799,7 +798,7 @@ social-auth-app-django==5.7.0
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   edx-auth-backends
-social-auth-core==4.8.3
+social-auth-core==4.8.5
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -810,14 +809,14 @@ sqlparse==0.5.5
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   django
-stevedore==5.6.0
+stevedore==5.7.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   code-annotations
     #   edx-django-utils
     #   edx-opaque-keys
-stripe==14.1.0
+stripe==14.3.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -826,12 +825,12 @@ text-unidecode==1.3
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   python-slugify
-tomlkit==0.13.3
+tomlkit==0.14.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   pylint
-tox==4.34.1
+tox==4.44.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
@@ -850,7 +849,6 @@ tzdata==2025.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
-    #   faker
     #   kombu
 tzlocal==5.3.1
     # via
@@ -868,6 +866,7 @@ urllib3==2.6.3
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
+    #   id
     #   requests
     #   twine
 vine==5.1.0
@@ -877,12 +876,12 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==20.36.1
+virtualenv==20.39.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
     #   tox
-wcwidth==0.2.14
+wcwidth==0.6.0
     # via
     #   -r requirements/quality.txt
     #   -r requirements/test.txt
