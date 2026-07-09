@@ -3,8 +3,123 @@ name = "enterprise-access"
 version = "0.1.0"
 requires-python = ">=3.12"
 
+[dependency-groups]
+base = [
+    "analytics-python",
+    "cattrs",
+    "celery",
+    "confluent-kafka[avro,schema-registry]",
+    "crispy-bootstrap5",
+    "Django>=2.2",
+    "djangoql",
+    "django-cors-headers",
+    "django-celery-results",
+    "django-countries",
+    "django-crispy-forms",
+    "django-crum",
+    "django-extensions",
+    "django-filter",
+    "django-object-actions",
+    "django-rest-swagger",
+    "django-simple-history",
+    "django-waffle",
+    "djangorestframework",
+    "djangorestframework-csv",
+    "fastavro",
+    "edx-api-doc-tools",
+    "edx-auth-backends",
+    "edx-braze-client",
+    "edx-celeryutils",
+    "edx-django-utils",
+    "edx-django-release-util",
+    "edx-drf-extensions",
+    "edx-enterprise-subsidy-client",
+    "edx-event-bus-kafka",
+    "edx-rbac",
+    "edx-rest-api-client",
+    "jsonfield2",
+    "mysqlclient",
+    "openedx-events",
+    "pygments",
+    "pymemcache",
+    "pytz",
+    "redis",
+    "rules",
+    "stripe",
+    "drf-spectacular",
+    "django-log-request-id",
+]
+test = [
+    {include-group = "base"},
+    "code-annotations",
+    "coverage",
+    "ddt",
+    "django-dynamic-fixture",
+    "edx-lint",
+    "factory-boy",
+    "freezegun",
+    "pytest-cov",
+    "pytest-django",
+    "pytest_dictsdiff",
+    "tox",
+]
+quality = [
+    {include-group = "test"},
+    "isort",
+    "pycodestyle",
+    "pydocstyle",
+    "twine",
+]
+doc = [
+    {include-group = "test"},
+    "doc8",
+    "sphinx-book-theme",
+    "readme_renderer",
+    "Sphinx",
+]
+production = [
+    {include-group = "base"},
+    "gevent",
+    "gunicorn",
+    "python-memcached",
+    "PyYAML>=5.1",
+]
+ci = [
+    "codecov",
+    "tox",
+    "tox-uv",
+]
+dev = [
+    {include-group = "quality"},
+    {include-group = "ci"},
+    "diff-cover",
+    "edx-i18n-tools",
+    "django-debug-toolbar",
+]
+
 [tool.uv]
 package = false
+#  DO NOT EDIT constraint-dependencies DIRECTLY.
+#  This list is managed by `edx_lint write_uv_constraints`
+#  and will be overwritten the next time `make upgrade` is run.
+#  - GLOBAL constraints: edit edx_lint/files/common_constraints.txt
+#  - REPO-SPECIFIC constraints: edit [tool.edx_lint].uv_constraints in this file
+constraint-dependencies = [
+    "Django<6.0",
+    "elasticsearch<7.14.0",
+    "confluent-kafka<2.6.2",
+    "edx-braze-client<1",
+]
+
+[tool.edx_lint]
+uv_constraints = [
+    # confluent-kafka 2.7.0 increased CPU usage
+    "confluent-kafka<2.6.2",
+    # pinning braze-client below version 1, which will likely introduce a breaking-change
+    # as the package is converted to an openedx plugin.
+    # https://github.com/edx/braze-client/pull/30
+    "edx-braze-client<1",
+]
 
 [tool.isort]
 indent = '    '
