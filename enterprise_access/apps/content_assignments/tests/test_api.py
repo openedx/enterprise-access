@@ -1,7 +1,6 @@
 """
 Tests for the ``api.py`` module of the content_assignments app.
 """
-import re
 from unittest import mock
 from uuid import uuid4
 
@@ -27,11 +26,7 @@ from ..api import (
     get_assignment_for_learner,
     get_assignments_for_configuration
 )
-from ..constants import (
-    NUM_DAYS_BEFORE_AUTO_EXPIRATION,
-    RETIRED_EMAIL_ADDRESS_FORMAT,
-    LearnerContentAssignmentStateChoices
-)
+from ..constants import NUM_DAYS_BEFORE_AUTO_EXPIRATION, LearnerContentAssignmentStateChoices
 from ..models import AssignmentConfiguration, LearnerContentAssignment
 from .factories import AssignmentConfigurationFactory, LearnerContentAssignmentFactory
 

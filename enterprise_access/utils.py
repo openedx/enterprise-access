@@ -76,7 +76,8 @@ def _get_subsidy_expiration(assignment):
     Returns the datetime at which the subsidy for this assignment expires.
     """
     # Import here to avoid circular import
-    from enterprise_access.apps.content_assignments.content_metadata_api import parse_datetime_string
+    from enterprise_access.apps.content_assignments.content_metadata_api import \
+        parse_datetime_string  # pylint: disable=import-outside-toplevel
 
     subsidy_expiration_datetime = (
         assignment.assignment_configuration.policy.subsidy_expiration_datetime
@@ -96,9 +97,8 @@ def _get_enrollment_deadline_date(assignment, content_metadata):
     - Other assignments: Use existing normalized_metadata behavior
     """
     # Import here to avoid circular import
-    from enterprise_access.apps.content_assignments.enrollment_deadline_strategies import (
-        EnrollmentDeadlineStrategyFactory
-    )
+    from enterprise_access.apps.content_assignments.enrollment_deadline_strategies import \
+        EnrollmentDeadlineStrategyFactory  # pylint: disable=import-outside-toplevel
 
     strategy = EnrollmentDeadlineStrategyFactory.get_strategy(assignment)
     return strategy.get_enrollment_deadline(assignment, content_metadata)
@@ -123,7 +123,8 @@ def get_automatic_expiration_date_and_reason(
             fetched and subsequently cached from the content metadata API.
     """
     # Import here to avoid circular import
-    from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
+    from enterprise_access.apps.content_assignments.content_metadata_api import \
+        get_content_metadata_for_assignments  # pylint: disable=import-outside-toplevel
 
     assignment_configuration = assignment.assignment_configuration
     # pylint: disable=no-member,useless-suppression
