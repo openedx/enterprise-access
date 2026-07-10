@@ -115,6 +115,7 @@ constraint-dependencies = [
     "elasticsearch<7.14.0",
     "confluent-kafka<2.6.2",
     "edx-braze-client<1",
+    "stripe<15",
 ]
 
 [tool.edx_lint]
@@ -125,6 +126,11 @@ uv_constraints = [
     # as the package is converted to an openedx plugin.
     # https://github.com/edx/braze-client/pull/30
     "edx-braze-client<1",
+    # stripe 15.x changed StripeObject's attribute/item access behavior in a way that
+    # breaks this app's `.get()` calls on nested event payloads (see customer_billing's
+    # stripe_event_handlers/models tests). Pin to the same major version already
+    # verified against this codebase until that's addressed as its own piece of work.
+    "stripe<15",
 ]
 
 [tool.isort]
