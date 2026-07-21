@@ -57,24 +57,24 @@ shell: ## run Django shell
 	python manage.py shell
 
 test: clean ## run tests and generate coverage report
-	pytest --ds=enterprise_access.settings.test
+	uv run pytest --ds=enterprise_access.settings.test
 
 # To be run from CI context
 coverage: clean
-	pytest --cov-report html
+	uv run pytest --cov-report html
 	$(BROWSER) htmlcov/index.html
 
 isort_check: ## check that isort has been run
-	isort --check-only enterprise_access/
+	uv run isort --check-only enterprise_access/
 
 isort: ## run isort to sort imports in all Python files
-	isort --atomic enterprise_access/
+	uv run isort --atomic enterprise_access/
 
 style: ## run Python style checker
-	pycodestyle enterprise_access manage.py
+	uv run pycodestyle enterprise_access manage.py
 
 lint: ## run Python code linting
-	pylint --rcfile=pylintrc enterprise_access/apps/customer_billing *.py
+	uv run pylint --rcfile=pylintrc enterprise_access/apps/customer_billing *.py
 
 quality: style isort_check lint ## check code style and import sorting, then lint
 	@echo "\e[32mQuality tests passed!\e[0m"

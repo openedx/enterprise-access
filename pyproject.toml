@@ -1,6 +1,6 @@
 [project]
 name = "enterprise-access"
-version = "0.1.0"
+version = "1.0.1"
 requires-python = ">=3.12"
 
 [dependency-groups]
@@ -147,4 +147,18 @@ filterwarnings = [
     "ignore:.*urlresolvers is deprecated in favor of.*:DeprecationWarning:auth_backends.views:5",
     "ignore:.*invalid escape sequence.*:DeprecationWarning:.*(newrelic|uritemplate|psutil).*",
     "ignore:.*the imp module is deprecated in favour of importlib.*:DeprecationWarning:.*distutils.*",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["enterprise_access"]
+omit = [
+    "enterprise_access/settings*",
+    "enterprise_access/conf*",
+    "enterprise_access/apps/subsidy_access_policy/mocks.py",
+    "*wsgi.py",
+    "*migrations*",
+    "*admin.py",
+    "*static*",
+    "*templates*",
 ]
