@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        python-version:
+        - "3.12"
         toxenv:
         - "py312-django42"
         - "py312-django52"
@@ -23,7 +25,7 @@ jobs:
       uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
       with:
         enable-cache: true
-        python-version: '3.12'
+        python-version: ${{ matrix.python-version }}
 
     - name: Install Dependencies
       run: uv sync --group ci
@@ -34,7 +36,7 @@ jobs:
       run: uv run tox
 
     - name: Codecov
-      if: startsWith(matrix.toxenv, 'py312-django')
+      if: startsWith(matrix.toxenv, 'py312-django') && matrix.python-version == '3.12'
       run: uv run codecov
 
   quality:
