@@ -10,7 +10,7 @@ base = [
     "celery",
     "confluent-kafka[avro,schema-registry]",
     "crispy-bootstrap5",
-    "Django>=2.2",
+    "Django",
     "djangoql",
     "django-cors-headers",
     "django-celery-results",
@@ -49,7 +49,8 @@ base = [
     "drf-spectacular",
     "django-log-request-id",
 ]
-test = [
+# Base test packages, no Django version pinned - shared by `test` and `django42`.
+test-base = [
     {include-group = "base"},
     "code-annotations",
     "coverage",
@@ -62,6 +63,17 @@ test = [
     "pytest-django",
     "pytest_dictsdiff",
     "tox",
+]
+# Default test group: current supported Django version.
+test = [
+    {include-group = "test-base"},
+    "Django>=5.2,<6.0",
+]
+# Legacy Django 4.2 support - kept independent from `test` via [tool.uv].conflicts
+# below so `uv.lock` carries two separate, correct resolutions.
+django42 = [
+    {include-group = "test-base"},
+    "Django>=4.2,<5.0",
 ]
 quality = [
     {include-group = "test"},
@@ -104,6 +116,27 @@ package = false
 # dev/test/quality/ci superset (and mysqlclient) into every target, defeating
 # the point of having separate groups.
 default-groups = []
+# `quality`/`doc`/`dev` all transitively include `test` (for its default
+# Django pin), so they each conflict with `django42` the same way `test`
+# does. Update this list if the include-group chain changes.
+conflicts = [
+    [
+        {group = "test"},
+        {group = "django42"},
+    ],
+    [
+        {group = "quality"},
+        {group = "django42"},
+    ],
+    [
+        {group = "doc"},
+        {group = "django42"},
+    ],
+    [
+        {group = "dev"},
+        {group = "django42"},
+    ],
+]
 #  DO NOT EDIT constraint-dependencies DIRECTLY.
 #  This list is managed by `edx_lint write_uv_constraints`
 #  and will be overwritten the next time `make upgrade` is run.
