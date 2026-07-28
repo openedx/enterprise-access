@@ -68,7 +68,6 @@ quality = [
     "isort",
     "pycodestyle",
     "pydocstyle",
-    "twine",
 ]
 doc = [
     {include-group = "test"},
