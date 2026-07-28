@@ -101,7 +101,7 @@ def _get_enrollment_deadline_date(assignment, content_metadata):
     """
     # Import here to avoid circular import
     from enterprise_access.apps.content_assignments.enrollment_deadline_strategies import \
-        EnrollmentDeadlineStrategyFactory  # pylint: disable=import-outside-toplevel
+        EnrollmentDeadlineStrategyFactory  # pylint: disable=import-outside-toplevel,cyclic-import
 
     strategy = EnrollmentDeadlineStrategyFactory.get_strategy(assignment)
     return strategy.get_enrollment_deadline(assignment, content_metadata)

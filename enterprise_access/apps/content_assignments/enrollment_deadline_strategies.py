@@ -55,7 +55,7 @@ class DefaultEnrollmentDeadlineStrategy(EnrollmentDeadlineStrategy):
     ) -> Optional[datetime]:
         # Import here to avoid circular import with enterprise_access.utils
         from enterprise_access.utils import \
-            get_normalized_metadata_for_assignment  # pylint: disable=import-outside-toplevel
+            get_normalized_metadata_for_assignment  # pylint: disable=import-outside-toplevel,cyclic-import
 
         if not content_metadata:
             return None
@@ -103,7 +103,7 @@ class CreditRequestEnrollmentDeadlineStrategy(EnrollmentDeadlineStrategy):
         content_metadata: dict
     ) -> Optional[datetime]:
         # Import here to avoid circular import with enterprise_access.utils
-        from enterprise_access.utils import localized_utcnow  # pylint: disable=import-outside-toplevel
+        from enterprise_access.utils import localized_utcnow  # pylint: disable=import-outside-toplevel,cyclic-import
 
         if not content_metadata:
             return None
