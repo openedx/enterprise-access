@@ -6,7 +6,10 @@ import hashlib
 from django.conf import settings
 from edx_django_utils.cache import RequestCache
 
-from enterprise_access import __version__ as code_version
+# This repo is a deployed service (pyproject.toml's [tool.uv] package = false),
+# not an installed package, so importlib.metadata.version() has nothing to look
+# up here. Bump this alongside pyproject.toml's version on release.
+code_version = '1.0.1'
 
 CACHE_KEY_SEP = ':'
 DEFAULT_NAMESPACE = 'enterprise-access-default'
@@ -14,8 +17,9 @@ DEFAULT_NAMESPACE = 'enterprise-access-default'
 
 def versioned_cache_key(*args):
     """
-    Utility to produce a versioned cache key, which includes
-    an optional settings variable and the current code version,
+    Produce a versioned cache key.
+
+    Includes an optional settings variable and the current code version,
     so that we can perform key-based cache invalidation.
     """
     components = [str(arg) for arg in args]
@@ -28,6 +32,6 @@ def versioned_cache_key(*args):
 
 def request_cache(namespace=DEFAULT_NAMESPACE):
     """
-    Helper that returns a namespaced RequestCache instance.
+    Return a namespaced RequestCache instance.
     """
     return RequestCache(namespace=namespace)
