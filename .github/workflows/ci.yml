@@ -15,8 +15,8 @@ jobs:
         python-version:
         - "3.12"
         toxenv:
-        - "py312-django42"
-        - "py312-django52"
+        - "django42"
+        - "django52"
         - "translations"
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,7 +36,7 @@ jobs:
       run: uv run tox
 
     - name: Codecov
-      if: startsWith(matrix.toxenv, 'py312-django') && matrix.python-version == '3.12'
+      if: startsWith(matrix.toxenv, 'django') && matrix.python-version == '3.12'
       run: uv run codecov
 
   quality:
