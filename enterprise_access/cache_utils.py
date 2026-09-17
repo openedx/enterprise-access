@@ -14,8 +14,9 @@ DEFAULT_NAMESPACE = 'enterprise-access-default'
 
 def versioned_cache_key(*args):
     """
-    Utility to produce a versioned cache key, which includes
-    an optional settings variable and the current code version,
+    Produce a versioned cache key.
+
+    Includes an optional settings variable and the current code version,
     so that we can perform key-based cache invalidation.
     """
     components = [str(arg) for arg in args]
@@ -28,6 +29,6 @@ def versioned_cache_key(*args):
 
 def request_cache(namespace=DEFAULT_NAMESPACE):
     """
-    Helper that returns a namespaced RequestCache instance.
+    Return a namespaced RequestCache instance.
     """
     return RequestCache(namespace=namespace)

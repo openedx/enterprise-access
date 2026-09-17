@@ -14,9 +14,11 @@ from requests.exceptions import Timeout as RequestsTimeoutError
 class LoggedTaskWithRetry(LoggedTask):  # pylint: disable=abstract-method
     """
     Shared base task that allows tasks that raise some common exceptions to retry automatically.
+
     See https://docs.celeryproject.org/en/stable/userguide/tasks.html#automatic-retry-for-known-exceptions for
     more documentation.
     """
+
     autoretry_for = (
         RequestsConnectionError,
         RequestsTimeoutError,

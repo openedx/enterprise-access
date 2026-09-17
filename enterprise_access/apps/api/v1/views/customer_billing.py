@@ -18,8 +18,6 @@ from rest_framework.response import Response
 from enterprise_access.apps.api import serializers
 from enterprise_access.apps.api.authentication import StripeWebhookAuthentication
 from enterprise_access.apps.core.constants import (
-    ALL_ACCESS_CONTEXT,
-    CHECKOUT_INTENT_READ_WRITE_ALL_PERMISSION,
     CUSTOMER_BILLING_CREATE_PORTAL_SESSION_PERMISSION,
     STRIPE_EVENT_SUMMARY_READ_PERMISSION
 )

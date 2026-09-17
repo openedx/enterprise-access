@@ -1,0 +1,196 @@
+[project]
+name = "enterprise-access"
+version = "1.0.1"
+requires-python = ">=3.12"
+
+[dependency-groups]
+base = [
+    "analytics-python",
+    "cattrs",
+    "celery",
+    "confluent-kafka[avro,schema-registry]",
+    "crispy-bootstrap5",
+    "Django",
+    "djangoql",
+    "django-cors-headers",
+    "django-celery-results",
+    "django-countries",
+    "django-crispy-forms",
+    "django-crum",
+    "django-extensions",
+    "django-filter",
+    "django-object-actions",
+    "django-rest-swagger",
+    "django-simple-history",
+    "django-waffle",
+    "djangorestframework",
+    "djangorestframework-csv",
+    "fastavro",
+    "edx-api-doc-tools",
+    "edx-auth-backends",
+    "edx-braze-client",
+    "edx-celeryutils",
+    "edx-django-utils",
+    "edx-django-release-util",
+    "edx-drf-extensions",
+    "edx-enterprise-subsidy-client",
+    "edx-event-bus-kafka",
+    "edx-rbac",
+    "edx-rest-api-client",
+    "jsonfield2",
+    "mysqlclient",
+    "openedx-events",
+    "pygments",
+    "pymemcache",
+    "pytz",
+    "redis",
+    "rules",
+    "stripe",
+    "drf-spectacular",
+    "django-log-request-id",
+]
+# Base test packages, no Django version pinned - shared by `test` and `django42`.
+test-base = [
+    {include-group = "base"},
+    "code-annotations",
+    "coverage",
+    "ddt",
+    "django-dynamic-fixture",
+    "edx-lint",
+    "factory-boy",
+    "freezegun",
+    "pytest-cov",
+    "pytest-django",
+    "pytest_dictsdiff",
+    "tox",
+]
+# Default test group: current supported Django version.
+test = [
+    {include-group = "test-base"},
+    "Django>=5.2,<6.0",
+]
+# Legacy Django 4.2 support - kept independent from `test` via [tool.uv].conflicts
+# below so `uv.lock` carries two separate, correct resolutions.
+django42 = [
+    {include-group = "test-base"},
+    "Django>=4.2,<5.0",
+]
+quality = [
+    {include-group = "test"},
+    "isort",
+    "pycodestyle",
+    "pydocstyle",
+]
+doc = [
+    {include-group = "test"},
+    "doc8",
+    "sphinx-book-theme",
+    "readme_renderer",
+    "Sphinx",
+]
+production = [
+    {include-group = "base"},
+    "gevent",
+    "gunicorn",
+    "python-memcached",
+    "PyYAML>=5.1",
+]
+ci = [
+    "codecov",
+    "tox",
+    "tox-uv",
+]
+dev = [
+    {include-group = "quality"},
+    {include-group = "ci"},
+    "diff-cover",
+    "edx-i18n-tools",
+    "django-debug-toolbar",
+]
+
+[tool.uv]
+package = false
+# Every `uv sync`/`uv run` invocation in this repo names an explicit --group.
+# Without this, uv's implicit default group (named "dev") would be synced *in
+# addition* to whatever --group is passed, silently pulling the entire
+# dev/test/quality/ci superset (and mysqlclient) into every target, defeating
+# the point of having separate groups.
+default-groups = []
+# `quality`/`doc`/`dev` all transitively include `test` (for its default
+# Django pin), so they each conflict with `django42` the same way `test`
+# does. Update this list if the include-group chain changes.
+conflicts = [
+    [
+        {group = "test"},
+        {group = "django42"},
+    ],
+    [
+        {group = "quality"},
+        {group = "django42"},
+    ],
+    [
+        {group = "doc"},
+        {group = "django42"},
+    ],
+    [
+        {group = "dev"},
+        {group = "django42"},
+    ],
+]
+#  DO NOT EDIT constraint-dependencies DIRECTLY.
+#  This list is managed by `edx_lint write_uv_constraints`
+#  and will be overwritten the next time `make upgrade` is run.
+#  - GLOBAL constraints: edit edx_lint/files/common_constraints.txt
+#  - REPO-SPECIFIC constraints: edit [tool.edx_lint].uv_constraints in this file
+constraint-dependencies = [
+    "Django<6.0",
+    "elasticsearch<7.14.0",
+    "confluent-kafka<2.6.2",
+    "edx-braze-client<1",
+    "stripe<15",
+]
+
+[tool.edx_lint]
+uv_constraints = [
+    # confluent-kafka 2.7.0 increased CPU usage
+    "confluent-kafka<2.6.2",
+    # pinning braze-client below version 1, which will likely introduce a breaking-change
+    # as the package is converted to an openedx plugin.
+    # https://github.com/edx/braze-client/pull/30
+    "edx-braze-client<1",
+    # stripe 15.x changed StripeObject's attribute/item access behavior in a way that
+    # breaks this app's `.get()` calls on nested event payloads (see customer_billing's
+    # stripe_event_handlers/models tests). Pin to the same major version already
+    # verified against this codebase until that's addressed as its own piece of work.
+    "stripe<15",
+]
+
+[tool.isort]
+indent = '    '
+line_length = 120
+multi_line_output = 3
+skip = ["migrations"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "enterprise_access.settings.test"
+addopts = "--cov enterprise_access --cov-report term-missing --cov-report xml"
+norecursedirs = [".*", "docs", "requirements", "site-packages"]
+filterwarnings = [
+    "ignore:.*urlresolvers is deprecated in favor of.*:DeprecationWarning:auth_backends.views:5",
+    "ignore:.*invalid escape sequence.*:DeprecationWarning:.*(newrelic|uritemplate|psutil).*",
+    "ignore:.*the imp module is deprecated in favour of importlib.*:DeprecationWarning:.*distutils.*",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["enterprise_access"]
+omit = [
+    "enterprise_access/settings*",
+    "enterprise_access/conf*",
+    "enterprise_access/apps/subsidy_access_policy/mocks.py",
+    "*wsgi.py",
+    "*migrations*",
+    "*admin.py",
+    "*static*",
+    "*templates*",
+]

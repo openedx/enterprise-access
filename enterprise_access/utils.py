@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 def get_subsidy_model(subsidy_type):
     """
-    Get subsidy model from subsidy_type string
+    Get subsidy model from subsidy_type string.
 
     Args:
         subsidy_type (string): string name of subsidy
@@ -46,37 +46,41 @@ def get_subsidy_model(subsidy_type):
 
 
 def is_not_none(thing):
+    """Return whether ``thing`` is not None."""
     return thing is not None
 
 
 def is_none(thing):
+    """Return whether ``thing`` is None."""
     return thing is None
 
 
 def localized_utcnow():
-    """Helper function to return localized utcnow()."""
+    """Return localized utcnow()."""
     return datetime.now().replace(tzinfo=UTC)
 
 
 def chunks(a_list, chunk_size):
     """
-    Helper to break a list up into chunks. Returns a generator of lists.
+    Break a list up into chunks. Returns a generator of lists.
     """
     for i in range(0, len(a_list), chunk_size):
         yield a_list[i:i + chunk_size]
 
 
 def format_traceback(exception):
+    """Return a formatted string of the exception and its traceback."""
     trace = ''.join(traceback.format_tb(exception.__traceback__))
     return f'{exception}\n{trace}'
 
 
 def _get_subsidy_expiration(assignment):
     """
-    Returns the datetime at which the subsidy for this assignment expires.
+    Return the datetime at which the subsidy for this assignment expires.
     """
     # Import here to avoid circular import
-    from enterprise_access.apps.content_assignments.content_metadata_api import parse_datetime_string
+    from enterprise_access.apps.content_assignments.content_metadata_api import \
+        parse_datetime_string  # pylint: disable=import-outside-toplevel
 
     subsidy_expiration_datetime = (
         assignment.assignment_configuration.policy.subsidy_expiration_datetime
@@ -89,16 +93,15 @@ def _get_subsidy_expiration(assignment):
 
 def _get_enrollment_deadline_date(assignment, content_metadata):
     """
-    Helper to get the enrollment end date from a content metadata record.
+    Get the enrollment end date from a content metadata record.
 
     Uses strategy pattern to handle different assignment types:
     - Credit request assignments: Consider future course runs (last course run's deadline)
     - Other assignments: Use existing normalized_metadata behavior
     """
     # Import here to avoid circular import
-    from enterprise_access.apps.content_assignments.enrollment_deadline_strategies import (
-        EnrollmentDeadlineStrategyFactory
-    )
+    from enterprise_access.apps.content_assignments.enrollment_deadline_strategies import \
+        EnrollmentDeadlineStrategyFactory  # pylint: disable=import-outside-toplevel,cyclic-import
 
     strategy = EnrollmentDeadlineStrategyFactory.get_strategy(assignment)
     return strategy.get_enrollment_deadline(assignment, content_metadata)
@@ -109,7 +112,9 @@ def get_automatic_expiration_date_and_reason(
     content_metadata: dict = None
 ):
     """
-    For the given assignment, returns the date at which this assignment expires due to:
+    Return the date at which this assignment expires, and the reason why.
+
+    Checks three possible expiration dates:
     * subsidy expiration
     * content enrollment deadline
     * 90-day timeout from allocation
@@ -119,11 +124,12 @@ def get_automatic_expiration_date_and_reason(
 
     Arguments:
         assignment (LearnerContentAssignment): The assignment to check for expiration.
-        [content_metadata] (dict): Content metadata for the assignment's content key. If not provided, it will be
-            fetched and subsequently cached from the content metadata API.
+        content_metadata (dict): Optional content metadata for the assignment's content key. If not
+            provided, it will be fetched and subsequently cached from the content metadata API.
     """
     # Import here to avoid circular import
-    from enterprise_access.apps.content_assignments.content_metadata_api import get_content_metadata_for_assignments
+    from enterprise_access.apps.content_assignments.content_metadata_api import \
+        get_content_metadata_for_assignments  # pylint: disable=import-outside-toplevel
 
     assignment_configuration = assignment.assignment_configuration
     # pylint: disable=no-member,useless-suppression
@@ -184,8 +190,9 @@ def get_automatic_expiration_date_and_reason(
 
 def should_send_email_to_pecu(recent_action):
     """
-    Helper to check if the groups invite was sent to pending enterprise customer user
-    5, 25, 50, 65, or 85 days ago.
+    Check whether the groups invite was sent to a pending enterprise customer user.
+
+    Checks whether the invite was sent 5, 25, 50, 65, or 85 days ago.
     """
     current_date = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
     is_5_days_since_invited = current_date - timedelta(
@@ -215,9 +222,11 @@ def should_send_email_to_pecu(recent_action):
 
 def get_normalized_metadata_for_assignment(assignment, content_metadata):
     """
-    Retrieve normalized metadata for a given object. If the object is associated
-    with a specific course run or a preferred course run key, return the metadata for that run.
-    If metadata for the run is missing, return the normalized metadata for the advertised run.
+    Retrieve normalized metadata for a given object.
+
+    If the object is associated with a specific course run or a preferred course run key, return
+    the metadata for that run. If metadata for the run is missing, return the normalized metadata
+    for the advertised run.
 
     Args:
         assignment (dict): The assignment object.
@@ -250,6 +259,7 @@ def _days_from_now(days_from_now=0, date_format=None):
 
 
 def get_advertised_course_run_metadata(content_metadata):
+    """Return the metadata for the advertised course run, if any."""
     course_runs = content_metadata.get('course_runs', [])
     advertised_course_run_uuid = content_metadata.get('advertised_course_run_uuid')
     return next((run for run in course_runs if run.get('uuid') == advertised_course_run_uuid), None)
@@ -257,9 +267,10 @@ def get_advertised_course_run_metadata(content_metadata):
 
 def get_course_run_metadata_for_assignment(assignment, content_metadata):
     """
-    Retrieves metadata for a specific course run associated with an assignment. If the assignment has
-    a preferred course run, returns the metadata for that run. If the preferred run metadata is not
-    found, returns normalized_metadata.
+    Retrieve metadata for a specific course run associated with an assignment.
+
+    If the assignment has a preferred course run, returns the metadata for that run. If the
+    preferred run metadata is not found, returns normalized_metadata.
 
     Args:
         assignment (dict): The assignment object.
@@ -291,8 +302,7 @@ def get_course_run_metadata_for_assignment(assignment, content_metadata):
 
 def cents_to_dollars(value_in_cents):
     """
-    Converts some value of cents (could be an int or a string)
-    into dollars.
+    Convert some value of cents (could be an int or a string) into dollars.
 
     Returns:
       A Decimal representation of cents converted to dollars.
@@ -302,7 +312,7 @@ def cents_to_dollars(value_in_cents):
 
 def format_cents_for_user_display(amount_cents):
     """
-    Formats a monetary amount in cents as a user-friendly string with USD currency.
+    Format a monetary amount in cents as a user-friendly string with USD currency.
 
     Args:
         amount_cents: The amount in cents (int or string)
@@ -315,4 +325,5 @@ def format_cents_for_user_display(amount_cents):
 
 
 def format_datetime_obj(datetime_obj, output_pattern=DEFAULT_STRFTIME_PATTERN):
+    """Format a datetime object using the given strftime pattern."""
     return datetime_obj.strftime(output_pattern)
