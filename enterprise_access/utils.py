@@ -104,6 +104,79 @@ def _get_enrollment_deadline_date(assignment, content_metadata):
     return strategy.get_enrollment_deadline(assignment, content_metadata)
 
 
+def _get_course_run_ended_date(content_metadata):
+    """
+    Return the datetime when all known course runs have ended, or None if not all known runs are complete.
+    """
+    # Import here to avoid circular import
+    from enterprise_access.apps.content_assignments.content_metadata_api import parse_datetime_string
+
+    if not content_metadata:
+        return None
+
+    run_metadata_by_key = content_metadata.get('normalized_metadata_by_run') or {}
+    if not run_metadata_by_key:
+        course_runs = content_metadata.get('course_runs') or []
+        run_metadata_by_key = {
+            run.get('key'): run
+            for run in course_runs
+            if run.get('key')
+        }
+
+    if not run_metadata_by_key:
+        return None
+
+    known_end_dates = []
+    for run_metadata in run_metadata_by_key.values():
+        run_end_date = run_metadata.get('end_date') or run_metadata.get('end')
+        if not run_end_date:
+            return None
+
+        try:
+            run_end_datetime = parse_datetime_string(run_end_date)
+        except ValueError:
+            logger.warning(
+                'Bad course run end date for content %s, value: %s',
+                content_metadata.get('key'),
+                run_end_date,
+            )
+            return None
+
+        if run_end_datetime:
+            known_end_dates.append(run_end_datetime.replace(tzinfo=UTC))
+
+    if not known_end_dates:
+        return None
+
+    if all(datetime_value <= localized_utcnow() for datetime_value in known_end_dates):
+        return max(known_end_dates)
+    return None
+
+
+def _get_catalog_agnostic_content_metadata_for_assignment(assignment):
+    """
+    Fetch content metadata without relying on the assignment's active policy catalog.
+    """
+    from enterprise_access.apps.content_metadata.api import get_and_cache_content_metadata
+
+    content_identifiers = []
+    if assignment.content_key:
+        content_identifiers.append(assignment.content_key)
+    if assignment.parent_content_key and assignment.parent_content_key not in content_identifiers:
+        content_identifiers.append(assignment.parent_content_key)
+
+    for content_identifier in content_identifiers:
+        for coerce_to_parent_course in (True, False):
+            content_metadata = get_and_cache_content_metadata(
+                content_identifier,
+                coerce_to_parent_course=coerce_to_parent_course,
+            )
+            if content_metadata:
+                return content_metadata
+
+    return {}
+
+
 def get_automatic_expiration_date_and_reason(
     assignment,
     content_metadata: dict = None
@@ -140,14 +213,20 @@ def get_automatic_expiration_date_and_reason(
             assignments=[assignment],
         )
         content_metadata = content_metadata_by_key.get(content_key)
+
+    if not content_metadata:
+        content_metadata = _get_catalog_agnostic_content_metadata_for_assignment(assignment)
+
     enrollment_deadline_datetime = _get_enrollment_deadline_date(assignment, content_metadata)
     if enrollment_deadline_datetime:
         enrollment_deadline_datetime = enrollment_deadline_datetime.replace(tzinfo=UTC)
 
+    course_run_ended_datetime = _get_course_run_ended_date(content_metadata)
+
     # 90-day timeout from allocation
     timeout_expiration_datetime = assignment.get_allocation_timeout_expiration()
 
-    # Determine which of the three expiration dates is the earliest
+    # Determine which of the four expiration dates is the earliest
     subsidy_expiration = {
         'date': subsidy_expiration_datetime,
         'reason': AssignmentAutomaticExpiredReason.SUBSIDY_EXPIRED,
@@ -156,11 +235,15 @@ def get_automatic_expiration_date_and_reason(
         'date': enrollment_deadline_datetime,
         'reason': AssignmentAutomaticExpiredReason.ENROLLMENT_DATE_PASSED,
     }
+    course_run_ended = {
+        'date': course_run_ended_datetime,
+        'reason': AssignmentAutomaticExpiredReason.COURSE_RUN_ENDED,
+    }
     timeout_expiration = {
         'date': timeout_expiration_datetime,
         'reason': AssignmentAutomaticExpiredReason.NINETY_DAYS_PASSED,
     }
-    expiration_dates = [subsidy_expiration, enrollment_deadline, timeout_expiration]
+    expiration_dates = [subsidy_expiration, enrollment_deadline, course_run_ended, timeout_expiration]
     sorted_available_expiration_dates = sorted(
         filter(lambda x: x['date'] is not None, expiration_dates),
         key=lambda x: x['date'],

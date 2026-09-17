@@ -37,6 +37,14 @@ ENTERPRISE_CATALOG_URL = 'http://enterprise-catalog.example.com'
 ENTERPRISE_SUBSIDY_URL = 'http://enterprise-subsidy.example.com'
 ENTERPRISE_ACCESS_URL = 'http://enterprise-access.example.com'
 
+# OAuth2 settings for testing
+SOCIAL_AUTH_EDX_OAUTH2_KEY = 'test-oauth2-key'
+SOCIAL_AUTH_EDX_OAUTH2_SECRET = 'test-oauth2-secret'
+SOCIAL_AUTH_EDX_OAUTH2_URL_ROOT = 'http://edx.example.com'
+SOCIAL_AUTH_EDX_OAUTH2_LOGOUT_URL = 'http://edx.example.com/logout'
+BACKEND_SERVICE_EDX_OAUTH2_KEY = 'test-backend-oauth2-key'
+BACKEND_SERVICE_EDX_OAUTH2_SECRET = 'test-backend-oauth2-secret'
+
 BRAZE_APPROVE_NOTIFICATION_CAMPAIGN = 'test-approve-campaign'
 BRAZE_DECLINE_NOTIFICATION_CAMPAIGN = 'test-decline-campaign'
 BRAZE_AUTO_DECLINE_NOTIFICATION_CAMPAIGN = 'test-campaign-id'

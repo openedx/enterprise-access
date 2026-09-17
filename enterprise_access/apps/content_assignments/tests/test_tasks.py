@@ -740,7 +740,7 @@ class TestBrazeEmailTasks(APITestWithMocks):
             'key': assignment.content_key,
             'normalized_metadata': {
                 'start_date': '2020-01-01 12:00:00Z',
-                'end_date': '2022-01-01 12:00:00Z',
+                'end_date': '2099-12-31 12:00:00Z',
                 'enroll_by_date': (now() + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%SZ'),
             },
         }
@@ -793,13 +793,13 @@ class TestBrazeEmailTasks(APITestWithMocks):
             'key': assignment.content_key,
             'normalized_metadata': {
                 'start_date': '2020-01-01 12:00:00Z',
-                'end_date': '2022-01-01 12:00:00Z',
+                'end_date': '2099-12-31 12:00:00Z',
                 'enroll_by_date': formatted_yesterday,
             },
             'normalized_metadata_by_run': {
                 TEST_COURSE_RUN_KEY: {
                     'start_date': '2020-01-01 12:00:00Z',
-                    'end_date': '2022-01-01 12:00:00Z',
+                    'end_date': '2099-12-31 12:00:00Z',
                     'enroll_by_date': formatted_yesterday,
                 },
             }
@@ -851,13 +851,13 @@ class TestBrazeEmailTasks(APITestWithMocks):
             'key': assignment.content_key,
             'normalized_metadata': {
                 'start_date': '2020-01-01 12:00:00Z',
-                'end_date': '2022-01-01 12:00:00Z',
+                'end_date': '2099-12-31 12:00:00Z',
                 'enroll_by_date': the_future.strftime('%Y-%m-%d %H:%M:%SZ'),
             },
             'normalized_metadata_by_run': {
                 TEST_COURSE_RUN_KEY: {
                     'start_date': '2020-01-01 12:00:00Z',
-                    'end_date': '2022-01-01 12:00:00Z',
+                    'end_date': '2099-12-31 12:00:00Z',
                     'enroll_by_date': the_future.strftime('%Y-%m-%d %H:%M:%SZ'),
                 },
             },
