@@ -51,6 +51,7 @@ from enterprise_access.apps.subsidy_access_policy.models import (
     AssignedLearnerCreditAccessPolicy,
     PerLearnerEnrollmentCreditAccessPolicy,
     PerLearnerSpendCreditAccessPolicy,
+    PolicyGroupAssociation,
     SubsidyAccessPolicy,
     SubsidyAccessPolicyLockAttemptFailed
 )
@@ -2555,3 +2556,27 @@ class PolicyGroupAssociationTests(MockPolicyDependenciesMixin, TestCase):
 
         self.assertEqual(policy.enterprise_group_uuid, self.group_uuid)
         self.assertIsNotNone(policy.subsidy_access_policy)
+
+    def test_cascade_delete_for_group_uuid_should_delete_correct_associations(self):
+        """
+        Test that deleting a group uuid will delete all associations
+        with that group uuid, and no others.
+        """
+        policy1 = PolicyGroupAssociationFactory(
+            enterprise_group_uuid=self.group_uuid,
+            subsidy_access_policy=self.access_policy,
+        )
+        policy2 = PolicyGroupAssociationFactory(
+            enterprise_group_uuid=uuid4(),
+            subsidy_access_policy=self.access_policy,
+        )
+
+        # Ensure both policies are created
+        self.assertEqual(PolicyGroupAssociation.objects.count(), 2)
+
+        # Delete the first policy group association
+        policy1.delete()
+
+        # Ensure only the second policy remains
+        self.assertEqual(PolicyGroupAssociation.objects.count(), 1)
+        self.assertEqual(PolicyGroupAssociation.objects.first(), policy2)
