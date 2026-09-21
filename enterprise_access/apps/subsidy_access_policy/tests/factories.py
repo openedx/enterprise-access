@@ -79,7 +79,7 @@ class PolicyGroupAssociationFactory(factory.django.DjangoModelFactory):
         model = PolicyGroupAssociation
 
     enterprise_group_uuid = factory.LazyFunction(uuid4)
-    subsidy_access_policy = factory.SubFactory(SubsidyAccessPolicyFactory)
+    subsidy_access_policy = factory.SubFactory(PerLearnerEnrollmentCapLearnerCreditAccessPolicyFactory)
 
 
 class ForcedPolicyRedemptionFactory(factory.django.DjangoModelFactory):
