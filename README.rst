@@ -14,7 +14,6 @@ Quick Setup
 
 ::
 
-  $ make docker_build
   $ make dev.provision
   $ make dev.up
   $ make app-shell
