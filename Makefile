@@ -51,10 +51,10 @@ production-requirements: ## install requirements for production
 	uv sync --group production
 
 static: ## generate static files
-	python manage.py collectstatic --noinput
+	uv run python manage.py collectstatic --noinput
 
 shell: ## run Django shell
-	python manage.py shell
+	uv run python manage.py shell
 
 test: clean ## run tests and generate coverage report
 	uv run pytest --ds=enterprise_access.settings.test
@@ -84,21 +84,21 @@ quality_fix: style isort lint ## Check code style, FIX any imports, then lint
 
 pii_check: ## check for PII annotations on all Django models
 	DJANGO_SETTINGS_MODULE=enterprise_access.settings.test \
-	code_annotations django_find_annotations --config_file .pii_annotations.yml --lint --report --coverage
+	uv run code_annotations django_find_annotations --config_file .pii_annotations.yml --lint --report --coverage
 
 check_keywords: ## Scan the Django models in all installed apps in this project for restricted field names
-	python manage.py check_reserved_keywords --override_file db_keyword_overrides.yml
+	uv run python manage.py check_reserved_keywords --override_file db_keyword_overrides.yml
 
 validate: test quality pii_check check_keywords ## run tests, quality, and PII annotation checks
 
 migrate: ## apply database migrations
-	python manage.py migrate
+	uv run python manage.py migrate
 
 html_coverage: ## generate and view HTML coverage report
-	coverage html && open htmlcov/index.html
+	uv run coverage html && open htmlcov/index.html
 
 subsidy_client_local:  # re-install edx-enterprise-subsidy-client from local code
-	pip uninstall -y edx-enterprise-subsidy-client && pip install -e /edx/src/edx-enterprise-subsidy-client/ && pip freeze | grep subsidy-client
+	uv pip uninstall -y edx-enterprise-subsidy-client && uv pip install -e /edx/src/edx-enterprise-subsidy-client/ && uv pip freeze | grep subsidy-client
 
 upgrade: ## upgrade all packages in uv.lock and sync constraints from edx-lint
 	uv run --with edx-lint edx_lint write_uv_constraints pyproject.toml
