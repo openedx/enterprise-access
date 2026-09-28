@@ -51,30 +51,30 @@ production-requirements: ## install requirements for production
 	uv sync --group production
 
 static: ## generate static files
-	uv run python manage.py collectstatic --noinput
+	python manage.py collectstatic --noinput
 
 shell: ## run Django shell
-	uv run python manage.py shell
+	python manage.py shell
 
 test: clean ## run tests and generate coverage report
-	uv run pytest --ds=enterprise_access.settings.test
+	pytest --ds=enterprise_access.settings.test
 
 # To be run from CI context
 coverage: clean
-	uv run pytest --cov-report html
+	pytest --cov-report html
 	$(BROWSER) htmlcov/index.html
 
 isort_check: ## check that isort has been run
-	uv run isort --check-only enterprise_access/
+	isort --check-only enterprise_access/
 
 isort: ## run isort to sort imports in all Python files
-	uv run isort --atomic enterprise_access/
+	isort --atomic enterprise_access/
 
 style: ## run Python style checker
-	uv run pycodestyle enterprise_access manage.py
+	pycodestyle enterprise_access manage.py
 
 lint: ## run Python code linting
-	uv run pylint --rcfile=pylintrc enterprise_access/apps/customer_billing *.py
+	pylint --rcfile=pylintrc enterprise_access/apps/customer_billing *.py
 
 quality: style isort_check lint ## check code style and import sorting, then lint
 	@echo "\e[32mQuality tests passed!\e[0m"
@@ -84,18 +84,18 @@ quality_fix: style isort lint ## Check code style, FIX any imports, then lint
 
 pii_check: ## check for PII annotations on all Django models
 	DJANGO_SETTINGS_MODULE=enterprise_access.settings.test \
-	uv run code_annotations django_find_annotations --config_file .pii_annotations.yml --lint --report --coverage
+	code_annotations django_find_annotations --config_file .pii_annotations.yml --lint --report --coverage
 
 check_keywords: ## Scan the Django models in all installed apps in this project for restricted field names
-	uv run python manage.py check_reserved_keywords --override_file db_keyword_overrides.yml
+	python manage.py check_reserved_keywords --override_file db_keyword_overrides.yml
 
 validate: test quality pii_check check_keywords ## run tests, quality, and PII annotation checks
 
 migrate: ## apply database migrations
-	uv run python manage.py migrate
+	python manage.py migrate
 
 html_coverage: ## generate and view HTML coverage report
-	uv run coverage html && open htmlcov/index.html
+	coverage html && open htmlcov/index.html
 
 subsidy_client_local:  # re-install edx-enterprise-subsidy-client from local code
 	uv pip uninstall -y edx-enterprise-subsidy-client && uv pip install -e /edx/src/edx-enterprise-subsidy-client/ && uv pip freeze | grep subsidy-client
