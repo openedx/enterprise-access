@@ -156,7 +156,7 @@ class APITest(APITestCase):
         request.COOKIES[jwt_cookie_name()] = jwt_token
         return request
 
-    def set_jwt_cookie(self, roles_and_contexts=[], user=None):
+    def set_jwt_cookie(self, roles_and_contexts=None, user=None):
         """
         Set jwt token in cookies.
         """

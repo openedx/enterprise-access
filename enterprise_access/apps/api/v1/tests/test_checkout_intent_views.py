@@ -10,12 +10,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.reverse import reverse
 
-from enterprise_access.apps.core.constants import (
-    ALL_ACCESS_CONTEXT,
-    SYSTEM_ENTERPRISE_LEARNER_ROLE,
-    SYSTEM_ENTERPRISE_OPERATOR_ROLE,
-    SYSTEM_ENTERPRISE_PROVISIONING_ADMIN_ROLE
-)
+from enterprise_access.apps.core.constants import SYSTEM_ENTERPRISE_LEARNER_ROLE
 from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.customer_billing.constants import CheckoutIntentState
 from enterprise_access.apps.customer_billing.models import CheckoutIntent
@@ -682,13 +677,13 @@ class CheckoutIntentViewSetTestCase(APITest):
 
     def test_list_with_staff_permission_returns_all_records(self):
         """Test that users with `is_staff=True` can see all checkout intents."""
-        staff_user = self.create_user(
+        self.create_user(
             username='a-staff-user', password='password', is_staff=True,
         )
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
             'context': str(uuid.uuid4()),
-        }], user=staff_user)
+        }])
 
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -706,13 +701,13 @@ class CheckoutIntentViewSetTestCase(APITest):
 
     def test_retrieve_other_users_record_with_staff_permission(self):
         """Test that users with staff permission can retrieve other users' records."""
-        staff_user = self.create_user(
+        self.create_user(
             username='a-staff-user', password='password', is_staff=True,
         )
         self.set_jwt_cookie([{
             'system_wide_role': SYSTEM_ENTERPRISE_LEARNER_ROLE,
             'context': str(uuid.uuid4()),
-        }], user=staff_user)
+        }])
 
         # Try to access user_3's checkout intent (should succeed with permission)
         response = self.client.get(self.detail_url_3)

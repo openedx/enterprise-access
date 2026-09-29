@@ -1,8 +1,6 @@
 """
 Tests for enrollment deadline strategies.
 """
-from unittest import mock
-
 import ddt
 from django.test import TestCase
 from pytz import UTC
