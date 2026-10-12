@@ -675,10 +675,10 @@ STRIPE_GRACEFUL_EXCEPTION_MODE = False
 
 # List of 2-letter ISO country codes that are embargoed
 # Can be overridden via EMBARGOED_COUNTRY_CODES environment variable
-# Expected format: comma-separated string like "RU,IR,KP,SY,CU,BY"
+# Expected format: comma-separated string like "RU,IR,KP,CU,BY"
 EMBARGOED_COUNTRY_CODES = os.environ.get(
     'EMBARGOED_COUNTRY_CODES',
-    'RU,IR,KP,SY,CU,BY'
+    'RU,IR,KP,CU,BY'
 ).split(',')
 
 ################# End Embargo Settings #################
