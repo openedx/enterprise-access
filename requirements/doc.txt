@@ -61,7 +61,7 @@ celery==5.6.2
     #   -r requirements/test.txt
     #   django-celery-results
     #   edx-celeryutils
-certifi==2026.1.4
+certifi==2026.10.19
     # via
     #   -r requirements/test.txt
     #   requests
@@ -597,10 +597,12 @@ snowballstemmer==3.0.1
     # via sphinx
 social-auth-app-django==5.7.0
     # via
+    #   -c requirements/common_constraints.txt
     #   -r requirements/test.txt
     #   edx-auth-backends
 social-auth-core==4.8.3
     # via
+    #   -c requirements/common_constraints.txt
     #   -r requirements/test.txt
     #   edx-auth-backends
     #   social-auth-app-django
