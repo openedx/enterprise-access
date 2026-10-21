@@ -48,7 +48,7 @@ celery==5.6.2
     #   -r requirements/base.txt
     #   django-celery-results
     #   edx-celeryutils
-certifi==2026.1.4
+certifi==2026.10.19
     # via
     #   -r requirements/base.txt
     #   requests
@@ -520,10 +520,12 @@ six==1.17.0
     #   python-dateutil
 social-auth-app-django==5.7.0
     # via
+    #   -c requirements/common_constraints.txt
     #   -r requirements/base.txt
     #   edx-auth-backends
 social-auth-core==4.8.3
     # via
+    #   -c requirements/common_constraints.txt
     #   -r requirements/base.txt
     #   edx-auth-backends
     #   social-auth-app-django
