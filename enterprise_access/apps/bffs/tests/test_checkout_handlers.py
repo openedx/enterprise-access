@@ -223,7 +223,7 @@ class TestCheckoutContextHandler(APITest):
 
         self.assertIn('embargoed_countries', constraints)
         self.assertIsInstance(constraints['embargoed_countries'], list)
-        self.assertEqual(constraints['embargoed_countries'], ['RU', 'IR', 'KP', 'SY', 'CU', 'BY'])
+        self.assertEqual(constraints['embargoed_countries'], ['RU', 'IR', 'KP', 'CU', 'BY'])
 
     @ddt.data(
         {
