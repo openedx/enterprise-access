@@ -35,10 +35,6 @@ jobs:
         TOXENV: ${{ matrix.toxenv }}
       run: uv run tox
 
-    - name: Codecov
-      if: startsWith(matrix.toxenv, 'django') && matrix.python-version == '3.12'
-      run: uv run codecov
-
   quality:
     runs-on: ubuntu-latest
     strategy:
