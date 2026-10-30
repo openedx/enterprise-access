@@ -6,12 +6,12 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-if TYPE_CHECKING:
-    from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
-
 from pytz import UTC
 
 from enterprise_access.apps.content_assignments.content_metadata_api import parse_datetime_string
+
+if TYPE_CHECKING:
+    from enterprise_access.apps.content_assignments.models import LearnerContentAssignment
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,8 @@ class DefaultEnrollmentDeadlineStrategy(EnrollmentDeadlineStrategy):
         content_metadata: dict
     ) -> Optional[datetime]:
         # Import here to avoid circular import with enterprise_access.utils
-        from enterprise_access.utils import get_normalized_metadata_for_assignment
+        from enterprise_access.utils import \
+            get_normalized_metadata_for_assignment  # pylint: disable=import-outside-toplevel,cyclic-import
 
         if not content_metadata:
             return None
@@ -77,7 +78,6 @@ class DefaultEnrollmentDeadlineStrategy(EnrollmentDeadlineStrategy):
                 content_metadata.get('key'),
                 enrollment_end_date_str,
             )
-            pass
 
         return None
 
@@ -103,7 +103,7 @@ class CreditRequestEnrollmentDeadlineStrategy(EnrollmentDeadlineStrategy):
         content_metadata: dict
     ) -> Optional[datetime]:
         # Import here to avoid circular import with enterprise_access.utils
-        from enterprise_access.utils import localized_utcnow
+        from enterprise_access.utils import localized_utcnow  # pylint: disable=import-outside-toplevel,cyclic-import
 
         if not content_metadata:
             return None
