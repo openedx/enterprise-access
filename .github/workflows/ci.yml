@@ -15,7 +15,6 @@ jobs:
         python-version:
         - "3.12"
         toxenv:
-        - "django42"
         - "django52"
         - "translations"
     steps:

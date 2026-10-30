@@ -40,14 +40,6 @@ def _rand_created_at():
     return timezone.now() - timedelta(seconds=randint(1, 30))
 
 
-def _rand_numeric_string():
-    return str(randint(1, 100000)).zfill(6)
-
-
-def _rand_created_at():
-    return timezone.now() - timedelta(seconds=randint(1, 30))
-
-
 class AttrDict(dict):
     """
     Minimal helper that allows both attribute (obj.foo) and item (obj['foo']) access.
