@@ -2,6 +2,7 @@
 Tests for Enterprise Access content_assignments tasks.
 """
 import datetime
+import re
 from unittest import mock
 from uuid import uuid4
 
@@ -18,6 +19,7 @@ from enterprise_access.apps.api_client.braze_client import ENTERPRISE_BRAZE_ALIA
 from enterprise_access.apps.api_client.tests.test_utils import MockResponse
 from enterprise_access.apps.content_assignments.constants import (
     BRAZE_TIMESTAMP_FORMAT,
+    RETIRED_EMAIL_ADDRESS_FORMAT,
     AssignmentActionErrors,
     AssignmentActions,
     LearnerContentAssignmentStateChoices
@@ -25,6 +27,7 @@ from enterprise_access.apps.content_assignments.constants import (
 from enterprise_access.apps.content_assignments.content_metadata_api import get_human_readable_date
 from enterprise_access.apps.content_assignments.tasks import (
     BrazeCampaignSender,
+    clear_pii_for_expired_assignments,
     create_pending_enterprise_learner_for_assignment_task,
     send_assignment_automatically_expired_email,
     send_bnr_automatically_expired_email,
@@ -934,11 +937,6 @@ class TestClearPiiForExpiredAssignmentsTask(APITestWithMocks):
         Test that the task clears PII for assignments expired due to 90-day timeout
         after expiration email has been sent.
         """
-        import re
-
-        from enterprise_access.apps.content_assignments.constants import RETIRED_EMAIL_ADDRESS_FORMAT
-        from enterprise_access.apps.content_assignments.tasks import clear_pii_for_expired_assignments
-
         self.expired_assignment.add_successful_expiration_action()
 
         subsidy_expiry = now() + timedelta(days=365)
@@ -979,8 +977,6 @@ class TestClearPiiForExpiredAssignmentsTask(APITestWithMocks):
         """
         Test that PII is NOT cleared if expiration email wasn't successfully sent.
         """
-        from enterprise_access.apps.content_assignments.tasks import clear_pii_for_expired_assignments
-
         # Note: NOT adding successful expiration action
         original_email = self.expired_assignment.learner_email
 

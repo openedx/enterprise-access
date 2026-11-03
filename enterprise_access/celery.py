@@ -1,5 +1,5 @@
 """
-Defines the Celery application for the enterprise_access project
+Defines the Celery application for the enterprise_access project.
 """
 from celery import Celery
 

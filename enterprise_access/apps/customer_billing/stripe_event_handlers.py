@@ -163,6 +163,9 @@ class StripeEventHandler:
     """
     @classmethod
     def dispatch(cls, event: stripe.Event) -> None:
+        """
+        Dispatch a Stripe event to its registered handler, if one exists.
+        """
         if event.type not in _handlers_by_type:
             logger.warning('No stripe event handler configured for event type %s', event.type)
             return
