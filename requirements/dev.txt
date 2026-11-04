@@ -8,7 +8,7 @@
     # via -r requirements/validation.txt
 algoliasearch==3.0.0
     # via -r requirements/validation.txt
-amqp==5.4.1
+amqp==5.4.2
     # via
     #   -r requirements/validation.txt
     #   kombu
@@ -18,9 +18,9 @@ annotated-types==0.8.0
     # via
     #   -r requirements/validation.txt
     #   pydantic
-anthropic==2.3.0
+anthropic==2.4.0
     # via -r requirements/validation.txt
-anyio==4.15.1
+anyio==4.16.0
     # via
     #   -r requirements/validation.txt
     #   anthropic
@@ -53,7 +53,7 @@ backoff==1.10.0
     # via
     #   -r requirements/validation.txt
     #   analytics-python
-billiard==4.3.1
+billiard==4.3.2
     # via
     #   -r requirements/validation.txt
     #   celery
@@ -61,7 +61,7 @@ build==1.6.1
     # via
     #   -r requirements/pip-tools.txt
     #   pip-tools
-cachetools==7.2.7
+cachetools==7.2.8
     # via
     #   -r requirements/validation.txt
     #   tox
@@ -72,6 +72,7 @@ celery==5.6.3
     #   -r requirements/validation.txt
     #   django-celery-results
     #   edx-celeryutils
+    #   openedx-events
 certifi==2026.10.23
     # via
     #   -r requirements/validation.txt
@@ -127,7 +128,7 @@ colorama==0.4.6
     #   tox
 confluent-kafka[avro,schema-registry]==2.6.1
     # via -r requirements/validation.txt
-coverage[toml]==7.17.0
+coverage[toml]==7.17.1
     # via
     #   -r requirements/validation.txt
     #   pytest-cov
@@ -161,7 +162,7 @@ distlib==0.4.4
     # via
     #   -r requirements/validation.txt
     #   virtualenv
-django==5.2.18
+django==5.2.19
     # via
     #   -r requirements/validation.txt
     #   crispy-bootstrap5
@@ -250,7 +251,7 @@ djangorestframework==3.18.3
     #   edx-drf-extensions
 djangorestframework-csv==3.0.2
     # via -r requirements/validation.txt
-dnspython==2.9.1
+dnspython==2.9.2
     # via
     #   -r requirements/validation.txt
     #   pymongo
@@ -333,7 +334,7 @@ fastavro==1.13.1
     #   -r requirements/validation.txt
     #   confluent-kafka
     #   openedx-events
-filelock==4.2.4
+filelock==4.2.7
     # via
     #   -r requirements/validation.txt
     #   python-discovery
@@ -427,7 +428,7 @@ keyring==25.7.0
     # via
     #   -r requirements/validation.txt
     #   twine
-kombu==5.6.2
+kombu==5.7.0
     # via
     #   -r requirements/validation.txt
     #   celery
@@ -462,7 +463,7 @@ more-itertools==11.2.1
     #   -r requirements/validation.txt
     #   jaraco-classes
     #   jaraco-functools
-mypy-extensions==1.1.0
+mypy-extensions==1.2.0
     # via
     #   -r requirements/validation.txt
     #   isort
@@ -472,18 +473,18 @@ nh3==0.3.7
     # via
     #   -r requirements/validation.txt
     #   readme-renderer
-nodeenv==1.11.1
+nodeenv==1.12.0
     # via pyright
-oauthlib==4.0.0
+oauthlib==4.0.1
     # via
     #   -r requirements/validation.txt
     #   requests-oauthlib
     #   social-auth-core
-openai==3.41.0
+openai==3.44.0
     # via -r requirements/validation.txt
 openedx-atlas==0.7.2
     # via -r requirements/validation.txt
-openedx-events==11.2.0
+openedx-events==11.3.0
     # via
     #   -r requirements/validation.txt
     #   edx-event-bus-kafka
@@ -497,7 +498,6 @@ packaging==26.3
     #   -r requirements/validation.txt
     #   build
     #   drf-yasg
-    #   kombu
     #   pyproject-api
     #   pytest
     #   tox
@@ -508,7 +508,7 @@ path==17.1.1
     # via edx-i18n-tools
 pip-tools==7.5.3
     # via -r requirements/pip-tools.txt
-platformdirs==4.14.0
+platformdirs==4.14.3
     # via
     #   -r requirements/validation.txt
     #   pylint
@@ -601,7 +601,7 @@ pynacl==1.6.2
     # via
     #   -r requirements/validation.txt
     #   edx-django-utils
-pyproject-api==1.12.2
+pyproject-api==1.12.3
     # via
     #   -r requirements/validation.txt
     #   tox
@@ -623,13 +623,13 @@ pytest-dictsdiff==0.5.8
     # via -r requirements/validation.txt
 pytest-django==4.14.0
     # via -r requirements/validation.txt
-python-dateutil==3.0.0
+python-dateutil==4.0.0
     # via
     #   -r requirements/validation.txt
     #   analytics-python
     #   celery
     #   freezegun
-python-discovery==1.6.7
+python-discovery==1.9.2
     # via
     #   -r requirements/validation.txt
     #   tox
@@ -720,7 +720,6 @@ six==1.17.0
     #   edx-django-release-util
     #   edx-lint
     #   edx-rbac
-    #   python-dateutil
 sniffio==1.3.1
     # via
     #   -r requirements/validation.txt
@@ -741,7 +740,7 @@ social-auth-core==4.9.1
     #   -r requirements/validation.txt
     #   edx-auth-backends
     #   social-auth-app-django
-sqlparse==0.6.0
+sqlparse==0.6.1
     # via
     #   -r requirements/validation.txt
     #   django
@@ -772,7 +771,7 @@ tomlkit==0.15.2
     #   edx-lint
     #   pylint
     #   snowflake-connector-python
-tox==4.67.4
+tox==4.67.8
     # via -r requirements/validation.txt
 truststore==0.10.5
     # via
@@ -808,7 +807,6 @@ typing-inspection==0.4.4
 tzdata==2026.6
     # via
     #   -r requirements/validation.txt
-    #   kombu
     #   python-dateutil
 tzlocal==5.4.5
     # via
@@ -831,7 +829,7 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-virtualenv==21.15.1
+virtualenv==21.15.4
     # via
     #   -r requirements/validation.txt
     #   tox
