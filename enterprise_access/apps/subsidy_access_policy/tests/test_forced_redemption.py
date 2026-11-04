@@ -219,6 +219,7 @@ class ForcedPolicyRedemptionAssignmentTests(BaseForcedRedemptionTestCase):
         return AssignedLearnerCreditAccessPolicyFactory(
             enterprise_customer_uuid=customer_uuid,
             assignment_configuration=assignment_config,
+            spend_limit=10000,
         )
 
     @mock.patch('enterprise_access.apps.content_assignments.api.send_email_for_new_assignment')
