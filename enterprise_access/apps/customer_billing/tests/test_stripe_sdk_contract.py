@@ -19,7 +19,7 @@ from enterprise_access.apps.customer_billing.tests.utils import stripe_call_prob
 # The Stripe API version our Stripe usage has been reviewed against. Removals can ship in any API
 # version, not only in a new named release (e.g. stripe 15.6.0 stayed on ``dahlia`` and still removed
 # ``PaymentAttemptRecord...cryptogram``), so this trips on every pinned-version change.
-REVIEWED_STRIPE_API_VERSION = '2026-09-30.endive'
+REVIEWED_STRIPE_API_VERSION = '2026-10-28.endive'
 
 SOURCE_ROOT = Path(enterprise_access.__file__).parent
 
