@@ -9,6 +9,7 @@ import ddt
 import requests
 import stripe
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
@@ -19,15 +20,22 @@ from enterprise_access.apps.customer_billing.api import (
     SubsidyUnreachableError,
     evaluate_top_up_eligibility,
     evaluate_top_up_eligibility_for_policies,
+    get_or_create_enterprise_stripe_customer,
+    get_stripe_customer_id_for_enterprise,
     is_account_in_good_standing,
     is_top_up_enabled
 )
 from enterprise_access.apps.customer_billing.constants import TOP_UP_MAX_SUBSIDY_FETCH_ATTEMPTS, CheckoutIntentState
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
+    EnterpriseStripeCustomer,
     FailedCheckoutIntentConflict,
     SlugReservationConflict,
     SspProduct
+)
+from enterprise_access.apps.customer_billing.tests.factories import (
+    CheckoutIntentFactory,
+    EnterpriseStripeCustomerFactory
 )
 from enterprise_access.apps.subsidy_access_policy.exceptions import SubsidyAPIHTTPError
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
@@ -1004,3 +1012,141 @@ class EvaluateTopUpEligibilityForPoliciesTests(TestCase):
         with _mock_retrieve_subsidy(side_effect=_http_error(403)):
             with self.assertRaises(SubsidyAPIHTTPError):
                 evaluate_top_up_eligibility_for_policies([retired, dead])
+
+
+def _create_checkout_intent(enterprise_uuid, stripe_customer_id, created):
+    """
+    Create a CheckoutIntent for ``enterprise_uuid`` with the given ``created`` timestamp.
+    """
+    intent = CheckoutIntentFactory(enterprise_uuid=enterprise_uuid, stripe_customer_id=stripe_customer_id)
+    # ``created`` is set on insert, so it can only be backdated afterwards.
+    CheckoutIntent.objects.filter(pk=intent.pk).update(created=created)
+    return intent
+
+
+@ddt.ddt
+class GetStripeCustomerIdForEnterpriseTests(TestCase):
+    """
+    Tests for get_stripe_customer_id_for_enterprise (ENT-12509). The billing management endpoint tests cover the
+    mapping being read before the CheckoutIntent.
+    """
+
+    @ddt.data(None, '')
+    @mock.patch('enterprise_access.apps.customer_billing.stripe_api.stripe.Customer.create')
+    def test_falls_back_to_newest_checkout_intent_with_a_customer(self, missing_customer_id, mock_create):
+        """
+        Without a mapping, the newest CheckoutIntent with a Stripe customer is used: NULL and empty IDs are skipped,
+        other enterprises' rows are ignored, and nothing is created or written.
+        """
+        enterprise_uuid, only_missing_ids = uuid.uuid4(), uuid.uuid4()
+        now = timezone.now()
+        _create_checkout_intent(enterprise_uuid, 'cus_oldest', now - timedelta(days=3))
+        _create_checkout_intent(enterprise_uuid, 'cus_newer', now - timedelta(days=2))
+        _create_checkout_intent(enterprise_uuid, missing_customer_id, now - timedelta(days=1))
+        _create_checkout_intent(only_missing_ids, missing_customer_id, now)
+        EnterpriseStripeCustomerFactory()  # Another enterprise's mapping.
+
+        self.assertEqual(get_stripe_customer_id_for_enterprise(enterprise_uuid), 'cus_newer')
+        self.assertIsNone(get_stripe_customer_id_for_enterprise(only_missing_ids))
+        mock_create.assert_not_called()
+        self.assertEqual(EnterpriseStripeCustomer.objects.count(), 1)
+
+
+@ddt.ddt
+@mock.patch('enterprise_access.apps.customer_billing.stripe_api.stripe.Customer.create')
+class GetOrCreateEnterpriseStripeCustomerTests(TestCase):
+    """
+    Tests for get_or_create_enterprise_stripe_customer (ENT-12509).
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.enterprise_uuid = uuid.uuid4()
+        self.idempotency_key = f'enterprise-stripe-customer-{self.enterprise_uuid}'
+
+    def test_creates_one_stripe_customer_then_returns_the_mapping(self, mock_create):
+        """
+        The first call creates a customer keyed by the enterprise, however its UUID is spelled. Later calls return the
+        recorded mapping without calling Stripe, even once a CheckoutIntent has another customer.
+        """
+        mock_create.return_value = {'id': 'cus_new', 'object': 'customer'}
+
+        with self.assertRaises(ValueError):
+            get_or_create_enterprise_stripe_customer('not-a-uuid')
+        first = get_or_create_enterprise_stripe_customer(self.enterprise_uuid.hex)
+        _create_checkout_intent(self.enterprise_uuid, 'cus_intent', timezone.now())
+        second = get_or_create_enterprise_stripe_customer(str(self.enterprise_uuid).upper())
+
+        mock_create.assert_called_once_with(idempotency_key=self.idempotency_key)
+        self.assertEqual(first.pk, second.pk)
+        self.assertEqual(
+            (second.enterprise_customer_uuid, second.stripe_customer_id, second.source),
+            (self.enterprise_uuid, 'cus_new', EnterpriseStripeCustomer.SourceChoices.CREATED_FOR_TOP_UP),
+        )
+        self.assertEqual(list(second.history.values_list('history_type', flat=True)), ['+'])
+
+    def test_records_checkout_intent_customer_without_calling_stripe(self, mock_create):
+        """
+        A self-service enterprise keeps the customer get_stripe_customer_id_for_enterprise() already returns.
+        """
+        now = timezone.now()
+        _create_checkout_intent(self.enterprise_uuid, 'cus_intent', now - timedelta(days=1))
+        _create_checkout_intent(self.enterprise_uuid, '', now)
+
+        mapping = get_or_create_enterprise_stripe_customer(self.enterprise_uuid)
+
+        mock_create.assert_not_called()
+        self.assertEqual(
+            (mapping.stripe_customer_id, mapping.source),
+            ('cus_intent', EnterpriseStripeCustomer.SourceChoices.CHECKOUT_INTENT_BACKFILL),
+        )
+
+    @ddt.data(
+        stripe.APIConnectionError('Stripe is unreachable'),
+        stripe.IdempotencyError('Keys for idempotent requests can only be used with the same parameters'),
+    )
+    def test_stripe_failure_records_nothing_and_a_later_call_retries(self, stripe_error, mock_create):
+        mock_create.side_effect = stripe_error
+
+        with self.assertLogs(stripe_api.logger, level='ERROR') as logs, self.assertRaises(type(stripe_error)):
+            get_or_create_enterprise_stripe_customer(self.enterprise_uuid)
+        self.assertIn(str(self.enterprise_uuid), logs.output[0])
+        self.assertFalse(EnterpriseStripeCustomer.objects.exists())
+
+        mock_create.side_effect = None
+        mock_create.return_value = {'id': 'cus_retry', 'object': 'customer'}
+        self.assertEqual(get_or_create_enterprise_stripe_customer(self.enterprise_uuid).stripe_customer_id, 'cus_retry')
+        self.assertEqual(mock_create.call_args_list, [mock.call(idempotency_key=self.idempotency_key)] * 2)
+
+    @ddt.data(
+        # Stripe replayed the same customer for the shared idempotency key.
+        ('cus_winner', False),
+        # Stripe no longer remembered the key (over 24 hours): this call's customer is left unrecorded and logged.
+        ('cus_loser', True),
+    )
+    @ddt.unpack
+    def test_concurrent_call_that_recorded_first_wins(self, created_customer_id, logs_error, mock_create):
+        """
+        Another request records the mapping while this one creates the customer. The recorded row wins, and the
+        caller's own transaction stays usable after the lost insert.
+        """
+        def record_concurrently(**kwargs):
+            EnterpriseStripeCustomerFactory(
+                enterprise_customer_uuid=self.enterprise_uuid, stripe_customer_id='cus_winner',
+            )
+            return {'id': created_customer_id}
+        mock_create.side_effect = record_concurrently
+
+        with mock.patch.object(customer_billing_api.logger, 'error') as mock_log_error, transaction.atomic():
+            mapping = get_or_create_enterprise_stripe_customer(self.enterprise_uuid)
+            self.assertEqual(EnterpriseStripeCustomer.objects.count(), 1)
+
+        self.assertEqual(mapping.stripe_customer_id, 'cus_winner')
+        self.assertEqual(mock_log_error.called, logs_error)
+
+    def test_integrity_error_without_a_mapping_is_raised(self, mock_create):
+        mock_create.return_value = {'id': 'cus_new', 'object': 'customer'}
+
+        with mock.patch.object(EnterpriseStripeCustomer.objects, 'create', side_effect=IntegrityError('other')):
+            with self.assertRaises(IntegrityError):
+                get_or_create_enterprise_stripe_customer(self.enterprise_uuid)

@@ -30,6 +30,7 @@ from enterprise_access.apps.customer_billing.models import (
     StripeEventData,
     StripeEventSummary
 )
+from enterprise_access.apps.customer_billing.tests.factories import EnterpriseStripeCustomerFactory
 from enterprise_access.apps.customer_billing.tests.utils import AttrDict
 from enterprise_access.apps.subsidy_access_policy.tests.factories import (
     PerLearnerSpendCapLearnerCreditAccessPolicyFactory
@@ -4003,6 +4004,180 @@ class BillingManagementAdditionalCoverageTests(BillingManagementBaseTest):
         sub.to_dict.side_effect = Exception('Unexpected failure')
         result = BillingManagementViewSet._get_license_count(sub)  # pylint: disable=protected-access
         self.assertEqual(result, 0)
+
+
+@ddt.ddt
+class BillingManagementEnterpriseStripeCustomerTests(BillingManagementBaseTest):
+    """
+    Billing management finds the Stripe customer in EnterpriseStripeCustomer first, then on the newest CheckoutIntent
+    (ENT-12509). The subscription actions still read the CheckoutIntent itself.
+    """
+    MAPPED_CUSTOMER_ID = 'cus_test_mapped_customer'
+
+    def _get_stripe_customer_id(self):
+        return 'cus_test_checkout_intent_customer'
+
+    def _map_enterprise(self):
+        EnterpriseStripeCustomerFactory(
+            enterprise_customer_uuid=self.enterprise_uuid,
+            stripe_customer_id=self.MAPPED_CUSTOMER_ID,
+        )
+
+    def _create_subscription_summary(self, subscription_cancel_at=None):
+        """
+        Record an active subscription on the enterprise's CheckoutIntent.
+        """
+        event_data = StripeEventData.objects.create(
+            event_id='evt_mapped_sub',
+            event_type='customer.subscription.updated',
+            checkout_intent=self.checkout_intent,
+            data={'data': {'object': {}}},
+        )
+        StripeEventSummary.objects.create(
+            stripe_event_data=event_data,
+            event_id='evt_mapped_sub',
+            event_type='customer.subscription.updated',
+            checkout_intent=self.checkout_intent,
+            stripe_event_created_at=timezone.now(),
+            stripe_subscription_id='sub_checkout_intent',
+            subscription_status='active',
+            subscription_cancel_at=subscription_cancel_at,
+            subscription_period_end=timezone.now() + timedelta(days=30),
+            currency='usd',
+        )
+
+    @ddt.data(
+        # The mapping wins over the CheckoutIntent.
+        (True, True, MAPPED_CUSTOMER_ID),
+        # Without a mapping, the CheckoutIntent's customer is used, as before.
+        (False, True, 'cus_test_checkout_intent_customer'),
+        # Learner-Credit-only enterprise (provisioned through Salesforce): a mapping and no CheckoutIntent.
+        (True, False, MAPPED_CUSTOMER_ID),
+        # Neither: 404 without calling Stripe, as before.
+        (False, False, None),
+    )
+    @ddt.unpack
+    @mock.patch('stripe.Customer.retrieve')
+    @mock.patch('stripe.PaymentMethod.list')
+    def test_payment_methods_resolve_stripe_customer(
+        self, has_mapping, has_checkout_intent, expected_customer_id, mock_payment_method_list, mock_customer_retrieve,
+    ):
+        if has_mapping:
+            self._map_enterprise()
+        if not has_checkout_intent:
+            self.checkout_intent.delete()
+        mock_customer_retrieve.return_value = AttrDict.wrap(
+            {'invoice_settings': {'default_payment_method': 'pm_card_visa'}},
+        )
+        mock_payment_method_list.return_value = mock.Mock(data=[
+            AttrDict.wrap({
+                'id': 'pm_card_visa',
+                'type': 'card',
+                'card': {'last4': '4242', 'brand': 'visa', 'exp_month': 12, 'exp_year': 2030},
+            }),
+        ])
+
+        url = reverse('api:v1:billing-management-payment-methods')
+        response = self.client.get(url, {'enterprise_customer_uuid': self.enterprise_uuid})
+
+        if expected_customer_id is None:
+            self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+            self.assertEqual(response.json(), {'error': 'Stripe customer not found for this enterprise'})
+            mock_customer_retrieve.assert_not_called()
+            return
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payment_methods = response.json()['payment_methods']
+        self.assertEqual([(pm['id'], pm['is_default']) for pm in payment_methods], [('pm_card_visa', True)])
+        mock_customer_retrieve.assert_called_once_with(expected_customer_id)
+        mock_payment_method_list.assert_called_once_with(customer=expected_customer_id, limit=100)
+
+    @mock.patch('stripe.Invoice.list')
+    @mock.patch('stripe.Customer.retrieve')
+    def test_learner_credit_only_enterprise_gets_address_and_transactions(
+        self, mock_customer_retrieve, mock_invoice_list,
+    ):
+        """
+        An enterprise with a mapping and no CheckoutIntent gets its mapped customer's address and invoices.
+        """
+        self._map_enterprise()
+        self.checkout_intent.delete()
+        mock_customer_retrieve.return_value = AttrDict.wrap({
+            'id': self.MAPPED_CUSTOMER_ID, 'name': 'Billing Contact', 'email': 'billing@example.com',
+            'phone': None, 'address': None,
+        })
+        mock_invoice_list.return_value = mock.Mock(data=[], has_more=False)
+        query = {'enterprise_customer_uuid': self.enterprise_uuid}
+
+        address_response = self.client.get(reverse('api:v1:billing-management-address'), query)
+        transactions_response = self.client.get(reverse('api:v1:billing-management-list-transactions'), query)
+
+        self.assertEqual(address_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(address_response.json()['email'], 'billing@example.com')
+        mock_customer_retrieve.assert_called_once_with(self.MAPPED_CUSTOMER_ID)
+        self.assertEqual(transactions_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(mock_invoice_list.call_args.kwargs['customer'], self.MAPPED_CUSTOMER_ID)
+
+    @ddt.data(
+        ('get', 'api:v1:billing-management-get-subscription', 'Checkout Intent not found for this enterprise'),
+        ('post', 'api:v1:billing-management-cancel-subscription', 'Stripe customer not found for this enterprise'),
+        ('post', 'api:v1:billing-management-reinstate-subscription', 'Stripe customer not found for this enterprise'),
+    )
+    @ddt.unpack
+    def test_subscription_actions_still_need_a_checkout_intent(self, method, url_name, expected_error):
+        """
+        A mapping alone doesn't give an enterprise a subscription: the subscription actions answer 404, as before.
+        """
+        self._map_enterprise()
+        self.checkout_intent.delete()
+
+        response = getattr(self.client, method)(f'{reverse(url_name)}?enterprise_customer_uuid={self.enterprise_uuid}')
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.json(), {'error': expected_error})
+
+    @ddt.data(
+        ('get', 'api:v1:billing-management-get-subscription', None, None),
+        # Cancel: not yet scheduled for cancellation.
+        ('post', 'api:v1:billing-management-cancel-subscription', None, True),
+        # Reinstate: scheduled for cancellation at the end of the period.
+        ('post', 'api:v1:billing-management-reinstate-subscription', timedelta(days=30), False),
+    )
+    @ddt.unpack
+    @mock.patch('enterprise_access.apps.api.v1.views.customer_billing.get_ssp_product_pricing')
+    @mock.patch('stripe.Subscription.modify')
+    @mock.patch('stripe.Subscription.retrieve')
+    def test_subscription_actions_read_checkout_intent_when_mapped(
+        self, method, url_name, cancel_in, expected_cancel_at_period_end,
+        mock_subscription_retrieve, mock_subscription_modify, mock_get_ssp_pricing,
+    ):
+        """
+        A mapping to another customer doesn't change which subscription is read, cancelled or reinstated.
+        """
+        self._map_enterprise()
+        self._create_subscription_summary(
+            subscription_cancel_at=timezone.now() + cancel_in if cancel_in else None,
+        )
+        mock_get_ssp_pricing.return_value = {'teams_plan': {'id': 'price_test123', 'quantity_range': (5, 30)}}
+        subscription = {
+            'id': 'sub_checkout_intent',
+            'status': 'active',
+            'cancel_at_period_end': not expected_cancel_at_period_end,
+            'current_period_end': 1640000000,
+            'items': {'data': [{'price': {'id': 'price_test123'}, 'quantity': 5}]},
+        }
+        mock_subscription_retrieve.return_value = AttrDict.wrap(subscription)
+        mock_subscription_modify.return_value = AttrDict.wrap(
+            {**subscription, 'cancel_at_period_end': expected_cancel_at_period_end},
+        )
+
+        response = getattr(self.client, method)(f'{reverse(url_name)}?enterprise_customer_uuid={self.enterprise_uuid}')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual((response.json()['id'], response.json()['product_type']), ('sub_checkout_intent', 'Teams'))
+        if expected_cancel_at_period_end is not None:
+            mock_subscription_modify.assert_called_once_with(
+                'sub_checkout_intent', cancel_at_period_end=expected_cancel_at_period_end,
+            )
 
 
 class CreateCheckoutSessionViewTests(APITest):

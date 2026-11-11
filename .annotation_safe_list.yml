@@ -67,6 +67,8 @@ content_assignments.HistoricalLearnerContentAssignmentAction:
   ".. no_pii:": "This model has no PII"
 customer_billing.HistoricalCheckoutIntent:
   ".. no_pii:": "This model has no PII"
+customer_billing.HistoricalEnterpriseStripeCustomer:
+  ".. no_pii:": "This model has no PII"
 customer_billing.HistoricalLearnerCreditTopUp:
   ".. pii:": The initiated_by_lms_user_id field stores the LMS user id of the admin who started the top-up, kept for audit.
   ".. pii_types:": id

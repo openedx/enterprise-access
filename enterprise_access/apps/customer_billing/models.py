@@ -1874,3 +1874,48 @@ class LearnerCreditTopUp(TimeStampedModel):
         with transaction.atomic():
             self._reload_for_update()
             self._write(updates, **{name: value for name, value in kwargs.items() if name != 'update_fields'})
+
+
+class EnterpriseStripeCustomer(TimeStampedModel):
+    """
+    The one Stripe Customer of an enterprise, including enterprises with no CheckoutIntent (provisioned through
+    Salesforce). Read it with get_stripe_customer_id_for_enterprise() in ``customer_billing/api.py``.
+
+    ``stripe_customer_id`` is not unique: checkout reuses the Stripe customer that has the admin's email, so two
+    enterprises with the same admin can share one.
+
+    .. no_pii: This model has no PII
+    """
+    class Meta:
+        verbose_name = 'Enterprise Stripe Customer'
+        verbose_name_plural = 'Enterprise Stripe Customers'
+
+    class SourceChoices(models.TextChoices):
+        """
+        How the mapping was first recorded.
+        """
+        CHECKOUT_INTENT_BACKFILL = ('checkout_intent_backfill', 'CheckoutIntent backfill')
+        CREATED_FOR_TOP_UP = ('created_for_top_up', 'Created for top-up')
+
+    enterprise_customer_uuid = models.UUIDField(
+        unique=True,
+        help_text='The EnterpriseCustomer this Stripe customer belongs to.',
+    )
+    stripe_customer_id = models.CharField(
+        max_length=255,
+        db_index=True,
+        help_text='The Stripe Customer identifier of the enterprise.',
+    )
+    source = models.CharField(
+        max_length=64,
+        choices=SourceChoices.choices,
+        help_text='How this mapping was first recorded.',
+    )
+
+    history = HistoricalRecords()
+
+    def __str__(self):
+        return (
+            f'<EnterpriseStripeCustomer enterprise_customer_uuid={self.enterprise_customer_uuid}, '
+            f'stripe_customer_id={self.stripe_customer_id}>'
+        )

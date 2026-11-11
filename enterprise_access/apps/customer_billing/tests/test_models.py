@@ -31,6 +31,7 @@ from enterprise_access.apps.customer_billing.constants import (
 )
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
+    EnterpriseStripeCustomer,
     FailedCheckoutIntentConflict,
     InvalidLearnerCreditTopUpTransition,
     LearnerCreditTopUp,
@@ -41,7 +42,11 @@ from enterprise_access.apps.customer_billing.models import (
     StripeEventSummary
 )
 from enterprise_access.apps.customer_billing.stripe_event_handlers import StripeEventHandler
-from enterprise_access.apps.customer_billing.tests.factories import LearnerCreditTopUpFactory, StripeEventDataFactory
+from enterprise_access.apps.customer_billing.tests.factories import (
+    EnterpriseStripeCustomerFactory,
+    LearnerCreditTopUpFactory,
+    StripeEventDataFactory
+)
 from enterprise_access.apps.customer_billing.tests.utils import AttrDict
 from enterprise_access.apps.provisioning.models import (
     GetCreateFirstPaidSubscriptionPlanStep,
@@ -2206,3 +2211,27 @@ class TestLearnerCreditTopUp(TestCase):
             ('subsidy_access_policy_id', 'state'),
         ):
             self.assertIn(columns, indexed_columns)
+
+
+class TestEnterpriseStripeCustomer(TestCase):
+    """
+    Tests for the EnterpriseStripeCustomer model (ENT-12509).
+    """
+
+    def test_one_row_per_enterprise_but_stripe_customers_can_be_shared(self):
+        """
+        An enterprise can't be mapped twice, but two enterprises can share a Stripe customer: checkout reuses the
+        Stripe customer that has the admin's email.
+        """
+        mapping = EnterpriseStripeCustomerFactory(stripe_customer_id='cus_shared')
+        EnterpriseStripeCustomerFactory(stripe_customer_id='cus_shared')
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            EnterpriseStripeCustomerFactory(enterprise_customer_uuid=mapping.enterprise_customer_uuid)
+
+        self.assertEqual(EnterpriseStripeCustomer.objects.filter(stripe_customer_id='cus_shared').count(), 2)
+        self.assertEqual(
+            str(mapping),
+            f'<EnterpriseStripeCustomer enterprise_customer_uuid={mapping.enterprise_customer_uuid}, '
+            'stripe_customer_id=cus_shared>',
+        )

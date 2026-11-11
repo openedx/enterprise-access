@@ -5,6 +5,7 @@ import logging
 from collections.abc import Mapping
 from datetime import timedelta
 from typing import TypedDict, Unpack, cast
+from uuid import UUID
 
 import stripe
 from django.conf import settings
@@ -12,6 +13,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email, validate_slug
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from requests.exceptions import HTTPError
@@ -25,12 +27,16 @@ from enterprise_access.apps.customer_billing.constants import (
 )
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
+    EnterpriseStripeCustomer,
     FailedCheckoutIntentConflict,
     SlugReservationConflict,
     SspProduct
 )
 from enterprise_access.apps.customer_billing.pricing_api import get_ssp_product_pricing
-from enterprise_access.apps.customer_billing.stripe_api import create_subscription_checkout_session
+from enterprise_access.apps.customer_billing.stripe_api import (
+    create_enterprise_stripe_customer,
+    create_subscription_checkout_session
+)
 from enterprise_access.apps.subsidy_access_policy.exceptions import SubsidyAPIHTTPError
 from enterprise_access.apps.subsidy_access_policy.subsidy_api import UNREACHABLE_SUBSIDY_STATUS_CODES
 
@@ -561,6 +567,84 @@ def create_stripe_billing_portal_session(
             f"StripeError creating billing portal session for CheckoutIntent {checkout_intent.id}: {exc}"
         )
         raise
+
+
+# Enterprise Stripe customer (ENT-12509).
+
+def get_stripe_customer_id_for_enterprise(enterprise_customer_uuid: UUID | str) -> str | None:
+    """
+    Return the enterprise's Stripe customer ID, or None. Never calls Stripe and never writes.
+
+    Reads EnterpriseStripeCustomer first, then the newest CheckoutIntent with a Stripe customer (a self-service
+    checkout paid after the backfill has no mapping yet).
+    """
+    stripe_customer_id = EnterpriseStripeCustomer.objects.filter(
+        enterprise_customer_uuid=enterprise_customer_uuid,
+    ).values_list('stripe_customer_id', flat=True).first()
+    if stripe_customer_id:
+        return stripe_customer_id
+
+    checkout_intent = CheckoutIntent.get_latest_for_customer(
+        customer_uuid=enterprise_customer_uuid,
+        require_stripe_customer=True,
+    )
+    return checkout_intent.stripe_customer_id if checkout_intent else None
+
+
+def get_or_create_enterprise_stripe_customer(enterprise_customer_uuid: UUID | str) -> EnterpriseStripeCustomer:
+    """
+    Return the enterprise's EnterpriseStripeCustomer, recording one first if it has none: the newest CheckoutIntent's
+    Stripe customer if there is one, so a self-service enterprise keeps a single customer, else a new Stripe customer.
+
+    Concurrent calls return the same row: Stripe replays the customer for the repeated idempotency key, and the
+    unique enterprise_customer_uuid lets one insert win while the others read it back.
+
+    Raises:
+        ValueError: ``enterprise_customer_uuid`` is not a UUID.
+        stripe.StripeError: Creating the Stripe customer failed. Nothing is recorded; a later call tries again.
+    """
+    # The idempotency key is built from this value, so every spelling of the UUID must give the same string.
+    enterprise_customer_uuid = UUID(str(enterprise_customer_uuid))
+
+    existing = EnterpriseStripeCustomer.objects.filter(enterprise_customer_uuid=enterprise_customer_uuid).first()
+    if existing:
+        return existing
+
+    checkout_intent = CheckoutIntent.get_latest_for_customer(
+        customer_uuid=enterprise_customer_uuid,
+        require_stripe_customer=True,
+    )
+    if checkout_intent:
+        stripe_customer_id = checkout_intent.stripe_customer_id
+        source = EnterpriseStripeCustomer.SourceChoices.CHECKOUT_INTENT_BACKFILL
+    else:
+        stripe_customer_id = create_enterprise_stripe_customer(enterprise_customer_uuid)['id']
+        source = EnterpriseStripeCustomer.SourceChoices.CREATED_FOR_TOP_UP
+
+    try:
+        # A savepoint, so that losing the race doesn't break a transaction the caller has open.
+        with transaction.atomic():
+            mapping = EnterpriseStripeCustomer.objects.create(
+                enterprise_customer_uuid=enterprise_customer_uuid,
+                stripe_customer_id=stripe_customer_id,
+                source=source,
+            )
+    except IntegrityError:
+        mapping = EnterpriseStripeCustomer.objects.filter(enterprise_customer_uuid=enterprise_customer_uuid).first()
+        if mapping is None:
+            raise
+        if mapping.stripe_customer_id != stripe_customer_id:
+            logger.error(
+                'Enterprise %s already maps to Stripe customer %s; Stripe customer %s was not recorded',
+                enterprise_customer_uuid, mapping.stripe_customer_id, stripe_customer_id,
+            )
+        return mapping
+
+    logger.info(
+        'Recorded Stripe customer %s for enterprise %s (source=%s)',
+        stripe_customer_id, enterprise_customer_uuid, source,
+    )
+    return mapping
 
 
 # Learner Credit top-up eligibility (ENT-12356). The single implementation of the eligibility rules: the eligibility

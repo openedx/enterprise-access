@@ -35,6 +35,7 @@ from enterprise_access.apps.customer_billing.api import (
     CreateCheckoutSessionValidationError,
     create_free_trial_checkout_session,
     evaluate_top_up_eligibility_for_policies,
+    get_stripe_customer_id_for_enterprise,
     is_top_up_enabled
 )
 from enterprise_access.apps.customer_billing.constants import TOP_UP_ERRORS
@@ -823,31 +824,32 @@ class BillingManagementViewSet(viewsets.ViewSet):
 
     def _get_stripe_customer_id_for_enterprise(self, enterprise_uuid):
         """
-        Helper method to retrieve Stripe customer ID from enterprise UUID.
+        Return the enterprise's Stripe customer ID, or None if it has none.
 
-        Args:
-            enterprise_uuid: The enterprise customer UUID
-
-        Returns:
-            tuple: (stripe_customer_id, checkout_intent) if found, (None, None) otherwise
+        Reads EnterpriseStripeCustomer first, then the newest CheckoutIntent with a Stripe customer, so an
+        enterprise provisioned without self-service checkout is found too.
         """
-        checkout_intent = CheckoutIntent.objects.select_related(
-            'ssp_product',
-        ).filter(
-            enterprise_uuid=enterprise_uuid,
-        ).exclude(
-            stripe_customer_id__isnull=True,
-        ).exclude(
-            stripe_customer_id='',
-        ).order_by(
-            '-created',
-        ).first()
-        if not checkout_intent or not checkout_intent.stripe_customer_id:
+        stripe_customer_id = get_stripe_customer_id_for_enterprise(enterprise_uuid)
+        if not stripe_customer_id:
+            logger.warning(f'No Stripe customer found for enterprise_uuid: {enterprise_uuid}')
+        return stripe_customer_id
+
+    def _get_checkout_intent_for_enterprise(self, enterprise_uuid):
+        """
+        Return the enterprise's newest CheckoutIntent that has a Stripe customer, or None.
+
+        The subscription actions read the subscription's state from this intent's StripeEventSummary records, so they
+        need the intent itself, not just a Stripe customer ID.
+        """
+        checkout_intent = CheckoutIntent.get_latest_for_customer(
+            customer_uuid=enterprise_uuid,
+            require_stripe_customer=True,
+        )
+        if not checkout_intent:
             logger.warning(
                 f'No checkout intent with stripe customer ID found for enterprise_uuid: {enterprise_uuid}'
             )
-            return None, None
-        return checkout_intent.stripe_customer_id, checkout_intent
+        return checkout_intent
 
     @staticmethod
     def _get_product_type_from_checkout_intent(checkout_intent):
@@ -997,7 +999,7 @@ class BillingManagementViewSet(viewsets.ViewSet):
 
         try:
             # Get Stripe customer ID using helper method
-            stripe_customer_id, _ = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
+            stripe_customer_id = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
             if not stripe_customer_id:
                 return Response(
                     {'error': 'Stripe customer not found for this enterprise'},
@@ -1076,7 +1078,7 @@ class BillingManagementViewSet(viewsets.ViewSet):
 
         try:
             # Get Stripe customer ID using helper method
-            stripe_customer_id, _ = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
+            stripe_customer_id = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
             if not stripe_customer_id:
                 return Response(
                     {'error': 'Stripe customer not found for this enterprise'},
@@ -1241,7 +1243,7 @@ class BillingManagementViewSet(viewsets.ViewSet):
 
         try:
             # Get Stripe customer ID using helper method
-            stripe_customer_id, _ = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
+            stripe_customer_id = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
             if not stripe_customer_id:
                 return Response(
                     {'error': 'Stripe customer not found for this enterprise'},
@@ -1339,7 +1341,7 @@ class BillingManagementViewSet(viewsets.ViewSet):
 
         try:
             # Get Stripe customer ID using helper method
-            stripe_customer_id, _ = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
+            stripe_customer_id = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
             if not stripe_customer_id:
                 return Response(
                     {'error': 'Stripe customer not found for this enterprise'},
@@ -1473,7 +1475,7 @@ class BillingManagementViewSet(viewsets.ViewSet):
 
         try:
             # Get Stripe customer ID using helper method
-            stripe_customer_id, _ = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
+            stripe_customer_id = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
             if not stripe_customer_id:
                 return Response(
                     {'error': 'Stripe customer not found for this enterprise'},
@@ -1597,7 +1599,7 @@ class BillingManagementViewSet(viewsets.ViewSet):
 
         try:
             # Get Stripe customer ID using helper method
-            stripe_customer_id, _ = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
+            stripe_customer_id = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
             if not stripe_customer_id:
                 return Response(
                     {'error': 'Stripe customer not found for this enterprise'},
@@ -1745,7 +1747,7 @@ class BillingManagementViewSet(viewsets.ViewSet):
 
         try:
             # Get Stripe customer ID using helper method
-            stripe_customer_id, _ = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
+            stripe_customer_id = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
             if not stripe_customer_id:
                 return Response(
                     {'error': 'Stripe customer not found for this enterprise'},
@@ -1883,7 +1885,7 @@ class BillingManagementViewSet(viewsets.ViewSet):
 
         try:
             # Get CheckoutIntent for the enterprise
-            _, checkout_intent = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
+            checkout_intent = self._get_checkout_intent_for_enterprise(enterprise_uuid)
             if not checkout_intent:
                 return Response(
                     {'error': 'Checkout Intent not found for this enterprise'},
@@ -2174,7 +2176,7 @@ class BillingManagementViewSet(viewsets.ViewSet):
 
         try:
             # Get CheckoutIntent for the enterprise
-            _, checkout_intent = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
+            checkout_intent = self._get_checkout_intent_for_enterprise(enterprise_uuid)
             if not checkout_intent:
                 return Response(
                     {'error': 'Stripe customer not found for this enterprise'},
@@ -2307,7 +2309,7 @@ class BillingManagementViewSet(viewsets.ViewSet):
 
         try:
             # Get CheckoutIntent for the enterprise
-            _, checkout_intent = self._get_stripe_customer_id_for_enterprise(enterprise_uuid)
+            checkout_intent = self._get_checkout_intent_for_enterprise(enterprise_uuid)
             if not checkout_intent:
                 return Response(
                     {'error': 'Stripe customer not found for this enterprise'},

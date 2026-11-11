@@ -31,7 +31,7 @@ The Billing Management API acts as a secure proxy layer between frontend applica
 
 1. Frontend (Admin Portal MFE) → Billing Management API
 2. API validates JWT authentication and RBAC permissions
-3. API looks up ``CheckoutIntent`` to get ``stripe_customer_id``
+3. API looks up the enterprise's ``stripe_customer_id`` (see `CheckoutIntent Lookup`_)
 4. API makes authenticated Stripe API call
 5. API returns normalized response to frontend
 
@@ -222,9 +222,10 @@ CheckoutIntent Lookup
 All endpoints follow the same pattern for Stripe customer ID resolution:
 
 1. Extract ``enterprise_customer_uuid`` from query parameters
-2. Look up ``CheckoutIntent.objects.filter(enterprise_uuid=enterprise_uuid).first()``
-3. Extract ``stripe_customer_id`` from CheckoutIntent
-4. Return 404 if CheckoutIntent not found or missing ``stripe_customer_id``
+2. Use the enterprise's ``EnterpriseStripeCustomer`` row; without one, the newest ``CheckoutIntent`` with a
+   non-empty ``stripe_customer_id``
+3. Return 404 if neither is found. The subscription endpoints need the ``CheckoutIntent`` itself and return 404
+   without one.
 
 Error Handling
 ^^^^^^^^^^^^^^

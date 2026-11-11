@@ -114,6 +114,24 @@ def create_subscription_checkout_session(
     return session
 
 
+def create_enterprise_stripe_customer(enterprise_customer_uuid) -> stripe.Customer:
+    """
+    Create a Stripe Customer for an enterprise that has none.
+
+    The idempotency key depends only on the enterprise, so for as long as Stripe keeps it (at least 24 hours) repeated
+    or concurrent calls return the first customer. Stripe rejects a reused key sent with different parameters, so
+    don't add per-call values to this request. No name, email or metadata is sent: none is required yet (ENT-12509).
+    """
+    logger.info('Creating Stripe customer for enterprise_customer_uuid=%s', enterprise_customer_uuid)
+    try:
+        customer = stripe.Customer.create(idempotency_key=f'enterprise-stripe-customer-{enterprise_customer_uuid}')
+    except stripe.StripeError:
+        logger.exception('Stripe error creating customer for enterprise_customer_uuid=%s', enterprise_customer_uuid)
+        raise
+    logger.info('Created Stripe customer %s for enterprise_customer_uuid=%s', customer['id'], enterprise_customer_uuid)
+    return customer
+
+
 def stripe_cache(timeout=settings.DEFAULT_STRIPE_CACHE_TIMEOUT):
     """
     Decorator for caching Stripe API responses.

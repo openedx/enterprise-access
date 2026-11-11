@@ -13,6 +13,7 @@ from enterprise_access.apps.core.tests.factories import UserFactory
 from enterprise_access.apps.customer_billing.constants import SUBSCRIPTION_ITEM_TYPE, CheckoutIntentState
 from enterprise_access.apps.customer_billing.models import (
     CheckoutIntent,
+    EnterpriseStripeCustomer,
     LearnerCreditTopUp,
     SelfServiceSubscriptionRenewal,
     StripeEventData,
@@ -117,6 +118,18 @@ class CheckoutIntentFactory(DjangoModelFactory):
             'version': '1.0'
         }
     )
+
+
+class EnterpriseStripeCustomerFactory(DjangoModelFactory):
+    """
+    Factory for creating EnterpriseStripeCustomer instances for testing.
+    """
+    class Meta:
+        model = EnterpriseStripeCustomer
+
+    enterprise_customer_uuid = factory.LazyFunction(uuid4)
+    stripe_customer_id = factory.LazyAttribute(lambda x: f'cus_{FAKER.bothify("?" * 17)}_00')
+    source = EnterpriseStripeCustomer.SourceChoices.CREATED_FOR_TOP_UP
 
 
 class StripeEventDataFactory(DjangoModelFactory):
