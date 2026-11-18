@@ -55,7 +55,7 @@ test = [
     "coverage",
     "ddt",
     "django-dynamic-fixture",
-    "edx-lint",
+    "edx-lint>=6.2",
     "factory-boy",
     "freezegun",
     "pytest-cov",

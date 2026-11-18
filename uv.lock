@@ -1143,7 +1143,7 @@ wheels = [
 
 [[package]]
 name = "edx-lint"
-version = "5.6.0"
+version = "6.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -1153,10 +1153,11 @@ dependencies = [
     { name = "pylint-celery" },
     { name = "pylint-django" },
     { name = "six" },
+    { name = "tomlkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8c/73/edde6d4035b21d186df41937e50c2676cf256c7ed0dc92b08dbbeb6b3927/edx_lint-5.6.0.tar.gz", hash = "sha256:ba188d0b2fbf57954fdf373e213743d8acf68215b040dcb92fd5762850844f66", size = 47886, upload-time = "2025-01-24T18:40:18.095Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/f9/4dd88acbbe9e1fc1c72db5375198e109e8b14544b5bb03a1981b40d42982/edx_lint-6.3.1.tar.gz", hash = "sha256:f85ef5ce11380441b26597d7099ac47c0d03f60eb302b2296d92518b4e0bfefd", size = 98444, upload-time = "2026-11-16T15:03:50.564Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/09/5a/bc59dc0179342a1580b1425779437cc59c160dd7f722a28909f2fe5f7824/edx_lint-5.6.0-py3-none-any.whl", hash = "sha256:516ff64364d8efdfb5fbfd7f63cf196d92b74c5163397a55d12db4d32d6ec8b4", size = 56805, upload-time = "2025-01-24T18:40:16.249Z" },
+    { url = "https://files.pythonhosted.org/packages/71/ec/d846a8f5195c79577f55813a5fa0de3cee155c30b842ffebd9918bc9a23f/edx_lint-6.3.1-py3-none-any.whl", hash = "sha256:5899110232093c20911a3f057d7282adf16573fe5db28a9ced43126011732db4", size = 51075, upload-time = "2026-11-16T15:03:49.014Z" },
 ]
 
 [[package]]
@@ -1663,7 +1664,7 @@ dev = [
     { name = "edx-enterprise-subsidy-client" },
     { name = "edx-event-bus-kafka" },
     { name = "edx-i18n-tools" },
-    { name = "edx-lint" },
+    { name = "edx-lint", specifier = ">=6.2" },
     { name = "edx-rbac" },
     { name = "edx-rest-api-client" },
     { name = "factory-boy" },
@@ -1727,7 +1728,7 @@ doc = [
     { name = "edx-drf-extensions" },
     { name = "edx-enterprise-subsidy-client" },
     { name = "edx-event-bus-kafka" },
-    { name = "edx-lint" },
+    { name = "edx-lint", specifier = ">=6.2" },
     { name = "edx-rbac" },
     { name = "edx-rest-api-client" },
     { name = "factory-boy" },
@@ -1835,7 +1836,7 @@ quality = [
     { name = "edx-drf-extensions" },
     { name = "edx-enterprise-subsidy-client" },
     { name = "edx-event-bus-kafka" },
-    { name = "edx-lint" },
+    { name = "edx-lint", specifier = ">=6.2" },
     { name = "edx-rbac" },
     { name = "edx-rest-api-client" },
     { name = "factory-boy" },
@@ -1894,7 +1895,7 @@ test = [
     { name = "edx-drf-extensions" },
     { name = "edx-enterprise-subsidy-client" },
     { name = "edx-event-bus-kafka" },
-    { name = "edx-lint" },
+    { name = "edx-lint", specifier = ">=6.2" },
     { name = "edx-rbac" },
     { name = "edx-rest-api-client" },
     { name = "factory-boy" },
