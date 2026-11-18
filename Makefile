@@ -101,7 +101,7 @@ subsidy_client_local:  # re-install edx-enterprise-subsidy-client from local cod
 	uv pip uninstall -y edx-enterprise-subsidy-client && uv pip install -e /edx/src/edx-enterprise-subsidy-client/ && uv pip freeze | grep subsidy-client
 
 upgrade: ## upgrade all packages in uv.lock and sync constraints from edx-lint
-	uv run --with edx-lint edx_lint write_uv_constraints pyproject.toml
+	uv run --with 'edx-lint>=6.2' edx_lint write_uv_constraints pyproject.toml
 	uv lock --upgrade
 
 extract_translations: ## extract strings to be translated, outputting .mo files
